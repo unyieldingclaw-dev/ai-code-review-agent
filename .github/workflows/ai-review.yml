@@ -1,0 +1,140 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Secret scan (Gitleaks)
+        id: gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz \
+            | tar -xz gitleaks
+          ./gitleaks detect \
+            --source . \
+            --report-format json \
+            --report-path gitleaks-results.json \
+            --redact \
+            --no-banner || true
+
+      - name: Dependency audit
+        run: npm audit --json > audit-results.json || true
+
+      - name: ESLint
+        run: |
+          npx eslint . \
+            --format json \
+            --output-file eslint-results.json || true
+
+      - name: Semgrep
+        run: |
+          pip install semgrep --quiet
+          semgrep scan \
+            --config p/javascript \
+            --config p/typescript \
+            --config p/owasp-top-ten \
+            --json \
+            --output semgrep-results.json \
+            --quiet || true
+
+      - name: Run tests
+        run: |
+          npm test -- --run --reporter=json \
+            --outputFile=test-results.json || true
+
+      - name: Collect changed files
+        id: files
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD \
+            --name-only > changed-files.txt
+          COUNT=$(wc -l < changed-files.txt | tr -d ' ')
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+
+      - name: Generate diff (chunked by file)
+        run: |
+          python3 - <<'EOF'
+          import subprocess, json, os
+          changed = open("changed-files.txt").read().strip().split("\n")
+          base = os.environ.get("BASE_REF", "HEAD~1")
+          chunks = {}
+          for f in changed:
+              if not f:
+                  continue
+              result = subprocess.run(
+                  ["git", "diff", f"origin/{base}...HEAD", "--unified=5", "--", f],
+                  capture_output=True, text=True
+              )
+              chunks[f] = result.stdout[:8000]
+          with open("pr-diff.json", "w") as out:
+              json.dump(chunks, out)
+          EOF
+        env:
+          BASE_REF: ${{ github.base_ref }}
+
+      - name: Run review agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          FILE_COUNT: ${{ steps.files.outputs.count }}
+          REVIEW_MODEL: ${{ vars.REVIEW_MODEL || 'claude-sonnet-4-6' }}
+          VERIFIER_MODEL: ${{ vars.VERIFIER_MODEL || 'claude-sonnet-4-6' }}
+          MAX_TOKENS_PER_REVIEW: ${{ vars.MAX_TOKENS_PER_REVIEW || '8000' }}
+        run: node .github/scripts/review-agent.js
+
+      - name: Upload findings
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-findings-pr-${{ github.event.pull_request.number }}
+          path: |
+            findings.json
+            review-agent-error.json
+          retention-days: 90
+
+      - name: Upload raw LLM responses
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-raw-responses-pr-${{ github.event.pull_request.number }}
+          path: |
+            reviewer-response.txt
+            verifier-response.txt
+          retention-days: 30
+
+      - name: Upload tool outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tool-outputs-pr-${{ github.event.pull_request.number }}
+          path: |
+            eslint-results.json
+            semgrep-results.json
+            gitleaks-results.json
+            audit-results.json
+            test-results.json
+          retention-days: 30

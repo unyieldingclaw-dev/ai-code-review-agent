@@ -1,0 +1,13 @@
+{
+  "name": "ai-code-review-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "AI-assisted code review agent — static analysis gate + optional LLM reviewer and verifier",
+  "scripts": {
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "vitest": "^1.6.0"
+  }
+}

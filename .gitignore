@@ -1,0 +1,16 @@
+node_modules/
+.env
+
+# CI output artifacts written during workflow run
+findings.json
+review-agent-error.json
+reviewer-response.txt
+verifier-response.txt
+eslint-results.json
+semgrep-results.json
+gitleaks-results.json
+audit-results.json
+test-results.json
+pr-diff.json
+changed-files.txt
+gitleaks
