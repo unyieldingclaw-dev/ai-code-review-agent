@@ -1,0 +1,12 @@
+{
+  "model": "devstral:latest",
+  "provider": "ollama",
+  "ollamaUrl": "http://localhost:11434",
+  "maxFindings": 15,
+  "agents": [
+    "security", "performance", "correctness", "design",
+    "dependencies", "coverage", "testgen", "adversarial", "integration"
+  ],
+  "contextLines": 10,
+  "testOutputDir": "./ai-review-tests"
+}
