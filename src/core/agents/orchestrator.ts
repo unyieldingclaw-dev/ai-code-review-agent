@@ -44,7 +44,7 @@ export class OrchestratorAgent {
         result.push(...group)
       } else {
         // Multiple agents at same location — keep only the highest-priority agent's findings
-        let bestPriority = -1
+        let bestPriority = -Infinity
         let bestAgent: AgentName | null = null
         for (const agent of agents) {
           const priority = AGENT_PRIORITY.indexOf(agent)
@@ -68,11 +68,11 @@ export class OrchestratorAgent {
     return findings.map(f => {
       // Correctness bug at same file:line as a coverage gap → escalate severity
       if (f.agent === 'correctness') {
-        const hasCoverageGap = findings.some(
+        const coverageGap = findings.find(
           other => other.agent === 'coverage' && other.file === f.file && Math.abs(other.line - f.line) <= 5
         )
-        if (hasCoverageGap) {
-          return { ...f, severity: this.escalate(f.severity), relatedFindings: [...(f.relatedFindings ?? []), 'coverage'] }
+        if (coverageGap) {
+          return { ...f, severity: this.escalate(f.severity), relatedFindings: [...(f.relatedFindings ?? []), coverageGap.id] }
         }
       }
       // Security finding at same location as adversarial → escalate
