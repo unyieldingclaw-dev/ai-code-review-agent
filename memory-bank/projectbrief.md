@@ -6,7 +6,7 @@ staleness-threshold: 365d
 tags:
   - requirements/core
   - constraints/non-negotiable
-last-reviewed: 2026-06-04
+last-reviewed: 2026-06-06
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -15,7 +15,7 @@ lineage: []
 
 # Project Brief
 
-**Last Updated**: 2026-06-04
+**Last Updated**: 2026-06-06
 
 ## Core Purpose
 
@@ -55,22 +55,22 @@ A local AI-powered code review agent (`/ai-review`) that runs 9 specialist sub-a
 - [x] Orchestrator — dedup, cross-reference escalation, cap (Task 9)
 - [x] SwarmRunner — sequential orchestration + ping check (Task 10)
 
-### Phase 3 — CLI, CI, Distribution (Tasks 11–16)
-- [ ] CLI entry point + markdown/json formatters (Task 11)
-- [ ] GitHub Actions adapter + workflow (Task 12)
-- [ ] Claude Code slash command `.claude/commands/ai-review.md` (Task 13)
-- [ ] Calibration suite — 9 fixture diffs + calibrate.ts (Task 14)
-- [ ] Integration test — full e2e against real Ollama (Task 15)
-- [ ] Final wiring + verification (Task 16)
+### Phase 3 — CLI, CI, Distribution (Tasks 11–16) ✅ COMPLETE
+- [x] CLI entry point + markdown/json formatters (Task 11)
+- [x] GitHub Actions adapter + workflow (Task 12)
+- [x] Claude Code slash command `.claude/commands/ai-review.md` (Task 13)
+- [x] Calibration suite — 9 fixture diffs + calibrate.ts (Task 14)
+- [x] Integration test — full e2e against real Ollama (Task 15)
+- [x] Final wiring + verification (Task 16)
 
 ## Success Metrics
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| Unit tests passing | 100% | 12/12 ✅ |
+| Unit tests passing | 100% | 19/19 ✅ |
 | TypeScript errors | 0 | 0 ✅ |
-| Agent count | 9 specialists + 1 orchestrator | 0/10 implemented |
-| Calibration score | TBD | — |
+| Agent count | 9 specialists + 1 orchestrator | 10/10 ✅ |
+| Calibration suite | 9 fixture diffs | Complete ✅ |
 
 ## Stakeholders
 

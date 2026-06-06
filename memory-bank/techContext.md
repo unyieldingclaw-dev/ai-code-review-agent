@@ -7,7 +7,7 @@ tags:
   - stack/backend
   - stack/frontend
   - env/tools
-last-reviewed: 2026-06-04
+last-reviewed: 2026-06-06
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,7 +16,7 @@ lineage: []
 
 # Technical Context & Stack
 
-**Last Updated**: 2026-06-04
+**Last Updated**: 2026-06-06
 
 ## Development Environment
 
@@ -25,7 +25,7 @@ lineage: []
 | OS | Windows 11 Home 10.0.26200 |
 | Shell | PowerShell (primary), Bash available via Bash tool |
 | IDE | Claude Code (CLI + desktop) |
-| Git remote | `master` branch, no GitHub remote yet |
+| Git remote | `master` branch — https://github.com/unyieldingclaw-dev/ai-code-review-agent |
 | Package Manager | npm |
 
 ## Backend Stack
@@ -77,10 +77,12 @@ lineage: []
 ### Key npm Scripts
 
 ```bash
-npm test               # run all unit tests
-npm test -- baseAgent  # run specific test file
-npm run typecheck      # tsc --noEmit
-npm run build          # compile TypeScript
+npm test                              # run all unit tests (19 passing)
+npm test -- baseAgent                 # run specific test file
+npm run typecheck                     # tsc --noEmit
+npm run build                         # compile TypeScript
+INTEGRATION=1 npm run test:integration  # e2e against live Ollama
+npm run calibrate                     # calibration suite (requires Ollama)
 ```
 
 ## Infrastructure
@@ -91,12 +93,12 @@ npm run build          # compile TypeScript
 |---------|------|--------|
 | Ollama | 11434 | Must be running for reviews and integration tests |
 
-## Current State (as of 2026-06-05)
+## Current State (as of 2026-06-06)
 
-- **Tests**: 19 passing, 0 failing
+- **Tests**: 19 unit tests passing, 0 failing; 1 e2e integration test file (skippable)
 - **TypeScript**: 0 errors
-- **Git**: 10 commits on `master`, clean working tree
-- **Tasks complete**: 1–10 of 16
+- **Git**: 20 commits on `master`, clean working tree
+- **Tasks complete**: 16 / 16 (100%) ✅
 
 ## Plan & Spec Documents
 

@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-06-05
+last-reviewed: 2026-06-06
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,7 +16,7 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-06-05
+**Last Updated**: 2026-06-06
 
 ## Current Focus
 
@@ -29,8 +29,11 @@ lineage: []
 - CLI entry point with Commander, markdown/JSON formatters (Task 11)
 - GitHub Actions adapter — PR comment upsert + Step Summary (Task 12)
 - `/ai-review` Claude Code slash command (Task 13)
+- Calibration suite — 9 fixture diffs with real findings and false-positive baits (Task 14)
+- E2E integration test against live Ollama, skippable via `INTEGRATION=1` (Task 15)
+- Final verification — build clean, 0 TypeScript errors, CLI smoke-test passed (Task 16)
 - **19 unit tests passing** across 5 test files
-- **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
+- **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent (20 commits)
 
 ## Next Steps
 
@@ -40,7 +43,7 @@ No planned tasks remain. Future work would be: publishing to npm, adding more ag
 
 **Infrastructure**: Ollama must be running on port 11434 for integration tests (not required for unit tests)
 
-**Git**: `master` branch, 10 commits, clean working tree
+**Git**: `master` branch, 20 commits, clean working tree
 
 ## Key Commands
 
@@ -68,4 +71,5 @@ node dist/cli/index.js --help   # smoke test CLI (after Task 11)
 
 - 2026-06-04: Tasks 1–5 implemented and committed.
 - 2026-06-04/05: Tasks 6–10 implemented and committed (agents, orchestrator, SwarmRunner).
-- 2026-06-05: Memory bank updated to reflect Tasks 1–10 complete. Starting Task 11.
+- 2026-06-05: Tasks 11–15 implemented (CLI, GitHub Actions, slash command, calibration suite, e2e test).
+- 2026-06-06: Task 16 — final verification complete. All 16 tasks shipped. Pushed to GitHub.
