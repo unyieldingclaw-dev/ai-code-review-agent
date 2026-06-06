@@ -1,6 +1,7 @@
 import type { LLMProvider } from './llm/provider.js'
 import type { ReviewConfig } from './config.js'
 import type { AgentName, Finding, ReviewInput, ReviewResult, CoverageGap, GeneratedTestFile } from './schema.js'
+import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
 import { BaseAgent } from './agents/base.js'
 import { SecurityAgent } from './agents/security.js'
 import { PerformanceAgent } from './agents/performance.js'
@@ -55,6 +56,14 @@ export class SwarmRunner {
   ): Promise<ReviewResult> {
     const ping = await this.provider.ping()
     if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')
+
+    // Path exclusions — filter files matching .aiignore or config.ignorePaths
+    if (input.projectPath || this.config.ignorePaths.length > 0) {
+      const patterns = loadIgnorePatterns(input.projectPath ?? '', this.config.ignorePaths)
+      if (patterns.length > 0) {
+        input = { ...input, diff: filterDiff(input.diff, patterns) }
+      }
+    }
 
     // Diff size guard — truncate oversized diffs before sending to agents
     const diffLines = input.diff.split('\n').length

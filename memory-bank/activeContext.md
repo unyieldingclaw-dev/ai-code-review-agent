@@ -42,11 +42,11 @@ lineage: []
 - [x] **G3**: Finding deduplication merging — `corroboratingAgents` field added to Finding schema; dedup now merges all agents into one entry.
 - [x] **G4**: Per-agent timeouts — `agentTimeoutMs` (default 60 s) in config + `--timeout` CLI flag. Timed-out agents warn and are skipped.
 - [x] **G5**: Configurable severity gating — `--fail-on` flag (critical|high|medium|any|never; default: high). Logic in `src/cli/exitCode.ts`.
-- [ ] **G6**: Path exclusions — .aiignore + --ignore-path flag
+- [x] **G6**: Path exclusions — `.aiignore` (gitignore syntax) + `--ignore-path` CLI flag + `ignorePaths` config. Logic in `src/core/ignoreFilter.ts`.
 
 ## Next Steps
 
-Implement remaining 5 guardrails (G2–G6).
+All 6 guardrails complete. 37 unit tests passing. 0 TypeScript errors. Future work: npm publish, adding more agents, tuning prompts.
 
 ## Environment Status
 

@@ -13,6 +13,7 @@ export interface ReviewConfig {
   testOutputDir: string
   maxDiffLines: number
   agentTimeoutMs: number
+  ignorePaths: string[]
 }
 
 export const DEFAULT_CONFIG: ReviewConfig = {
@@ -25,7 +26,8 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   contextLines: 10,
   testOutputDir: './ai-review-tests',
   maxDiffLines: 2000,
-  agentTimeoutMs: 60000
+  agentTimeoutMs: 60000,
+  ignorePaths: []
 }
 
 export function loadConfig(projectPath: string): ReviewConfig {

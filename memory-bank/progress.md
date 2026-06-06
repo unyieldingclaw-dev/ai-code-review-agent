@@ -46,12 +46,21 @@ lineage: []
 - [x] **Task 15**: Integration test — E2E against live Ollama, skippable via INTEGRATION=1 (`46e0d7a`)
 - [x] **Task 16**: Final wiring + verification — build clean, 19 unit tests pass, CLI --help, typecheck 0 errors (`945217d`)
 
+## ✅ Guardrails (G1–G6, 2026-06-06)
+
+- [x] **G1**: Hallucination cross-check — Critical/High requires ≥2 agents at same file+line (±5)
+- [x] **G2**: Diff size guard — `maxDiffLines` (default 2000) + `--max-diff-lines` CLI flag
+- [x] **G3**: Finding merge dedup — `corroboratingAgents` field on Finding schema
+- [x] **G4**: Per-agent timeouts — `agentTimeoutMs` (default 60 s) + `--timeout` CLI flag
+- [x] **G5**: Severity gating — `--fail-on` flag (critical|high|medium|any|never; default: high)
+- [x] **G6**: Path exclusions — `.aiignore` + `--ignore-path` + `ignorePaths` config
+
 ## 📊 Metrics
 
 ### Test Coverage
-- **Unit Tests**: 19 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 4, runner: 3)
+- **Unit Tests**: 37 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 8, runner: 5, exitCode: 5, ignoreFilter: 7)
 - **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
-- **Total**: 19
+- **Total**: 37
 
 ### Implementation Progress
 - **Tasks complete**: 16 / 16 (100%) ✅
@@ -87,3 +96,4 @@ lineage: []
 | 0.1.0-dev | 2026-06-04 | Tasks 1–5: scaffolding, types, config, Ollama, BaseAgent |
 | 0.1.0-dev | 2026-06-05 | Tasks 6–10: all 10 agents, orchestrator, SwarmRunner (19 tests) |
 | 0.1.0 | 2026-06-06 | Tasks 11–16: CLI, GitHub Actions, slash command, calibration, e2e test, final verification |
+| 0.1.1 | 2026-06-06 | Guardrails G1–G6: hallucination check, diff size guard, dedup merge, timeouts, severity gate, path exclusions (37 tests) |

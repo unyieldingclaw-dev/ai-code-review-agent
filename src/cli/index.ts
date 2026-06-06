@@ -30,6 +30,7 @@ program
   .option('--max-diff-lines <n>', 'Truncate diff to this many lines before review (default: 2000)', parseInt)
   .option('--timeout <ms>', 'Per-agent timeout in milliseconds (default: 60000)', parseInt)
   .option('--fail-on <level>', `Exit 1 when any finding meets this severity (${FAIL_ON_OPTIONS.join('|')}; default: high)`, 'high')
+  .option('--ignore-path <pattern>', 'Exclude files matching this glob pattern (repeatable)', collect, [] as string[])
   .action(async (options: {
     diff?: string
     path?: string
@@ -40,6 +41,7 @@ program
     maxDiffLines?: number
     timeout?: number
     failOn: FailOnLevel
+    ignorePath: string[]
   }) => {
     const projectPath = resolve(options.path ?? process.cwd())
     const config = loadConfig(projectPath)
@@ -48,6 +50,7 @@ program
     if (options.agents) config.agents = options.agents.split(',').map(a => a.trim()) as AgentName[]
     if (options.maxDiffLines !== undefined) config.maxDiffLines = options.maxDiffLines
     if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
+    if (options.ignorePath.length > 0) config.ignorePaths = [...config.ignorePaths, ...options.ignorePath]
 
     const diff = getDiff(options.diff, options.path)
     if (!diff.trim()) {
@@ -88,6 +91,10 @@ program
     const hasBlocker = result.findings.some(f => shouldFail(f.severity, options.failOn))
     process.exit(hasBlocker ? 1 : 0)
   })
+
+function collect(value: string, previous: string[]): string[] {
+  return [...previous, value]
+}
 
 function getDiff(diffFile?: string, pathOverride?: string): string {
   if (diffFile) {

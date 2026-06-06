@@ -83,6 +83,9 @@ ai-review --fail-on critical
 # Never fail CI regardless of findings
 ai-review --fail-on never
 
+# Exclude generated files and test fixtures from review
+ai-review --ignore-path "dist/**" --ignore-path "**/*.snap"
+
 # Full help
 ai-review --help
 ```
@@ -121,6 +124,19 @@ Create `ai-review.config.json` in your project root to override defaults:
              "adversarial", "integration", "coverage", "testgen"],
   "testOutputDir": "ai-review-tests"
 }
+```
+
+Create `.aiignore` in your repo root to exclude files from every review (gitignore syntax):
+
+```
+# Ignore generated files
+dist/
+build/
+*.min.js
+
+# Ignore test snapshots and fixtures
+**/__snapshots__/
+calibration/fixtures/
 ```
 
 ## Development
@@ -199,6 +215,7 @@ calibration/
 | Finding deduplication | When multiple agents flag the same file+line, the finding is merged into one entry. All agents that caught it are listed in `corroboratingAgents`. |
 | Per-agent timeouts | Each agent call is wrapped in a timeout (default 60 s). A timed-out agent logs a warning and the review continues with the remaining agents' results. Override with `--timeout <ms>` or `"agentTimeoutMs"` in `ai-review.config.json`. |
 | Configurable severity gating | `--fail-on <level>` controls when exit code 1 is returned. Options: `critical`, `high` (default), `medium`, `any`, `never`. |
+| Path exclusions | Files matching patterns in `.aiignore` (gitignore syntax) are stripped from the diff before any agent sees it. Add one-off patterns with `--ignore-path <glob>` (repeatable). Also configurable via `"ignorePaths"` in `ai-review.config.json`. |
 
 ## Design decisions
 
