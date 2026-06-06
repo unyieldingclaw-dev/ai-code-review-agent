@@ -1,0 +1,14 @@
+diff --git a/src/cart/calculator.ts b/src/cart/calculator.ts
+index 000000..111111 100644
+--- a/src/cart/calculator.ts
++++ b/src/cart/calculator.ts
+@@ -0,0 +1,16 @@
++// REAL BUG: off-by-one — last item is excluded
++export function getLastNItems<T>(items: T[], n: number): T[] {
++  return items.slice(items.length - n - 1)
++}
++
++// FALSE POSITIVE BAIT: correct use of >= boundary
++export function isAdult(age: number): boolean {
++  return age >= 18
++}

@@ -1,0 +1,14 @@
+diff --git a/src/api/handler.ts b/src/api/handler.ts
+index 000000..111111 100644
+--- a/src/api/handler.ts
++++ b/src/api/handler.ts
+@@ -0,0 +1,14 @@
++// REAL: no guard against empty array — items[0] will throw
++export function getFirstItem<T>(items: T[]): T {
++  return items[0]
++}
++
++// FALSE POSITIVE BAIT: correctly handles empty string
++export function trimOrDefault(s: string | null | undefined): string {
++  return s?.trim() ?? ''
++}

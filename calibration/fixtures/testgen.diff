@@ -1,0 +1,14 @@
+diff --git a/src/billing/invoice.ts b/src/billing/invoice.ts
+index 000000..111111 100644
+--- a/src/billing/invoice.ts
++++ b/src/billing/invoice.ts
+@@ -0,0 +1,12 @@
++export function calculateTax(subtotal: number, taxRate: number): number {
++  if (taxRate < 0 || taxRate > 1) throw new RangeError('Tax rate must be between 0 and 1')
++  return Math.round(subtotal * taxRate * 100) / 100
++}
++
++export function applyDiscount(price: number, discountPercent: number): number {
++  if (discountPercent < 0 || discountPercent > 100) throw new RangeError('Discount must be 0-100')
++  return price * (1 - discountPercent / 100)
++}

@@ -1,0 +1,19 @@
+diff --git a/src/webhooks/handler.ts b/src/webhooks/handler.ts
+index 000000..111111 100644
+--- a/src/webhooks/handler.ts
++++ b/src/webhooks/handler.ts
+@@ -0,0 +1,14 @@
++import { fetch } from 'node-fetch'
++
++// REAL: new external HTTP call with no integration test
++export async function notifyWebhook(url: string, payload: object): Promise<void> {
++  const res = await fetch(url, {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json' },
++    body: JSON.stringify(payload)
++  })
++  if (!res.ok) throw new Error(`Webhook failed: ${res.status}`)
++}
++
++// FALSE POSITIVE BAIT: pure function, no integration needed
++export function buildPayload(event: string, data: object) { return { event, data, ts: Date.now() } }

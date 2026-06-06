@@ -1,0 +1,21 @@
+diff --git a/src/payments/processor.ts b/src/payments/processor.ts
+index 000000..111111 100644
+--- a/src/payments/processor.ts
++++ b/src/payments/processor.ts
+@@ -0,0 +1,18 @@
++// REAL GAP: new function with no test file in this diff
++export async function processRefund(orderId: string, amount: number): Promise<boolean> {
++  if (amount <= 0) throw new Error('Refund amount must be positive')
++  const order = await getOrder(orderId)
++  if (!order) return false
++  await issueRefund(order, amount)
++  return true
++}
++
++// FALSE POSITIVE BAIT: trivial getter that likely doesn't need a test
++export function getVersion(): string {
++  return '1.0.0'
++}
++
++async function getOrder(id: string) { return null as any }
++async function issueRefund(order: any, amount: number) {}

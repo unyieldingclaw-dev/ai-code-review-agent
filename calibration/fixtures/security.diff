@@ -1,0 +1,20 @@
+diff --git a/src/auth/login.ts b/src/auth/login.ts
+index 000000..111111 100644
+--- a/src/auth/login.ts
++++ b/src/auth/login.ts
+@@ -0,0 +1,20 @@
++import { db } from '../db'
++
++// REAL VULN: SQL injection via string interpolation
++export async function getUser(username: string) {
++  const result = await db.query(`SELECT * FROM users WHERE username = '${username}'`)
++  return result.rows[0]
++}
++
++// FALSE POSITIVE BAIT: looks like hardcoded secret but is a config key name
++const CONFIG_KEY = 'database_password_key'
++
++export async function hashPassword(password: string) {
++  const crypto = await import('crypto')
++  return crypto.createHash('md5').update(password).digest('hex')
++}

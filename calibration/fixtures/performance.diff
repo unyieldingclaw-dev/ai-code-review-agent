@@ -1,0 +1,22 @@
+diff --git a/src/users/service.ts b/src/users/service.ts
+index 000000..111111 100644
+--- a/src/users/service.ts
++++ b/src/users/service.ts
+@@ -0,0 +1,18 @@
++import { db } from '../db'
++
++// REAL PERF ISSUE: N+1 query — loads posts for each user in a loop
++export async function getUsersWithPosts(userIds: string[]) {
++  const users = await db.query('SELECT * FROM users WHERE id = ANY($1)', [userIds])
++  for (const user of users.rows) {
++    user.posts = await db.query('SELECT * FROM posts WHERE user_id = $1', [user.id])
++  }
++  return users.rows
++}
++
++// FALSE POSITIVE BAIT: linear loop, not a perf issue
++export function sumArray(numbers: number[]): number {
++  let total = 0
++  for (const n of numbers) total += n
++  return total
++}
