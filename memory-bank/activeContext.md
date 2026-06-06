@@ -20,23 +20,23 @@ lineage: []
 
 ## Current Focus
 
-Implementing the 16-task AI Code Review Agent plan. Tasks 1–10 are complete. Currently implementing **Task 11** (CLI entry point + formatters).
+Implementing the 16-task AI Code Review Agent plan. Tasks 1–13 are complete. Next up: **Task 14** (calibration suite).
 
 ## What's Working
 
 - Full 10-agent swarm: 9 specialists + OrchestratorAgent (Tasks 6–9)
 - `SwarmRunner` with sequential execution and coverage-first ordering (Task 10)
-- `BaseAgent` with 3-stage JSON parse
-- `OllamaProvider` with think-tag stripping and ping
-- `loadConfig()` with defaults and project override
+- CLI entry point with Commander, markdown/JSON formatters (Task 11)
+- GitHub Actions adapter — PR comment upsert + Step Summary (Task 12)
+- `/ai-review` Claude Code slash command (Task 13)
 - **19 unit tests passing** across 5 test files
+- **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
 
 ## Immediate Next Steps
 
-1. **Task 11** — CLI (`src/cli/formatter.ts` + `src/cli/index.ts`) — **IN PROGRESS**
-2. **Task 12** — GitHub Actions adapter + workflow
-3. **Task 13** — Claude Code slash command `.claude/commands/ai-review.md`
-4. **Tasks 14–16** — Calibration, integration tests, final wiring
+1. **Task 14** — Calibration suite (9 fixture diffs + calibrate.ts runner)
+2. **Task 15** — Integration test (full e2e against real Ollama)
+3. **Task 16** — Final wiring + verification
 
 ## Environment Status
 

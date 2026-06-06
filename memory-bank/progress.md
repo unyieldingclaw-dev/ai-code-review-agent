@@ -36,20 +36,30 @@ lineage: []
 - [x] **Task 9**: OrchestratorAgent — dedup, cross-reference escalation, publication filter, cap (`c9b7835`, `46b3585`)
 - [x] **Task 10**: SwarmRunner — sequential orchestration with coverage-first ordering (`0634500`)
 
-## 🚧 In Progress
-
-- **Task 11**: CLI — Commander entry point + markdown/json formatters
-
-## 📋 Planned (Tasks 12–16)
+## 📋 Planned (Tasks 14–16)
 
 ### Distribution
-- [ ] **Task 12**: GitHub Actions adapter + workflow (PR comment upsert, Step Summary)
-- [ ] **Task 13**: Claude Code slash command `.claude/commands/ai-review.md`
+- [x] **Task 11**: CLI — Commander entry point + markdown/json formatters (`c26fab1`)
+- [x] **Task 12**: GitHub Actions adapter + workflow (PR comment upsert, Step Summary) (`4bc5298`)
+- [x] **Task 13**: Claude Code slash command `.claude/commands/ai-review.md` (`9c7db4a`)
 
 ### Quality & Verification
 - [ ] **Task 14**: Calibration suite — 9 fixture diffs + calibrate.ts runner
 - [ ] **Task 15**: Integration test — full e2e against real Ollama
 - [ ] **Task 16**: Final wiring + verification (npm test, build, smoke-test, final commit)
+
+## 📊 Metrics
+
+### Test Coverage
+- **Unit Tests**: 19 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 4, runner: 3)
+- **Integration Tests**: 0 (planned Task 15)
+- **Total**: 19
+
+### Implementation Progress
+- **Tasks complete**: 13 / 16 (81%)
+- **Agents implemented**: 10 / 10 (9 specialists + orchestrator) ✅
+- **TypeScript errors**: 0
+- **GitHub**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
 
 ## 📊 Metrics
 
