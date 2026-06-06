@@ -1,5 +1,5 @@
 ---
-description: Run a deep 9-agent local AI code review on the current diff using Ollama (devstral:latest). Reviews security, correctness, performance, design, dependencies, adversarial patterns, integration risks, and coverage. Slower than /code-review but fully offline.
+description: Run a deep 11-agent local AI code review on the current diff using Ollama (devstral:latest). Reviews security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, and coverage. Fully offline.
 allowed-tools:
   - Bash(ai-review *)
   - Bash(node dist/cli/index.js *)
@@ -12,7 +12,7 @@ allowed-tools:
 
 # /ai-review
 
-Run the 9-agent local AI code review swarm against the current working diff using Ollama.
+Run the 11-agent local AI code review swarm against the current working diff using Ollama.
 
 **When to use:**
 - Before committing or opening a PR — thorough, multi-domain review
@@ -24,11 +24,16 @@ Run the 9-agent local AI code review swarm against the current working diff usin
 ## Usage
 
 ```
-/ai-review                                   # reviews staged diff (falls back to unstaged)
-/ai-review --agents security,correctness     # specific agents only
-/ai-review --model qwen3:latest              # override the model
-/ai-review --diff path/to/changes.diff       # review a saved diff file
-/ai-review --format json                     # JSON output
+/ai-review                                        # reviews staged diff (falls back to unstaged)
+/ai-review --agents security,correctness          # specific agents only
+/ai-review --model qwen3:latest                   # override the model
+/ai-review --diff path/to/changes.diff            # review a saved diff file
+/ai-review --dir /path/to/repo                    # diff a directory against HEAD
+/ai-review --format json                          # JSON output
+/ai-review --no-sanitize                          # skip prompt injection sanitization
+/ai-review --ignore "dist/**"                     # exclude files by glob (repeatable)
+/ai-review --max-lines 500                        # limit diff size
+/ai-review --fail-on critical                     # only fail CI on critical findings
 ```
 
 ## Instructions for Claude
@@ -59,7 +64,7 @@ Run the 9-agent local AI code review swarm against the current working diff usin
    node dist/cli/index.js --format markdown
    ```
 
-   Pass through any flags the user specified (`--agents`, `--model`, `--diff`, etc.).
+   Pass through any flags the user specified (`--agents`, `--model`, `--diff`, `--dir`, `--ignore`, `--max-lines`, `--no-sanitize`, etc.).
 
 4. **Stream the output** directly into the conversation.
 

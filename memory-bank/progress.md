@@ -58,15 +58,26 @@ lineage: []
 ## 📊 Metrics
 
 ### Test Coverage
-- **Unit Tests**: 37 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 8, runner: 5, exitCode: 5, ignoreFilter: 7)
+- **Unit Tests**: 62 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 8, runner: 5, exitCode: 5, ignoreFilter: 7, sanitizer: 9, breakingChangeAgent: 5, licenseComplianceAgent: 5, confidence: 6)
 - **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
-- **Total**: 37
+- **Total**: 62
 
 ### Implementation Progress
-- **Tasks complete**: 16 / 16 (100%) ✅
-- **Agents implemented**: 10 / 10 (9 specialists + orchestrator) ✅
+- **Tasks complete**: 16 / 16 (100%) ✅ + Phase 2 (8 tasks) ✅
+- **Agents implemented**: 12 / 12 (11 specialists + orchestrator) ✅
 - **TypeScript errors**: 0
 - **GitHub**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
+
+## ✅ Phase 2 Improvements (2026-06-06)
+
+- [x] **P2-1**: CLI consolidation — flatten review subcommand; --path→--dir, --max-diff-lines→--max-lines, --ignore-path→--ignore; add --no-sanitize
+- [x] **P2-2**: Schema extensions — confidence field on Finding, sanitize on ReviewConfig, breaking-change/license AgentNames
+- [x] **P2-3**: Prompt injection sanitizer — 9 unit tests
+- [x] **P2-4**: BreakingChangeAgent — detects removed exports, signature changes, renamed APIs — 5 unit tests
+- [x] **P2-5**: LicenseComplianceAgent — flags GPL/AGPL/SSPL/Commons Clause — 5 unit tests
+- [x] **P2-6**: Confidence scoring — self-reported 0–100, confidence-aware hallucination check, shown in formatter — 6 unit tests
+- [x] **P2-7**: Calibration CI — weekly + release schedule, self-hosted runner, graceful skip
+- [x] **P2-8**: Documentation — README v0.2.0, CHANGELOG, slash command, memory-bank
 
 ## 🎯 Milestones
 
@@ -97,3 +108,4 @@ lineage: []
 | 0.1.0-dev | 2026-06-05 | Tasks 6–10: all 10 agents, orchestrator, SwarmRunner (19 tests) |
 | 0.1.0 | 2026-06-06 | Tasks 11–16: CLI, GitHub Actions, slash command, calibration, e2e test, final verification |
 | 0.1.1 | 2026-06-06 | Guardrails G1–G6: hallucination check, diff size guard, dedup merge, timeouts, severity gate, path exclusions (37 tests) |
+| 0.2.0 | 2026-06-06 | Phase 2: CLI consolidation, sanitizer, BreakingChangeAgent, LicenseComplianceAgent, confidence scoring, calibration CI (62 tests) |
