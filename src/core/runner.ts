@@ -2,6 +2,7 @@ import type { LLMProvider } from './llm/provider.js'
 import type { ReviewConfig } from './config.js'
 import type { AgentName, Finding, ReviewInput, ReviewResult, CoverageGap, GeneratedTestFile } from './schema.js'
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
+import { sanitizeDiff } from './sanitizer.js'
 import { BaseAgent } from './agents/base.js'
 import { SecurityAgent } from './agents/security.js'
 import { PerformanceAgent } from './agents/performance.js'
@@ -69,6 +70,17 @@ export class SwarmRunner {
       const patterns = loadIgnorePatterns(input.projectPath ?? '', this.config.ignorePaths)
       if (patterns.length > 0) {
         input = { ...input, diff: filterDiff(input.diff, patterns) }
+      }
+    }
+
+    // Prompt injection sanitization — strip LLM-manipulating patterns from added lines
+    if (this.config.sanitize !== false) {
+      const { sanitized, warnings } = sanitizeDiff(input.diff)
+      for (const w of warnings) {
+        console.warn(`[ai-review] ${w}`)
+      }
+      if (warnings.length > 0) {
+        input = { ...input, diff: sanitized }
       }
     }
 
