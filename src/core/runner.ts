@@ -4,6 +4,7 @@ import type { AgentName, Finding, ReviewInput, ReviewResult, CoverageGap, Genera
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
 import { sanitizeDiff } from './sanitizer.js'
 import { BreakingChangeAgent } from './agents/breakingChange.js'
+import { LicenseComplianceAgent } from './agents/licenseCompliance.js'
 import { BaseAgent } from './agents/base.js'
 import { SecurityAgent } from './agents/security.js'
 import { PerformanceAgent } from './agents/performance.js'
@@ -35,6 +36,7 @@ function buildAgents(config: ReviewConfig, provider: LLMProvider): BaseAgent[] {
     ['adversarial', () => new AdversarialAgent(provider, config)],
     ['integration', () => new IntegrationScoutAgent(provider, config)],
     ['breaking-change', () => new BreakingChangeAgent(provider, config)],
+    ['license', () => new LicenseComplianceAgent(provider, config)],
   ])
   return config.agents
     .filter(a => a !== 'testgen' && a !== 'coverage')
