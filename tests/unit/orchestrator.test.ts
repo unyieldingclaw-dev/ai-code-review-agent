@@ -25,6 +25,18 @@ const finding = (overrides: Partial<Finding> = {}): Finding => ({
 
 describe('OrchestratorAgent', () => {
   describe('deduplication', () => {
+    it('merges duplicate findings from multiple agents into one with corroboratingAgents', () => {
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [
+        finding({ id: 'security-0', agent: 'security', file: 'src/auth.ts', line: 10, title: 'SQL injection' }),
+        finding({ id: 'correctness-0', agent: 'correctness', file: 'src/auth.ts', line: 10, title: 'Null pointer' })
+      ]
+      const result = orch.synthesize(findings)
+      expect(result).toHaveLength(1)
+      expect(result[0].agent).toBe('security')
+      expect(result[0].corroboratingAgents).toContain('correctness')
+    })
+
     it('removes duplicate findings at same file:line from different agents', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [

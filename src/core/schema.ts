@@ -24,6 +24,8 @@ export interface Finding {
   detail: string
   suggestion: string
   relatedFindings?: string[]
+  /** Other agent names that independently flagged the same file+line */
+  corroboratingAgents?: AgentName[]
 }
 
 export interface CoverageGap {

@@ -187,6 +187,7 @@ calibration/
 |---|---|
 | Hallucination cross-check | Critical/High findings require corroboration from ≥ 2 independent agents at the same file + line region (±5 lines). Solo findings are downgraded to Medium. Skipped when only one agent runs. |
 | Diff size guard | If the diff exceeds `maxDiffLines` (default 2000), it is truncated and a warning is printed. Override with `--max-diff-lines <n>` or `"maxDiffLines"` in `ai-review.config.json`. |
+| Finding deduplication | When multiple agents flag the same file+line, the finding is merged into one entry. All agents that caught it are listed in `corroboratingAgents`. |
 
 ## Design decisions
 

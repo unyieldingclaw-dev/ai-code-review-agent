@@ -55,7 +55,8 @@ export class OrchestratorAgent {
 
   private deduplicate(findings: Finding[]): Finding[] {
     // Group by file:line; within each group, if multiple different agents reported,
-    // keep only the highest-priority agent's finding. Same-agent findings are distinct.
+    // keep only the highest-priority agent's finding and record all other agents in
+    // corroboratingAgents. Same-agent findings at the same location are kept as-is.
     const byLocation = new Map<string, Finding[]>()
     for (const f of findings) {
       const key = `${f.file}:${f.line}`
@@ -68,10 +69,11 @@ export class OrchestratorAgent {
     for (const group of byLocation.values()) {
       const agents = new Set(group.map(f => f.agent))
       if (agents.size === 1) {
-        // All from same agent — keep all
+        // All from same agent — keep all as-is
         result.push(...group)
       } else {
-        // Multiple agents at same location — keep only the highest-priority agent's findings
+        // Multiple agents at same location — keep highest-priority agent's finding,
+        // merge all other agents into corroboratingAgents
         let bestPriority = -Infinity
         let bestAgent: AgentName | null = null
         for (const agent of agents) {
@@ -82,9 +84,12 @@ export class OrchestratorAgent {
           }
         }
         const kept = group.filter(f => f.agent === bestAgent)
-        const droppedIds = group.filter(f => f.agent !== bestAgent).map(f => f.id)
+        const dropped = group.filter(f => f.agent !== bestAgent)
+        const droppedAgents = [...new Set(dropped.map(f => f.agent))]
+        const droppedIds = dropped.map(f => f.id)
         result.push(...kept.map(f => ({
           ...f,
+          corroboratingAgents: [...new Set([...(f.corroboratingAgents ?? []), ...droppedAgents])],
           relatedFindings: [...(f.relatedFindings ?? []), ...droppedIds]
         })))
       }
