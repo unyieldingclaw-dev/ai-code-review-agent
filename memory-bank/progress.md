@@ -18,7 +18,7 @@ lineage: []
 
 **Last Updated**: 2026-06-05
 
-## ✅ Completed (Tasks 1–10)
+## ✅ Completed (Tasks 1–15)
 
 ### Core Infrastructure
 - [x] **Task 1**: Project scaffolding — package.json, tsconfig, vitest.config.ts (`d21e3c7`)
@@ -44,15 +44,15 @@ lineage: []
 - [x] **Task 13**: Claude Code slash command `.claude/commands/ai-review.md` (`9c7db4a`)
 
 ### Quality & Verification
-- [ ] **Task 14**: Calibration suite — 9 fixture diffs + calibrate.ts runner
-- [ ] **Task 15**: Integration test — full e2e against real Ollama
+- [x] **Task 14**: Calibration suite — 9 fixture diffs + calibrate.ts runner (`c90d63b`)
+- [x] **Task 15**: Integration test — E2E against live Ollama, skippable via INTEGRATION=1 (`46e0d7a`)
 - [ ] **Task 16**: Final wiring + verification (npm test, build, smoke-test, final commit)
 
 ## 📊 Metrics
 
 ### Test Coverage
 - **Unit Tests**: 19 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 4, runner: 3)
-- **Integration Tests**: 0 (planned Task 15)
+- **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
 - **Total**: 19
 
 ### Implementation Progress
@@ -65,7 +65,7 @@ lineage: []
 
 ### Test Coverage
 - **Unit Tests**: 19 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 4, runner: 3)
-- **Integration Tests**: 0 (planned Task 15)
+- **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
 - **Total**: 19
 
 ### Implementation Progress
