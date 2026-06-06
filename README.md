@@ -155,7 +155,7 @@ calibration/
 
 ## Status
 
-### Completed (Tasks 1–12)
+### Completed (Tasks 1–13)
 
 | Task | Description |
 |---|---|
@@ -171,14 +171,14 @@ calibration/
 | 10 | SwarmRunner — sequential orchestration, coverage-first ordering |
 | 11 | CLI entry point + markdown/JSON formatters |
 | 12 | GitHub Actions adapter + PR comment upsert + Step Summary |
+| 13 | Claude Code slash command `.claude/commands/ai-review.md` |
 
 **19/19 unit tests passing. 0 TypeScript errors.**
 
-### Remaining (Tasks 13–16)
+### Remaining (Tasks 14–16)
 
 | Task | Description |
 |---|---|
-| 13 | Claude Code slash command `.claude/commands/ai-review.md` |
 | 14 | Calibration suite — 9 fixture diffs + calibrate.ts runner |
 | 15 | Integration test — full e2e against real Ollama |
 | 16 | Final wiring + verification |
