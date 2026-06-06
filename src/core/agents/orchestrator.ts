@@ -28,13 +28,11 @@ export class OrchestratorAgent {
   }
 
   private hallucinationCrossCheck(findings: Finding[]): Finding[] {
-    // Only meaningful when multiple agents ran
     const agentsPresent = new Set(findings.map(f => f.agent))
     if (agentsPresent.size <= 1) return findings
 
     return findings.map(f => {
       if (f.severity !== 'critical' && f.severity !== 'high') return f
-      // Count distinct OTHER agents that flagged the same file within ±5 lines
       const corroborators = new Set(
         findings
           .filter(other =>
@@ -45,11 +43,18 @@ export class OrchestratorAgent {
           )
           .map(other => other.agent)
       )
-      if (corroborators.size === 0) {
-        // Only one agent flagged this location — downgrade to medium
-        return { ...f, severity: 'medium' as Severity }
+      if (corroborators.size > 0) return f
+
+      // Solo finding — apply confidence-aware downgrade
+      const confidence = f.confidence ?? 70
+      if (f.severity === 'critical') {
+        // High-confidence solo Critical stays Critical; low-confidence → High (not Medium)
+        return confidence < 60
+          ? { ...f, severity: 'high' as Severity }
+          : f
       }
-      return f
+      // Solo High → Medium (unchanged behavior)
+      return { ...f, severity: 'medium' as Severity }
     })
   }
 

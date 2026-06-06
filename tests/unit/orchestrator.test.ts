@@ -77,16 +77,16 @@ describe('OrchestratorAgent', () => {
   })
 
   describe('hallucination cross-check', () => {
-    it('downgrades critical finding to medium when only one agent flags it in a multi-agent run', () => {
+    it('downgrades solo Critical to High (not Medium) when confidence < 60', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', severity: 'critical', file: 'src/foo.ts', line: 5 }),
-        // Second agent at a completely different file — no corroboration for security-0
+        finding({ id: 'security-0', agent: 'security', severity: 'critical', confidence: 45, file: 'src/foo.ts', line: 5 }),
         finding({ id: 'correctness-0', agent: 'correctness', severity: 'low', file: 'src/bar.ts', line: 99 })
       ]
       const result = orch.synthesize(findings)
       const f = result.find(r => r.id === 'security-0')
-      expect(f?.severity).toBe('medium')
+      // confidence < 60 → downgraded to high, not medium
+      expect(f?.severity).toBe('high')
     })
 
     it('keeps critical finding when a second agent flags the same file+line region', () => {

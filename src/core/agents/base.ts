@@ -66,10 +66,14 @@ export abstract class BaseAgent {
         typeof f.detail === 'string' &&
         typeof f.suggestion === 'string'
       )
-      .map((f, i) => ({
-        ...f,
-        id: `${this.name}-${i}`,
-        agent: this.name
-      }))
+      .map((f, i) => {
+        const rawConf = typeof f.confidence === 'number' ? f.confidence : 70
+        return {
+          ...f,
+          id: `${this.name}-${i}`,
+          agent: this.name,
+          confidence: Math.max(0, Math.min(100, rawConf))
+        }
+      })
   }
 }

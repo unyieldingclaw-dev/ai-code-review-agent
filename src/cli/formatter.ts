@@ -29,7 +29,8 @@ export function formatMarkdown(result: ReviewResult): string {
     lines.push('')
     for (const f of group) {
       lines.push(`### ${f.title}`)
-      lines.push(`**Agent:** ${f.agent} | **Basis:** ${f.basis} | **File:** \`${f.file}:${f.line}\``)
+      const conf = f.confidence ?? 70
+      lines.push(`**Agent:** ${f.agent} | **Basis:** ${f.basis} | **Confidence:** ${conf}% | **File:** \`${f.file}:${f.line}\``)
       lines.push('')
       lines.push(f.detail)
       lines.push('')
