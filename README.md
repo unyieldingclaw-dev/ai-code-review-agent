@@ -19,7 +19,7 @@ Each specialist agent receives only the diff and its own system prompt, so agent
 | CorrectnessAgent | Logic bugs, null dereferences, off-by-one errors |
 | DesignAgent | SOLID violations, coupling, abstraction leaks |
 | DependenciesAgent | Outdated/vulnerable packages, license risks |
-| AdversarialAgent | Supply-chain risks, prototype pollution, eval injection |
+| AdversarialAgent | Adversarial inputs — null/empty/boundary values, unicode edge cases, concurrent access |
 | IntegrationScoutAgent | API contract breaks, schema mismatches |
 | CoverageAnalystAgent | Test coverage gaps, untested branches |
 | TestGenAgent | Generates test stubs for coverage gaps |
@@ -106,7 +106,7 @@ Create `ai-review.config.json` in your project root to override defaults:
   "ollamaUrl": "http://localhost:11434",
   "maxFindings": 20,
   "agents": ["security", "correctness", "performance", "design", "dependencies",
-             "adversarial", "integrationScout", "coverageAnalyst", "testGen"],
+             "adversarial", "integration", "coverage", "testgen"],
   "testOutputDir": "ai-review-tests"
 }
 ```
