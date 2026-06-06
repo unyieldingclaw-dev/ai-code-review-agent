@@ -8,6 +8,8 @@ export type AgentName =
   | 'testgen'
   | 'adversarial'
   | 'integration'
+  | 'breaking-change'
+  | 'license'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
 export type Basis = 'VERIFIED' | 'INFERRED' | 'SPECULATIVE'
@@ -23,6 +25,8 @@ export interface Finding {
   title: string
   detail: string
   suggestion: string
+  /** Agent's self-reported confidence 0–100. Default: 70. */
+  confidence?: number
   relatedFindings?: string[]
   /** Other agent names that independently flagged the same file+line */
   corroboratingAgents?: AgentName[]

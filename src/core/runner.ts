@@ -24,18 +24,25 @@ function withTimeout<T>(promise: Promise<T>, ms: number, agentName: string): Pro
 }
 
 function buildAgents(config: ReviewConfig, provider: LLMProvider): BaseAgent[] {
-  const map: Record<Exclude<AgentName, 'testgen' | 'coverage'>, () => BaseAgent> = {
-    security: () => new SecurityAgent(provider, config),
-    performance: () => new PerformanceAgent(provider, config),
-    correctness: () => new CorrectnessAgent(provider, config),
-    design: () => new DesignAgent(provider, config),
-    dependencies: () => new DependenciesAgent(provider, config),
-    adversarial: () => new AdversarialAgent(provider, config),
-    integration: () => new IntegrationScoutAgent(provider, config)
-  }
+  const builders = new Map<AgentName, () => BaseAgent>([
+    ['security', () => new SecurityAgent(provider, config)],
+    ['performance', () => new PerformanceAgent(provider, config)],
+    ['correctness', () => new CorrectnessAgent(provider, config)],
+    ['design', () => new DesignAgent(provider, config)],
+    ['dependencies', () => new DependenciesAgent(provider, config)],
+    ['adversarial', () => new AdversarialAgent(provider, config)],
+    ['integration', () => new IntegrationScoutAgent(provider, config)],
+  ])
   return config.agents
-    .filter((a): a is Exclude<AgentName, 'testgen' | 'coverage'> => a !== 'testgen' && a !== 'coverage')
-    .map(a => map[a]())
+    .filter(a => a !== 'testgen' && a !== 'coverage')
+    .flatMap(a => {
+      const build = builders.get(a)
+      if (!build) {
+        console.warn(`[ai-review] Unknown agent "${a}" — skipping`)
+        return []
+      }
+      return [build()]
+    })
 }
 
 export class SwarmRunner {

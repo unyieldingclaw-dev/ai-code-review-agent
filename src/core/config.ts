@@ -14,6 +14,7 @@ export interface ReviewConfig {
   maxDiffLines: number
   agentTimeoutMs: number
   ignorePaths: string[]
+  sanitize: boolean
 }
 
 export const DEFAULT_CONFIG: ReviewConfig = {
@@ -22,12 +23,16 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   ollamaUrl: 'http://localhost:11434',
   anthropicModel: 'claude-sonnet-4-5',
   maxFindings: 15,
-  agents: ['security', 'performance', 'correctness', 'design', 'dependencies', 'coverage', 'testgen', 'adversarial', 'integration'],
+  agents: [
+    'security', 'performance', 'correctness', 'design', 'dependencies',
+    'coverage', 'testgen', 'adversarial', 'integration'
+  ],
   contextLines: 10,
   testOutputDir: './ai-review-tests',
   maxDiffLines: 2000,
   agentTimeoutMs: 60000,
-  ignorePaths: []
+  ignorePaths: [],
+  sanitize: true
 }
 
 export function loadConfig(projectPath: string): ReviewConfig {
