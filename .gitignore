@@ -4,3 +4,8 @@ coverage/
 ai-review-tests/
 *.env
 .env*
+test_output.txt
+.claude/settings.local.json
+
+# Memory Bank
+handoff.md
