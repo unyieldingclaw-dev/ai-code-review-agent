@@ -35,9 +35,18 @@ lineage: []
 - **19 unit tests passing** across 5 test files
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent (20 commits)
 
+## Guardrails In Progress (6 total)
+
+- [x] **G1**: Hallucination cross-check — Critical/High requires 2+ agents at same file+line (±5). Implemented in OrchestratorAgent.hallucinationCrossCheck().
+- [ ] **G2**: Diff size guard — truncate/warn at configurable line limit
+- [ ] **G3**: Finding deduplication merging — merge corroborating agents into one finding
+- [ ] **G4**: Per-agent timeouts — graceful degradation on timeout
+- [ ] **G5**: Configurable severity gating — --fail-on flag
+- [ ] **G6**: Path exclusions — .aiignore + --ignore-path flag
+
 ## Next Steps
 
-No planned tasks remain. Future work would be: publishing to npm, adding more agents, tuning system prompts via the calibration suite.
+Implement remaining 5 guardrails (G2–G6).
 
 ## Environment Status
 

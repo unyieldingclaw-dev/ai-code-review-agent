@@ -19,10 +19,38 @@ export class OrchestratorAgent {
     let result = [...findings]
     // Cross-reference before dedup so coverage gaps can escalate correctness findings
     result = this.crossReference(result)
+    // Require 2+ independent agents for Critical/High before publishing
+    result = this.hallucinationCrossCheck(result)
     result = this.deduplicate(result)
     result = this.applyPublicationFilter(result)
     result = this.capAndSort(result)
     return result
+  }
+
+  private hallucinationCrossCheck(findings: Finding[]): Finding[] {
+    // Only meaningful when multiple agents ran
+    const agentsPresent = new Set(findings.map(f => f.agent))
+    if (agentsPresent.size <= 1) return findings
+
+    return findings.map(f => {
+      if (f.severity !== 'critical' && f.severity !== 'high') return f
+      // Count distinct OTHER agents that flagged the same file within ±5 lines
+      const corroborators = new Set(
+        findings
+          .filter(other =>
+            other.id !== f.id &&
+            other.agent !== f.agent &&
+            other.file === f.file &&
+            Math.abs(other.line - f.line) <= 5
+          )
+          .map(other => other.agent)
+      )
+      if (corroborators.size === 0) {
+        // Only one agent flagged this location — downgrade to medium
+        return { ...f, severity: 'medium' as Severity }
+      }
+      return f
+    })
   }
 
   private deduplicate(findings: Finding[]): Finding[] {

@@ -178,6 +178,12 @@ calibration/
 | 15 | Integration test — E2E against live Ollama, skippable via `INTEGRATION=1` |
 | 16 | Final verification — build, typecheck, CLI smoke-test, all tests green |
 
+## Guardrails
+
+| Guardrail | Behaviour |
+|---|---|
+| Hallucination cross-check | Critical/High findings require corroboration from ≥ 2 independent agents at the same file + line region (±5 lines). Solo findings are downgraded to Medium. Skipped when only one agent runs. |
+
 ## Design decisions
 
 - **Ollama-only** — no Anthropic/OpenAI API calls in the review pipeline
