@@ -20,7 +20,7 @@ lineage: []
 
 ## Current Focus
 
-Implementing the 16-task AI Code Review Agent plan. Tasks 1–13 are complete. Next up: **Task 14** (calibration suite).
+**All 16 tasks complete.** The AI Code Review Agent is fully implemented and shipped.
 
 ## What's Working
 
@@ -32,11 +32,9 @@ Implementing the 16-task AI Code Review Agent plan. Tasks 1–13 are complete. N
 - **19 unit tests passing** across 5 test files
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
 
-## Immediate Next Steps
+## Next Steps
 
-1. **Task 14** — Calibration suite (9 fixture diffs + calibrate.ts runner)
-2. **Task 15** — Integration test (full e2e against real Ollama)
-3. **Task 16** — Final wiring + verification
+No planned tasks remain. Future work would be: publishing to npm, adding more agents, tuning system prompts via the calibration suite.
 
 ## Environment Status
 

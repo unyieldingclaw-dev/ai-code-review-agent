@@ -114,9 +114,11 @@ Create `ai-review.config.json` in your project root to override defaults:
 ## Development
 
 ```bash
-npm test          # 19 unit tests
-npm run typecheck # 0 TypeScript errors
-npm run build     # compile to dist/
+npm test                    # 19 unit tests (no Ollama needed)
+npm run typecheck           # 0 TypeScript errors
+npm run build               # compile to dist/
+INTEGRATION=1 npm run test:integration  # e2e — requires Ollama
+npm run calibrate           # calibration suite — requires Ollama
 ```
 
 ### Project structure
@@ -141,10 +143,10 @@ src/
     github.ts          # PR comment upsert + Step Summary
 tests/
   unit/               # 19 passing tests
-  integration/        # planned (Task 15)
+  integration/        # e2e against live Ollama (INTEGRATION=1 to run)
 calibration/
-  fixtures/           # 9 reference diffs (planned, Task 14)
-  calibrate.ts        # calibration runner (planned, Task 14)
+  fixtures/           # 9 reference diffs with real findings and false-positive baits
+  calibrate.ts        # calibration runner (npm run calibrate)
 .claude/
   commands/
     ai-review.md      # /ai-review slash command (Task 13)
@@ -155,7 +157,7 @@ calibration/
 
 ## Status
 
-### Completed (Tasks 1–13)
+**All 16 tasks complete. 19/19 unit tests passing. 0 TypeScript errors.**
 
 | Task | Description |
 |---|---|
@@ -172,16 +174,9 @@ calibration/
 | 11 | CLI entry point + markdown/JSON formatters |
 | 12 | GitHub Actions adapter + PR comment upsert + Step Summary |
 | 13 | Claude Code slash command `.claude/commands/ai-review.md` |
-
-**19/19 unit tests passing. 0 TypeScript errors.**
-
-### Remaining (Tasks 14–16)
-
-| Task | Description |
-|---|---|
-| 14 | Calibration suite — 9 fixture diffs + calibrate.ts runner |
-| 15 | Integration test — full e2e against real Ollama |
-| 16 | Final wiring + verification |
+| 14 | Calibration suite — 9 fixture diffs + false-positive baits + calibrate.ts runner |
+| 15 | Integration test — E2E against live Ollama, skippable via `INTEGRATION=1` |
+| 16 | Final verification — build, typecheck, CLI smoke-test, all tests green |
 
 ## Design decisions
 

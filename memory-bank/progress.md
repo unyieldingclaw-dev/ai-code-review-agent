@@ -46,7 +46,7 @@ lineage: []
 ### Quality & Verification
 - [x] **Task 14**: Calibration suite — 9 fixture diffs + calibrate.ts runner (`c90d63b`)
 - [x] **Task 15**: Integration test — E2E against live Ollama, skippable via INTEGRATION=1 (`46e0d7a`)
-- [ ] **Task 16**: Final wiring + verification (npm test, build, smoke-test, final commit)
+- [x] **Task 16**: Final wiring + verification — build clean, 19 unit tests pass, CLI --help, typecheck 0 errors
 
 ## 📊 Metrics
 
