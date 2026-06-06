@@ -26,6 +26,7 @@ program
   .option('--format <format>', 'Output format: markdown or json', 'markdown')
   .option('--out <path>', 'Write output to file instead of stdout')
   .option('--max-diff-lines <n>', 'Truncate diff to this many lines before review (default: 2000)', parseInt)
+  .option('--timeout <ms>', 'Per-agent timeout in milliseconds (default: 60000)', parseInt)
   .action(async (options: {
     diff?: string
     path?: string
@@ -34,6 +35,7 @@ program
     format: 'markdown' | 'json'
     out?: string
     maxDiffLines?: number
+    timeout?: number
   }) => {
     const projectPath = resolve(options.path ?? process.cwd())
     const config = loadConfig(projectPath)
@@ -41,6 +43,7 @@ program
     if (options.model) config.model = options.model
     if (options.agents) config.agents = options.agents.split(',').map(a => a.trim()) as AgentName[]
     if (options.maxDiffLines !== undefined) config.maxDiffLines = options.maxDiffLines
+    if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
 
     const diff = getDiff(options.diff, options.path)
     if (!diff.trim()) {

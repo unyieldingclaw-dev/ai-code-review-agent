@@ -13,6 +13,15 @@ import { AdversarialAgent } from './agents/adversarial.js'
 import { IntegrationScoutAgent } from './agents/integrationScout.js'
 import { OrchestratorAgent } from './agents/orchestrator.js'
 
+function withTimeout<T>(promise: Promise<T>, ms: number, agentName: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Agent ${agentName} timed out after ${ms}ms`)), ms)
+    )
+  ])
+}
+
 function buildAgents(config: ReviewConfig, provider: LLMProvider): BaseAgent[] {
   const map: Record<Exclude<AgentName, 'testgen' | 'coverage'>, () => BaseAgent> = {
     security: () => new SecurityAgent(provider, config),
@@ -62,29 +71,43 @@ export class SwarmRunner {
     let coverageGaps: CoverageGap[] = []
     let testFiles: GeneratedTestFile[] = []
 
+    const timeout = this.config.agentTimeoutMs
+
     // Run CoverageAnalyst first if enabled (TestGen depends on it)
     if (this.config.agents.includes('coverage')) {
       onProgress?.('coverage')
       const coverageAgent = new CoverageAnalystAgent(this.provider, this.config)
-      const coverageResult = await coverageAgent.runForCoverage(input)
-      allFindings.push(...coverageResult.findings)
-      coverageGaps = coverageResult.gaps
+      try {
+        const coverageResult = await withTimeout(coverageAgent.runForCoverage(input), timeout, 'coverage')
+        allFindings.push(...coverageResult.findings)
+        coverageGaps = coverageResult.gaps
+      } catch (err) {
+        console.warn(`[ai-review] Agent coverage timed out or failed: ${(err as Error).message}`)
+      }
     }
 
     // Run remaining specialist agents
     const agents = buildAgents(this.config, this.provider)
     for (const agent of agents) {
       onProgress?.(agent.name)
-      const findings = await agent.run(input)
-      allFindings.push(...findings)
+      try {
+        const findings = await withTimeout(agent.run(input), timeout, agent.name)
+        allFindings.push(...findings)
+      } catch (err) {
+        console.warn(`[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`)
+      }
     }
 
     // Run TestGen if enabled — always fire onProgress, only call LLM when there are gaps
     if (this.config.agents.includes('testgen')) {
       onProgress?.('testgen')
       if (coverageGaps.length > 0) {
-        const testResult = await this.testGen.runWithGaps(input, coverageGaps)
-        testFiles = testResult.testFiles
+        try {
+          const testResult = await withTimeout(this.testGen.runWithGaps(input, coverageGaps), timeout, 'testgen')
+          testFiles = testResult.testFiles
+        } catch (err) {
+          console.warn(`[ai-review] Agent testgen timed out or failed: ${(err as Error).message}`)
+        }
       }
     }
 

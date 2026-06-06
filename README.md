@@ -74,6 +74,9 @@ ai-review --format json --out findings.json
 # Limit diff to first 500 lines
 ai-review --max-diff-lines 500
 
+# Set per-agent timeout to 120 seconds
+ai-review --timeout 120000
+
 # Full help
 ai-review --help
 ```
@@ -188,6 +191,7 @@ calibration/
 | Hallucination cross-check | Critical/High findings require corroboration from ≥ 2 independent agents at the same file + line region (±5 lines). Solo findings are downgraded to Medium. Skipped when only one agent runs. |
 | Diff size guard | If the diff exceeds `maxDiffLines` (default 2000), it is truncated and a warning is printed. Override with `--max-diff-lines <n>` or `"maxDiffLines"` in `ai-review.config.json`. |
 | Finding deduplication | When multiple agents flag the same file+line, the finding is merged into one entry. All agents that caught it are listed in `corroboratingAgents`. |
+| Per-agent timeouts | Each agent call is wrapped in a timeout (default 60 s). A timed-out agent logs a warning and the review continues with the remaining agents' results. Override with `--timeout <ms>` or `"agentTimeoutMs"` in `ai-review.config.json`. |
 
 ## Design decisions
 

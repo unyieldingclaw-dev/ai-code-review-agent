@@ -12,6 +12,7 @@ export interface ReviewConfig {
   contextLines: number
   testOutputDir: string
   maxDiffLines: number
+  agentTimeoutMs: number
 }
 
 export const DEFAULT_CONFIG: ReviewConfig = {
@@ -23,7 +24,8 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   agents: ['security', 'performance', 'correctness', 'design', 'dependencies', 'coverage', 'testgen', 'adversarial', 'integration'],
   contextLines: 10,
   testOutputDir: './ai-review-tests',
-  maxDiffLines: 2000
+  maxDiffLines: 2000,
+  agentTimeoutMs: 60000
 }
 
 export function loadConfig(projectPath: string): ReviewConfig {

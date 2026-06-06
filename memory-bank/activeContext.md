@@ -40,7 +40,7 @@ lineage: []
 - [x] **G1**: Hallucination cross-check — Critical/High requires 2+ agents at same file+line (±5). Implemented in OrchestratorAgent.hallucinationCrossCheck().
 - [x] **G2**: Diff size guard — truncate/warn at configurable line limit. `maxDiffLines` in config + `--max-diff-lines` CLI flag.
 - [x] **G3**: Finding deduplication merging — `corroboratingAgents` field added to Finding schema; dedup now merges all agents into one entry.
-- [ ] **G4**: Per-agent timeouts — graceful degradation on timeout
+- [x] **G4**: Per-agent timeouts — `agentTimeoutMs` (default 60 s) in config + `--timeout` CLI flag. Timed-out agents warn and are skipped.
 - [ ] **G5**: Configurable severity gating — --fail-on flag
 - [ ] **G6**: Path exclusions — .aiignore + --ignore-path flag
 
