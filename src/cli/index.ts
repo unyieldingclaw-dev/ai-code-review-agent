@@ -8,6 +8,8 @@ import { loadConfig } from '../core/config.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
 import { formatMarkdown, formatJson } from './formatter.js'
 import type { AgentName } from '../core/schema.js'
+import { shouldFail, FAIL_ON_OPTIONS } from './exitCode.js'
+import type { FailOnLevel } from './exitCode.js'
 
 const program = new Command()
 
@@ -27,6 +29,7 @@ program
   .option('--out <path>', 'Write output to file instead of stdout')
   .option('--max-diff-lines <n>', 'Truncate diff to this many lines before review (default: 2000)', parseInt)
   .option('--timeout <ms>', 'Per-agent timeout in milliseconds (default: 60000)', parseInt)
+  .option('--fail-on <level>', `Exit 1 when any finding meets this severity (${FAIL_ON_OPTIONS.join('|')}; default: high)`, 'high')
   .action(async (options: {
     diff?: string
     path?: string
@@ -36,6 +39,7 @@ program
     out?: string
     maxDiffLines?: number
     timeout?: number
+    failOn: FailOnLevel
   }) => {
     const projectPath = resolve(options.path ?? process.cwd())
     const config = loadConfig(projectPath)
@@ -80,8 +84,8 @@ program
       process.stdout.write('\n' + output + '\n')
     }
 
-    // Exit 1 if any critical/high findings (useful for CI)
-    const hasBlocker = result.findings.some(f => f.severity === 'critical' || f.severity === 'high')
+    // Exit 1 based on --fail-on threshold (default: high)
+    const hasBlocker = result.findings.some(f => shouldFail(f.severity, options.failOn))
     process.exit(hasBlocker ? 1 : 0)
   })
 

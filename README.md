@@ -77,11 +77,17 @@ ai-review --max-diff-lines 500
 # Set per-agent timeout to 120 seconds
 ai-review --timeout 120000
 
+# Gate CI only on critical findings
+ai-review --fail-on critical
+
+# Never fail CI regardless of findings
+ai-review --fail-on never
+
 # Full help
 ai-review --help
 ```
 
-Exit code `1` if any `critical` or `high` findings are found — suitable for CI gates.
+Exit code `1` when any finding meets the `--fail-on` threshold (default: `high`). Use `--fail-on never` to always exit 0, or `--fail-on critical` to gate only on critical findings.
 
 ### Claude Code slash command
 
@@ -192,6 +198,7 @@ calibration/
 | Diff size guard | If the diff exceeds `maxDiffLines` (default 2000), it is truncated and a warning is printed. Override with `--max-diff-lines <n>` or `"maxDiffLines"` in `ai-review.config.json`. |
 | Finding deduplication | When multiple agents flag the same file+line, the finding is merged into one entry. All agents that caught it are listed in `corroboratingAgents`. |
 | Per-agent timeouts | Each agent call is wrapped in a timeout (default 60 s). A timed-out agent logs a warning and the review continues with the remaining agents' results. Override with `--timeout <ms>` or `"agentTimeoutMs"` in `ai-review.config.json`. |
+| Configurable severity gating | `--fail-on <level>` controls when exit code 1 is returned. Options: `critical`, `high` (default), `medium`, `any`, `never`. |
 
 ## Design decisions
 
