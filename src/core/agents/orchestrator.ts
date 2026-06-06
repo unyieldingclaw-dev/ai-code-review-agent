@@ -5,8 +5,8 @@ import { SEVERITY_RANK } from '../schema.js'
 
 // Agent priority for deduplication — higher index = higher priority kept
 const AGENT_PRIORITY: AgentName[] = [
-  'integration', 'coverage', 'testgen', 'adversarial',
-  'design', 'dependencies', 'correctness', 'performance', 'security'
+  'integration', 'breaking-change', 'coverage', 'testgen', 'adversarial',
+  'design', 'dependencies', 'license', 'correctness', 'performance', 'security'
 ]
 
 export class OrchestratorAgent {

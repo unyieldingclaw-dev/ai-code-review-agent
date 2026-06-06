@@ -25,7 +25,7 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   maxFindings: 15,
   agents: [
     'security', 'performance', 'correctness', 'design', 'dependencies',
-    'coverage', 'testgen', 'adversarial', 'integration'
+    'coverage', 'testgen', 'adversarial', 'integration', 'breaking-change'
   ],
   contextLines: 10,
   testOutputDir: './ai-review-tests',
