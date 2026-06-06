@@ -27,6 +27,18 @@ describe('SwarmRunner', () => {
     expect(progress.length).toBe(DEFAULT_CONFIG.agents.length)
   })
 
+  it('truncates diff that exceeds maxDiffLines and warns', async () => {
+    const provider = makeProvider()
+    const config = { ...DEFAULT_CONFIG, maxDiffLines: 3 }
+    const runner = new SwarmRunner(config, provider)
+    const largeDiff = Array.from({ length: 10 }, (_, i) => `line ${i}`).join('\n')
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = await runner.run({ diff: largeDiff })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Truncating'))
+    expect(result.findings).toBeInstanceOf(Array)
+    warnSpy.mockRestore()
+  })
+
   it('aborts with error when ping fails', async () => {
     const provider: LLMProvider = {
       chat: vi.fn(),

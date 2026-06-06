@@ -47,6 +47,16 @@ export class SwarmRunner {
     const ping = await this.provider.ping()
     if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')
 
+    // Diff size guard — truncate oversized diffs before sending to agents
+    const diffLines = input.diff.split('\n').length
+    if (diffLines > this.config.maxDiffLines) {
+      console.warn(
+        `[ai-review] diff is ${diffLines} lines (limit ${this.config.maxDiffLines}). ` +
+        `Truncating to first ${this.config.maxDiffLines} lines.`
+      )
+      input = { ...input, diff: input.diff.split('\n').slice(0, this.config.maxDiffLines).join('\n') }
+    }
+
     const start = Date.now()
     const allFindings: Finding[] = []
     let coverageGaps: CoverageGap[] = []
