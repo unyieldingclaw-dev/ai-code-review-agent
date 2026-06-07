@@ -1,5 +1,5 @@
 ---
-description: Run a deep 11-agent local AI code review on the current diff using Ollama (devstral:latest). Reviews security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, and coverage. Fully offline.
+description: Run a deep 11-agent local AI code review on the current diff using Ollama (devstral:latest). Reviews security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, coverage, and test generation. Fully offline.
 allowed-tools:
   - Bash(ai-review *)
   - Bash(node dist/cli/index.js *)

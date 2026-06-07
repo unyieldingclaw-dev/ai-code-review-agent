@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - **BreakingChangeAgent**: detects removed exports, changed function signatures, renamed public APIs, and incompatible return type changes. Reports as High severity.
-- **LicenseComplianceAgent**: detects newly-added dependencies with GPL, AGPL, SSPL, or Commons Clause licenses incompatible with commercial use. Reports as High severity.
+- **LicenseComplianceAgent**: detects newly-added dependencies with GPL, AGPL, SSPL, Commons Clause, EUPL, or CDDL-1.0 licenses incompatible with commercial use; LGPL flagged at medium severity when dynamically linked. Reports as High severity.
 - **Prompt injection sanitizer**: scans added lines in the diff for LLM-manipulating patterns (SYSTEM: directives, instruction overrides, role-play directives, long base64 payloads) and redacts them before agents run. Enabled by default; disable with `--no-sanitize`.
 - **Confidence scoring**: `confidence` (0–100) field added to the Finding schema. Agents self-report confidence; defaults to 70. Shown in markdown reports.
 - **Calibration CI** (`.github/workflows/calibrate.yml`): runs `npm run calibrate` weekly (Monday 06:00 UTC) and on releases on a self-hosted runner; skips gracefully when Ollama is unavailable.
@@ -29,7 +29,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Guardrail G3: finding deduplication merge — `corroboratingAgents` field on Finding schema
 - Guardrail G4: per-agent timeouts — `--timeout` CLI flag
 - Guardrail G5: severity gating — `--fail-on` flag
-- Guardrail G6: path exclusions — `.aiignore` + `--ignore-path` flag (now `--ignore`)
+- Guardrail G6: path exclusions — `.aiignore` + `--ignore-path` flag
 
 ## [0.1.0] — 2026-06-06
 

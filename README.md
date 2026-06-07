@@ -5,7 +5,11 @@ A local, 11-agent AI code review tool powered by [Ollama](https://ollama.com). R
 ## Overview
 
 ```
-git diff → sanitizer → SwarmRunner → 11 specialist agents (sequential) → OrchestratorAgent → findings
+git diff → sanitizer
+  → [Phase 1] CoverageAnalystAgent
+  → [Phase 2] 9 specialists in parallel
+  → [Phase 3] TestGenAgent (only if coverage gaps found)
+  → OrchestratorAgent → findings
 ```
 
 Each specialist agent receives only the (sanitized) diff and its own system prompt, so agents don't bias each other. The orchestrator deduplicates, cross-references, applies confidence-aware severity gating, and caps the final finding set.
@@ -20,12 +24,13 @@ Each specialist agent receives only the (sanitized) diff and its own system prom
 | DesignAgent | SOLID violations, coupling, abstraction leaks |
 | DependenciesAgent | Outdated/vulnerable packages, supply chain risks |
 | BreakingChangeAgent | Removed exports, changed signatures, renamed public APIs |
-| LicenseComplianceAgent | GPL/AGPL/SSPL/Commons Clause dependencies |
+| LicenseComplianceAgent | GPL/AGPL/SSPL/Commons Clause/EUPL/CDDL-1.0 dependencies; LGPL (dynamic linking flagged at medium severity) |
 | AdversarialAgent | Adversarial inputs — null/empty/boundary values, concurrent access |
-| IntegrationScoutAgent | API contract breaks, schema mismatches |
+| IntegrationScoutAgent | Integration boundaries lacking tests (new HTTP calls, DB writes, queues, WebSocket connections) |
 | CoverageAnalystAgent | Test coverage gaps, untested branches |
 | TestGenAgent | Generates test stubs for coverage gaps |
-| OrchestratorAgent | Dedup, cross-reference escalation, confidence scoring, severity cap |
+
+> **Note:** `OrchestratorAgent` is internal infrastructure — it deduplicates findings, cross-references severity, applies confidence scoring, and caps the final set. It cannot be selected via `--agents` and does not appear in agent output.
 
 ## Requirements
 
@@ -131,14 +136,20 @@ Create `ai-review.config.json` in your project root to override defaults:
 {
   "model": "devstral:latest",
   "ollamaUrl": "http://localhost:11434",
-  "maxFindings": 20,
+  "maxFindings": 15,
   "agents": ["security", "correctness", "performance", "design", "dependencies",
              "adversarial", "integration", "breaking-change", "license",
              "coverage", "testgen"],
-  "testOutputDir": "ai-review-tests",
-  "sanitize": true
+  "testOutputDir": "./ai-review-tests",
+  "sanitize": true,
+  "provider": "ollama",
+  "anthropicModel": "claude-opus-4-8"
 }
 ```
+
+**Config field notes:**
+- `provider`: `"ollama"` (default) or `"anthropic"`. The Anthropic provider is defined in the schema but **not yet implemented** — all runs use Ollama regardless of this value. Planned for a future release.
+- `anthropicModel`: Model ID to use when `provider` is `"anthropic"` (e.g. `"claude-opus-4-8"`). Has no effect until the Anthropic provider is implemented.
 
 Create `.aiignore` in your repo root to exclude files from every review (gitignore syntax):
 
