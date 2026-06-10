@@ -1,6 +1,7 @@
 import { BaseAgent } from './base.js'
 import type { AgentName, CoverageGap, Finding, ReviewInput } from '../schema.js'
 import type { Message } from '../llm/provider.js'
+import { resolve, join } from 'path'
 
 export interface CoverageAnalystResult {
   findings: Finding[]
@@ -35,6 +36,11 @@ Rules:
 - If fully covered, return: {"findings":[],"gaps":[]}`
   }
 
+  async run(input: ReviewInput): Promise<Finding[]> {
+    const { findings } = await this.runForCoverage(input)
+    return findings
+  }
+
   async runForCoverage(input: ReviewInput): Promise<CoverageAnalystResult> {
     const messages: Message[] = [
       { role: 'system', content: this.systemPrompt },
@@ -44,12 +50,12 @@ Rules:
     return this.parseCoverageResult(raw, input)
   }
 
-  private parseCoverageResult(raw: string, _input: ReviewInput): CoverageAnalystResult {
+  private parseCoverageResult(raw: string, input: ReviewInput): CoverageAnalystResult {
     const cleaned = raw.replace(/```json\s*|```\s*/g, '').trim()
     try {
       const parsed = JSON.parse(cleaned) as { findings?: unknown[]; gaps?: unknown[] }
-      const findings = this.parseFindings(JSON.stringify(parsed.findings ?? []))
-      const gaps = this.validateGaps(parsed.gaps ?? [])
+      const findings = this.validateFindingsArray(parsed.findings ?? [])
+      const gaps = this.validateGaps(parsed.gaps ?? [], input.projectPath)
       return { findings, gaps }
     } catch {
       // Try regex extraction
@@ -58,8 +64,8 @@ Rules:
         if (objMatch) {
           const parsed = JSON.parse(objMatch[0]) as { findings?: unknown[]; gaps?: unknown[] }
           return {
-            findings: this.parseFindings(JSON.stringify(parsed.findings ?? [])),
-            gaps: this.validateGaps(parsed.gaps ?? [])
+            findings: this.validateFindingsArray(parsed.findings ?? []),
+            gaps: this.validateGaps(parsed.gaps ?? [], input.projectPath)
           }
         }
       } catch { /* fall through */ }
@@ -68,15 +74,24 @@ Rules:
     }
   }
 
-  private validateGaps(items: unknown[]): CoverageGap[] {
-    return (items as CoverageGap[]).filter(g =>
-      typeof g === 'object' &&
-      g !== null &&
-      typeof g.file === 'string' &&
-      typeof g.functionName === 'string' &&
-      typeof g.lineStart === 'number' &&
-      typeof g.lineEnd === 'number' &&
-      typeof g.description === 'string'
-    )
+  private validateGaps(items: unknown[], projectPath?: string): CoverageGap[] {
+    return (items as CoverageGap[]).filter(g => {
+      if (
+        typeof g !== 'object' ||
+        g === null ||
+        typeof g.file !== 'string' ||
+        typeof g.functionName !== 'string' ||
+        typeof g.lineStart !== 'number' ||
+        typeof g.lineEnd !== 'number' ||
+        typeof g.description !== 'string'
+      ) return false
+      // Reject absolute paths and path traversal
+      if (g.file.startsWith('/') || g.file.includes('..')) return false
+      if (projectPath) {
+        const resolved = resolve(join(projectPath, g.file))
+        if (!resolved.startsWith(resolve(projectPath) + '/')) return false
+      }
+      return true
+    })
   }
 }

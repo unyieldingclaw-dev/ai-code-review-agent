@@ -42,9 +42,13 @@ export async function upsertPRComment(
   }
 }
 
+function escapeCell(value: string): string {
+  return value.replace(/\n/g, ' ').replace(/\|/g, '\\|')
+}
+
 export function buildStepSummary(result: ReviewResult): string {
   const rows = result.findings.map(f =>
-    `| ${f.severity} | ${f.agent} | ${f.file}:${f.line} | ${f.title} | ${f.basis} |`
+    `| ${escapeCell(f.severity)} | ${escapeCell(f.agent)} | ${escapeCell(`${f.file}:${f.line}`)} | ${escapeCell(f.title)} | ${escapeCell(f.basis)} |`
   ).join('\n')
 
   return `## AI Review Summary

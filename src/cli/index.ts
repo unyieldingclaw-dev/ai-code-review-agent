@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
-import { execSync } from 'child_process'
+import { spawnSync } from 'child_process'
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs'
-import { join, resolve } from 'path'
+import { join, resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { SwarmRunner } from '../core/runner.js'
 import { loadConfig } from '../core/config.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
@@ -11,12 +12,21 @@ import type { AgentName } from '../core/schema.js'
 import { shouldFail, FAIL_ON_OPTIONS } from './exitCode.js'
 import type { FailOnLevel } from './exitCode.js'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8')) as { version: string }
+
+const VALID_AGENT_NAMES = new Set<AgentName>([
+  'security', 'performance', 'correctness', 'design', 'dependencies',
+  'coverage', 'testgen', 'adversarial', 'integration', 'breaking-change', 'license'
+])
+
 const program = new Command()
 
 program
   .name('ai-review')
   .description('AI-powered code review using a local LLM swarm')
-  .version('0.2.0')
+  .version(pkg.version)
   .option('--diff <path>', 'Path to a .diff file to review')
   .option('--dir <path>', 'Directory to diff against HEAD (default: cwd)')
   .option('--model <model>', 'Override Ollama model')
@@ -45,7 +55,10 @@ program
     const config = loadConfig(projectPath)
 
     if (options.model) config.model = options.model
-    if (options.agents) config.agents = options.agents.split(',').map(a => a.trim()) as AgentName[]
+    if (options.agents) {
+      const filtered = options.agents.split(',').map(a => a.trim()).filter(a => VALID_AGENT_NAMES.has(a as AgentName)) as AgentName[]
+      if (filtered.length > 0) config.agents = filtered
+    }
     if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
     if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
     if (options.ignore.length > 0) config.ignorePaths = [...config.ignorePaths, ...options.ignore]
@@ -68,10 +81,15 @@ program
     )
 
     if (result.testFiles.length > 0) {
+      const baseDir = resolve(projectPath)
       for (const tf of result.testFiles) {
-        const outPath = join(projectPath, tf.path)
-        mkdirSync(join(outPath, '..'), { recursive: true })
-        writeFileSync(outPath, tf.content, 'utf-8')
+        const resolvedOut = resolve(join(projectPath, tf.path))
+        if (!resolvedOut.startsWith(baseDir + '/')) {
+          console.warn(`[ai-review] Skipping test file with out-of-bounds path: ${tf.path}`)
+          continue
+        }
+        mkdirSync(dirname(resolvedOut), { recursive: true })
+        writeFileSync(resolvedOut, tf.content, 'utf-8')
       }
       process.stdout.write(`\n📝 Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`)
     }
@@ -102,11 +120,16 @@ function getDiff(diffFile?: string, dir?: string): string {
     return readFileSync(diffFile, 'utf-8')
   }
   if (dir) {
-    return execSync(`git -C "${dir}" diff HEAD`, { encoding: 'utf-8' })
+    const result = spawnSync('git', ['-C', dir, 'diff', 'HEAD'], { encoding: 'utf-8' })
+    if (result.error) throw result.error
+    return result.stdout
   }
-  const staged = execSync('git diff --staged', { encoding: 'utf-8' })
-  if (staged.trim()) return staged
-  return execSync('git diff', { encoding: 'utf-8' })
+  const staged = spawnSync('git', ['diff', '--staged'], { encoding: 'utf-8' })
+  if (staged.error) throw staged.error
+  if (staged.stdout.trim()) return staged.stdout
+  const unstaged = spawnSync('git', ['diff'], { encoding: 'utf-8' })
+  if (unstaged.error) throw unstaged.error
+  return unstaged.stdout
 }
 
 program.parse()

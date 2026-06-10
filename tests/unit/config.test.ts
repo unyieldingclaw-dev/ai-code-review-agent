@@ -6,7 +6,6 @@ describe('loadConfig', () => {
   it('returns defaults when no config file exists', () => {
     const config = loadConfig('/nonexistent/path')
     expect(config.model).toBe('devstral:latest')
-    expect(config.provider).toBe('ollama')
     expect(config.maxFindings).toBe(15)
   })
 
@@ -16,7 +15,7 @@ describe('loadConfig', () => {
       const config = loadConfig(process.cwd())
       expect(config.model).toBe('qwen3:latest')
       expect(config.maxFindings).toBe(5)
-      expect(config.provider).toBe('ollama') // default preserved
+      expect(config.ollamaUrl).toBe('http://localhost:11434') // default preserved
     } finally {
       unlinkSync('ai-review.config.json')
     }

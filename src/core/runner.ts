@@ -89,13 +89,13 @@ export class SwarmRunner {
     }
 
     // Diff size guard — truncate oversized diffs before sending to agents
-    const diffLines = input.diff.split('\n').length
-    if (diffLines > this.config.maxDiffLines) {
+    const diffLinesArr = input.diff.split('\n')
+    if (diffLinesArr.length > this.config.maxDiffLines) {
       console.warn(
-        `[ai-review] diff is ${diffLines} lines (limit ${this.config.maxDiffLines}). ` +
+        `[ai-review] diff is ${diffLinesArr.length} lines (limit ${this.config.maxDiffLines}). ` +
         `Truncating to first ${this.config.maxDiffLines} lines.`
       )
-      input = { ...input, diff: input.diff.split('\n').slice(0, this.config.maxDiffLines).join('\n') }
+      input = { ...input, diff: diffLinesArr.slice(0, this.config.maxDiffLines).join('\n') }
     }
 
     const start = Date.now()

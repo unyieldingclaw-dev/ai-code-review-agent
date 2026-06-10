@@ -1,6 +1,9 @@
 import type { LLMProvider, Message } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
-import type { Finding, ReviewInput, AgentName } from '../schema.js'
+import type { Finding, ReviewInput, AgentName, Severity, Basis } from '../schema.js'
+
+const VALID_SEVERITIES = new Set<Severity>(['critical', 'high', 'medium', 'low'])
+const VALID_BASES = new Set<Basis>(['VERIFIED', 'INFERRED', 'SPECULATIVE'])
 
 export abstract class BaseAgent {
   constructor(
@@ -31,12 +34,12 @@ export abstract class BaseAgent {
     try {
       const parsed = JSON.parse(cleaned)
       if (Array.isArray(parsed)) {
-        const valid = this.validateFindings(parsed)
+        const valid = this.validateFindingsArray(parsed)
         if (valid.length > 0 || parsed.length === 0) return valid
       }
       // Stage 2: object with .findings array
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.findings)) {
-        return this.validateFindings(parsed.findings)
+        return this.validateFindingsArray(parsed.findings)
       }
     } catch { /* fall through */ }
 
@@ -45,7 +48,7 @@ export abstract class BaseAgent {
       const arrMatch = cleaned.match(/\[[\s\S]*\]/)
       if (arrMatch) {
         const parsed = JSON.parse(arrMatch[0])
-        if (Array.isArray(parsed)) return this.validateFindings(parsed)
+        if (Array.isArray(parsed)) return this.validateFindingsArray(parsed)
       }
     } catch { /* fall through */ }
 
@@ -53,13 +56,15 @@ export abstract class BaseAgent {
     return []
   }
 
-  private validateFindings(items: unknown[]): Finding[] {
+  protected validateFindingsArray(items: unknown[]): Finding[] {
     return (items as Finding[])
       .filter(f =>
         typeof f === 'object' &&
         f !== null &&
         typeof f.severity === 'string' &&
+        VALID_SEVERITIES.has(f.severity as Severity) &&
         typeof f.basis === 'string' &&
+        VALID_BASES.has(f.basis as Basis) &&
         typeof f.file === 'string' &&
         typeof f.line === 'number' &&
         typeof f.title === 'string' &&

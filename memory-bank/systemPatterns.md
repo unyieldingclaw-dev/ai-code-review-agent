@@ -20,9 +20,9 @@ lineage: []
 
 ## Architecture Patterns
 
-### 10-Agent Swarm (9 Specialists + 1 Orchestrator)
+### 11-Agent Swarm (10 Specialists + 1 Orchestrator)
 
-**Decision**: One abstract `BaseAgent`, nine concrete specialist subclasses, one `Orchestrator`, driven by `SwarmRunner`.
+**Decision**: One abstract `BaseAgent`, ten concrete specialist subclasses, one `Orchestrator`, driven by `SwarmRunner`.
 
 **Rationale**:
 - Specialist agents don't bias each other (each sees only the diff + its own system prompt)
@@ -41,6 +41,8 @@ SwarmRunner
        ├─ DependenciesAgent
        ├─ AdversarialAgent
        ├─ IntegrationScoutAgent
+       ├─ BreakingChangeAgent
+       ├─ LicenseComplianceAgent
        ├─ CoverageAnalystAgent   (returns gaps + findings)
        └─ TestGenAgent           (produces test file content)
   └─ Orchestrator → deduplicated Finding[]

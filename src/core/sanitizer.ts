@@ -32,13 +32,14 @@ export function sanitizeDiff(diff: string): SanitizeResult {
     // Only scan added lines; skip diff header lines (+++ b/...)
     if (!line.startsWith('+') || line.startsWith('+++')) return line
 
+    let processed = line
     for (const { pattern, label } of INJECTION_PATTERNS) {
-      if (pattern.test(line)) {
+      if (pattern.test(processed)) {
         warnings.push(`Prompt injection pattern detected (${label}): ${line.slice(0, 100)}`)
-        return line.replace(pattern, '[REDACTED]')
+        processed = processed.replace(pattern, '[REDACTED]')
       }
     }
-    return line
+    return processed
   })
 
   return { sanitized: sanitizedLines.join('\n'), warnings }

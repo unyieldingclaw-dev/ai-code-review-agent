@@ -3,11 +3,20 @@ import type { ReviewConfig } from '../config.js'
 import type { Finding, Severity, AgentName } from '../schema.js'
 import { SEVERITY_RANK } from '../schema.js'
 
-// Agent priority for deduplication — higher index = higher priority kept
-const AGENT_PRIORITY: AgentName[] = [
-  'integration', 'breaking-change', 'coverage', 'testgen', 'adversarial',
-  'design', 'dependencies', 'license', 'correctness', 'performance', 'security'
-]
+// Record-based priority map — TypeScript will error if any AgentName is missing
+const AGENT_PRIORITY: Record<AgentName, number> = {
+  'integration': 0,
+  'breaking-change': 1,
+  'coverage': 2,
+  'testgen': 3,
+  'adversarial': 4,
+  'design': 5,
+  'dependencies': 6,
+  'license': 7,
+  'correctness': 8,
+  'performance': 9,
+  'security': 10,
+}
 
 export class OrchestratorAgent {
   constructor(
@@ -28,17 +37,22 @@ export class OrchestratorAgent {
   }
 
   private hallucinationCrossCheck(findings: Finding[]): Finding[] {
-    const agentsPresent = new Set(findings.map(f => f.agent))
-    if (agentsPresent.size <= 1) return findings
+    // Build file-indexed map for O(n) lookup instead of O(n²) scan
+    const byFile = new Map<string, Finding[]>()
+    for (const f of findings) {
+      const arr = byFile.get(f.file) ?? []
+      arr.push(f)
+      byFile.set(f.file, arr)
+    }
 
     return findings.map(f => {
       if (f.severity !== 'critical' && f.severity !== 'high') return f
+      const fileFindings = byFile.get(f.file) ?? []
       const corroborators = new Set(
-        findings
+        fileFindings
           .filter(other =>
             other.id !== f.id &&
             other.agent !== f.agent &&
-            other.file === f.file &&
             Math.abs(other.line - f.line) <= 5
           )
           .map(other => other.agent)
@@ -82,7 +96,7 @@ export class OrchestratorAgent {
         let bestPriority = -Infinity
         let bestAgent: AgentName | null = null
         for (const agent of agents) {
-          const priority = AGENT_PRIORITY.indexOf(agent)
+          const priority = AGENT_PRIORITY[agent]
           if (priority > bestPriority) {
             bestPriority = priority
             bestAgent = agent
@@ -103,22 +117,35 @@ export class OrchestratorAgent {
   }
 
   private crossReference(findings: Finding[]): Finding[] {
+    // Build file-indexed maps for O(n) lookup instead of O(n²) scan
+    const coverageByFile = new Map<string, Finding[]>()
+    const adversarialByFile = new Map<string, Finding[]>()
+    for (const f of findings) {
+      if (f.agent === 'coverage') {
+        const arr = coverageByFile.get(f.file) ?? []
+        arr.push(f)
+        coverageByFile.set(f.file, arr)
+      }
+      if (f.agent === 'adversarial') {
+        const arr = adversarialByFile.get(f.file) ?? []
+        arr.push(f)
+        adversarialByFile.set(f.file, arr)
+      }
+    }
+
     return findings.map(f => {
       // Correctness bug at same file:line as a coverage gap → escalate severity
       if (f.agent === 'correctness') {
-        const coverageGap = findings.find(
-          other => other.agent === 'coverage' && other.file === f.file && Math.abs(other.line - f.line) <= 5
-        )
+        const fileCoverage = coverageByFile.get(f.file) ?? []
+        const coverageGap = fileCoverage.find(other => Math.abs(other.line - f.line) <= 5)
         if (coverageGap) {
           return { ...f, severity: this.escalate(f.severity), relatedFindings: [...(f.relatedFindings ?? []), coverageGap.id] }
         }
       }
       // Security finding at same location as adversarial → escalate
       if (f.agent === 'security') {
-        const hasAdversarial = findings.some(
-          other => other.agent === 'adversarial' && other.file === f.file && Math.abs(other.line - f.line) <= 5
-        )
-        if (hasAdversarial) {
+        const fileAdversarial = adversarialByFile.get(f.file) ?? []
+        if (fileAdversarial.some(other => Math.abs(other.line - f.line) <= 5)) {
           return { ...f, severity: this.escalate(f.severity) }
         }
       }

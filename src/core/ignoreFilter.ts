@@ -25,6 +25,9 @@ export function loadIgnorePatterns(projectPath: string, extraPaths: string[] = [
 export function filterDiff(diff: string, patterns: string[]): string {
   if (patterns.length === 0) return diff
 
+  // Pre-compile once; avoids reconstructing RegExp objects per file per pattern
+  const compiled = patterns.map(compilePattern)
+
   // Split on diff --git boundaries, preserving the marker in each chunk
   const sections = diff.split(/(?=^diff --git )/m)
   return sections
@@ -32,7 +35,7 @@ export function filterDiff(diff: string, patterns: string[]): string {
       if (!section.startsWith('diff --git ')) return true
       const filePath = extractFilePath(section)
       if (!filePath) return true
-      return !matchesAnyPattern(filePath, patterns)
+      return !compiled.some(re => re.test(filePath))
     })
     .join('')
 }
@@ -53,11 +56,7 @@ function extractFilePath(section: string): string | null {
   return null
 }
 
-function matchesAnyPattern(filePath: string, patterns: string[]): boolean {
-  return patterns.some(p => matchPattern(filePath, p))
-}
-
-function matchPattern(filePath: string, pattern: string): boolean {
+function compilePattern(pattern: string): RegExp {
   const isDir = pattern.endsWith('/')
   const normalised = isDir ? pattern.slice(0, -1) : pattern
   const hasSlash = normalised.includes('/')
@@ -71,12 +70,7 @@ function matchPattern(filePath: string, pattern: string): boolean {
     .replace(/\x00/g, '.*')                   // ** = anything
 
   const suffix = isDir ? '(/.*)?$' : '$'
-
-  if (hasSlash) {
-    // Anchored to repo root (strip leading slash if present)
-    return new RegExp(`^/?${regexStr}${suffix}`).test(filePath)
-  } else {
-    // Match against any path component
-    return new RegExp(`(^|/)${regexStr}(/|$)`).test(filePath)
-  }
+  return hasSlash
+    ? new RegExp(`^/?${regexStr}${suffix}`)   // anchored to repo root
+    : new RegExp(`(^|/)${regexStr}(/|$)`)     // match any path component
 }

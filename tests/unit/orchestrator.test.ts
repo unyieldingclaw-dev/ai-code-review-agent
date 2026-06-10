@@ -112,17 +112,33 @@ describe('OrchestratorAgent', () => {
   })
 
   describe('publication filter', () => {
-    it('excludes SPECULATIVE findings below high severity', () => {
+    it('excludes low-severity and SPECULATIVE-below-high findings', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
+        // medium SPECULATIVE → filtered by publication filter
         finding({ id: 'security-0', severity: 'medium', basis: 'SPECULATIVE' }),
+        // high SPECULATIVE solo → hallucinationCrossCheck downgrades to medium → then filtered
         finding({ id: 'security-1', severity: 'high', basis: 'SPECULATIVE' }),
+        // medium VERIFIED → survives (not low, not speculative-below-high)
         finding({ id: 'security-2', severity: 'medium', basis: 'VERIFIED' })
       ]
       const result = orch.synthesize(findings)
       expect(result.find(f => f.id === 'security-0')).toBeUndefined()
-      expect(result.find(f => f.id === 'security-1')).toBeDefined()
+      expect(result.find(f => f.id === 'security-1')).toBeUndefined()
       expect(result.find(f => f.id === 'security-2')).toBeDefined()
+    })
+
+    it('keeps SPECULATIVE high finding when corroborated by a second agent', () => {
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [
+        finding({ id: 'security-0', agent: 'security', severity: 'high', basis: 'SPECULATIVE', file: 'src/foo.ts', line: 10 }),
+        finding({ id: 'correctness-0', agent: 'correctness', severity: 'medium', basis: 'VERIFIED', file: 'src/foo.ts', line: 12 })
+      ]
+      const result = orch.synthesize(findings)
+      // security-0 is corroborated by correctness-0 (same file, within 5 lines) → stays high
+      const kept = result.find(f => f.id === 'security-0')
+      expect(kept).toBeDefined()
+      expect(kept?.severity).toBe('high')
     })
   })
 })

@@ -1,14 +1,15 @@
-import type { LLMProvider, Message } from '../llm/provider.js'
-import type { ReviewConfig } from '../config.js'
-import type { CoverageGap, GeneratedTestFile, ReviewInput, TestFramework } from '../schema.js'
+import { BaseAgent } from './base.js'
+import type { AgentName, CoverageGap, GeneratedTestFile, ReviewInput, TestFramework } from '../schema.js'
+import type { Message } from '../llm/provider.js'
 import { readFileSync, existsSync } from 'fs'
-import { join } from 'path'
+import { join, resolve } from 'path'
 
-export class TestGenAgent {
-  constructor(
-    private readonly provider: LLMProvider,
-    private readonly config: ReviewConfig
-  ) {}
+export class TestGenAgent extends BaseAgent {
+  get name(): AgentName { return 'testgen' }
+
+  get systemPrompt(): string {
+    return 'You are a test generation agent. Write complete, runnable test code. Output ONLY valid test code.'
+  }
 
   async runWithGaps(input: ReviewInput, gaps: CoverageGap[]): Promise<{ testFiles: GeneratedTestFile[] }> {
     if (gaps.length === 0) return { testFiles: [] }
@@ -55,11 +56,12 @@ Tests must: import the module under test, cover the happy path, cover the error/
       }
     ]
 
-    const raw = await this.provider.chat(messages, { think: false })
+    const raw = await this.provider.chat(messages, { think: true })
     const content = raw.replace(/```(?:typescript|javascript|python)?\s*|```\s*/g, '').trim()
     if (!content || content.length < 50) return null
 
-    const testPath = this.deriveTestPath(sourceFile, framework)
+    const testPath = this.deriveTestPath(sourceFile, framework, input.projectPath)
+    if (testPath === null) return null
     return { path: testPath, content, framework }
   }
 
@@ -80,9 +82,14 @@ Tests must: import the module under test, cover the happy path, cover the error/
     return 'vitest'
   }
 
-  private deriveTestPath(sourceFile: string, framework: TestFramework): string {
+  private deriveTestPath(sourceFile: string, framework: TestFramework, projectPath?: string): string | null {
     const ext = framework === 'pytest' ? '.py' : '.test.ts'
     const base = sourceFile.replace(/\.(ts|js|tsx|jsx|py)$/, '')
-    return `${this.config.testOutputDir}/${base.replace(/^src\//, '')}${ext}`
+    const relativePath = `${this.config.testOutputDir}/${base.replace(/^src\//, '')}${ext}`
+    if (projectPath) {
+      const resolved = resolve(join(projectPath, relativePath))
+      if (!resolved.startsWith(resolve(projectPath) + '/')) return null
+    }
+    return relativePath
   }
 }
