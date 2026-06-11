@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-06-06
+last-reviewed: 2026-06-11
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,11 +16,11 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-06-06
+**Last Updated**: 2026-06-11
 
 ## Current Focus
 
-**Phase 2 complete.** All 8 phase-2 improvement tasks shipped.
+**v0.4.0 complete. v0.5.0 (Cursor extension) spec + plan complete — ready for implementation.** v0.4.0 shipped prompt tuning + calibration expansion. Spec committed at `488fba2`, implementation plan committed at `2fa1444`. Next step: execute the 10-task plan starting with Task 0 (`--ollama-url` CLI flag) through Task 9 (README + memory bank update).
 
 ## What's Working
 
@@ -56,7 +56,33 @@ lineage: []
 
 ## Next Steps
 
-All phase 2 improvements complete. Future work: npm publish, agent prompt tuning, more calibration fixtures.
+- **v0.5.0**: Execute `docs/superpowers/plans/2026-06-11-vscode-extension.md` — Task 0 (add `--ollama-url` to CLI) through Task 9 (README + MB update). Use subagent-driven-development or executing-plans skill.
+- **Backlog**: Anthropic/Claude provider — deprioritized; `/code-review` in Claude Code already covers that use case
+- **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new token and update `NPM_TOKEN` secret before then
+
+## v0.5.0 Design Decisions (2026-06-11)
+
+**Target**: Cursor IDE (VS Code-compatible extension API), Windows + Mac.
+
+**Architecture**: Subprocess model — extension shells out to `ai-review-agent --format json`, parses `Finding[]` JSON from stdout. No monorepo, no restructuring of existing codebase. Extension is ~150 lines.
+
+**Bundling**: Bundle `ai-review-agent` npm package inside the `.vsix` (~5 MB). Zero install friction — no global npm install required.
+
+**Trigger**: Command palette only — `AI Review: Review Staged Changes`. User-initiated, never runs on save (Ollama latency is 30–120 s).
+
+**Diff source**: Staged changes (`git diff --cached`). If nothing staged, show clear error: "No staged changes found. Stage your changes with `git add` and try again." No fallback magic.
+
+**Output surfaces** (both):
+1. `vscode.languages.createDiagnosticCollection` → squiggles in editor + Problems panel entries, click-to-navigate to file/line. Cleared on next run.
+2. `vscode.window.createOutputChannel("AI Review")` → full markdown report, same content as CLI output. No webview.
+
+**Repo structure**: `vscode-extension/` subfolder in existing repo. Standalone package, no pnpm workspace needed (subprocess approach requires no shared source).
+
+**Rejected alternatives**:
+- Monorepo (Option 2): too much restructuring risk for first extension release
+- Workspace dep (Option 3): half the monorepo pain with fewer benefits
+- Webview output: OutputChannel gives 90% of value at 10% complexity
+- Quick-pick diff source: decision fatigue for the common case; two explicit commands if needed later
 
 ## Environment Status
 
@@ -89,3 +115,7 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-06: Task 16 — final verification complete. All 16 tasks shipped. Pushed to GitHub.
 - 2026-06-06: Guardrails G1–G6 complete. 37 unit tests passing.
 - 2026-06-06: Phase 2 — CLI consolidation, sanitizer, BreakingChangeAgent, LicenseComplianceAgent, confidence scoring, calibration CI. 62 unit tests passing.
+- 2026-06-10: v0.3.0 — npm distribution. Renamed package `ai-review` → `ai-review-agent` (name taken). Published to npm via tag-triggered release workflow. Node.js upgraded to 24 in release.yml.
+- 2026-06-11: v0.4.0 — prompt tuning + calibration expansion. `confidence` field added to all 10 agent systemPrompts. `calibrate.ts` rewritten to cover all 11 agents (10 standard + TestGen). New fixtures: `breaking-change.diff`, `license.diff`.
+- 2026-06-11: v0.5.0 brainstorm — Cursor/VS Code extension design decisions locked. Subprocess architecture, bundled install, command palette trigger, staged-changes diff, DiagnosticCollection + OutputChannel output.
+- 2026-06-11: v0.5.0 spec written and committed at `488fba2`. Implementation plan written and committed at `2fa1444`. 10 tasks, full TDD, all code included verbatim. Ready for execution.

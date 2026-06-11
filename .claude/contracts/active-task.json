@@ -1,0 +1,26 @@
+{
+  "task": "v0.5.0 — Cursor/VS Code extension",
+  "status": "planned",
+  "expires_at": "2026-06-12T08:00:00Z",
+  "scope": [
+    { "file": "src/cli/index.ts", "op": "edit" },
+    { "file": "vscode-extension/package.json", "op": "create" },
+    { "file": "vscode-extension/tsconfig.json", "op": "create" },
+    { "file": "vscode-extension/vitest.config.ts", "op": "create" },
+    { "file": "vscode-extension/esbuild.config.js", "op": "create" },
+    { "file": "vscode-extension/.vscodeignore", "op": "create" },
+    { "file": "vscode-extension/tests/__mocks__/vscode.ts", "op": "create" },
+    { "file": "vscode-extension/src/types.ts", "op": "create" },
+    { "file": "vscode-extension/src/config.ts", "op": "create" },
+    { "file": "vscode-extension/src/runner.ts", "op": "create" },
+    { "file": "vscode-extension/src/diagnostics.ts", "op": "create" },
+    { "file": "vscode-extension/src/output.ts", "op": "create" },
+    { "file": "vscode-extension/src/extension.ts", "op": "create" },
+    { "file": "vscode-extension/tests/config.test.ts", "op": "create" },
+    { "file": "vscode-extension/tests/runner.test.ts", "op": "create" },
+    { "file": "vscode-extension/tests/diagnostics.test.ts", "op": "create" },
+    { "file": "vscode-extension/README.md", "op": "create" },
+    { "file": "memory-bank/progress.md", "op": "edit" },
+    { "file": "memory-bank/activeContext.md", "op": "edit" }
+  ]
+}

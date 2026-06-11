@@ -7,7 +7,7 @@ tags:
   - work/completed
   - work/in-progress
   - work/backlog
-last-reviewed: 2026-06-06
+last-reviewed: 2026-06-10
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,7 +16,7 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-06-06
+**Last Updated**: 2026-06-11
 
 ## ✅ Completed (Tasks 1–16)
 
@@ -79,6 +79,16 @@ lineage: []
 - [x] **P2-7**: Calibration CI — weekly + release schedule, self-hosted runner, graceful skip
 - [x] **P2-8**: Documentation — README v0.2.0, CHANGELOG, slash command, memory-bank
 
+## 🔜 Planned: v0.5.0 Cursor/VS Code Extension
+
+- [ ] **V5-1**: `vscode-extension/` scaffold — `package.json` (type: `extensionKind: ["workspace"]`), `tsconfig.json`, `esbuild` bundler config
+- [ ] **V5-2**: Core subprocess runner — spawn `ai-review-agent --format json`, capture stdout, parse `Finding[]`
+- [ ] **V5-3**: DiagnosticCollection adapter — map `Finding` → `vscode.Diagnostic`, push to collection
+- [ ] **V5-4**: OutputChannel renderer — format findings as markdown in "AI Review" output channel
+- [ ] **V5-5**: Command registration — `aiReview.reviewStagedChanges`, progress notification during run
+- [ ] **V5-6**: Bundling — bundle `ai-review-agent` into `.vsix` via esbuild/webpack, verify size
+- [ ] **V5-7**: README + publish — marketplace metadata, `vsce package`, smoke test in Cursor
+
 ## 🎯 Milestones
 
 ### Phase 1: Core Infrastructure (Complete)
@@ -109,3 +119,6 @@ lineage: []
 | 0.1.0 | 2026-06-06 | Tasks 11–16: CLI, GitHub Actions, slash command, calibration, e2e test, final verification |
 | 0.1.1 | 2026-06-06 | Guardrails G1–G6: hallucination check, diff size guard, dedup merge, timeouts, severity gate, path exclusions (37 tests) |
 | 0.2.0 | 2026-06-06 | Phase 2: CLI consolidation, sanitizer, BreakingChangeAgent, LicenseComplianceAgent, confidence scoring, calibration CI (62 tests) |
+| 0.3.0 | 2026-06-10 | npm distribution: package renamed `ai-review-agent`, release workflow, Node.js 24, published to npm |
+| 0.4.0 | 2026-06-11 | prompt tuning + calibration expansion: `confidence` on all 10 agents, calibrate.ts covers all 11, new breaking-change + license fixtures |
+| 0.5.0 | 2026-06-11 (planned) | Cursor/VS Code extension: subprocess architecture, bundled install, command palette trigger, DiagnosticCollection + OutputChannel — spec + plan complete |
