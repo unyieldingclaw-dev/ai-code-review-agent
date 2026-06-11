@@ -14,9 +14,9 @@ import type { FailOnLevel } from './exitCode.js'
 const program = new Command()
 
 program
-  .name('ai-review')
+  .name('ai-review-agent')
   .description('AI-powered code review using a local LLM swarm')
-  .version('0.2.0')
+  .version('0.3.0')
   .option('--diff <path>', 'Path to a .diff file to review')
   .option('--dir <path>', 'Directory to diff against HEAD (default: cwd)')
   .option('--model <model>', 'Override Ollama model')
@@ -60,7 +60,7 @@ program
     const provider = new OllamaProvider(config.ollamaUrl, config.model)
     const runner = new SwarmRunner(config, provider)
 
-    process.stdout.write(`\n🔍 Running ai-review with ${config.agents.length} agents...\n\n`)
+    process.stdout.write(`\n🔍 Running ai-review-agent with ${config.agents.length} agents...\n\n`)
 
     const result = await runner.run(
       { diff, projectPath },

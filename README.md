@@ -42,7 +42,7 @@ Each specialist agent receives only the (sanitized) diff and its own system prom
 ## Installation
 
 ```bash
-npm install -g ai-review
+npm install -g ai-review-agent
 ```
 
 Pull the model if you haven't already:
@@ -55,10 +55,10 @@ ollama pull devstral:latest
 
 ```bash
 cd your-project
-git add -p                      # stage the changes you want reviewed
-ai-review                       # run the full 11-agent swarm
-ai-review --agents security     # single-agent fast pass
-ai-review --format json         # machine-readable output
+git add -p                            # stage the changes you want reviewed
+ai-review-agent                       # run the full 11-agent swarm
+ai-review-agent --agents security     # single-agent fast pass
+ai-review-agent --format json         # machine-readable output
 ```
 
 <details>
@@ -79,43 +79,43 @@ npm link
 
 ```bash
 # Review staged changes (default)
-ai-review
+ai-review-agent
 
 # Review unstaged diff in a specific directory
-ai-review --dir /path/to/repo
+ai-review-agent --dir /path/to/repo
 
 # Review a saved diff file
-ai-review --diff my-changes.diff
+ai-review-agent --diff my-changes.diff
 
 # Run specific agents only
-ai-review --agents security,correctness,breaking-change
+ai-review-agent --agents security,correctness,breaking-change
 
 # Override model
-ai-review --model qwen3:latest
+ai-review-agent --model qwen3:latest
 
 # JSON output (useful for CI)
-ai-review --format json --out findings.json
+ai-review-agent --format json --out findings.json
 
 # Limit diff to first 500 lines
-ai-review --max-lines 500
+ai-review-agent --max-lines 500
 
 # Set per-agent timeout to 120 seconds
-ai-review --timeout 120000
+ai-review-agent --timeout 120000
 
 # Gate CI only on critical findings
-ai-review --fail-on critical
+ai-review-agent --fail-on critical
 
 # Never fail CI regardless of findings
-ai-review --fail-on never
+ai-review-agent --fail-on never
 
 # Exclude generated files and test fixtures from review
-ai-review --ignore "dist/**" --ignore "**/*.snap"
+ai-review-agent --ignore "dist/**" --ignore "**/*.snap"
 
 # Skip prompt-injection sanitization (use if sanitizer causes false positives)
-ai-review --no-sanitize
+ai-review-agent --no-sanitize
 
 # Full help
-ai-review --help
+ai-review-agent --help
 ```
 
 **Flag reference:**

@@ -1,7 +1,7 @@
 ---
 description: Run a deep 11-agent local AI code review on the current diff using Ollama (devstral:latest). Reviews security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, coverage, and test generation. Fully offline.
 allowed-tools:
-  - Bash(ai-review *)
+  - Bash(ai-review-agent *)
   - Bash(node dist/cli/index.js *)
   - Bash(npm run build)
   - Bash(git diff *)
@@ -55,10 +55,10 @@ Run the 11-agent local AI code review swarm against the current working diff usi
 3. **Run the review.** Execute with the arguments the user provided (or defaults):
 
    ```bash
-   ai-review --format markdown
+   ai-review-agent --format markdown
    ```
 
-   If `ai-review` is not installed globally, use:
+   If `ai-review-agent` is not installed globally, use:
 
    ```bash
    node dist/cli/index.js --format markdown

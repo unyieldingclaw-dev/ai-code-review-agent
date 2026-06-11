@@ -22,8 +22,8 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install ai-review
-        run: npm install -g ai-review
+      - name: Install ai-review-agent
+        run: npm install -g ai-review-agent
 
       - name: Generate diff
         run: |
@@ -33,7 +33,7 @@ jobs:
       - name: Run AI Review
         id: review
         run: |
-          ai-review --diff pr.diff --format json --out findings.json || true
+          ai-review-agent --diff pr.diff --format json --out findings.json || true
         env:
           OLLAMA_URL: http://localhost:11434
 

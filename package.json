@@ -1,5 +1,5 @@
 {
-  "name": "ai-review",
+  "name": "ai-review-agent",
   "version": "0.3.0",
   "description": "Local AI code review swarm — 11 specialist agents powered by Ollama, zero API costs",
   "type": "module",
@@ -19,7 +19,7 @@
   },
   "files": ["dist/", "README.md", "LICENSE"],
   "bin": {
-    "ai-review": "./dist/cli/index.js"
+    "ai-review-agent": "./dist/cli/index.js"
   },
   "scripts": {
     "build": "tsc",
