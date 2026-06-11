@@ -20,6 +20,7 @@ program
   .option('--diff <path>', 'Path to a .diff file to review')
   .option('--dir <path>', 'Directory to diff against HEAD (default: cwd)')
   .option('--model <model>', 'Override Ollama model')
+  .option('--ollama-url <url>', 'Override Ollama base URL')
   .option('--agents <list>', 'Comma-separated list of agents to run')
   .option('--format <format>', 'Output format: markdown or json', 'markdown')
   .option('--out <path>', 'Write output to file instead of stdout')
@@ -32,6 +33,7 @@ program
     diff?: string
     dir?: string
     model?: string
+    ollamaUrl?: string
     agents?: string
     format: 'markdown' | 'json'
     out?: string
@@ -45,6 +47,7 @@ program
     const config = loadConfig(projectPath)
 
     if (options.model) config.model = options.model
+    if (options.ollamaUrl) config.ollamaUrl = options.ollamaUrl
     if (options.agents) config.agents = options.agents.split(',').map(a => a.trim()) as AgentName[]
     if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
     if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
