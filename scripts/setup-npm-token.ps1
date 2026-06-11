@@ -29,7 +29,7 @@ Write-Host "  npm user: $whoami" -ForegroundColor Green
 
 # Check gh auth
 Write-Host "Checking GitHub CLI auth..." -ForegroundColor Gray
-gh auth status 2>&1 | Out-Null
+$null = gh auth status 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: gh CLI not authenticated. Run: gh auth login" -ForegroundColor Red
     exit 1
