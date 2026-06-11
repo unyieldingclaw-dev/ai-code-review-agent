@@ -1,8 +1,23 @@
 {
   "name": "ai-review",
-  "version": "0.1.0",
-  "description": "AI-powered code review and deep testing agent using local LLMs",
+  "version": "0.3.0",
+  "description": "Local AI code review swarm — 11 specialist agents powered by Ollama, zero API costs",
   "type": "module",
+  "keywords": ["code-review", "ai", "ollama", "llm", "devtools", "cli"],
+  "author": "UnyieldingClaw",
+  "license": "MIT",
+  "homepage": "https://github.com/unyieldingclaw-dev/ai-code-review-agent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unyieldingclaw-dev/ai-code-review-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/unyieldingclaw-dev/ai-code-review-agent/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": ["dist/", "README.md", "LICENSE"],
   "bin": {
     "ai-review": "./dist/cli/index.js"
   },

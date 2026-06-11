@@ -42,18 +42,36 @@ Each specialist agent receives only the (sanitized) diff and its own system prom
 ## Installation
 
 ```bash
+npm install -g ai-review
+```
+
+Pull the model if you haven't already:
+
+```bash
+ollama pull devstral:latest
+```
+
+## Quick Start
+
+```bash
+cd your-project
+git add -p                      # stage the changes you want reviewed
+ai-review                       # run the full 11-agent swarm
+ai-review --agents security     # single-agent fast pass
+ai-review --format json         # machine-readable output
+```
+
+<details>
+<summary>Install from source (development)</summary>
+
+```bash
 git clone https://github.com/unyieldingclaw-dev/ai-code-review-agent.git
 cd ai-code-review-agent
 npm install
 npm run build
-```
-
-To use as a global CLI:
-
-```bash
 npm link
-# or: node dist/cli/index.js --help
 ```
+</details>
 
 ## Usage
 
