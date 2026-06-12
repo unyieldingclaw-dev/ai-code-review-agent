@@ -54,7 +54,15 @@ export const window = {
     show: vi.fn(),
     dispose: vi.fn(),
   })),
-  withProgress: vi.fn(),
+  withProgress: vi.fn(
+    (
+      _opts: unknown,
+      task: (
+        progress: { report: (v: unknown) => void },
+        token: { isCancellationRequested: boolean }
+      ) => unknown
+    ) => task({ report: vi.fn() }, { isCancellationRequested: false })
+  ),
   showErrorMessage: vi.fn(),
   showWarningMessage: vi.fn(),
   showInformationMessage: vi.fn(),
@@ -66,6 +74,8 @@ export const commands = {
 }
 
 export const workspace = {
+  // Base mock always returns the default value.
+  // For key-specific behavior in tests, use vi.mocked(workspace.getConfiguration).mockReturnValue(...)
   getConfiguration: vi.fn(() => ({
     get: vi.fn((_key: string, defaultVal: unknown) => defaultVal),
   })),
