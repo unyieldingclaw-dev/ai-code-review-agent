@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatMcpOutput } from '../../../src/mcp/formatter.js'
-import type { ReviewResult } from '../../../src/core/schema.js'
+import type { ReviewResult, Finding } from '../../../src/core/schema.js'
 
 function makeResult(overrides: Partial<ReviewResult> = {}): ReviewResult {
   return {
@@ -16,7 +16,7 @@ function makeResult(overrides: Partial<ReviewResult> = {}): ReviewResult {
   }
 }
 
-function makeFinding(severity: 'critical' | 'high' | 'medium' | 'low', overrides = {}) {
+function makeFinding(severity: 'critical' | 'high' | 'medium' | 'low', overrides: Partial<Finding> = {}): Finding {
   return {
     id: 'f1',
     agent: 'security' as const,

@@ -1,5 +1,11 @@
 import type { Finding, ReviewResult } from '../core/schema.js'
 
+// Only critical and high are rendered — medium/low appear in the tail only.
+const SEVERITY_ICONS: Record<'critical' | 'high', string> = {
+  critical: '🔴',
+  high: '🟠',
+}
+
 export function formatMcpOutput(result: ReviewResult): string {
   const { findings, summary } = result
 
@@ -10,6 +16,9 @@ export function formatMcpOutput(result: ReviewResult): string {
   const actionable = findings.filter(
     f => f.severity === 'critical' || f.severity === 'high'
   )
+  // Intentionally trust summary.bySeverity rather than re-counting from findings —
+  // summary is the canonical source of truth and keeps medium/low counts correct even
+  // if the caller pre-filtered findings.
   const mediumCount = summary.bySeverity.medium ?? 0
   const lowCount = summary.bySeverity.low ?? 0
 
@@ -28,7 +37,7 @@ export function formatMcpOutput(result: ReviewResult): string {
 }
 
 function renderFinding(f: Finding): string {
-  const icon = f.severity === 'critical' ? '🔴' : '🟠'
+  const icon = SEVERITY_ICONS[f.severity as 'critical' | 'high']
   return [
     `### ${icon} ${f.severity.toUpperCase()} · ${f.agent} · \`${f.file}:${f.line}\``,
     `**${f.title}**`,
