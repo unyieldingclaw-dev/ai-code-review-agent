@@ -64,6 +64,7 @@ describe('applyDiagnostics', () => {
   it('converts line 1 → range startLine 0 (1-based to 0-based)', async () => {
     const { applyDiagnostics } = await import('../src/diagnostics')
     applyDiagnostics(collection as any, [makeFinding({ line: 1 })], '/workspace')
+    expect(collection.set).toHaveBeenCalledTimes(1)
     const [, diags] = vi.mocked(collection.set).mock.calls[0] as [unknown, vscode.Diagnostic[]]
     expect((diags[0].range as vscode.Range).startLine).toBe(0)
   })
@@ -71,6 +72,7 @@ describe('applyDiagnostics', () => {
   it('converts line 42 → range startLine 41', async () => {
     const { applyDiagnostics } = await import('../src/diagnostics')
     applyDiagnostics(collection as any, [makeFinding({ line: 42 })], '/workspace')
+    expect(collection.set).toHaveBeenCalledTimes(1)
     const [, diags] = vi.mocked(collection.set).mock.calls[0] as [unknown, vscode.Diagnostic[]]
     expect((diags[0].range as vscode.Range).startLine).toBe(41)
   })

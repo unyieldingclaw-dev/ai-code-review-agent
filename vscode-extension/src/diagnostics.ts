@@ -30,7 +30,7 @@ export function applyDiagnostics(
 
   for (const finding of findings) {
     const uri = vscode.Uri.file(path.join(workspaceDir, finding.file))
-    const key = uri.fsPath
+    const key = uri.fsPath.toLowerCase()
 
     const line = Math.max(0, finding.line - 1)  // 1-based → 0-based
     const range = new vscode.Range(line, 0, line, Number.MAX_SAFE_INTEGER)
