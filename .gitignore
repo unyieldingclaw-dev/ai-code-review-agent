@@ -9,3 +9,12 @@ test_output.txt
 
 # Memory Bank
 handoff.md
+
+# Memory Bank
+.pmb-hook-errors.log
+.pmb-checksums
+.pmb-delegation-depth
+
+# Build artifacts
+*.vsix
+*.tgz

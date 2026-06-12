@@ -13,3 +13,17 @@ node_modules/ai-review-agent/memory-bank/**
 node_modules/ai-review-agent/.github/**
 node_modules/ai-review-agent/.claude/**
 node_modules/ai-review-agent/docs/**
+node_modules/ai-review-agent/standards/**
+node_modules/ai-review-agent/scripts/**
+node_modules/ai-review-agent/vscode-extension/**
+node_modules/ai-review-agent/.git/**
+node_modules/ai-review-agent/.gitignore
+node_modules/ai-review-agent/.gitattributes
+node_modules/ai-review-agent/.pmb-version
+node_modules/ai-review-agent/CHANGELOG.md
+node_modules/ai-review-agent/CLAUDE.md
+node_modules/ai-review-agent/tsconfig.json
+node_modules/ai-review-agent/vitest.config.ts
+node_modules/ai-review-agent/test_output.txt
+node_modules/ai-review-agent/handoff.md
+node_modules/ai-review-agent/node_modules/**
