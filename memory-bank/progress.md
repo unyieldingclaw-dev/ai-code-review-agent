@@ -58,7 +58,7 @@ lineage: []
 ## 📊 Metrics
 
 ### Test Coverage
-- **Unit Tests**: 62 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 8, runner: 5, exitCode: 5, ignoreFilter: 7, sanitizer: 9, breakingChangeAgent: 5, licenseComplianceAgent: 5, confidence: 6)
+- **Unit Tests**: 77 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 8, runner: 5, exitCode: 5, ignoreFilter: 7, sanitizer: 9, breakingChangeAgent: 5, licenseComplianceAgent: 5, confidence: 6, mcp/formatter: 8, mcp/tool: 7)
 - **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
 - **Total**: 62
 
@@ -123,3 +123,4 @@ lineage: []
 | 0.4.0 | 2026-06-11 | prompt tuning + calibration expansion: `confidence` on all 10 agents, calibrate.ts covers all 11, new breaking-change + license fixtures |
 | 0.5.0 | 2026-06-11 | Cursor/VS Code extension: subprocess architecture, bundled install, command palette trigger, DiagnosticCollection + OutputChannel (V5-1–V5-7) |
 | 0.5.0 (cleanup) | 2026-06-12 | vscode-extension dep → `^0.4.0` (npm), tarball removed from repo, `.gitignore` stale exception removed |
+| 0.6.0 | 2026-06-12 | MCP server: `ai-review-mcp` binary, `review_diff` tool, stdio transport, A+C hybrid output, 10 agents (no testgen), `.cursor/mcp.json`, 77 unit tests |

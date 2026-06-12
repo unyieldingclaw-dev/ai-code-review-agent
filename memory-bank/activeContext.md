@@ -20,7 +20,7 @@ lineage: []
 
 ## Current Focus
 
-**Cleanup complete. v0.4.0 on npm. Extension dep updated.** All working-tree changes committed and pushed. Tarball removed from repo history and disk. Brainstorming was in progress for the next feature (see Session Notes) — needs to resume.
+**v0.6.0 MCP server — COMPLETE.** All 6 tasks implemented, reviewed, committed. `ai-review-mcp` binary ships in the `ai-review-agent` package and exposes the `review_diff` MCP tool via stdio transport. 77 unit tests passing. Version bumped to 0.6.0.
 
 ## What's Working
 
@@ -31,7 +31,7 @@ lineage: []
 - Confidence-aware hallucination check: solo Critical ≥60% confidence stays Critical; <60% → High
 - Prompt injection sanitizer: strips SYSTEM:, instruction overrides, role-play directives, long base64
 - Calibration CI: `.github/workflows/calibrate.yml` — weekly + release, skips gracefully without Ollama
-- **62 unit tests passing** across 11 test files
+- **77 unit tests passing** across 13 test files (includes 15 new MCP tests)
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
 
 ## Guardrails (All Complete)
@@ -56,9 +56,9 @@ lineage: []
 
 ## Next Steps
 
-- **Resume brainstorming**: Next feature brainstorm was in progress — user was leaning options A + C (hybrid), Cursor IDE target, Windows + Mac, no Anthropic provider. Context was lost to compaction; ask user to recap what A/B/C were.
-- **Marketplace publish**: Explicitly DEFERRED by user — "I don't think we are even close to having this posted on marketplace."
-- **Backlog**: Anthropic/Claude provider — explicitly backlogged by user; wants Ollama-only to avoid API costs.
+- **Publish v0.6.0 to npm**: tag `v0.6.0`, push tag — triggers release workflow. Run `git tag v0.6.0 && git push && git push --tags`.
+- **Marketplace publish** (VS Code extension): Explicitly DEFERRED.
+- **Backlog**: Anthropic/Claude provider — explicitly backlogged; Ollama-only.
 - **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new token and update `NPM_TOKEN` secret before then.
 
 ## v0.5.0 Design Decisions (2026-06-11)
@@ -121,4 +121,6 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-11: v0.5.0 brainstorm — Cursor/VS Code extension design decisions locked. Subprocess architecture, bundled install, command palette trigger, staged-changes diff, DiagnosticCollection + OutputChannel output.
 - 2026-06-11: v0.5.0 spec written and committed at `488fba2`. Implementation plan written and committed at `2fa1444`. 10 tasks, full TDD, all code included verbatim. Ready for execution.
 - 2026-06-11: v0.5.0 complete — all 10 tasks (Task 0–9) implemented, reviewed, committed. Extension builds to `ai-review-agent-0.5.0.vsix` (137.85 KB, 119 files).
-- 2026-06-12: Cleanup — v0.4.0 published to npm; extension dep updated from tarball to `^0.4.0`; tarball removed from repo; `.gitignore` whitelist exception cleaned. All pushed (`2be6d27`). Next feature brainstorm was in progress (user leaning options A + C hybrid, Cursor + Windows/Mac target) — lost to compaction; resume with user.
+- 2026-06-12: Cleanup — v0.4.0 published to npm; extension dep updated from tarball to `^0.4.0`; tarball removed from repo; `.gitignore` whitelist exception cleaned. All pushed (`2be6d27`).
+- 2026-06-12: v0.6.0 brainstorm → A+C hybrid output format, Cursor+Windows/Mac target, Ollama-only. Spec committed at `2852b00`, plan committed at `d277da4`. Implementation starting.
+- 2026-06-12: v0.6.0 COMPLETE — `ai-review-mcp` binary ships in the package. 6 tasks, 7 commits (`27be871`→`1b697db`). 77 unit tests. Version bumped to 0.6.0. Next: `git tag v0.6.0 && git push --tags` to publish to npm.
