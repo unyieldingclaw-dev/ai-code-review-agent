@@ -122,3 +122,4 @@ lineage: []
 | 0.3.0 | 2026-06-10 | npm distribution: package renamed `ai-review-agent`, release workflow, Node.js 24, published to npm |
 | 0.4.0 | 2026-06-11 | prompt tuning + calibration expansion: `confidence` on all 10 agents, calibrate.ts covers all 11, new breaking-change + license fixtures |
 | 0.5.0 | 2026-06-11 | Cursor/VS Code extension: subprocess architecture, bundled install, command palette trigger, DiagnosticCollection + OutputChannel (V5-1–V5-7) |
+| 0.5.0 (cleanup) | 2026-06-12 | vscode-extension dep → `^0.4.0` (npm), tarball removed from repo, `.gitignore` stale exception removed |
