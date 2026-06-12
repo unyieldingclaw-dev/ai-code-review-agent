@@ -7,6 +7,8 @@ on:
 jobs:
   ai-review:
     runs-on: self-hosted  # Requires Ollama on the runner
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
     permissions:
       pull-requests: write
       contents: read
