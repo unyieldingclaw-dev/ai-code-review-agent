@@ -57,7 +57,7 @@
     "package": "vsce package"
   },
   "dependencies": {
-    "ai-review-agent": "file:../ai-review-agent-0.3.0.tgz"
+    "ai-review-agent": "^0.4.0"
   },
   "devDependencies": {
     "@types/node": "^18.0.0",
