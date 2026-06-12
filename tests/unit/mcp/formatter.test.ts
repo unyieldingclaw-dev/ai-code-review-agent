@@ -107,4 +107,15 @@ describe('formatMcpOutput', () => {
     }))
     expect(result).toContain('2 findings')
   })
+
+  it('shows only medium count in tail when no low findings', () => {
+    const finding = makeFinding('critical')
+    const result = formatMcpOutput(makeResult({
+      findings: [finding, makeFinding('medium')],
+      summary: { totalFindings: 2, bySeverity: { critical: 1, medium: 1 }, byAgent: {}, durationMs: 100 }
+    }))
+    expect(result).toContain('1 medium')
+    expect(result).not.toContain('low')
+    expect(result).toContain('ai-review-agent')
+  })
 })
