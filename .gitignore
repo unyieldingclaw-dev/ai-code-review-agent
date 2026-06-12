@@ -18,3 +18,5 @@ handoff.md
 # Build artifacts
 *.vsix
 *.tgz
+# Exception: tarball used as local dep until v0.4.0 publishes to npm
+!ai-review-agent-0.3.0.tgz
