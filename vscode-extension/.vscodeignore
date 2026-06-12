@@ -1,10 +1,11 @@
 .vscode/**
 src/**
 tests/**
-*.map
 esbuild.config.js
 tsconfig.json
 vitest.config.ts
+node_modules/**
+!node_modules/ai-review-agent/**
 node_modules/ai-review-agent/src/**
 node_modules/ai-review-agent/tests/**
 node_modules/ai-review-agent/calibration/**
