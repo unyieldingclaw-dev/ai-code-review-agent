@@ -28,7 +28,7 @@ export async function runReviewTool(params: ReviewToolParams): Promise<string> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     // Friendly message for the common case of not being in a repo
-    return `## AI Code Review\n\nNot a git repository: \`${repoPath}\`.\n\n_${msg}_`
+    return `## AI Code Review\n\nNot a git repository: \`${repoPath}\`.`
   }
 
   if (!diff.trim()) {
@@ -52,7 +52,7 @@ export async function runReviewTool(params: ReviewToolParams): Promise<string> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     if (msg.includes('provider not available') || msg.includes('ECONNREFUSED') || msg.includes('fetch')) {
-      return `## AI Code Review\n\nOllama is not reachable at \`${config.ollamaUrl}\`. Start Ollama and try again.\n\n_${msg}_`
+      return `## AI Code Review\n\nOllama is not reachable at \`${config.ollamaUrl}\`. Start Ollama and try again.`
     }
     return `## AI Code Review\n\nReview failed: ${msg}`
   }
