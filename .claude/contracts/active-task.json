@@ -1,6 +1,6 @@
 {
   "task": "v0.5.0 — Cursor/VS Code extension",
-  "status": "planned",
+  "status": "complete",
   "expires_at": "2026-06-12T08:00:00Z",
   "scope": [
     { "file": "src/cli/index.ts", "op": "edit" },
