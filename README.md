@@ -73,6 +73,31 @@ npm link
 ```
 </details>
 
+## Cursor Integration (MCP)
+
+After installing globally, add this to `.cursor/mcp.json` in your project root (or copy from the `.cursor/mcp.json` already in this repo):
+
+```json
+{
+  "mcpServers": {
+    "ai-review": {
+      "command": "ai-review-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+Restart Cursor. The `review_diff` tool will appear in **Settings → MCP**. In Cursor's chat panel, ask:
+
+> Review my staged changes
+
+or invoke directly:
+
+> @ai-review review_diff
+
+Requires Ollama running locally with `devstral:latest` pulled. The tool runs 10 agents (security, performance, correctness, design, dependencies, adversarial, integration, breaking-change, license, coverage). For generated test files, use the CLI (`ai-review-agent`).
+
 ## Usage
 
 ### CLI
