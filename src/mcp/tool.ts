@@ -25,8 +25,7 @@ export async function runReviewTool(params: ReviewToolParams): Promise<string> {
     if (!diff.trim()) {
       diff = execSync(`git -C "${repoPath}" diff HEAD`, { encoding: 'utf-8' })
     }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+  } catch {
     // Friendly message for the common case of not being in a repo
     return `## AI Code Review\n\nNot a git repository: \`${repoPath}\`.`
   }
