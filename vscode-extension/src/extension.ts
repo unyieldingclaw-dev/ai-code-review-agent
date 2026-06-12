@@ -32,7 +32,7 @@ export function activate(context: vscode.ExtensionContext): void {
           try {
             const result = await runReview(config, workspaceDir, token)
 
-            // Diagnostics cleared and replaced atomically after the run completes
+            // Diagnostics replaced after the run completes (clear + set in sequence)
             applyDiagnostics(collection, result.findings, workspaceDir)
             renderReport(channel, result)
 
@@ -47,7 +47,7 @@ export function activate(context: vscode.ExtensionContext): void {
               channel.show(false)
             }
           } catch (err) {
-            handleRunError(err as Error, config.ollamaUrl, channel)
+            handleRunError(err instanceof Error ? err : new Error(String(err)), config.ollamaUrl, channel)
           }
         }
       )
@@ -88,7 +88,7 @@ function handleRunError(
 
   if (msg.startsWith('ollama-unreachable:')) {
     const url = msg.slice('ollama-unreachable:'.length)
-    vscode.window.showErrorMessage(
+    void vscode.window.showErrorMessage(
       `AI Review: Ollama is not running at ${url}. Start it with \`ollama serve\`.`,
       'Open Settings'
     ).then(choice => {
