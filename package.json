@@ -30,7 +30,8 @@
     "LICENSE"
   ],
   "bin": {
-    "ai-review-agent": "./dist/cli/index.js"
+    "ai-review-agent": "./dist/cli/index.js",
+    "ai-review-mcp": "./dist/mcp/server.js"
   },
   "scripts": {
     "build": "tsc",
