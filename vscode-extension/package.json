@@ -1,0 +1,70 @@
+{
+  "name": "ai-review-agent",
+  "displayName": "AI Review Agent",
+  "description": "Local AI code review — run an 11-agent Ollama swarm on your staged changes",
+  "version": "0.5.0",
+  "publisher": "unyieldingclaw",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "extensionKind": ["workspace"],
+  "categories": ["Linters"],
+  "activationEvents": ["onCommand:aiReview.reviewStagedChanges"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "aiReview.reviewStagedChanges",
+        "title": "AI Review: Review Staged Changes"
+      }
+    ],
+    "configuration": {
+      "title": "AI Review",
+      "properties": {
+        "aiReview.ollamaUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama base URL (e.g. http://localhost:11434)"
+        },
+        "aiReview.model": {
+          "type": "string",
+          "default": "devstral:latest",
+          "description": "Ollama model to use for code review"
+        },
+        "aiReview.agents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Agents to run. Empty array runs all 11 agents. Valid values: security, performance, correctness, design, dependencies, coverage, testgen, adversarial, integration, breaking-change, license"
+        },
+        "aiReview.maxLines": {
+          "type": "number",
+          "default": 2000,
+          "description": "Maximum diff lines to send for review"
+        },
+        "aiReview.timeout": {
+          "type": "number",
+          "default": 120,
+          "description": "Per-agent timeout in seconds (passed to CLI as milliseconds)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.config.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "ai-review-agent": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}

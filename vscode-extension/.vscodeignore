@@ -1,0 +1,14 @@
+.vscode/**
+src/**
+tests/**
+*.map
+esbuild.config.js
+tsconfig.json
+vitest.config.ts
+node_modules/ai-review-agent/src/**
+node_modules/ai-review-agent/tests/**
+node_modules/ai-review-agent/calibration/**
+node_modules/ai-review-agent/memory-bank/**
+node_modules/ai-review-agent/.github/**
+node_modules/ai-review-agent/.claude/**
+node_modules/ai-review-agent/docs/**
