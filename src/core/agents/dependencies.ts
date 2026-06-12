@@ -21,12 +21,13 @@ Focus on:
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"Explanation of the dependency risk","suggestion":"Safer alternative or remediation"}]
+[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"Explanation of the dependency risk","suggestion":"Safer alternative or remediation"}]
 
 Rules:
 - basis=VERIFIED: CVE or known issue confirmed in training data
 - basis=INFERRED: suspicious pattern that warrants investigation
 - basis=SPECULATIVE: possible risk, needs npm audit to confirm
+- confidence: your certainty this is a real issue (0-100)
 - Only report severity >= medium
 - If the diff has no package.json / requirements.txt changes, return: []`
   }

@@ -22,12 +22,13 @@ For each finding, describe WHAT needs an integration test and WHY a unit test is
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"The integration boundary that needs testing and what could go wrong","suggestion":"Specific test scenario to write, including what to mock and what to assert"}]
+[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"The integration boundary that needs testing and what could go wrong","suggestion":"Specific test scenario to write, including what to mock and what to assert"}]
 
 Rules:
 - basis=VERIFIED: integration boundary is clearly new or changed in the diff
 - basis=INFERRED: likely needs integration testing based on patterns
 - basis=SPECULATIVE: may need testing depending on deployment context
+- confidence: your certainty this is a real issue (0-100)
 - Only report severity >= medium
 - If no integration boundaries found, return: []`
   }

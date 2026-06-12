@@ -24,7 +24,7 @@ Output ONLY a JSON object with two arrays: "findings" (coverage issues as review
 
 Required format:
 {
-  "findings": [{"severity":"medium","basis":"VERIFIED","file":"path/to/file","line":42,"title":"No test for X function","detail":"The X function added in this diff has no test coverage","suggestion":"Add unit test covering the happy path and error case"}],
+  "findings": [{"severity":"medium","basis":"VERIFIED","confidence":85,"file":"path/to/file","line":42,"title":"No test for X function","detail":"The X function added in this diff has no test coverage","suggestion":"Add unit test covering the happy path and error case"}],
   "gaps": [{"file":"path/to/file","functionName":"functionName","lineStart":10,"lineEnd":25,"description":"What the function does and what cases need testing"}]
 }
 
@@ -32,6 +32,7 @@ Rules:
 - Every gap should have a corresponding finding
 - basis=VERIFIED: function is clearly new/changed with no test file changes in the diff
 - basis=INFERRED: likely untested based on file patterns
+- confidence: your certainty this is a real issue (0-100)
 - If fully covered, return: {"findings":[],"gaps":[]}`
   }
 

@@ -22,12 +22,13 @@ Focus on:
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"Explanation of the bug and when it would manifest","suggestion":"Corrected code or approach"}]
+[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"Explanation of the bug and when it would manifest","suggestion":"Corrected code or approach"}]
 
 Rules:
 - basis=VERIFIED: bug is unambiguously present in the diff
 - basis=INFERRED: likely bug based on patterns
 - basis=SPECULATIVE: possible bug, depends on runtime state
+- confidence: your certainty this is a real issue (0-100)
 - Only report severity >= medium
 - If no issues found, return: []`
   }

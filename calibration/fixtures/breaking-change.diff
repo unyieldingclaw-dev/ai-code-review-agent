@@ -1,0 +1,21 @@
+diff --git a/src/api/users.ts b/src/api/users.ts
+index abc1234..def5678 100644
+--- a/src/api/users.ts
++++ b/src/api/users.ts
+@@ -1,10 +1,12 @@
+-export async function getUserById(id: string): Promise<User | null> {
++// REAL: added required parameter to exported function — breaks all existing callers
++export async function getUserById(id: string, includeDeleted: boolean): Promise<User | null> {
+   const row = await db.query(
+-    'SELECT * FROM users WHERE id = $1', [id]
++    `SELECT * FROM users WHERE id = $1${includeDeleted ? '' : ' AND deleted_at IS NULL'}`,
++    [id]
+   )
+   return row ?? null
+ }
+
+-function _formatUser(user: any) {
++// FALSE POSITIVE BAIT: private helper — not exported, optional parameter, no callers break
++function _formatUser(user: any, options?: { compact: boolean }) {
+   return { id: user.id, name: user.name }
+ }

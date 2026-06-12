@@ -23,12 +23,13 @@ For each finding, describe the specific breaking input and which code path it ex
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"The specific input that breaks this code and why","suggestion":"Guard condition or validation that would prevent the break"}]
+[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"The specific input that breaks this code and why","suggestion":"Guard condition or validation that would prevent the break"}]
 
 Rules:
 - basis=VERIFIED: the code clearly does not handle this input
 - basis=INFERRED: likely unhandled based on common patterns
 - basis=SPECULATIVE: might fail depending on upstream validation
+- confidence: your certainty this is a real issue (0-100)
 - Only report severity >= medium
 - If no breaking inputs found, return: []`
   }

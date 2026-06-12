@@ -21,12 +21,13 @@ Focus on:
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"Explanation of what changed and how callers break","suggestion":"Migration path or backward-compatible alternative"}]
+[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"Explanation of what changed and how callers break","suggestion":"Migration path or backward-compatible alternative"}]
 
 Rules:
 - basis=VERIFIED: the breaking change is clearly visible in the diff (e.g., removed export)
 - basis=INFERRED: likely breaking based on visible patterns (e.g., signature change without callers visible)
 - basis=SPECULATIVE: possible breaking change, needs broader codebase context to confirm
+- confidence: your certainty this is a real issue (0-100)
 - Always report severity=high for confirmed breaking changes, severity=medium for speculative ones
 - If the diff contains no public API changes, return: []`
   }
