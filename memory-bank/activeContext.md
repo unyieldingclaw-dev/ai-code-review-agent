@@ -20,7 +20,7 @@ lineage: []
 
 ## Current Focus
 
-**v0.4.0 complete. v0.5.0 (Cursor extension) spec + plan complete — ready for implementation.** v0.4.0 shipped prompt tuning + calibration expansion. Spec committed at `488fba2`, implementation plan committed at `2fa1444`. Next step: execute the 10-task plan starting with Task 0 (`--ollama-url` CLI flag) through Task 9 (README + memory bank update).
+**v0.5.0 complete.** The Cursor/VS Code extension is fully implemented and packaged. `ai-review-agent-0.5.0.vsix` is ready for manual install in Cursor or VS Code. Next: publish v0.4.0 to npm (so the `file:` dep can become `^0.4.0`), then submit to VS Code Marketplace / Open VSX.
 
 ## What's Working
 
@@ -56,7 +56,8 @@ lineage: []
 
 ## Next Steps
 
-- **v0.5.0**: Execute `docs/superpowers/plans/2026-06-11-vscode-extension.md` — Task 0 (add `--ollama-url` to CLI) through Task 9 (README + MB update). Use subagent-driven-development or executing-plans skill.
+- **Publish v0.4.0 to npm**: Update `vscode-extension/package.json` dep from `file:../ai-review-agent-0.3.0.tgz` to `^0.4.0` after publish.
+- **Marketplace publish**: Submit `ai-review-agent-0.5.0.vsix` to VS Code Marketplace and/or Open VSX Registry.
 - **Backlog**: Anthropic/Claude provider — deprioritized; `/code-review` in Claude Code already covers that use case
 - **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new token and update `NPM_TOKEN` secret before then
 
@@ -119,3 +120,4 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-11: v0.4.0 — prompt tuning + calibration expansion. `confidence` field added to all 10 agent systemPrompts. `calibrate.ts` rewritten to cover all 11 agents (10 standard + TestGen). New fixtures: `breaking-change.diff`, `license.diff`.
 - 2026-06-11: v0.5.0 brainstorm — Cursor/VS Code extension design decisions locked. Subprocess architecture, bundled install, command palette trigger, staged-changes diff, DiagnosticCollection + OutputChannel output.
 - 2026-06-11: v0.5.0 spec written and committed at `488fba2`. Implementation plan written and committed at `2fa1444`. 10 tasks, full TDD, all code included verbatim. Ready for execution.
+- 2026-06-11: v0.5.0 complete — all 10 tasks (Task 0–9) implemented, reviewed, committed. Extension builds to `ai-review-agent-0.5.0.vsix` (136 KB). Uses tarball dep (`ai-review-agent-0.3.0.tgz`) until v0.4.0 publishes to npm.

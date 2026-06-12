@@ -79,15 +79,15 @@ lineage: []
 - [x] **P2-7**: Calibration CI — weekly + release schedule, self-hosted runner, graceful skip
 - [x] **P2-8**: Documentation — README v0.2.0, CHANGELOG, slash command, memory-bank
 
-## 🔜 Planned: v0.5.0 Cursor/VS Code Extension
+## ✅ v0.5.0 Cursor/VS Code Extension (Complete)
 
-- [ ] **V5-1**: `vscode-extension/` scaffold — `package.json` (type: `extensionKind: ["workspace"]`), `tsconfig.json`, `esbuild` bundler config
-- [ ] **V5-2**: Core subprocess runner — spawn `ai-review-agent --format json`, capture stdout, parse `Finding[]`
-- [ ] **V5-3**: DiagnosticCollection adapter — map `Finding` → `vscode.Diagnostic`, push to collection
-- [ ] **V5-4**: OutputChannel renderer — format findings as markdown in "AI Review" output channel
-- [ ] **V5-5**: Command registration — `aiReview.reviewStagedChanges`, progress notification during run
-- [ ] **V5-6**: Bundling — bundle `ai-review-agent` into `.vsix` via esbuild/webpack, verify size
-- [ ] **V5-7**: README + publish — marketplace metadata, `vsce package`, smoke test in Cursor
+- [x] **V5-1**: `vscode-extension/` scaffold — `package.json` (type: `extensionKind: ["workspace"]`), `tsconfig.json`, `esbuild` bundler config
+- [x] **V5-2**: Core subprocess runner — spawn `ai-review-agent --format json`, capture stdout, parse `Finding[]`
+- [x] **V5-3**: DiagnosticCollection adapter — map `Finding` → `vscode.Diagnostic`, push to collection
+- [x] **V5-4**: OutputChannel renderer — format findings as markdown in "AI Review" output channel
+- [x] **V5-5**: Command registration — `aiReview.reviewStagedChanges`, progress notification during run
+- [x] **V5-6**: Bundling — bundle `ai-review-agent` into `.vsix` via esbuild/webpack, verify size
+- [x] **V5-7**: README + publish — marketplace metadata, `vsce package`, smoke test in Cursor
 
 ## 🎯 Milestones
 
@@ -121,4 +121,4 @@ lineage: []
 | 0.2.0 | 2026-06-06 | Phase 2: CLI consolidation, sanitizer, BreakingChangeAgent, LicenseComplianceAgent, confidence scoring, calibration CI (62 tests) |
 | 0.3.0 | 2026-06-10 | npm distribution: package renamed `ai-review-agent`, release workflow, Node.js 24, published to npm |
 | 0.4.0 | 2026-06-11 | prompt tuning + calibration expansion: `confidence` on all 10 agents, calibrate.ts covers all 11, new breaking-change + license fixtures |
-| 0.5.0 | 2026-06-11 (planned) | Cursor/VS Code extension: subprocess architecture, bundled install, command palette trigger, DiagnosticCollection + OutputChannel — spec + plan complete |
+| 0.5.0 | 2026-06-11 | Cursor/VS Code extension: subprocess architecture, bundled install, command palette trigger, DiagnosticCollection + OutputChannel (V5-1–V5-7) |
