@@ -13,6 +13,8 @@ export interface ReviewConfig {
   testOutputDir: string
   maxDiffLines: number
   agentTimeoutMs: number
+  retryAttempts: number
+  retryDelayMs: number
   ignorePaths: string[]
   sanitize: boolean
 }
@@ -31,6 +33,8 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   testOutputDir: './ai-review-tests',
   maxDiffLines: 2000,
   agentTimeoutMs: 60000,
+  retryAttempts: 2,
+  retryDelayMs: 2000,
   ignorePaths: [],
   sanitize: true
 }

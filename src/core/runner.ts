@@ -26,6 +26,28 @@ function withTimeout<T>(promise: Promise<T>, ms: number, agentName: string): Pro
   ])
 }
 
+async function withRetryTimeout<T>(
+  fn: () => Promise<T>,
+  timeoutMs: number,
+  agentName: string,
+  attempts: number,
+  backoffMs: number
+): Promise<T> {
+  let lastErr: Error = new Error('no attempts made')
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await withTimeout(fn(), timeoutMs, agentName)
+    } catch (err) {
+      lastErr = err as Error
+      if (i < attempts - 1) {
+        console.warn(`[ai-review] Agent ${agentName} failed (attempt ${i + 1}/${attempts}): ${lastErr.message} — retrying in ${backoffMs}ms`)
+        await new Promise(r => setTimeout(r, backoffMs))
+      }
+    }
+  }
+  throw lastErr
+}
+
 function buildAgents(config: ReviewConfig, provider: LLMProvider): BaseAgent[] {
   const builders = new Map<AgentName, () => BaseAgent>([
     ['security', () => new SecurityAgent(provider, config)],
@@ -104,13 +126,15 @@ export class SwarmRunner {
     let testFiles: GeneratedTestFile[] = []
 
     const timeout = this.config.agentTimeoutMs
+    const retryAttempts = this.config.retryAttempts
+    const retryDelayMs = this.config.retryDelayMs
 
     // Run CoverageAnalyst first if enabled (TestGen depends on it)
     if (this.config.agents.includes('coverage')) {
       onProgress?.('coverage')
       const coverageAgent = new CoverageAnalystAgent(this.provider, this.config)
       try {
-        const coverageResult = await withTimeout(coverageAgent.runForCoverage(input), timeout, 'coverage')
+        const coverageResult = await withRetryTimeout(() => coverageAgent.runForCoverage(input), timeout, 'coverage', retryAttempts, retryDelayMs)
         allFindings.push(...coverageResult.findings)
         coverageGaps = coverageResult.gaps
       } catch (err) {
@@ -123,7 +147,7 @@ export class SwarmRunner {
     for (const agent of agents) {
       onProgress?.(agent.name)
       try {
-        const findings = await withTimeout(agent.run(input), timeout, agent.name)
+        const findings = await withRetryTimeout(() => agent.run(input), timeout, agent.name, retryAttempts, retryDelayMs)
         allFindings.push(...findings)
       } catch (err) {
         console.warn(`[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`)
@@ -135,7 +159,7 @@ export class SwarmRunner {
       onProgress?.('testgen')
       if (coverageGaps.length > 0) {
         try {
-          const testResult = await withTimeout(this.testGen.runWithGaps(input, coverageGaps), timeout, 'testgen')
+          const testResult = await withRetryTimeout(() => this.testGen.runWithGaps(input, coverageGaps), timeout, 'testgen', retryAttempts, retryDelayMs)
           testFiles = testResult.testFiles
         } catch (err) {
           console.warn(`[ai-review] Agent testgen timed out or failed: ${(err as Error).message}`)

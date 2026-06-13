@@ -26,6 +26,8 @@ program
   .option('--out <path>', 'Write output to file instead of stdout')
   .option('--max-lines <n>', 'Truncate diff to this many lines (default: 2000)', parseInt)
   .option('--timeout <ms>', 'Per-agent timeout in milliseconds (default: 60000)', parseInt)
+  .option('--retry-attempts <n>', 'Number of attempts per agent before skipping (default: 2)', parseInt)
+  .option('--retry-delay <ms>', 'Delay between retries in ms (default: 2000)', parseInt)
   .option('--fail-on <level>', `Exit 1 when any finding meets this severity (${FAIL_ON_OPTIONS.join('|')}; default: high)`, 'high')
   .option('--ignore <pattern>', 'Exclude files matching this glob pattern (repeatable)', collect, [] as string[])
   .option('--no-sanitize', 'Skip prompt-injection sanitization of the diff')
@@ -39,6 +41,8 @@ program
     out?: string
     maxLines?: number
     timeout?: number
+    retryAttempts?: number
+    retryDelay?: number
     failOn: FailOnLevel
     ignore: string[]
     sanitize: boolean
@@ -51,6 +55,8 @@ program
     if (options.agents) config.agents = options.agents.split(',').map(a => a.trim()) as AgentName[]
     if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
     if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
+    if (options.retryAttempts !== undefined) config.retryAttempts = options.retryAttempts
+    if (options.retryDelay !== undefined) config.retryDelayMs = options.retryDelay
     if (options.ignore.length > 0) config.ignorePaths = [...config.ignorePaths, ...options.ignore]
     if (!options.sanitize) config.sanitize = false
 
