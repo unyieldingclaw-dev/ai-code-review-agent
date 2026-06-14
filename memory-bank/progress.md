@@ -16,7 +16,7 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-06-11
+**Last Updated**: 2026-06-13
 
 ## ✅ Completed (Tasks 1–16)
 
@@ -54,13 +54,14 @@ lineage: []
 - [x] **G4**: Per-agent timeouts — `agentTimeoutMs` (default 60 s) + `--timeout` CLI flag
 - [x] **G5**: Severity gating — `--fail-on` flag (critical|high|medium|any|never; default: high)
 - [x] **G6**: Path exclusions — `.aiignore` + `--ignore-path` + `ignorePaths` config
+- [x] **G8**: Configurable retry — `retryAttempts`/`retryDelayMs` config + `--retry-attempts`/`--retry-delay` CLI flags (`c2d2387`)
 
 ## 📊 Metrics
 
 ### Test Coverage
-- **Unit Tests**: 77 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 8, runner: 5, exitCode: 5, ignoreFilter: 7, sanitizer: 9, breakingChangeAgent: 5, licenseComplianceAgent: 5, confidence: 6, mcp/formatter: 8, mcp/tool: 7)
+- **Unit Tests**: 80 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 8, runner: 8, exitCode: 5, ignoreFilter: 7, sanitizer: 9, breakingChangeAgent: 5, licenseComplianceAgent: 5, confidence: 6, mcp/formatter: 8, mcp/tool: 7)
 - **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
-- **Total**: 62
+- **Total**: 80
 
 ### Implementation Progress
 - **Tasks complete**: 16 / 16 (100%) ✅ + Phase 2 (8 tasks) ✅
@@ -124,3 +125,4 @@ lineage: []
 | 0.5.0 | 2026-06-11 | Cursor/VS Code extension: subprocess architecture, bundled install, command palette trigger, DiagnosticCollection + OutputChannel (V5-1–V5-7) |
 | 0.5.0 (cleanup) | 2026-06-12 | vscode-extension dep → `^0.4.0` (npm), tarball removed from repo, `.gitignore` stale exception removed |
 | 0.6.0 | 2026-06-12 | MCP server: `ai-review-mcp` binary, `review_diff` tool, stdio transport, A+C hybrid output, 10 agents (no testgen), `.cursor/mcp.json`, 77 unit tests |
+| 0.7.0 | 2026-06-13 | Configurable retry logic: `withRetryTimeout` wrapper, `retryAttempts`/`retryDelayMs` config fields, `--retry-attempts`/`--retry-delay` CLI flags, 3 new retry tests (80 total) |

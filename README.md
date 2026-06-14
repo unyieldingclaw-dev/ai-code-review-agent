@@ -155,6 +155,8 @@ ai-review-agent --help
 | `--out <path>` | stdout | Write report to file |
 | `--max-lines <n>` | 2000 | Truncate diff before review |
 | `--timeout <ms>` | 60000 | Per-agent timeout |
+| `--retry-attempts <n>` | 2 | Attempts per agent before skipping |
+| `--retry-delay <ms>` | 2000 | Backoff between retries |
 | `--fail-on <level>` | high | Exit 1 when severity ≥ level (`critical\|high\|medium\|any\|never`) |
 | `--ignore <glob>` | — | Exclude matching files (repeatable) |
 | `--no-sanitize` | — | Skip prompt injection sanitization |
@@ -184,6 +186,10 @@ Create `ai-review.config.json` in your project root to override defaults:
              "adversarial", "integration", "breaking-change", "license",
              "coverage", "testgen"],
   "testOutputDir": "./ai-review-tests",
+  "maxDiffLines": 2000,
+  "agentTimeoutMs": 60000,
+  "retryAttempts": 2,
+  "retryDelayMs": 2000,
   "sanitize": true,
   "provider": "ollama",
   "anthropicModel": "claude-opus-4-8"
@@ -210,6 +216,7 @@ calibration/fixtures/
 |-----------|----------|---------|
 | Diff size limit | `--max-lines` | 2000 lines |
 | Per-agent timeout | `--timeout` | 60 s |
+| Transient failure retry | `--retry-attempts` / `--retry-delay` | 2 attempts, 2 s backoff |
 | Severity gating | `--fail-on` | high |
 | Path exclusions | `--ignore` / `.aiignore` | — |
 | Prompt injection sanitization | `--no-sanitize` to disable | enabled |
@@ -230,7 +237,7 @@ Confidence is shown in the markdown report next to each finding.
 ## Development
 
 ```bash
-npm test                     # unit tests — no Ollama needed (62 passing)
+npm test                     # unit tests — no Ollama needed (80 passing)
 npm run typecheck            # 0 TypeScript errors
 npm run build                # compile to dist/
 INTEGRATION=1 npm run test:integration  # e2e — requires Ollama

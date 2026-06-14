@@ -16,11 +16,11 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-06-12
+**Last Updated**: 2026-06-13
 
 ## Current Focus
 
-**v0.6.0 MCP server — COMPLETE.** All 6 tasks implemented, reviewed, committed. `ai-review-mcp` binary ships in the `ai-review-agent` package and exposes the `review_diff` MCP tool via stdio transport. 77 unit tests passing. Version bumped to 0.6.0.
+**Configurable retry logic — COMPLETE.** `withRetryTimeout` wrapper added to `src/core/runner.ts` at all 3 agent call sites. `retryAttempts` (default 2) and `retryDelayMs` (default 2000) added to `ReviewConfig` and `DEFAULT_CONFIG`. `--retry-attempts` and `--retry-delay` CLI flags wired. 3 new retry unit tests added. 80 unit tests passing. Committed as `c2d2387`.
 
 ## What's Working
 
@@ -31,7 +31,7 @@ lineage: []
 - Confidence-aware hallucination check: solo Critical ≥60% confidence stays Critical; <60% → High
 - Prompt injection sanitizer: strips SYSTEM:, instruction overrides, role-play directives, long base64
 - Calibration CI: `.github/workflows/calibrate.yml` — weekly + release, skips gracefully without Ollama
-- **77 unit tests passing** across 13 test files (includes 15 new MCP tests)
+- **80 unit tests passing** across 13 test files (includes 15 new MCP tests, 3 new retry tests)
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
 
 ## Guardrails (All Complete)
@@ -56,7 +56,7 @@ lineage: []
 
 ## Next Steps
 
-- **Publish v0.6.0 to npm**: tag `v0.6.0`, push tag — triggers release workflow. Run `git tag v0.6.0 && git push && git push --tags`.
+- **Publish v0.7.0 to npm**: tag `v0.7.0`, push tag — triggers release workflow. Run `git tag v0.7.0 && git push && git push --tags`.
 - **Marketplace publish** (VS Code extension): Explicitly DEFERRED.
 - **Backlog**: Anthropic/Claude provider — explicitly backlogged; Ollama-only.
 - **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new token and update `NPM_TOKEN` secret before then.
@@ -94,7 +94,7 @@ lineage: []
 ## Key Commands
 
 ```bash
-npm test                    # all unit tests (62 passing)
+npm test                    # all unit tests (80 passing)
 npm run typecheck           # 0 errors
 npm run build               # compile to dist/
 node dist/cli/index.js --help   # smoke test CLI
@@ -124,3 +124,4 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-12: Cleanup — v0.4.0 published to npm; extension dep updated from tarball to `^0.4.0`; tarball removed from repo; `.gitignore` whitelist exception cleaned. All pushed (`2be6d27`).
 - 2026-06-12: v0.6.0 brainstorm → A+C hybrid output format, Cursor+Windows/Mac target, Ollama-only. Spec committed at `2852b00`, plan committed at `d277da4`. Implementation starting.
 - 2026-06-12: v0.6.0 COMPLETE — `ai-review-mcp` binary ships in the package. 6 tasks, 7 commits (`27be871`→`1b697db`). 77 unit tests. Version bumped to 0.6.0. Next: `git tag v0.6.0 && git push --tags` to publish to npm.
+- 2026-06-13: Configurable retry logic — `withRetryTimeout` wrapper in `runner.ts`, `retryAttempts`/`retryDelayMs` config + CLI flags, 3 new tests. 80 unit tests. Committed as `c2d2387`.
