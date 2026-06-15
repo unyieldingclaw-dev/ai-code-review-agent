@@ -29,7 +29,8 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   maxFindings: 15,
   agents: [
     'security', 'performance', 'correctness', 'design', 'dependencies',
-    'coverage', 'testgen', 'adversarial', 'integration', 'breaking-change', 'license'
+    'coverage', 'testgen', 'adversarial', 'integration', 'breaking-change', 'license',
+    'error-handling', 'observability', 'migration-safety', 'secrets', 'complexity'
   ],
   contextLines: 10,
   testOutputDir: './ai-review-tests',

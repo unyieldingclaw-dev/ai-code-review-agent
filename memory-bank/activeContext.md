@@ -16,22 +16,22 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-06-13
+**Last Updated**: 2026-06-15
 
 ## Current Focus
 
-**Configurable retry logic — COMPLETE.** `withRetryTimeout` wrapper added to `src/core/runner.ts` at all 3 agent call sites. `retryAttempts` (default 2) and `retryDelayMs` (default 2000) added to `ReviewConfig` and `DEFAULT_CONFIG`. `--retry-attempts` and `--retry-delay` CLI flags wired. 3 new retry unit tests added. 80 unit tests passing. Committed as `c2d2387`.
+**v0.8.0 — 5 new specialist agents — COMPLETE (pending final verification + tag).** Tasks 1–9 done. 16 agents total. 112 unit tests passing. Task 10 (final verification, tag v0.8.0, push) is next.
 
 ## What's Working
 
-- Full 11-agent swarm: 9 original specialists + BreakingChangeAgent + LicenseComplianceAgent + OrchestratorAgent
+- Full 16-agent swarm: 11 original + ErrorHandlingAgent + ObservabilityAgent + MigrationSafetyAgent + SecretsAgent + ComplexityAgent + OrchestratorAgent
 - `SwarmRunner` with sanitizer, sequential execution, coverage-first ordering
 - CLI: top-level flags (no subcommand), `--dir`, `--max-lines`, `--ignore`, `--no-sanitize`
 - Confidence scoring: `confidence` (0–100) on Finding, shown in markdown output
 - Confidence-aware hallucination check: solo Critical ≥60% confidence stays Critical; <60% → High
 - Prompt injection sanitizer: strips SYSTEM:, instruction overrides, role-play directives, long base64
 - Calibration CI: `.github/workflows/calibrate.yml` — weekly + release, skips gracefully without Ollama
-- **80 unit tests passing** across 13 test files (includes 15 new MCP tests, 3 new retry tests)
+- **112 unit tests passing** across 18 test files (includes 15 new MCP tests, 3 new retry tests, 5 new agent tests × 5 agents)
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
 
 ## Guardrails (All Complete)
@@ -56,7 +56,7 @@ lineage: []
 
 ## Next Steps
 
-- **Publish v0.7.0 to npm**: tag `v0.7.0`, push tag — triggers release workflow. Run `git tag v0.7.0 && git push && git push --tags`.
+- **Task 10 — Final verification + release**: `npm test` (112 passing), `npx tsc --noEmit` (0 errors), `npm run build` (clean), `node dist/cli/index.js --help` (smoke test), then `git tag v0.8.0 && git push && git push --tags` → triggers npm release.
 - **Marketplace publish** (VS Code extension): Explicitly DEFERRED.
 - **Backlog**: Anthropic/Claude provider — explicitly backlogged; Ollama-only.
 - **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new token and update `NPM_TOKEN` secret before then.
@@ -94,7 +94,7 @@ lineage: []
 ## Key Commands
 
 ```bash
-npm test                    # all unit tests (80 passing)
+npm test                    # all unit tests (112 passing)
 npm run typecheck           # 0 errors
 npm run build               # compile to dist/
 node dist/cli/index.js --help   # smoke test CLI
@@ -125,3 +125,4 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-12: v0.6.0 brainstorm → A+C hybrid output format, Cursor+Windows/Mac target, Ollama-only. Spec committed at `2852b00`, plan committed at `d277da4`. Implementation starting.
 - 2026-06-12: v0.6.0 COMPLETE — `ai-review-mcp` binary ships in the package. 6 tasks, 7 commits (`27be871`→`1b697db`). 77 unit tests. Version bumped to 0.6.0. Next: `git tag v0.6.0 && git push --tags` to publish to npm.
 - 2026-06-13: Configurable retry logic — `withRetryTimeout` wrapper in `runner.ts`, `retryAttempts`/`retryDelayMs` config + CLI flags, 3 new tests. 80 unit tests. Committed as `c2d2387`.
+- 2026-06-15: v0.8.0 — 5 new specialist agents (ErrorHandlingAgent, ObservabilityAgent, MigrationSafetyAgent, SecretsAgent, ComplexityAgent), `shell.ts` runTool(), conditional MigrationSafety skip in SwarmRunner, 32 new unit tests (112 total), 5 calibration fixtures, DEFAULT_CONFIG updated to 16 agents, package.json v0.8.0, README updated. Tasks 1–9 committed. Task 10 (final verification + tag) is next.

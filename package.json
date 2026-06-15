@@ -1,7 +1,7 @@
 {
   "name": "ai-review-agent",
-  "version": "0.7.0",
-  "description": "Local AI code review swarm — 11 specialist agents powered by Ollama, zero API costs",
+  "version": "0.8.0",
+  "description": "Local AI code review swarm — 16 specialist agents powered by Ollama, zero API costs",
   "type": "module",
   "keywords": [
     "code-review",

@@ -1,6 +1,6 @@
 # AI Code Review Agent
 
-A local, 11-agent AI code review tool powered by [Ollama](https://ollama.com). Runs against any git diff and produces structured findings across security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, test coverage, and test generation — no cloud API calls required.
+A local, 16-agent AI code review tool powered by [Ollama](https://ollama.com). Runs against any git diff and produces structured findings across security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, test coverage, test generation, error handling, observability, database migration safety, secrets detection, and code complexity — no cloud API calls required.
 
 ## Overview
 
@@ -29,6 +29,11 @@ Each specialist agent receives only the (sanitized) diff and its own system prom
 | IntegrationScoutAgent | Integration boundaries lacking tests (new HTTP calls, DB writes, queues, WebSocket connections) |
 | CoverageAnalystAgent | Test coverage gaps, untested branches |
 | TestGenAgent | Generates test stubs for coverage gaps |
+| ErrorHandlingAgent | Swallowed exceptions, ignored Promise rejections, sentinel-value failure returns, error paths that should propagate |
+| ObservabilityAgent | New code paths (branches, state changes, API entry points) lacking log output |
+| MigrationSafetyAgent | NOT NULL without DEFAULT, DROP without IF EXISTS, missing FK indexes, missing down migrations (skipped when diff has no migration files) |
+| SecretsAgent | Hardcoded API keys, passwords, private keys, connection strings in source code |
+| ComplexityAgent | High cyclomatic complexity, deep nesting, functions exceeding threshold (uses `lizard` if installed, falls back to LLM) |
 
 > **Note:** `OrchestratorAgent` is internal infrastructure — it deduplicates findings, cross-references severity, applies confidence scoring, and caps the final set. It cannot be selected via `--agents` and does not appear in agent output.
 
@@ -56,7 +61,7 @@ ollama pull devstral:latest
 ```bash
 cd your-project
 git add -p                            # stage the changes you want reviewed
-ai-review-agent                       # run the full 11-agent swarm
+ai-review-agent                       # run the full 16-agent swarm
 ai-review-agent --agents security     # single-agent fast pass
 ai-review-agent --format json         # machine-readable output
 ```
@@ -96,7 +101,7 @@ or invoke directly:
 
 > @ai-review review_diff
 
-Requires Ollama running locally with `devstral:latest` pulled. The tool runs 10 agents (security, performance, correctness, design, dependencies, adversarial, integration, breaking-change, license, coverage). For generated test files, use the CLI (`ai-review-agent`).
+Requires Ollama running locally with `devstral:latest` pulled. The tool runs 15 agents (all except `testgen`). For generated test files, use the CLI (`ai-review-agent`).
 
 ## Usage
 
@@ -113,7 +118,7 @@ ai-review-agent --dir /path/to/repo
 ai-review-agent --diff my-changes.diff
 
 # Run specific agents only
-ai-review-agent --agents security,correctness,breaking-change
+ai-review-agent --agents security,correctness,breaking-change,secrets,complexity
 
 # Override model
 ai-review-agent --model qwen3:latest
@@ -150,7 +155,7 @@ ai-review-agent --help
 | `--diff <path>` | — | Review a saved .diff file |
 | `--dir <path>` | cwd | Diff the given directory against HEAD |
 | `--model <model>` | devstral:latest | Override Ollama model |
-| `--agents <list>` | all 11 agents | Comma-separated agent list |
+| `--agents <list>` | all 16 agents | Comma-separated agent list |
 | `--format <fmt>` | markdown | `markdown` or `json` |
 | `--out <path>` | stdout | Write report to file |
 | `--max-lines <n>` | 2000 | Truncate diff before review |
@@ -165,7 +170,7 @@ Exit code `1` when any finding meets the `--fail-on` threshold (default: `high`)
 
 ### Claude Code slash command
 
-After installing, use `/ai-review` inside any Claude Code session to run the 11-agent swarm against your current diff and stream findings into the conversation.
+After installing, use `/ai-review` inside any Claude Code session to run the 16-agent swarm against your current diff and stream findings into the conversation.
 
 ### GitHub Actions
 
@@ -184,7 +189,8 @@ Create `ai-review.config.json` in your project root to override defaults:
   "maxFindings": 15,
   "agents": ["security", "correctness", "performance", "design", "dependencies",
              "adversarial", "integration", "breaking-change", "license",
-             "coverage", "testgen"],
+             "coverage", "testgen",
+             "error-handling", "observability", "migration-safety", "secrets", "complexity"],
   "testOutputDir": "./ai-review-tests",
   "maxDiffLines": 2000,
   "agentTimeoutMs": 60000,
@@ -192,13 +198,21 @@ Create `ai-review.config.json` in your project root to override defaults:
   "retryDelayMs": 2000,
   "sanitize": true,
   "provider": "ollama",
-  "anthropicModel": "claude-opus-4-8"
+  "anthropicModel": "claude-opus-4-8",
+  "preferredSecretsScanner": "gitleaks",
+  "complexityThreshold": 10
 }
 ```
 
 **Config field notes:**
 - `provider`: `"ollama"` (default) or `"anthropic"`. The Anthropic provider is defined in the schema but **not yet implemented** — all runs use Ollama regardless of this value. Planned for a future release.
 - `anthropicModel`: Model ID to use when `provider` is `"anthropic"` (e.g. `"claude-opus-4-8"`). Has no effect until the Anthropic provider is implemented.
+- `preferredSecretsScanner`: `"gitleaks"` (default when installed) or `"trufflehog"` or `"none"` — controls which external scanner SecretsAgent prefers. Falls back to LLM-only when the tool is not found.
+- `complexityThreshold`: Cyclomatic complexity threshold for ComplexityAgent (default: `10`). Functions exceeding this value are flagged. Used when `lizard` is installed; LLM estimates when not.
+
+**Optional dependencies (enhance specific agents):**
+- **[gitleaks](https://github.com/gitleaks/gitleaks)** or **[trufflehog](https://github.com/trufflesecurity/trufflehog)** — improves SecretsAgent accuracy. Falls back to LLM-only if neither is installed.
+- **[lizard](https://github.com/terryyin/lizard)** (`pip install lizard`) — provides precise cyclomatic complexity metrics to ComplexityAgent. Falls back to LLM estimation if not installed.
 
 Create `.aiignore` in your repo root to exclude files from every review (gitignore syntax):
 
@@ -237,7 +251,7 @@ Confidence is shown in the markdown report next to each finding.
 ## Development
 
 ```bash
-npm test                     # unit tests — no Ollama needed (80 passing)
+npm test                     # unit tests — no Ollama needed (112 passing)
 npm run typecheck            # 0 TypeScript errors
 npm run build                # compile to dist/
 INTEGRATION=1 npm run test:integration  # e2e — requires Ollama

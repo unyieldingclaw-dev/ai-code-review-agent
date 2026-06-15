@@ -16,7 +16,7 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-06-13
+**Last Updated**: 2026-06-15
 
 ## ✅ Completed (Tasks 1–16)
 
@@ -59,13 +59,13 @@ lineage: []
 ## 📊 Metrics
 
 ### Test Coverage
-- **Unit Tests**: 80 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 8, runner: 8, exitCode: 5, ignoreFilter: 7, sanitizer: 9, breakingChangeAgent: 5, licenseComplianceAgent: 5, confidence: 6, mcp/formatter: 8, mcp/tool: 7)
+- **Unit Tests**: 112 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 8, runner: 8, exitCode: 5, ignoreFilter: 7, sanitizer: 9, breakingChangeAgent: 5, licenseComplianceAgent: 5, confidence: 6, mcp/formatter: 8, mcp/tool: 7, errorHandlingAgent: 5, observabilityAgent: 5, migrationSafetyAgent: 5, secretsAgent: 5, complexityAgent: 5)
 - **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
-- **Total**: 80
+- **Total**: 112
 
 ### Implementation Progress
-- **Tasks complete**: 16 / 16 (100%) ✅ + Phase 2 (8 tasks) ✅
-- **Agents implemented**: 12 / 12 (11 specialists + orchestrator) ✅
+- **Tasks complete**: 16 / 16 (100%) ✅ + Phase 2 (8 tasks) ✅ + v0.8.0 (5 new agents) ✅
+- **Agents implemented**: 17 / 17 (16 specialists + orchestrator) ✅
 - **TypeScript errors**: 0
 - **GitHub**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
 
@@ -126,3 +126,4 @@ lineage: []
 | 0.5.0 (cleanup) | 2026-06-12 | vscode-extension dep → `^0.4.0` (npm), tarball removed from repo, `.gitignore` stale exception removed |
 | 0.6.0 | 2026-06-12 | MCP server: `ai-review-mcp` binary, `review_diff` tool, stdio transport, A+C hybrid output, 10 agents (no testgen), `.cursor/mcp.json`, 77 unit tests |
 | 0.7.0 | 2026-06-13 | Configurable retry logic: `withRetryTimeout` wrapper, `retryAttempts`/`retryDelayMs` config fields, `--retry-attempts`/`--retry-delay` CLI flags, 3 new retry tests (80 total) |
+| 0.8.0 | 2026-06-15 | 5 new specialist agents: ErrorHandlingAgent, ObservabilityAgent, MigrationSafetyAgent, SecretsAgent, ComplexityAgent; shell.ts runTool(); conditional MigrationSafety skip; 32 new unit tests (112 total); 5 calibration fixtures; README + config updated |
