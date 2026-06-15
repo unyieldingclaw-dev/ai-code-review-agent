@@ -16,6 +16,7 @@ import { TestGenAgent } from './agents/testGen.js'
 import { AdversarialAgent } from './agents/adversarial.js'
 import { IntegrationScoutAgent } from './agents/integrationScout.js'
 import { OrchestratorAgent } from './agents/orchestrator.js'
+import { ErrorHandlingAgent } from './agents/errorHandling.js'
 
 function withTimeout<T>(promise: Promise<T>, ms: number, agentName: string): Promise<T> {
   return Promise.race([
@@ -59,6 +60,7 @@ function buildAgents(config: ReviewConfig, provider: LLMProvider): BaseAgent[] {
     ['integration', () => new IntegrationScoutAgent(provider, config)],
     ['breaking-change', () => new BreakingChangeAgent(provider, config)],
     ['license', () => new LicenseComplianceAgent(provider, config)],
+    ['error-handling', () => new ErrorHandlingAgent(provider, config)],
   ])
   return config.agents
     .filter(a => a !== 'testgen' && a !== 'coverage')
