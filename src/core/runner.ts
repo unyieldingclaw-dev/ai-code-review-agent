@@ -19,6 +19,7 @@ import { OrchestratorAgent } from './agents/orchestrator.js'
 import { ErrorHandlingAgent } from './agents/errorHandling.js'
 import { ObservabilityAgent } from './agents/observability.js'
 import { MigrationSafetyAgent, hasMigrationFiles } from './agents/migrationSafety.js'
+import { SecretsAgent } from './agents/secrets.js'
 
 function withTimeout<T>(promise: Promise<T>, ms: number, agentName: string): Promise<T> {
   return Promise.race([
@@ -65,6 +66,7 @@ function buildAgents(config: ReviewConfig, provider: LLMProvider): BaseAgent[] {
     ['error-handling', () => new ErrorHandlingAgent(provider, config)],
     ['observability', () => new ObservabilityAgent(provider, config)],
     ['migration-safety', () => new MigrationSafetyAgent(provider, config)],
+    ['secrets', () => new SecretsAgent(provider, config)],
   ])
   return config.agents
     .filter(a => a !== 'testgen' && a !== 'coverage')
