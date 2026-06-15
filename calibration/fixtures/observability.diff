@@ -1,0 +1,25 @@
+diff --git a/src/services/orderService.ts b/src/services/orderService.ts
+index 000000..111111 100644
+--- a/src/services/orderService.ts
++++ b/src/services/orderService.ts
+@@ -0,0 +1,24 @@
++import { db } from '../db'
++
++// REAL ISSUE: significant state mutation (order cancellation) with no logging
++export async function cancelOrder(orderId: string, reason: string): Promise<void> {
++  await db('orders')
++    .where('id', orderId)
++    .update({ status: 'cancelled', cancelReason: reason, cancelledAt: new Date() })
++  await db('order_items')
++    .where('orderId', orderId)
++    .update({ status: 'cancelled' })
++}
++
++// FALSE POSITIVE BAIT: pure formatting utilities — no logging needed
++export function formatDate(date: Date): string {
++  return date.toISOString().split('T')[0]
++}
++
++export function formatOrderSummary(orderId: string, total: number): string {
++  return `Order #${orderId}: $${total.toFixed(2)}`
++}

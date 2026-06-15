@@ -1,0 +1,61 @@
+diff --git a/src/billing/shippingCalculator.ts b/src/billing/shippingCalculator.ts
+index 000000..111111 100644
+--- a/src/billing/shippingCalculator.ts
++++ b/src/billing/shippingCalculator.ts
+@@ -0,0 +1,52 @@
++// REAL ISSUE: deeply nested function with high cyclomatic complexity
++export function calculateShippingCost(
++  weight: number,
++  destination: string,
++  carrier: string,
++  isExpress: boolean,
++  memberTier: string,
++  promoCode: string | null
++): number {
++  let cost = 0
++  if (carrier === 'fedex') {
++    if (destination === 'domestic') {
++      if (weight < 1) {
++        cost = isExpress ? 15 : 8
++      } else if (weight < 5) {
++        if (memberTier === 'gold') {
++          cost = isExpress ? 20 : 12
++        } else if (memberTier === 'silver') {
++          cost = isExpress ? 25 : 15
++        } else {
++          cost = isExpress ? 30 : 18
++        }
++      } else {
++        if (memberTier === 'gold') {
++          cost = isExpress ? 35 : 22
++        } else {
++          cost = isExpress ? 45 : 28
++        }
++      }
++    } else if (destination === 'international') {
++      if (weight < 1) {
++        cost = isExpress ? 40 : 25
++      } else {
++        cost = isExpress ? 65 : 45
++      }
++    }
++  } else if (carrier === 'ups') {
++    if (destination === 'domestic') {
++      cost = weight * (isExpress ? 8 : 5)
++    } else {
++      cost = weight * (isExpress ? 15 : 10)
++    }
++  } else {
++    cost = weight * 3
++  }
++  if (promoCode === 'FREESHIP') cost = 0
++  if (memberTier === 'gold' && promoCode) cost *= 0.9
++  return cost
++}
++
++// FALSE POSITIVE BAIT: long but linear formatting function — no nesting
++export function formatAddress(
++  name: string, street: string, city: string, state: string, zip: string, country: string
++): string {
++  return `${name}\n${street}\n${city}, ${state} ${zip}\n${country}`
++}

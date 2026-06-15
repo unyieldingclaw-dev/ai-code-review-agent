@@ -12,6 +12,11 @@ import { CoverageAnalystAgent } from '../src/core/agents/coverageAnalyst.js'
 import { TestGenAgent } from '../src/core/agents/testGen.js'
 import { BreakingChangeAgent } from '../src/core/agents/breakingChange.js'
 import { LicenseComplianceAgent } from '../src/core/agents/licenseCompliance.js'
+import { ErrorHandlingAgent } from '../src/core/agents/errorHandling.js'
+import { ObservabilityAgent } from '../src/core/agents/observability.js'
+import { MigrationSafetyAgent } from '../src/core/agents/migrationSafety.js'
+import { SecretsAgent } from '../src/core/agents/secrets.js'
+import { ComplexityAgent } from '../src/core/agents/complexity.js'
 import { OrchestratorAgent } from '../src/core/agents/orchestrator.js'
 import { BaseAgent } from '../src/core/agents/base.js'
 import type { Finding } from '../src/core/schema.js'
@@ -34,6 +39,11 @@ const CASES: CalibrationCase[] = [
   { name: 'coverage',        fixtureFile: 'calibration/fixtures/coverage.diff',         expectedKeyword: 'processRefund',  baitKeyword: 'getVersion' },
   { name: 'breaking-change', fixtureFile: 'calibration/fixtures/breaking-change.diff',  expectedKeyword: 'parameter',      baitKeyword: '_formatUser' },
   { name: 'license',         fixtureFile: 'calibration/fixtures/license.diff',          expectedKeyword: 'lgpl',           baitKeyword: 'chalk' },
+  { name: 'error-handling',  fixtureFile: 'calibration/fixtures/error-handling.diff',   expectedKeyword: 'swallowed',       baitKeyword: 'loadUserPreferences' },
+  { name: 'observability',   fixtureFile: 'calibration/fixtures/observability.diff',    expectedKeyword: 'logging',         baitKeyword: 'formatDate' },
+  { name: 'migration-safety',fixtureFile: 'calibration/fixtures/migration-safety.diff', expectedKeyword: 'not null',        baitKeyword: 'idx_users_email' },
+  { name: 'secrets',         fixtureFile: 'calibration/fixtures/secrets.diff',          expectedKeyword: 'password',        baitKeyword: 'REPLACE_WITH_REAL_KEY' },
+  { name: 'complexity',      fixtureFile: 'calibration/fixtures/complexity.diff',        expectedKeyword: 'complexity',      baitKeyword: 'formatAddress' },
 ]
 
 async function main() {
@@ -54,8 +64,13 @@ async function main() {
     'adversarial':     new AdversarialAgent(provider, DEFAULT_CONFIG),
     'integration':     new IntegrationScoutAgent(provider, DEFAULT_CONFIG),
     'coverage':        new CoverageAnalystAgent(provider, DEFAULT_CONFIG),
-    'breaking-change': new BreakingChangeAgent(provider, DEFAULT_CONFIG),
-    'license':         new LicenseComplianceAgent(provider, DEFAULT_CONFIG),
+    'breaking-change':  new BreakingChangeAgent(provider, DEFAULT_CONFIG),
+    'license':          new LicenseComplianceAgent(provider, DEFAULT_CONFIG),
+    'error-handling':   new ErrorHandlingAgent(provider, DEFAULT_CONFIG),
+    'observability':    new ObservabilityAgent(provider, DEFAULT_CONFIG),
+    'migration-safety': new MigrationSafetyAgent(provider, DEFAULT_CONFIG),
+    'secrets':          new SecretsAgent(provider, DEFAULT_CONFIG),
+    'complexity':       new ComplexityAgent(provider, DEFAULT_CONFIG),
   }
 
   let passed = 0

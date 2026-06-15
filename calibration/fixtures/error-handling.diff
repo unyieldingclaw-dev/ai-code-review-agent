@@ -1,0 +1,33 @@
+diff --git a/src/api/userService.ts b/src/api/userService.ts
+index 000000..111111 100644
+--- a/src/api/userService.ts
++++ b/src/api/userService.ts
+@@ -0,0 +1,30 @@
++import { db } from '../db'
++import { cache } from '../cache'
++
++// REAL ISSUE: DB transaction failure silently swallowed — caller gets false with no log
++export async function chargeUser(userId: string, amount: number): Promise<boolean> {
++  try {
++    await db.transaction(async (trx) => {
++      await trx('accounts').decrement('balance', amount).where('id', userId)
++      await trx('transactions').insert({ userId, amount, type: 'charge' })
++    })
++    return true
++  } catch (e) {
++    return false
++  }
++}
++
++// FALSE POSITIVE BAIT: legitimately handles expected cache-miss errors
++export async function loadUserPreferences(userId: string): Promise<Record<string, unknown>> {
++  try {
++    const raw = await cache.get(`prefs:${userId}`)
++    return JSON.parse(raw)
++  } catch (e) {
++    // Cache miss or corrupt JSON — fall back to defaults, rethrow unexpected errors
++    const code = (e as NodeJS.ErrnoException).code
++    if (code !== 'ENOENT' && !(e instanceof SyntaxError)) throw e
++    return {}
++  }
++}

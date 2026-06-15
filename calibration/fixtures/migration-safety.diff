@@ -1,0 +1,11 @@
+diff --git a/migrations/20240615_add_user_phone.sql b/migrations/20240615_add_user_phone.sql
+index 000000..111111 100644
+--- /dev/null
++++ b/migrations/20240615_add_user_phone.sql
+@@ -0,0 +1,8 @@
++-- REAL ISSUE: NOT NULL column added without DEFAULT on existing table
++-- This will fail if the table has existing rows
++ALTER TABLE users ADD COLUMN phone_number VARCHAR(20) NOT NULL;
++
++-- FALSE POSITIVE BAIT: safe index creation
++CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
