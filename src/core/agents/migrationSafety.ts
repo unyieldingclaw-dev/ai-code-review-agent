@@ -1,6 +1,14 @@
 import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
+const MIGRATION_PATTERNS = [
+  /migrations\//i,
+  /\.migration\.(ts|js|sql)$/i,
+  /versions\//i,
+  /_up\.sql$/i,
+  /\d{4}_.*\.sql$/i,
+]
+
 export class MigrationSafetyAgent extends BaseAgent {
   get name(): AgentName { return 'migration-safety' }
 
@@ -25,18 +33,11 @@ Required format:
 }
 
 export function hasMigrationFiles(diff: string): boolean {
-  const migrationPatterns = [
-    /migrations\//i,
-    /\.migration\.(ts|js|sql)$/i,
-    /versions\//i,
-    /_up\.sql$/i,
-    /\d{4}_.*\.sql$/i,
-  ]
   const lines = diff.split('\n')
   for (const line of lines) {
     if (!line.startsWith('+++ b/')) continue
     const filePath = line.slice(6)
-    if (migrationPatterns.some(p => p.test(filePath))) return true
+    if (MIGRATION_PATTERNS.some(p => p.test(filePath))) return true
   }
   return false
 }

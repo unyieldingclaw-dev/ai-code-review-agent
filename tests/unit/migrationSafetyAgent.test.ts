@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { MigrationSafetyAgent } from '../../src/core/agents/migrationSafety.js'
+import { MigrationSafetyAgent, hasMigrationFiles } from '../../src/core/agents/migrationSafety.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
@@ -34,5 +34,31 @@ describe('MigrationSafetyAgent', () => {
     const agent = new MigrationSafetyAgent(makeProvider('[]'), DEFAULT_CONFIG)
     expect(agent.systemPrompt).toMatch(/NOT NULL/i)
     expect(agent.systemPrompt).toMatch(/migration/i)
+  })
+})
+
+describe('hasMigrationFiles', () => {
+  it('returns true for a migrations/ path', () => {
+    expect(hasMigrationFiles('+++ b/db/migrations/0042_add_role.sql')).toBe(true)
+  })
+
+  it('returns true for a .migration.ts file', () => {
+    expect(hasMigrationFiles('+++ b/src/database/add_user.migration.ts')).toBe(true)
+  })
+
+  it('returns true for a versions/ path', () => {
+    expect(hasMigrationFiles('+++ b/alembic/versions/0001_initial.py')).toBe(true)
+  })
+
+  it('returns true for an _up.sql file', () => {
+    expect(hasMigrationFiles('+++ b/schema/0003_users_up.sql')).toBe(true)
+  })
+
+  it('returns false for a non-migration file', () => {
+    expect(hasMigrationFiles('--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1 @@\n-foo\n+bar')).toBe(false)
+  })
+
+  it('does not match the --- a/ (old-side) header', () => {
+    expect(hasMigrationFiles('--- a/migrations/old.sql\n+++ b/src/app.ts')).toBe(false)
   })
 })
