@@ -1,15 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { SecretsAgent } from '../../src/core/agents/secrets.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
-
-// Mock the shell utility
-vi.mock('../../src/utils/shell.js', () => ({
-  runTool: vi.fn()
-}))
-
-import { runTool } from '../../src/utils/shell.js'
-const mockRunTool = vi.mocked(runTool)
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
@@ -23,17 +15,11 @@ const FAKE_DIFF = `--- a/src/config.ts
 +const SECRET = 'AAAAAAAAAAAAAAAAAAAAAA'`
 
 describe('SecretsAgent', () => {
-  beforeEach(() => {
-    vi.resetAllMocks()
-  })
-
   it('has name secrets', () => {
-    mockRunTool.mockResolvedValue(null)
     expect(new SecretsAgent(makeProvider('[]'), DEFAULT_CONFIG).name).toBe('secrets')
   })
 
-  it('falls back to LLM when no scanner tool is found', async () => {
-    mockRunTool.mockResolvedValue(null)
+  it('uses LLM to analyze the diff', async () => {
     const provider = makeProvider('[]')
     const agent = new SecretsAgent(provider, DEFAULT_CONFIG)
     const findings = await agent.run({ diff: FAKE_DIFF })
@@ -42,7 +28,6 @@ describe('SecretsAgent', () => {
   })
 
   it('parses LLM finding and stamps agent name', async () => {
-    mockRunTool.mockResolvedValue(null)
     const raw = JSON.stringify([{
       severity: 'high',
       basis: 'VERIFIED',
@@ -61,14 +46,12 @@ describe('SecretsAgent', () => {
   })
 
   it('returns empty array on LLM parse failure', async () => {
-    mockRunTool.mockResolvedValue(null)
     expect(
       await new SecretsAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: FAKE_DIFF })
     ).toEqual([])
   })
 
   it('system prompt mentions credentials and secrets', () => {
-    mockRunTool.mockResolvedValue(null)
     const agent = new SecretsAgent(makeProvider('[]'), DEFAULT_CONFIG)
     expect(agent.systemPrompt).toMatch(/credential/i)
     expect(agent.systemPrompt).toMatch(/secret/i)
