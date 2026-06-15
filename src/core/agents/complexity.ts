@@ -1,0 +1,53 @@
+import { BaseAgent } from './base.js'
+import { runTool } from '../../utils/shell.js'
+import type { AgentName } from '../schema.js'
+import type { ReviewInput, Finding } from '../schema.js'
+
+function extractChangedFiles(diff: string): string[] {
+  const files: string[] = []
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('+++ b/')) {
+      files.push(line.slice(6))
+    }
+  }
+  return files
+}
+
+export class ComplexityAgent extends BaseAgent {
+  get name(): AgentName { return 'complexity' }
+
+  get systemPrompt(): string {
+    return `You are a code reviewer specializing in code complexity.
+Analyze the diff for functions and methods with high cyclomatic complexity:
+- Functions with deeply nested conditionals (3+ levels of nesting)
+- Functions with high cyclomatic complexity (more than 10 decision paths)
+- Large functions that do too many things (more than 50 lines)
+- Functions with too many parameters (more than 5)
+- Complex switch statements with many cases that could be simplified
+
+severity: "high" for functions exceeding cyclomatic complexity of 15 or with 5+ levels of nesting
+severity: "medium" for functions with complexity 10-15 or 3-4 levels of nesting
+severity: "low" for long functions that could be split but are otherwise clear
+
+Output ONLY a JSON array of findings. No prose, no explanation, no markdown fences. Empty array if no issues.
+Required format:
+[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":80,"file":"path/to/file","line":42,"title":"Short title","detail":"What the problem is","suggestion":"How to fix it"}]`
+  }
+
+  async run(input: ReviewInput): Promise<Finding[]> {
+    const files = extractChangedFiles(input.diff)
+    if (files.length === 0) {
+      return super.run(input)
+    }
+
+    const lizardOutput = await runTool('lizard', files)
+    if (lizardOutput === null) {
+      // lizard not found — LLM receives plain diff
+      return super.run(input)
+    }
+
+    // lizard found — prepend metrics so LLM can focus on high-complexity functions
+    const enhancedDiff = `=== Lizard Complexity Metrics ===\n${lizardOutput}\n\n=== Diff ===\n${input.diff}`
+    return super.run({ ...input, diff: enhancedDiff })
+  }
+}
