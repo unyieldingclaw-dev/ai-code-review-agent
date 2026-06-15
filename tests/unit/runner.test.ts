@@ -25,7 +25,8 @@ describe('SwarmRunner', () => {
     const runner = new SwarmRunner(DEFAULT_CONFIG, provider)
     const progress: string[] = []
     await runner.run({ diff: 'diff' }, (agent) => progress.push(agent))
-    expect(progress.length).toBe(DEFAULT_CONFIG.agents.length)
+    // migration-safety is excluded when diff has no migration files
+    expect(progress.length).toBe(DEFAULT_CONFIG.agents.length - 1)
   })
 
   it('truncates diff that exceeds maxDiffLines and warns', async () => {
