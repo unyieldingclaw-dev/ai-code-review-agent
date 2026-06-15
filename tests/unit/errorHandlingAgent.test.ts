@@ -18,7 +18,7 @@ describe('ErrorHandlingAgent', () => {
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{ severity: 'high', basis: 'VERIFIED', file: 'src/api.ts', line: 10, title: 'Swallowed exception in fetchUser', detail: 'The catch block is empty', suggestion: 'Rethrow the error' }])
+    const raw = JSON.stringify([{ severity: 'high', basis: 'VERIFIED', confidence: 80, file: 'src/api.ts', line: 10, title: 'Swallowed exception in fetchUser', detail: 'The catch block is empty', suggestion: 'Rethrow the error' }])
     const agent = new ErrorHandlingAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
