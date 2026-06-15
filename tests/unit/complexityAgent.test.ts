@@ -50,7 +50,7 @@ describe('ComplexityAgent', () => {
     const provider = makeProvider('[]')
     const agent = new ComplexityAgent(provider, DEFAULT_CONFIG)
     await agent.run({ diff: DIFF_WITH_FILE })
-    expect(mockRunTool).toHaveBeenCalled()
+    expect(mockRunTool).toHaveBeenCalledWith('lizard', ['src/app.ts'])
     expect(provider.chat).toHaveBeenCalledOnce()
     // The LLM prompt content should include the lizard metrics
     const chatArgs = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]

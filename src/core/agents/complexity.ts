@@ -37,6 +37,7 @@ Required format:
   async run(input: ReviewInput): Promise<Finding[]> {
     const files = extractChangedFiles(input.diff)
     if (files.length === 0) {
+      // No new/modified files in diff — nothing to pass to lizard; fall back to LLM-only.
       return super.run(input)
     }
 
