@@ -9,8 +9,10 @@ export function runTool(cmd: string, args: string[], stdinData?: string): Promis
     if (proc.stdout) {
       proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
     }
-    proc.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'ENOENT') resolve(null)
+    proc.stderr?.on('data', () => {})
+    proc.on('error', (err: Error) => {
+      const e = err as NodeJS.ErrnoException
+      if (e.code === 'ENOENT') resolve(null)
       else reject(err)
     })
     // Use 'close' (not 'exit') — gitleaks exits non-zero when secrets are found,
