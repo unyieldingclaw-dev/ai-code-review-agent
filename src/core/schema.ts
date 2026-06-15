@@ -10,6 +10,11 @@ export type AgentName =
   | 'integration'
   | 'breaking-change'
   | 'license'
+  | 'secrets'
+  | 'error-handling'
+  | 'observability'
+  | 'migration-safety'
+  | 'complexity'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
 export type Basis = 'VERIFIED' | 'INFERRED' | 'SPECULATIVE'

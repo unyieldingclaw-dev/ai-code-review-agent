@@ -17,6 +17,8 @@ export interface ReviewConfig {
   retryDelayMs: number
   ignorePaths: string[]
   sanitize: boolean
+  preferredSecretsScanner?: 'gitleaks' | 'trufflehog' | 'none'
+  complexityThreshold?: number
 }
 
 export const DEFAULT_CONFIG: ReviewConfig = {
