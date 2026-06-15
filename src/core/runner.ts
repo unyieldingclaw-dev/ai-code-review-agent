@@ -18,6 +18,7 @@ import { IntegrationScoutAgent } from './agents/integrationScout.js'
 import { OrchestratorAgent } from './agents/orchestrator.js'
 import { ErrorHandlingAgent } from './agents/errorHandling.js'
 import { ObservabilityAgent } from './agents/observability.js'
+import { MigrationSafetyAgent, hasMigrationFiles } from './agents/migrationSafety.js'
 
 function withTimeout<T>(promise: Promise<T>, ms: number, agentName: string): Promise<T> {
   return Promise.race([
@@ -63,6 +64,7 @@ function buildAgents(config: ReviewConfig, provider: LLMProvider): BaseAgent[] {
     ['license', () => new LicenseComplianceAgent(provider, config)],
     ['error-handling', () => new ErrorHandlingAgent(provider, config)],
     ['observability', () => new ObservabilityAgent(provider, config)],
+    ['migration-safety', () => new MigrationSafetyAgent(provider, config)],
   ])
   return config.agents
     .filter(a => a !== 'testgen' && a !== 'coverage')
@@ -147,7 +149,12 @@ export class SwarmRunner {
     }
 
     // Run remaining specialist agents
-    const agents = buildAgents(this.config, this.provider)
+    // Exclude MigrationSafetyAgent when diff contains no migration files
+    const activeConfig = this.config.agents.includes('migration-safety') && !hasMigrationFiles(input.diff)
+      ? { ...this.config, agents: this.config.agents.filter(a => a !== 'migration-safety') }
+      : this.config
+
+    const agents = buildAgents(activeConfig, this.provider)
     for (const agent of agents) {
       onProgress?.(agent.name)
       try {

@@ -115,4 +115,14 @@ describe('SwarmRunner', () => {
     const runner = new SwarmRunner(DEFAULT_CONFIG, provider)
     await expect(runner.run({ diff: 'diff' })).rejects.toThrow('Ollama not running')
   })
+
+  it('skips migration-safety agent when diff has no migration files', async () => {
+    const provider = makeProvider()
+    const config = { ...DEFAULT_CONFIG, agents: ['security', 'migration-safety'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const progress: string[] = []
+    await runner.run({ diff: '--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-foo\n+bar' }, (agent) => progress.push(agent))
+    expect(progress).not.toContain('migration-safety')
+    expect(progress).toContain('security')
+  })
 })
