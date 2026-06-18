@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { SwarmRunner } from '../../src/core/runner.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
-import type { AgentName } from '../../src/core/schema.js'
+import type { AgentName, AgentProgressEvent, FailOnLevel } from '../../src/core/schema.js'
 
 const makeProvider = (response = '[]'): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
@@ -24,7 +24,7 @@ describe('SwarmRunner', () => {
     const provider = makeProvider()
     const runner = new SwarmRunner(DEFAULT_CONFIG, provider)
     const progress: string[] = []
-    await runner.run({ diff: 'diff' }, (agent) => progress.push(agent))
+    await runner.run({ diff: 'diff' }, (event) => { if (event.phase === 'start') progress.push(event.name) })
     // migration-safety is excluded when diff has no migration files
     expect(progress.length).toBe(DEFAULT_CONFIG.agents.length - 1)
   })
@@ -122,8 +122,98 @@ describe('SwarmRunner', () => {
     const config = { ...DEFAULT_CONFIG, agents: ['security', 'migration-safety'] as AgentName[] }
     const runner = new SwarmRunner(config, provider)
     const progress: string[] = []
-    await runner.run({ diff: '--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-foo\n+bar' }, (agent) => progress.push(agent))
+    await runner.run({ diff: '--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-foo\n+bar' }, (event) => { if (event.phase === 'start') progress.push(event.name) })
     expect(progress).not.toContain('migration-safety')
     expect(progress).toContain('security')
+  })
+
+  it('onProgress fires start before end for each agent', async () => {
+    const provider = makeProvider()
+    const config = { ...DEFAULT_CONFIG, agents: ['security', 'correctness'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const events: { phase: string; name: AgentName }[] = []
+    await runner.run({ diff: 'diff' }, (event) => events.push({ phase: event.phase, name: event.name }))
+    expect(events).toHaveLength(4)
+    expect(events[0]).toMatchObject({ phase: 'start', name: 'security' })
+    expect(events[1]).toMatchObject({ phase: 'end', name: 'security' })
+    expect(events[2]).toMatchObject({ phase: 'start', name: 'correctness' })
+    expect(events[3]).toMatchObject({ phase: 'end', name: 'correctness' })
+  })
+
+  it("onProgress 'end' event includes findings and elapsedMs", async () => {
+    const provider = makeProvider()
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const endEvents: AgentProgressEvent[] = []
+    await runner.run({ diff: 'diff' }, (event) => { if (event.phase === 'end') endEvents.push(event) })
+    expect(endEvents).toHaveLength(1)
+    expect(endEvents[0].findings).toBeInstanceOf(Array)
+    expect(typeof endEvents[0].elapsedMs).toBe('number')
+  })
+
+  it('failFast stops swarm after critical finding; remaining agents not called', async () => {
+    const criticalFinding = JSON.stringify([{
+      severity: 'critical', basis: 'VERIFIED', file: 'app.ts',
+      line: 1, title: 'SQL Injection', detail: 'User input used directly in query', suggestion: 'Use parameterized queries'
+    }])
+    let chatCallCount = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => {
+        chatCallCount++
+        return Promise.resolve(chatCallCount === 1 ? criticalFinding : '[]')
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true })
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'correctness'] as AgentName[],
+      failFast: true,
+      failOn: 'high' as FailOnLevel
+    }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.earlyExit).toEqual({ stoppedAt: 'security' })
+    expect(chatCallCount).toBe(1)
+  })
+
+  it('failFast does not stop when findings are below failOn threshold', async () => {
+    const lowFinding = JSON.stringify([{
+      severity: 'low', basis: 'INFERRED', file: 'app.ts',
+      line: 1, title: 'Style', detail: 'Minor style issue', suggestion: 'Rename variable'
+    }])
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue(lowFinding),
+      ping: vi.fn().mockResolvedValue({ ok: true })
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'correctness'] as AgentName[],
+      failFast: true,
+      failOn: 'high' as FailOnLevel
+    }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.earlyExit).toBeUndefined()
+    expect(provider.chat).toHaveBeenCalledTimes(2)
+  })
+
+  it('failFast false runs all agents regardless of finding severity', async () => {
+    const criticalFinding = JSON.stringify([{
+      severity: 'critical', basis: 'VERIFIED', file: 'app.ts',
+      line: 1, title: 'RCE', detail: 'Remote code execution', suggestion: 'Sanitize input'
+    }])
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue(criticalFinding),
+      ping: vi.fn().mockResolvedValue({ ok: true })
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'correctness'] as AgentName[],
+      failFast: false
+    }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.earlyExit).toBeUndefined()
+    expect(provider.chat).toHaveBeenCalledTimes(2)
   })
 })

@@ -1,6 +1,7 @@
 import type { LLMProvider } from './llm/provider.js'
 import type { ReviewConfig } from './config.js'
-import type { AgentName, Finding, ReviewInput, ReviewResult, CoverageGap, GeneratedTestFile } from './schema.js'
+import type { AgentName, Severity, Finding, ReviewInput, ReviewResult, CoverageGap, GeneratedTestFile, AgentProgressEvent } from './schema.js'
+import { SEVERITY_RANK } from './schema.js'
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
 import { sanitizeDiff } from './sanitizer.js'
 import { BreakingChangeAgent } from './agents/breakingChange.js'
@@ -82,6 +83,14 @@ function buildAgents(config: ReviewConfig, provider: LLMProvider): BaseAgent[] {
     })
 }
 
+function shouldEarlyExit(config: ReviewConfig, allFindings: Finding[]): boolean {
+  if (!config.failFast) return false
+  const level = config.failOn ?? 'high'
+  if (level === 'never') return false
+  if (level === 'any') return allFindings.length > 0
+  return allFindings.some(f => SEVERITY_RANK[f.severity] >= SEVERITY_RANK[level as Severity])
+}
+
 export class SwarmRunner {
   private readonly orchestrator: OrchestratorAgent
   private readonly testGen: TestGenAgent
@@ -96,7 +105,7 @@ export class SwarmRunner {
 
   async run(
     input: ReviewInput,
-    onProgress?: (agent: AgentName) => void
+    onProgress?: (event: AgentProgressEvent) => void
   ): Promise<ReviewResult> {
     const ping = await this.provider.ping()
     if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')
@@ -139,39 +148,62 @@ export class SwarmRunner {
     const retryAttempts = this.config.retryAttempts
     const retryDelayMs = this.config.retryDelayMs
 
-    // Run CoverageAnalyst first if enabled (TestGen depends on it)
-    if (this.config.agents.includes('coverage')) {
-      onProgress?.('coverage')
-      const coverageAgent = new CoverageAnalystAgent(this.provider, this.config)
-      try {
-        const coverageResult = await withRetryTimeout(() => coverageAgent.runForCoverage(input), timeout, 'coverage', retryAttempts, retryDelayMs)
-        allFindings.push(...coverageResult.findings)
-        coverageGaps = coverageResult.gaps
-      } catch (err) {
-        console.warn(`[ai-review] Agent coverage timed out or failed: ${(err as Error).message}`)
-      }
-    }
-
-    // Run remaining specialist agents
-    // Exclude MigrationSafetyAgent when diff contains no migration files
+    // Determine which agents will run — hoist before coverage so total is known upfront
     const activeConfig = this.config.agents.includes('migration-safety') && !hasMigrationFiles(input.diff)
       ? { ...this.config, agents: this.config.agents.filter(a => a !== 'migration-safety') }
       : this.config
 
     const agents = buildAgents(activeConfig, this.provider)
-    for (const agent of agents) {
-      onProgress?.(agent.name)
+    const hasCoverage = activeConfig.agents.includes('coverage')
+    const hasTestgen = activeConfig.agents.includes('testgen')
+    const total = agents.length + (hasCoverage ? 1 : 0) + (hasTestgen ? 1 : 0)
+
+    let index = 0
+    let earlyExitAgent: AgentName | undefined
+
+    // Run CoverageAnalyst first if enabled (TestGen depends on it)
+    if (hasCoverage) {
+      index++
+      const coverageAgent = new CoverageAnalystAgent(this.provider, this.config)
+      onProgress?.({ phase: 'start', name: 'coverage', index, total })
+      const startMs = Date.now()
       try {
-        const findings = await withRetryTimeout(() => agent.run(input), timeout, agent.name, retryAttempts, retryDelayMs)
-        allFindings.push(...findings)
+        const coverageResult = await withRetryTimeout(() => coverageAgent.runForCoverage(input), timeout, 'coverage', retryAttempts, retryDelayMs)
+        allFindings.push(...coverageResult.findings)
+        coverageGaps = coverageResult.gaps
+        const shouldStop = shouldEarlyExit(this.config, allFindings)
+        onProgress?.({ phase: 'end', name: 'coverage', index, total, findings: coverageResult.findings, elapsedMs: Date.now() - startMs, earlyExit: shouldStop })
+        if (shouldStop) earlyExitAgent = 'coverage'
       } catch (err) {
-        console.warn(`[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`)
+        console.warn(`[ai-review] Agent coverage timed out or failed: ${(err as Error).message}`)
+        onProgress?.({ phase: 'end', name: 'coverage', index, total, findings: [], elapsedMs: Date.now() - startMs })
       }
     }
 
-    // Run TestGen if enabled — always fire onProgress, only call LLM when there are gaps
-    if (this.config.agents.includes('testgen')) {
-      onProgress?.('testgen')
+    // Run specialist agents — break early if failFast threshold is met
+    if (!earlyExitAgent) {
+      for (const agent of agents) {
+        index++
+        onProgress?.({ phase: 'start', name: agent.name, index, total })
+        const startMs = Date.now()
+        try {
+          const findings = await withRetryTimeout(() => agent.run(input), timeout, agent.name, retryAttempts, retryDelayMs)
+          allFindings.push(...findings)
+          const shouldStop = shouldEarlyExit(this.config, allFindings)
+          onProgress?.({ phase: 'end', name: agent.name, index, total, findings, elapsedMs: Date.now() - startMs, earlyExit: shouldStop })
+          if (shouldStop) { earlyExitAgent = agent.name; break }
+        } catch (err) {
+          console.warn(`[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`)
+          onProgress?.({ phase: 'end', name: agent.name, index, total, findings: [], elapsedMs: Date.now() - startMs })
+        }
+      }
+    }
+
+    // Run TestGen if enabled — skip entirely on early exit
+    if (!earlyExitAgent && hasTestgen) {
+      index++
+      onProgress?.({ phase: 'start', name: 'testgen', index, total })
+      const startMs = Date.now()
       if (coverageGaps.length > 0) {
         try {
           const testResult = await withRetryTimeout(() => this.testGen.runWithGaps(input, coverageGaps), timeout, 'testgen', retryAttempts, retryDelayMs)
@@ -180,6 +212,7 @@ export class SwarmRunner {
           console.warn(`[ai-review] Agent testgen timed out or failed: ${(err as Error).message}`)
         }
       }
+      onProgress?.({ phase: 'end', name: 'testgen', index, total, findings: [], elapsedMs: Date.now() - startMs })
     }
 
     const findings = this.orchestrator.synthesize(allFindings)
@@ -202,7 +235,8 @@ export class SwarmRunner {
         bySeverity,
         byAgent,
         durationMs: Date.now() - start
-      }
+      },
+      ...(earlyExitAgent ? { earlyExit: { stoppedAt: earlyExitAgent } } : {})
     }
   }
 }
