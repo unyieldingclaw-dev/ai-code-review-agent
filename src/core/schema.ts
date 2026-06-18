@@ -68,6 +68,7 @@ export interface ReviewResult {
   findings: Finding[]
   testFiles: GeneratedTestFile[]
   summary: ReviewSummary
+  earlyExit?: { stoppedAt: AgentName }
 }
 
 export const SEVERITY_RANK: Record<Severity, number> = {
@@ -75,4 +76,18 @@ export const SEVERITY_RANK: Record<Severity, number> = {
   high: 3,
   medium: 2,
   low: 1
+}
+
+export type FailOnLevel = 'critical' | 'high' | 'medium' | 'any' | 'never'
+
+export const FAIL_ON_OPTIONS: FailOnLevel[] = ['critical', 'high', 'medium', 'any', 'never']
+
+export interface AgentProgressEvent {
+  phase: 'start' | 'end'
+  name: AgentName
+  index: number
+  total: number
+  findings?: Finding[]
+  elapsedMs?: number
+  earlyExit?: boolean
 }
