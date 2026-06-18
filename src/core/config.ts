@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import type { AgentName } from './schema.js'
+import type { AgentName, FailOnLevel } from './schema.js'
 
 export interface ReviewConfig {
   model: string
@@ -19,6 +19,8 @@ export interface ReviewConfig {
   sanitize: boolean
   preferredSecretsScanner?: 'gitleaks' | 'trufflehog' | 'none'
   complexityThreshold?: number
+  failFast?: boolean
+  failOn?: FailOnLevel
 }
 
 export const DEFAULT_CONFIG: ReviewConfig = {
@@ -39,7 +41,9 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   retryAttempts: 2,
   retryDelayMs: 2000,
   ignorePaths: [],
-  sanitize: true
+  sanitize: true,
+  failFast: false,
+  failOn: 'high'
 }
 
 export function loadConfig(projectPath: string): ReviewConfig {
