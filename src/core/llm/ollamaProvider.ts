@@ -1,6 +1,6 @@
 import type { LLMProvider, Message, ChatOptions } from './provider.js'
 
-const DEFAULT_TIMEOUT_MS = 120_000
+const DEFAULT_TIMEOUT_MS = 300_000
 
 export class OllamaProvider implements LLMProvider {
   constructor(
