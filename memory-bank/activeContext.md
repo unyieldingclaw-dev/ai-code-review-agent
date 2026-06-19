@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-06-11
+last-reviewed: 2026-06-19
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,11 +16,11 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-06-15
+**Last Updated**: 2026-06-19
 
 ## Current Focus
 
-**v0.8.0 — 5 new specialist agents — COMPLETE (pending final verification + tag).** Tasks 1–9 done. 16 agents total. 112 unit tests passing. Task 10 (final verification, tag v0.8.0, push) is next.
+**v0.9.1 — Calibration pass — COMPLETE.** 117 unit tests passing. Three agent prompts improved: ErrorHandlingAgent (swallowed-exception keyword guarantee + selective-rethrow exclusion), ObservabilityAgent (pure-function exclusion strengthened), MigrationSafetyAgent (safe DDL exclusion). Tagged `v0.9.1`. Next: Anthropic/Claude provider backlog OR run `calibrate.ts` with live Ollama to validate.
 
 ## What's Working
 
@@ -31,7 +31,7 @@ lineage: []
 - Confidence-aware hallucination check: solo Critical ≥60% confidence stays Critical; <60% → High
 - Prompt injection sanitizer: strips SYSTEM:, instruction overrides, role-play directives, long base64
 - Calibration CI: `.github/workflows/calibrate.yml` — weekly + release, skips gracefully without Ollama
-- **112 unit tests passing** across 18 test files (includes 15 new MCP tests, 3 new retry tests, 5 new agent tests × 5 agents)
+- **117 unit tests passing** across 18 test files (includes 15 new MCP tests, 3 new retry tests, 5 new agent tests × 5 agents, 5 new fail-fast/progress tests)
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
 
 ## Guardrails (All Complete)
@@ -56,9 +56,10 @@ lineage: []
 
 ## Next Steps
 
-- **Task 10 — Final verification + release**: `npm test` (112 passing), `npx tsc --noEmit` (0 errors), `npm run build` (clean), `node dist/cli/index.js --help` (smoke test), then `git tag v0.8.0 && git push && git push --tags` → triggers npm release.
+- **Calibration validation**: Run `npx tsx calibration/calibrate.ts` with live Ollama to confirm all 16 cases PASS. Iterate if any fail.
+- **Anthropic/Claude provider** (backlog): Alternative to Ollama using `claude-sonnet-4-6` via API.
 - **Marketplace publish** (VS Code extension): Explicitly DEFERRED.
-- **Backlog**: Anthropic/Claude provider — explicitly backlogged; Ollama-only.
+- **Parallel agent execution** (future): `Promise.allSettled` pool — cuts review time from 20–32 min to 3–6 min.
 - **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new token and update `NPM_TOKEN` secret before then.
 
 ## v0.5.0 Design Decisions (2026-06-11)
@@ -94,7 +95,7 @@ lineage: []
 ## Key Commands
 
 ```bash
-npm test                    # all unit tests (112 passing)
+npm test                    # all unit tests (117 passing)
 npm run typecheck           # 0 errors
 npm run build               # compile to dist/
 node dist/cli/index.js --help   # smoke test CLI
@@ -125,4 +126,6 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-12: v0.6.0 brainstorm → A+C hybrid output format, Cursor+Windows/Mac target, Ollama-only. Spec committed at `2852b00`, plan committed at `d277da4`. Implementation starting.
 - 2026-06-12: v0.6.0 COMPLETE — `ai-review-mcp` binary ships in the package. 6 tasks, 7 commits (`27be871`→`1b697db`). 77 unit tests. Version bumped to 0.6.0. Next: `git tag v0.6.0 && git push --tags` to publish to npm.
 - 2026-06-13: Configurable retry logic — `withRetryTimeout` wrapper in `runner.ts`, `retryAttempts`/`retryDelayMs` config + CLI flags, 3 new tests. 80 unit tests. Committed as `c2d2387`.
+- 2026-06-18: v0.9.0 — AgentProgressEvent two-phase events, --fail-fast CLI flag, failFast/failOn on ReviewConfig, earlyExit on ReviewResult, stderr progress renderer. 117 unit tests. Published to npm.
+- 2026-06-19: v0.9.1 — Calibration pass: ErrorHandlingAgent prompt (swallowed keyword + selective-rethrow exclusion), ObservabilityAgent (pure-function exclusion), MigrationSafetyAgent (safe DDL exclusion). All 117 tests still pass.
 - 2026-06-15: v0.8.0 — 5 new specialist agents (ErrorHandlingAgent, ObservabilityAgent, MigrationSafetyAgent, SecretsAgent, ComplexityAgent), `shell.ts` runTool(), conditional MigrationSafety skip in SwarmRunner, 32 new unit tests (112 total), 5 calibration fixtures, DEFAULT_CONFIG updated to 16 agents, package.json v0.8.0, README updated. Tasks 1–9 committed. Task 10 (final verification + tag) is next.

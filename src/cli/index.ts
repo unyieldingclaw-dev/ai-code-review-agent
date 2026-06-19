@@ -16,7 +16,7 @@ const program = new Command()
 program
   .name('ai-review-agent')
   .description('AI-powered code review using a local LLM swarm')
-  .version('0.9.0')
+  .version('0.9.1')
   .option('--diff <path>', 'Path to a .diff file to review')
   .option('--dir <path>', 'Directory to diff against HEAD (default: cwd)')
   .option('--model <model>', 'Override Ollama model')

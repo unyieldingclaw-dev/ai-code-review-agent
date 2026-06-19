@@ -26,6 +26,8 @@ severity: "critical" for operations that will cause data loss or lock production
 severity: "high" for NOT NULL without DEFAULT or missing FK index on large tables
 severity: "medium" for missing down migration or DROP without IF EXISTS
 
+Only report the specific patterns listed above. Safe DDL operations such as CREATE INDEX IF NOT EXISTS are not problematic — do not flag them.
+
 Output ONLY a JSON array of findings. No prose, no explanation, no markdown fences. Empty array if no issues.
 Required format:
 [{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/migration","line":42,"title":"Short title","detail":"What the problem is","suggestion":"How to fix it"}]`

@@ -14,8 +14,8 @@ Analyze the diff for new code paths that lack adequate logging:
 - Retry logic or fallback paths that fire silently
 
 Infer the logging library from the diff context (winston, pino, console, logger variable, etc.).
-Only flag logging that adds genuine observability value — do not flag trivial getters or pure functions.
-Focus on: error paths, branching logic, state mutations, and service entry points.
+Only flag logging that adds genuine observability value. Never flag pure utility functions — formatters, date helpers, math functions, simple string transformations — they have no mutable state and do not need logging.
+Focus on: error paths, branching logic, state mutations (writes/deletes/status changes), and service entry points.
 
 severity: "high" for error paths or service boundaries with no logging
 severity: "medium" for missing logs on state changes or branching logic
