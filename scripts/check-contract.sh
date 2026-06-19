@@ -7,6 +7,9 @@ set -euo pipefail
 
 CONTRACT_FILE=".claude/contracts/active-task.json"
 
+# WHY: Claude Code PreToolUse hooks pass tool input as JSON via stdin, not env vars.
+HOOK_INPUT=$(cat 2>/dev/null) || HOOK_INPUT=""
+
 # --- Dependency check: python3 required for JSON parsing ---
 if ! command -v python3 >/dev/null 2>&1; then
   exit 0  # Fail open: no python3, skip the check
@@ -73,10 +76,10 @@ except Exception:
 fi
 
 # --- Extract target file from tool input ---
-TARGET_FILE=$(python3 -c "
-import sys, json, os
+TARGET_FILE=$(echo "$HOOK_INPUT" | python3 -c "
+import sys, json
 try:
-    data = json.loads(os.environ.get('CLAUDE_TOOL_INPUT', '{}'))
+    data = json.load(sys.stdin)
     print(data.get('file_path', ''))
 except Exception:
     print('')
@@ -116,6 +119,12 @@ if [ "$IN_SCOPE" -eq 0 ]; then
   echo "⚠️  CONTRACT SCOPE: Writing to '$TARGET_FILE' is outside the active contract."
   echo "    Task: $TASK"
   echo "    Declared scope: $SCOPE_SUMMARY"
+  # WHY: PMB_CONTRACT_HARD_BLOCK=1 promotes scope warnings to blocks (exit 2).
+  # Default is warn-only (exit 0); hard-block is opt-in for strict enforcement.
+  if [ "${PMB_CONTRACT_HARD_BLOCK:-}" = "1" ]; then
+    echo "    Hard-block active (PMB_CONTRACT_HARD_BLOCK=1) — write blocked."
+    exit 2
+  fi
   echo "    Pause and confirm with user before proceeding."
 fi
 

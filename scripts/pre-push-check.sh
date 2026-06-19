@@ -53,55 +53,73 @@ else
 fi
 
 # Check 5: Possible secrets in commits being pushed (block)
+# When a tracking ref exists, diff against it. When there is none (first push or
+# untracked branch), scan all commits not yet on any known remote so first pushes
+# are covered rather than silently skipped.
 REMOTE=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>&1 || true)
-if [[ "$REMOTE" != *"fatal"* ]] && [ -n "$REMOTE" ]; then
-    # WHY: fixtures/ and docs/ are excluded from secret scanning:
-    # fixtures/security/ intentionally contains vulnerable code for regression testing;
-    # docs/ (specs, plans) may quote fixture content as documentation examples.
+HAS_UPSTREAM=0
+if [[ "$REMOTE" != *"fatal"* ]] && [ -n "$REMOTE" ]; then HAS_UPSTREAM=1; fi
+
+# WHY: fixtures/ and docs/ are excluded from secret scanning:
+# fixtures/security/ intentionally contains vulnerable code for regression testing;
+# docs/ (specs, plans) may quote fixture content as documentation examples.
+if [ "$HAS_UPSTREAM" -eq 1 ]; then
     PUSH_DIFF=$(git diff "${REMOTE}..HEAD" 2>&1 | awk '
         /^\+\+\+ b\// { in_excl = ($0 ~ /^\+\+\+ b\/(fixtures|docs)\//) }
         /^\+[^+]/ && !in_excl { print }
     ' || true)
-
-    check_secret() {
-        local label="$1" pattern="$2"
-        local hits
-        hits=$(echo "$PUSH_DIFF" | grep -E "$pattern" | head -3 || true)
-        if [ -n "$hits" ]; then
-            echo -e "${RED}[ERROR] Possible ${label} in push diff:${RESET}"
-            echo "$hits" | while IFS= read -r line; do echo "        $line"; done
-            FAILED=1
-            echo ""
-        fi
-    }
-
-    check_secret "AWS access key"            'AKIA[0-9A-Z]{16}'
-    check_secret "OpenAI/Anthropic API key"  'sk-[a-zA-Z0-9]{32,}'
-    check_secret "GitHub personal token"     'ghp_[a-zA-Z0-9]{36}'
-    check_secret "Generic password"          'password[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}'
-    check_secret "Generic secret"            'secret[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}'
 else
-    echo -e "${GRAY}[SKIP] Secret scan skipped — no upstream branch configured.${RESET}"
-    echo ""
-fi
-
-# Check 6: Files over 500 KB in push (warn)
-if [ -n "$REMOTE" ] && [[ "$REMOTE" != *"fatal"* ]]; then
-    LARGE=$(git diff --name-only "${REMOTE}..HEAD" 2>/dev/null | while IFS= read -r f; do
-        if [ -f "$f" ]; then
-            bytes=$(wc -c < "$f" 2>/dev/null || echo 0)
-            if [ "$bytes" -gt 512000 ]; then
-                kb=$(( bytes / 1024 ))
-                echo "$f (${kb} KB)"
-            fi
-        fi
-    done || true)
-    if [ -n "$LARGE" ]; then
-        echo -e "${YELLOW}[WARN] Large files in push (>500 KB):${RESET}"
-        echo "$LARGE" | while IFS= read -r line; do echo "       $line"; done
-        echo "       Consider .gitignore or Git LFS for binary/generated files."
+    # WHY: --not --remotes finds every commit reachable from HEAD but not from any
+    # remote-tracking ref — exactly what a first push would send. --format="" drops
+    # commit headers so only patch lines remain.
+    PUSH_DIFF=$(git log --not --remotes --format="" -p 2>&1 | awk '
+        /^\+\+\+ b\// { in_excl = ($0 ~ /^\+\+\+ b\/(fixtures|docs)\//) }
+        /^\+[^+]/ && !in_excl { print }
+    ' || true)
+    if [ -z "$PUSH_DIFF" ]; then
+        echo -e "${GRAY}[SKIP] Secret scan — no commits to push (all already on a remote).${RESET}"
         echo ""
     fi
+fi
+
+check_secret() {
+    local label="$1" pattern="$2"
+    local hits
+    hits=$(echo "$PUSH_DIFF" | grep -E "$pattern" | head -3 || true)
+    if [ -n "$hits" ]; then
+        echo -e "${RED}[ERROR] Possible ${label} in push diff:${RESET}"
+        echo "$hits" | while IFS= read -r line; do echo "        $line"; done
+        FAILED=1
+        echo ""
+    fi
+}
+
+check_secret "AWS access key"            'AKIA[0-9A-Z]{16}'
+check_secret "OpenAI/Anthropic API key"  'sk-[a-zA-Z0-9]{32,}'
+check_secret "GitHub personal token"     'ghp_[a-zA-Z0-9]{36}'
+check_secret "Generic password"          'password[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}'
+check_secret "Generic secret"            'secret[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}'
+
+# Check 6: Files over 500 KB in push (warn)
+if [ "$HAS_UPSTREAM" -eq 1 ]; then
+    PUSH_FILE_LIST=$(git diff --name-only "${REMOTE}..HEAD" 2>/dev/null || true)
+else
+    PUSH_FILE_LIST=$(git log --not --remotes --format="" --name-only 2>/dev/null | sort -u | grep -v '^$' || true)
+fi
+LARGE=$(echo "$PUSH_FILE_LIST" | while IFS= read -r f; do
+    if [ -n "$f" ] && [ -f "$f" ]; then
+        bytes=$(wc -c < "$f" 2>/dev/null || echo 0)
+        if [ "$bytes" -gt 512000 ]; then
+            kb=$(( bytes / 1024 ))
+            echo "$f (${kb} KB)"
+        fi
+    fi
+done || true)
+if [ -n "$LARGE" ]; then
+    echo -e "${YELLOW}[WARN] Large files in push (>500 KB):${RESET}"
+    echo "$LARGE" | while IFS= read -r line; do echo "       $line"; done
+    echo "       Consider .gitignore or Git LFS for binary/generated files."
+    echo ""
 fi
 
 # Check 7: mb validate (warn if mb available)

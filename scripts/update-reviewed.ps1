@@ -41,6 +41,8 @@ try {
 } catch {
     # WHY: Silent failure — this hook must never block agent work. If the update
     # fails, the agent continues; the user can run mb audit to find stale files.
+    # WHY: Log to .pmb-hook-errors.log so mb doctor can surface repeated failures.
+    try { Add-Content ".pmb-hook-errors.log" "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [HOOK] update-reviewed.ps1: $_" -ErrorAction SilentlyContinue } catch {}
     exit 0
 }
 

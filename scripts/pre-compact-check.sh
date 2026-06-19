@@ -1,40 +1,66 @@
 #!/usr/bin/env sh
-# PreCompact hook — warn if memory bank is stale and no handoff was taken.
-#
-# Fires before Claude Code auto-compacts context. Goal: surface a reminder
-# so Claude updates memory-bank/ before context is permanently summarized.
-# Always exits 0 — advisory only, never blocks compaction.
-#
-# Two conditions suppress the warning (either is sufficient):
-#   1. handoff.md exists — user invoked the Handoff protocol; state is captured.
-#   2. Any memory-bank/*.md was modified within the last 8 hours — memory bank
-#      was updated this session; compaction summary will have up-to-date context.
+# PreCompact hook — quality gate before context compaction.
+# Blocks compaction unless the memory bank shows substantive session work:
+#   1. activeContext.md has ≥3 substantive content lines (not just a last-reviewed touch)
+#   2. progress.md contains at least one entry dated today
+# Exits 2 to block compaction; exits 0 to allow. Fails open on errors.
 
-# Drain stdin silently — PreCompact hooks receive a JSON payload we don't need.
-# WHY: Leaving stdin open can cause the hook to hang on some shells.
-cat > /dev/null 2>&1 || true
+today=$(date +%Y-%m-%d)
 
-# Condition 1: handoff taken this session — state is captured elsewhere.
+# Bypass: handoff.md present means state is captured via handoff protocol
 if [ -f "handoff.md" ]; then
     exit 0
 fi
 
-# Condition 2: memory bank updated recently (within 8 hours = one work session).
-# WHY: -mmin -480 is POSIX-compatible on both GNU find (Linux) and BSD find (macOS).
-# Falls back to no-op if memory-bank/ doesn't exist yet.
-if [ -d "memory-bank" ]; then
-    recent=$(find memory-bank -name '*.md' -mmin -480 2>/dev/null | head -1)
-    if [ -n "$recent" ]; then
-        exit 0
+BLOCK_REASONS=()
+
+# Check 1: activeContext.md — must have ≥3 substantive lines
+# Substantive = non-frontmatter, non-heading, non-empty, ≥20 chars
+ACTIVE_CTX="memory-bank/activeContext.md"
+if [ -f "$ACTIVE_CTX" ]; then
+    substantive=0
+    in_fm=0
+    fm_count=0
+    while IFS= read -r line; do
+        if [ "$line" = "---" ]; then
+            fm_count=$((fm_count + 1))
+            [ "$fm_count" -eq 1 ] && in_fm=1 || in_fm=0
+            continue
+        fi
+        [ "$in_fm" -eq 1 ] && continue
+        case "$line" in
+            \#*|'') continue ;;
+        esac
+        length=${#line}
+        # strip leading whitespace approximation
+        trimmed=$(echo "$line" | sed 's/^[[:space:]]*//')
+        trimlen=${#trimmed}
+        [ "$trimlen" -ge 20 ] && substantive=$((substantive + 1))
+    done < "$ACTIVE_CTX"
+    if [ "$substantive" -lt 3 ]; then
+        BLOCK_REASONS+=("activeContext.md has only ${substantive} substantive line(s) (need ≥3) — update it with current session state before compacting")
     fi
+else
+    BLOCK_REASONS+=("activeContext.md missing — run 'mb init'")
 fi
 
-# Neither condition met — warn before compaction proceeds.
-printf '[PRE-COMPACT WARNING] Memory bank appears stale and no handoff was taken.\n'
-printf '  Context is about to be compacted. To preserve in-flight state:\n'
-printf '  1. Update memory-bank/activeContext.md with current focus and next steps\n'
-printf '  2. Update memory-bank/progress.md with any completed work this session\n'
-printf '  3. Or type "Handoff" to capture full session state before compacting\n'
-printf '  Compaction will proceed regardless — this warning is advisory only.\n'
+# Check 2: progress.md — must contain at least one entry dated today
+PROGRESS_FILE="memory-bank/progress.md"
+if [ -f "$PROGRESS_FILE" ]; then
+    if ! grep -q "$today" "$PROGRESS_FILE" 2>/dev/null; then
+        BLOCK_REASONS+=("progress.md has no entry dated $today — add today's progress before compacting")
+    fi
+else
+    BLOCK_REASONS+=("progress.md missing — run 'mb init'")
+fi
 
-exit 0
+if [ "${#BLOCK_REASONS[@]}" -eq 0 ]; then
+    exit 0
+fi
+
+printf '[PreCompact] Compaction quality gate: %d check(s) failed.\n' "${#BLOCK_REASONS[@]}"
+for reason in "${BLOCK_REASONS[@]}"; do
+    printf '  - %s\n' "$reason"
+done
+printf 'Fix the above, then compact. Or create handoff.md to bypass via the Handoff Protocol.\n'
+exit 2

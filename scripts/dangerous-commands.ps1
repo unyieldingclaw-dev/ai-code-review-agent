@@ -24,6 +24,7 @@ try {
 } catch {
     Write-Host "[HOOK ERROR] dangerous-commands.ps1 failed unexpectedly."
     Write-Host "Proceeding in fails-open mode."
+    try { Add-Content ".pmb-hook-errors.log" "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [HOOK] dangerous-commands.ps1: $_" -ErrorAction SilentlyContinue } catch {}
     exit 0
 }
 
@@ -40,6 +41,14 @@ $blockPatterns = @(
     @{ pattern = "| sh";             reason = "command piped to sh" }                       # WHY: remote code execution via sh
     @{ pattern = "|bash";            reason = "command piped to bash (no-space form)" }     # WHY: curl|bash without spaces is valid shell and evades space-prefixed pattern
     @{ pattern = "|sh";              reason = "command piped to sh (no-space form)" }       # WHY: wget|sh without spaces is valid shell and evades space-prefixed pattern
+    # PowerShell-native equivalents (triggered by the PowerShell tool)
+    @{ pattern = "Remove-Item -Recurse -Force"; reason = "recursive force deletion (PowerShell rm -rf equivalent)" }         # WHY: Remove-Item -Recurse -Force is the PS equivalent of rm -rf
+    @{ pattern = "Remove-Item -Force -Recurse"; reason = "recursive force deletion (PowerShell rm -rf, flags reversed)" }   # WHY: same as above — flag order varies in real commands
+    @{ pattern = "Format-Volume";               reason = "disk volume format (PowerShell)" }                                # WHY: destroys all data on a volume
+    @{ pattern = "| Invoke-Expression";         reason = "command piped to Invoke-Expression (PS code execution)" }         # WHY: pipe-to-iex is the PS equivalent of pipe-to-bash
+    @{ pattern = "|Invoke-Expression";          reason = "command piped to Invoke-Expression (no-space form)" }             # WHY: no-space form evades space-prefixed pattern
+    @{ pattern = "| iex";                       reason = "command piped to iex (PS eval shorthand)" }                      # WHY: iex is the common alias for Invoke-Expression
+    @{ pattern = "|iex";                        reason = "command piped to iex (no-space form)" }                          # WHY: no-space form evades space-prefixed pattern
 )
 
 foreach ($entry in $blockPatterns) {

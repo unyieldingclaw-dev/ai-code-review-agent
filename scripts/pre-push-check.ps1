@@ -60,43 +60,58 @@ if (-not (Test-Path ".gitattributes")) {
 }
 
 # Check 5: Possible secrets in commits being pushed (block)
-# Checks commits on HEAD not yet on the remote branch.
+# When a tracking ref exists, diff against it. When there is none (first push or
+# untracked branch), scan all commits not yet on any known remote so first pushes
+# are covered rather than silently skipped.
 $remote = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>&1
-if ($LASTEXITCODE -eq 0 -and $remote -notmatch 'fatal') {
-    $secretPatterns = @(
-        @{ label = "AWS access key";            pattern = 'AKIA[0-9A-Z]{16}' }
-        @{ label = "OpenAI/Anthropic API key";  pattern = 'sk-[a-zA-Z0-9]{32,}' }
-        @{ label = "GitHub personal token";     pattern = 'ghp_[a-zA-Z0-9]{36}' }
-        @{ label = "Generic password assignment"; pattern = 'password\s*=\s*["\x27][^"\x27\s]{8,}' }
-        @{ label = "Generic secret assignment";  pattern = 'secret\s*=\s*["\x27][^"\x27\s]{8,}' }
-    )
-    # WHY: fixtures/security/ and docs/ are excluded from secret scanning:
-    # fixtures/security/ intentionally contains vulnerable code for regression testing;
-    # docs/ (specs, plans) may quote fixture content as documentation examples.
-    $inExcluded = $false
+$hasUpstream = ($LASTEXITCODE -eq 0 -and $remote -notmatch 'fatal')
+$secretPatterns = @(
+    @{ label = "AWS access key";            pattern = 'AKIA[0-9A-Z]{16}' }
+    @{ label = "OpenAI/Anthropic API key";  pattern = 'sk-[a-zA-Z0-9]{32,}' }
+    @{ label = "GitHub personal token";     pattern = 'ghp_[a-zA-Z0-9]{36}' }
+    @{ label = "Generic password assignment"; pattern = 'password\s*=\s*["\x27][^"\x27\s]{8,}' }
+    @{ label = "Generic secret assignment";  pattern = 'secret\s*=\s*["\x27][^"\x27\s]{8,}' }
+)
+# WHY: fixtures/security/ and docs/ are excluded from secret scanning:
+# fixtures/security/ intentionally contains vulnerable code for regression testing;
+# docs/ (specs, plans) may quote fixture content as documentation examples.
+$inExcluded = $false
+if ($hasUpstream) {
     $pushDiff = git diff "$remote..HEAD" 2>&1 | ForEach-Object {
-        if ($_ -match '^\+\+\+ b/') {
-            $inExcluded = $_ -match '^\+\+\+ b/(fixtures/|docs/)'
-        }
+        if ($_ -match '^\+\+\+ b/') { $inExcluded = $_ -match '^\+\+\+ b/(fixtures/|docs/)' }
         if (-not $inExcluded -and $_ -match '^\+[^+]') { $_ }
     }
-    foreach ($entry in $secretPatterns) {
-        $hits = $pushDiff | Where-Object { $_ -match $entry.pattern }
-        if ($hits) {
-            Write-Host "[ERROR] Possible $($entry.label) in push diff:" -ForegroundColor Red
-            $hits | Select-Object -First 3 | ForEach-Object { Write-Host "        $_" -ForegroundColor Red }
-            $failed = $true
-            Write-Host ""
-        }
-    }
 } else {
-    Write-Host "[SKIP] Secret scan skipped — no upstream branch configured." -ForegroundColor DarkGray
-    Write-Host ""
+    # WHY: --not --remotes finds every commit reachable from HEAD but not from any
+    # remote-tracking ref — this is exactly the set of commits a first push would
+    # send. --format="" suppresses commit headers; only the patch lines remain.
+    $pushDiff = git log --not --remotes --format="" -p 2>&1 | ForEach-Object {
+        if ($_ -match '^\+\+\+ b/') { $inExcluded = $_ -match '^\+\+\+ b/(fixtures/|docs/)' }
+        if (-not $inExcluded -and $_ -match '^\+[^+]') { $_ }
+    }
+    if (-not $pushDiff) {
+        Write-Host "[SKIP] Secret scan — no commits to push (all already on a remote)." -ForegroundColor DarkGray
+        Write-Host ""
+    }
+}
+foreach ($entry in $secretPatterns) {
+    $hits = $pushDiff | Where-Object { $_ -match $entry.pattern }
+    if ($hits) {
+        Write-Host "[ERROR] Possible $($entry.label) in push diff:" -ForegroundColor Red
+        $hits | Select-Object -First 3 | ForEach-Object { Write-Host "        $_" -ForegroundColor Red }
+        $failed = $true
+        Write-Host ""
+    }
 }
 
 # Check 6: Files over 500 KB in push (warn)
 $largeFiles = @()
-git diff --name-only $remote..HEAD 2>&1 | ForEach-Object {
+$pushFileList = if ($hasUpstream) {
+    git diff --name-only "$remote..HEAD" 2>&1
+} else {
+    git log --not --remotes --format="" --name-only 2>&1 | Where-Object { $_ -match '\S' } | Sort-Object -Unique
+}
+$pushFileList | ForEach-Object {
     if ($_ -and (Test-Path $_)) {
         $bytes = (Get-Item $_).Length
         if ($bytes -gt 512000) {

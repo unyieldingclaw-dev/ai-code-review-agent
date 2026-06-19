@@ -1,46 +1,70 @@
 <#
 .SYNOPSIS
-    PreCompact hook — warn if memory bank is stale and no handoff was taken.
+    PreCompact hook — quality gate before context compaction.
 .DESCRIPTION
-    Fires before Claude Code auto-compacts context. Goal: surface a reminder
-    so Claude updates memory-bank/ before context is permanently summarized.
-    Always exits 0 — advisory only, never blocks compaction.
-
-    Two conditions suppress the warning (either is sufficient):
-      1. handoff.md exists — user invoked the Handoff protocol; state is captured.
-      2. Any memory-bank/*.md was modified within the last 8 hours — memory bank
-         was updated this session; compaction summary will have up-to-date context.
+    Blocks compaction unless the memory bank shows substantive session work:
+      1. activeContext.md has ≥3 substantive content lines (not just a last-reviewed touch)
+      2. progress.md contains at least one entry dated today
+    If either check fails, exits 2 to block compaction with an actionable message.
+    A handoff.md bypasses all checks (handoff protocol already captures state).
+    Fails open on unexpected errors (exits 0) and logs to .pmb-hook-errors.log.
 #>
 
 param()
 
-# Drain stdin silently — PreCompact hooks receive a JSON payload we don't need.
-# WHY: Avoids the hook hanging if PowerShell tries to read a closed pipe.
-try { $null = $input | Out-Null } catch {}
+try {
+    $today = Get-Date -Format 'yyyy-MM-dd'
 
-# Condition 1: handoff taken this session — state is captured elsewhere.
-if (Test-Path "handoff.md") {
+    # Bypass: handoff.md present means state is captured via handoff protocol
+    if (Test-Path "handoff.md") { exit 0 }
+
+    $blockReasons = @()
+
+    # Check 1: activeContext.md — must have ≥3 substantive lines
+    # Substantive = non-frontmatter, non-heading, non-empty, ≥20 chars
+    $activeCtx = "memory-bank/activeContext.md"
+    if (Test-Path $activeCtx) {
+        $lines = Get-Content $activeCtx
+        $inFm = $false; $fmCount = 0; $substantive = 0
+        foreach ($line in $lines) {
+            if ($line -eq '---') {
+                $fmCount++
+                $inFm = ($fmCount -eq 1)
+                if ($fmCount -ge 2) { $inFm = $false }
+                continue
+            }
+            if ($inFm) { continue }
+            if ($line -match '^#{1,6}' -or [string]::IsNullOrWhiteSpace($line)) { continue }
+            if ($line.Trim().Length -ge 20) { $substantive++ }
+        }
+        if ($substantive -lt 3) {
+            $blockReasons += "activeContext.md has only $substantive substantive line(s) (need ≥3) — update it with current session state before compacting"
+        }
+    } else {
+        $blockReasons += "activeContext.md missing — run 'mb init'"
+    }
+
+    # Check 2: progress.md — must contain at least one entry dated today
+    $progressFile = "memory-bank/progress.md"
+    if (Test-Path $progressFile) {
+        $content = Get-Content $progressFile -Raw
+        if ($content -notmatch [regex]::Escape($today)) {
+            $blockReasons += "progress.md has no entry dated $today — add today's progress before compacting"
+        }
+    } else {
+        $blockReasons += "progress.md missing — run 'mb init'"
+    }
+
+    if ($blockReasons.Count -eq 0) { exit 0 }
+
+    Write-Host "[PreCompact] Compaction quality gate: $($blockReasons.Count) check(s) failed."
+    foreach ($reason in $blockReasons) {
+        Write-Host "  - $reason"
+    }
+    Write-Host "Fix the above, then compact. Or create handoff.md to bypass via the Handoff Protocol."
+    exit 2
+} catch {
+    Write-Host "[HOOK ERROR] pre-compact-check.ps1 failed unexpectedly. Proceeding in fails-open mode."
+    try { Add-Content ".pmb-hook-errors.log" "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [HOOK] pre-compact-check.ps1: $_" -ErrorAction SilentlyContinue } catch {}
     exit 0
 }
-
-# Condition 2: memory bank updated recently (within 8 hours = one work session).
-# WHY: 8 hours is a reasonable upper bound for a single work session.
-if (Test-Path "memory-bank") {
-    $cutoff = (Get-Date).AddHours(-8)
-    $recent = Get-ChildItem -Path "memory-bank" -Filter "*.md" -ErrorAction SilentlyContinue |
-              Where-Object { $_.LastWriteTime -gt $cutoff } |
-              Select-Object -First 1
-    if ($recent) {
-        exit 0
-    }
-}
-
-# Neither condition met — warn before compaction proceeds.
-Write-Host "[PRE-COMPACT WARNING] Memory bank appears stale and no handoff was taken."
-Write-Host "  Context is about to be compacted. To preserve in-flight state:"
-Write-Host "  1. Update memory-bank/activeContext.md with current focus and next steps"
-Write-Host "  2. Update memory-bank/progress.md with any completed work this session"
-Write-Host "  3. Or type 'Handoff' to capture full session state before compacting"
-Write-Host "  Compaction will proceed regardless — this warning is advisory only."
-
-exit 0

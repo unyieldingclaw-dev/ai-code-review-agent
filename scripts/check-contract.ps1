@@ -6,6 +6,14 @@ param()
 
 $ContractFile = ".claude/contracts/active-task.json"
 
+# WHY: Outer trap logs unexpected errors to .pmb-hook-errors.log so mb doctor
+# can surface them. The inner logic below uses narrow catches for expected failure
+# modes; this wrapper catches anything that slips through.
+trap {
+    try { Add-Content ".pmb-hook-errors.log" "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [HOOK] check-contract.ps1: $_" -ErrorAction SilentlyContinue } catch {}
+    exit 0
+}
+
 # --- Contract existence check ---
 if (-not (Test-Path $ContractFile)) {
     exit 0
@@ -44,8 +52,9 @@ if ($expiresAt) {
 }
 
 # --- Extract target file from tool input ---
-$toolInput = $env:CLAUDE_TOOL_INPUT
-if (-not $toolInput) {
+# WHY: Claude Code PreToolUse hooks pass tool input as JSON via stdin, not env vars.
+$toolInput = $input | Out-String
+if ([string]::IsNullOrWhiteSpace($toolInput)) {
     exit 0
 }
 
@@ -89,6 +98,13 @@ if (-not $inScope) {
     Write-Host "⚠️  CONTRACT SCOPE: Writing to '$targetFile' is outside the active contract."
     Write-Host "    Task: $task"
     Write-Host "    Declared scope: $scopeSummary"
+    # WHY: PMB_CONTRACT_HARD_BLOCK=1 promotes scope warnings to blocks (exit 2).
+    # Default is warn-only (exit 0) so accidental scope drift doesn't break workflows;
+    # hard-block is opt-in for strict enforcement contexts.
+    if ($env:PMB_CONTRACT_HARD_BLOCK -eq '1') {
+        Write-Host "    Hard-block active (PMB_CONTRACT_HARD_BLOCK=1) — write blocked."
+        exit 2
+    }
     Write-Host "    Pause and confirm with user before proceeding."
 }
 
