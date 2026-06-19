@@ -16,7 +16,7 @@ const program = new Command()
 program
   .name('ai-review-agent')
   .description('AI-powered code review using a local LLM swarm')
-  .version('0.9.1')
+  .version('0.9.4')
   .option('--diff <path>', 'Path to a .diff file to review')
   .option('--dir <path>', 'Directory to diff against HEAD (default: cwd)')
   .option('--model <model>', 'Override Ollama model')
@@ -30,6 +30,7 @@ program
   .option('--retry-delay <ms>', 'Delay between retries in ms (default: 2000)', parseInt)
   .option('--fail-on <level>', `Exit 1 when any finding meets this severity (${FAIL_ON_OPTIONS.join('|')}; default: high)`, 'high')
   .option('--fail-fast', 'Stop swarm on first finding at or above --fail-on threshold')
+  .option('--parallel', 'Run specialist agents in parallel (faster; disables fail-fast early exit)')
   .option('--ignore <pattern>', 'Exclude files matching this glob pattern (repeatable)', collect, [] as string[])
   .option('--no-sanitize', 'Skip prompt-injection sanitization of the diff')
   .action(async (options: {
@@ -46,6 +47,7 @@ program
     retryDelay?: number
     failOn: FailOnLevel
     failFast?: boolean
+    parallel?: boolean
     ignore: string[]
     sanitize: boolean
   }) => {
@@ -63,6 +65,7 @@ program
     if (!options.sanitize) config.sanitize = false
     config.failOn = options.failOn
     config.failFast = !!options.failFast
+    config.parallel = !!options.parallel
 
     const diff = getDiff(options.diff, options.dir)
     if (!diff.trim()) {

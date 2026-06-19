@@ -197,6 +197,28 @@ describe('SwarmRunner', () => {
     expect(provider.chat).toHaveBeenCalledTimes(2)
   })
 
+  it('parallel mode runs all agents and collects findings from each', async () => {
+    const finding = JSON.stringify([{ severity: 'medium', basis: 'INFERRED', file: 'a.ts', line: 1, title: 'T', detail: 'D', suggestion: 'S' }])
+    const provider = makeProvider(finding)
+    const config = { ...DEFAULT_CONFIG, agents: ['security', 'correctness'] as AgentName[], parallel: true }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(provider.chat).toHaveBeenCalledTimes(2)
+    expect(result.findings.length).toBeGreaterThan(0)
+  })
+
+  it('parallel mode fires all start events before any end events', async () => {
+    const provider = makeProvider()
+    const config = { ...DEFAULT_CONFIG, agents: ['security', 'correctness'] as AgentName[], parallel: true }
+    const runner = new SwarmRunner(config, provider)
+    const events: { phase: string; name: AgentName }[] = []
+    await runner.run({ diff: 'diff' }, (event) => events.push({ phase: event.phase, name: event.name }))
+    expect(events).toHaveLength(4)
+    const firstEndIdx = events.findIndex(e => e.phase === 'end')
+    const lastStartIdx = events.map(e => e.phase).lastIndexOf('start')
+    expect(lastStartIdx).toBeLessThan(firstEndIdx)
+  })
+
   it('failFast false runs all agents regardless of finding severity', async () => {
     const criticalFinding = JSON.stringify([{
       severity: 'critical', basis: 'VERIFIED', file: 'app.ts',

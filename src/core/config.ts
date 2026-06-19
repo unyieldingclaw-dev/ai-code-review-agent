@@ -21,6 +21,7 @@ export interface ReviewConfig {
   complexityThreshold?: number
   failFast?: boolean
   failOn?: FailOnLevel
+  parallel?: boolean
 }
 
 export const DEFAULT_CONFIG: ReviewConfig = {
@@ -43,7 +44,8 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   ignorePaths: [],
   sanitize: true,
   failFast: false,
-  failOn: 'high'
+  failOn: 'high',
+  parallel: false
 }
 
 export function loadConfig(projectPath: string): ReviewConfig {

@@ -180,21 +180,43 @@ export class SwarmRunner {
       }
     }
 
-    // Run specialist agents — break early if failFast threshold is met
+    // Run specialist agents — parallel or sequential
     if (!earlyExitAgent) {
-      for (const agent of agents) {
-        index++
-        onProgress?.({ phase: 'start', name: agent.name, index, total })
-        const startMs = Date.now()
-        try {
-          const findings = await withRetryTimeout(() => agent.run(input), timeout, agent.name, retryAttempts, retryDelayMs)
-          allFindings.push(...findings)
-          const shouldStop = shouldEarlyExit(this.config, allFindings)
-          onProgress?.({ phase: 'end', name: agent.name, index, total, findings, elapsedMs: Date.now() - startMs, earlyExit: shouldStop })
-          if (shouldStop) { earlyExitAgent = agent.name; break }
-        } catch (err) {
-          console.warn(`[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`)
-          onProgress?.({ phase: 'end', name: agent.name, index, total, findings: [], elapsedMs: Date.now() - startMs })
+      if (this.config.parallel) {
+        const baseIndex = hasCoverage ? 1 : 0
+        agents.forEach((agent, i) => {
+          onProgress?.({ phase: 'start', name: agent.name, index: baseIndex + i + 1, total })
+        })
+        await Promise.allSettled(
+          agents.map(async (agent, i) => {
+            const agentIndex = baseIndex + i + 1
+            const startMs = Date.now()
+            try {
+              const findings = await withRetryTimeout(() => agent.run(input), timeout, agent.name, retryAttempts, retryDelayMs)
+              allFindings.push(...findings)
+              onProgress?.({ phase: 'end', name: agent.name, index: agentIndex, total, findings, elapsedMs: Date.now() - startMs })
+            } catch (err) {
+              console.warn(`[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`)
+              onProgress?.({ phase: 'end', name: agent.name, index: agentIndex, total, findings: [], elapsedMs: Date.now() - startMs })
+            }
+          })
+        )
+        index += agents.length
+      } else {
+        for (const agent of agents) {
+          index++
+          onProgress?.({ phase: 'start', name: agent.name, index, total })
+          const startMs = Date.now()
+          try {
+            const findings = await withRetryTimeout(() => agent.run(input), timeout, agent.name, retryAttempts, retryDelayMs)
+            allFindings.push(...findings)
+            const shouldStop = shouldEarlyExit(this.config, allFindings)
+            onProgress?.({ phase: 'end', name: agent.name, index, total, findings, elapsedMs: Date.now() - startMs, earlyExit: shouldStop })
+            if (shouldStop) { earlyExitAgent = agent.name; break }
+          } catch (err) {
+            console.warn(`[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`)
+            onProgress?.({ phase: 'end', name: agent.name, index, total, findings: [], elapsedMs: Date.now() - startMs })
+          }
         }
       }
     }
