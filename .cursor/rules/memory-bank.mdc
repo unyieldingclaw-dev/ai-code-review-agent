@@ -1,0 +1,110 @@
+---
+alwaysApply: true
+---
+
+# Memory Bank - Persistent Context System
+
+At the start of every conversation (and after any context compaction), silently read ALL files in `memory-bank/` to restore full project context.
+Never ask the user to repeat constraints, decisions, or context already documented there.
+
+## Memory Bank Files (Read First, Always)
+
+**Core Context** (read these first):
+- `memory-bank/projectbrief.md` — Non-negotiable business requirements, constraints, and goals
+- `memory-bank/systemPatterns.md` — Established architectural patterns, code conventions, and "never do" rules
+- `memory-bank/techContext.md` — Complete tech stack, dependencies, environment setup, and constraints
+
+**Session Context** (read for current state):
+- `memory-bank/activeContext.md` — Current focus, recent decisions, next steps, known issues
+- `memory-bank/progress.md` — What's complete, in progress, and planned
+
+## Rules for Using Memory Bank
+
+1. **Always Read First**: Before responding to ANY user request, read all Memory Bank files to understand:
+   - What constraints must be followed
+   - What patterns are established
+   - What's already been decided
+   - What's currently in progress
+
+2. **Never Violate Constraints**: The patterns and constraints in Memory Bank are non-negotiable:
+   - Don't suggest approaches that violate `systemPatterns.md` rules
+   - Don't ask for information already in `techContext.md`
+   - Don't propose work that contradicts `projectbrief.md` requirements
+
+3. **Update After Changes**: When you make significant changes, update the relevant Memory Bank files:
+   - New architectural decisions → `systemPatterns.md`
+   - New dependencies or config → `techContext.md`
+   - Session progress → `activeContext.md`
+   - Completed features → `progress.md`
+
+4. **Reference Explicitly**: When user asks about project context, reference Memory Bank files:
+   - "According to the project brief..."
+   - "The established pattern in systemPatterns.md is..."
+   - "The tech stack (see techContext.md) uses..."
+
+## Context Management and Handoffs
+
+**CRITICAL RULE**: The agent cannot see context percentage - only the user sees it in the UI.
+
+**User triggers handoff** by either:
+- Typing "Handoff" (explicit trigger)
+- Telling the agent the context % is at or above 80%
+
+**When handoff is triggered**, you MUST:
+1. **STOP** all work immediately
+2. **CREATE** `handoff.md` in project root with:
+   - Summary of what was accomplished
+   - All files modified this session
+   - Current service state (running/stopped, ports)
+   - Commands to resume work
+   - Pending tasks and known issues
+   - Context for next agent to continue seamlessly
+3. **RESPOND** with only: "Handoff ready at `handoff.md`. Start a new conversation."
+4. **STOP RESPONDING** - do not continue working or answer more questions
+
+**When a new conversation starts** (next agent):
+1. Check for `handoff.md` in project root - if exists, read it FIRST
+2. Merge relevant info into `memory-bank/progress.md` and `memory-bank/activeContext.md`
+3. Delete `handoff.md` after merging
+4. Continue work from where previous agent stopped
+
+## Quick Commands
+
+Recognize these shortcuts and respond accordingly:
+
+| Command | Action |
+|---------|--------|
+| `mb update` | Update all relevant Memory Bank files based on current session |
+| `mb status` | Show file sizes, last updated timestamps, and health check |
+| `mb archive` | Move old session history from activeContext.md to AGENTS.md |
+| `mb slim` | Trim activeContext.md to essentials (<100 lines target) |
+| `mb commit` | Stage and commit all Memory Bank changes |
+
+## Auto-Update Behavior
+
+**Proactive Updates (agent should do automatically):**
+
+1. **After completing a feature or fix:**
+   - Update `progress.md` to mark item complete
+   - Remove from "Next Steps" in `activeContext.md`
+
+2. **After adding dependencies or changing config:**
+   - Update `techContext.md` with new dependencies/ports/config
+
+3. **After establishing new patterns:**
+   - Update `systemPatterns.md` with the pattern and rationale
+
+4. **When user says "done", "that's all", or "wrap up":**
+   - Offer to update Memory Bank: "Would you like me to update the Memory Bank with today's progress?"
+
+## File Size Management
+
+Keep Memory Bank files focused and scannable:
+
+| File | Target | Max | If Exceeded |
+|------|--------|-----|-------------|
+| `projectbrief.md` | 50-80 lines | 150 | Rarely changes, review if growing |
+| `systemPatterns.md` | 100-180 lines | 300 | Consolidate similar patterns |
+| `techContext.md` | 150-250 lines | 400 | Move details to docs/ |
+| `activeContext.md` | 50-100 lines | 150 | Archive history to AGENTS.md |
+| `progress.md` | 100-250 lines | 400 | Archive old versions to docs/ |

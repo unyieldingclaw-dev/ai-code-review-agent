@@ -1,0 +1,132 @@
+---
+description: Deep code review covering security, performance, style, and test coverage. Spawns separate subagents for each domain so findings don't bias each other. Trigger by asking for a code review, or specify a file/folder.
+globs:
+alwaysApply: false
+---
+
+# Deep Code Review
+
+You are a senior engineer orchestrating a thorough code review. Follow every step below in order. Do not skip any section.
+
+## Step 1 — Determine Scope
+
+If the user specified a file or folder path, review that target. Otherwise ask Cursor to run in terminal:
+  git diff HEAD
+  git status
+
+If the diff is empty, let the user know and stop.
+
+## Step 2 — Gather Context
+
+Run in terminal: git log --oneline -10
+For each changed file: git log --oneline -5 -- <filename>
+Use this to understand why the code exists and whether the change is consistent with past decisions.
+
+## Step 3 — Spawn Independent Review Subagents
+
+Spawn three separate subagents with fresh, uncorrelated context windows. Each subagent sees only the code and its own lens — not the other subagents' findings. This prevents a security finding from biasing how performance is read, and vice versa.
+
+### Subagent A — Security Only
+
+Review the diff for:
+- Hardcoded secrets, API keys, tokens, or passwords
+- Unvalidated or unsanitized user input
+- SQL injection or NoSQL injection risks
+- Broken authentication or missing authorization checks
+- Exposed internal error messages or stack traces
+- Insecure use of cryptography (weak algorithms, hardcoded IVs/salts)
+- Any use of eval(), exec(), shell=True, or equivalent dangerous calls
+- Sensitive data logged or returned in API responses
+
+Rate each finding: [CRITICAL], [HIGH], [MEDIUM], or [LOW]
+Return findings as a structured list with severity, description, and file:line.
+
+### Subagent B — Performance Only
+
+Review the diff for:
+- N+1 query patterns or repeated database calls in loops
+- Unbounded loops or recursion without depth limits
+- Large payloads loaded entirely into memory
+- Blocking I/O in async code paths
+- Redundant computation that could be cached or memoized
+- Missing pagination on collection endpoints
+
+Rate each finding: [HIGH], [MEDIUM], or [LOW]
+Return findings as a structured list with severity, description, and file:line.
+
+### Subagent C — Style & Standards Only
+
+Review the diff for:
+- Functions longer than 50 lines
+- Deeply nested logic that could be flattened
+- Ambiguous variable or function names
+- Missing comments on non-obvious logic
+- Dead code, commented-out blocks, or debug statements left in
+- Magic numbers or strings that should be named constants
+- Copy-paste duplication that should be abstracted
+
+Rate each finding: [MEDIUM] or [LOW]
+Return findings as a structured list with severity, description, and file:line.
+
+## Step 4 — Test Coverage Review
+
+(Run in the main agent, after subagents complete.)
+
+Evaluate:
+- Are there tests for the changed/new code?
+- Do tests cover happy path, edge cases, and error paths?
+- Are any new public functions or endpoints left untested?
+- Do tests assert meaningful outcomes?
+- Are mocks/stubs used appropriately?
+
+List any missing tests explicitly. If tests are missing, generate them now — one test file per changed module, covering: happy path, edge cases, and all error paths.
+
+## Step 5 — Opponent Check
+
+Spawn one final subagent as an auditor. Give it the findings from Subagents A, B, and C. Its job:
+- Challenge any finding it thinks is a false positive
+- Surface anything all three subagents missed
+- Confirm or downgrade severity ratings
+
+Return its verdict as a short list: confirmed findings, challenged findings (with reason), and any new findings.
+
+## Step 6 — Summary Report
+
+Collect all outputs and produce this report:
+
+### 🔍 Code Review Summary
+**Scope reviewed:** <git diff HEAD> or <filename>
+**Files changed:** N
+
+#### 🔐 Security
+| Severity | Finding | File:Line | Auditor verdict |
+|----------|---------|-----------|-----------------|
+| ...      | ...     | ...       | ✓ confirmed / ↓ downgraded / ✗ false positive |
+
+#### ⚡ Performance
+| Severity | Finding | File:Line | Auditor verdict |
+|----------|---------|-----------|-----------------|
+| ...      | ...     | ...       | ... |
+
+#### 🎨 Style & Standards
+| Severity | Finding | File:Line | Auditor verdict |
+|----------|---------|-----------|-----------------|
+| ...      | ...     | ...       | ... |
+
+#### 🧪 Test Coverage
+- [ ] Missing test: <what should be tested>
+(List generated test files if tests were written in Step 4.)
+
+#### ✅ Overall Verdict
+Approve / Request Changes / Needs Discussion
+
+One paragraph summary of the most important things to address before merging, based only on confirmed findings.
+
+---
+
+## How to trigger in Cursor
+Say any of these in Cursor chat:
+- "do a code review"
+- "review my changes"
+- "review src/api/routes.py"
+- "review the services/ folder"

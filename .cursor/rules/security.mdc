@@ -1,0 +1,79 @@
+---
+alwaysApply: true
+---
+
+# Security Guardrails
+
+## TIER 1: BLOCK (Never do these - no override)
+
+### Secrets & Credentials
+- **NEVER** commit files matching: `*.env*`, `*credentials*`, `*secret*`, `*.pem`, `*.key`
+- **NEVER** hardcode API keys, tokens, or passwords in source code
+- **NEVER** log or print secrets to console or files
+- **NEVER** include secrets in commit messages
+
+If asked to do these, explain why you cannot and suggest safe alternatives.
+
+### Supply Chain
+- **NEVER** recommend installing a package without first verifying it exists on
+  the official registry (PyPI, npm, Maven, etc.) — AI-hallucinated package names
+  are a live supply-chain attack vector known as slopsquatting
+
+### MCP Configuration
+- **NEVER** hardcode credentials, tokens, or API keys in `mcp.json` or any
+  MCP configuration file — use environment variable references (`${MY_API_KEY}`) instead
+
+### Git Safety
+- **NEVER** `git push --force` to main, master, or protected branches
+- **NEVER** `git reset --hard` on shared branches without explicit backup
+- **NEVER** modify git config (user.name, user.email)
+
+### System Protection
+- **NEVER** run `rm -rf /`, `del /s /q C:\`, or equivalent destructive commands
+- **NEVER** execute commands that modify system files outside the project
+- **NEVER** run commands with `sudo` or admin privileges unless explicitly requested
+
+## TIER 2: CONFIRM (Pause and ask before proceeding)
+
+Before these actions, list what will happen and ask "Type 'yes' to confirm":
+
+### File Operations
+- Deleting any files
+- Overwriting files without reading them first
+- Bulk operations on >3 files at once
+
+### Git Operations
+- `git commit --amend`
+- Using `--no-verify` flag
+- `git push --force` to any branch (even feature branches)
+- Interactive rebase (`git rebase -i`)
+
+### Database Operations
+- DROP statements (`DROP TABLE`, `DROP DATABASE`)
+- DELETE without WHERE clause
+- TRUNCATE operations
+- Schema changes to production configuration
+
+### Security-Sensitive Files
+- Modifying files matching: `*auth*`, `*security*`, `*permission*`
+- Modifying secrets templates: `*.env.example`, `*secrets*`
+- Modifying CI/CD: `.github/workflows/*`, `.gitlab-ci.yml`
+
+## TIER 3: WARN (Proceed but note the risk)
+
+For these actions, proceed but explicitly note the risk:
+
+### Code Changes
+- Large changes (>5 files or >200 lines) — note: "This is a large change, consider reviewing in smaller commits"
+- Creating new files (prefer editing existing) — note: "Creating new file, ensure this is necessary"
+- Missing tests for new functionality — note: "Consider adding tests for this functionality"
+
+### Verification
+- Claiming "done" before running tests — always run tests first
+- Skipping verification — always check build/lint after changes
+- Assuming success without checking — verify commands completed successfully
+
+### Configuration
+- Hardcoding IPs, URLs, or ports — recommend using config
+- Environment-specific values in code — recommend using environment variables
+- External calls without timeouts — recommend adding timeouts

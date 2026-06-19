@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Pre-push hook — delegates to pre-push-check.ps1 (Windows) or pre-push-check.sh (Mac/Linux).
+# Installed by: mb init / mb upgrade
+# Template source: templates/.githooks/pre-push
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+if command -v pwsh &>/dev/null; then
+    pwsh -NonInteractive -File "$ROOT/scripts/pre-push-check.ps1"
+elif command -v powershell &>/dev/null; then
+    powershell -NonInteractive -File "$ROOT/scripts/pre-push-check.ps1"
+else
+    bash "$ROOT/scripts/pre-push-check.sh"
+fi

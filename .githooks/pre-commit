@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+if git diff --cached --name-only | grep -q "^handoff\.md$"; then
+  echo "ERROR: handoff.md is staged for commit. This file is ephemeral and must not be committed."
+  echo "Remove it from staging: git rm --cached handoff.md"
+  exit 1
+fi
+
+if [ -f ".claude/settings.json" ] && ! grep -q "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE" .claude/settings.json; then
+  echo "WARNING: CLAUDE_AUTOCOMPACT_PCT_OVERRIDE not found in .claude/settings.json."
+  echo "Token budget auto-compaction may not be configured. Add it to avoid mid-task context loss."
+fi

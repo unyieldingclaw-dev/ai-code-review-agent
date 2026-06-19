@@ -1,0 +1,28 @@
+---
+alwaysApply: true
+---
+
+# Development Workflow
+
+## Always Follow This Sequence for Non-Trivial Features
+
+1. **Brainstorm** — Understand requirements, explore codebase, propose 2–3 approaches, get design approved before writing any code
+2. **Spec** — Write validated design to `docs/specs/YYYY-MM-DD-<topic>.md`
+3. **Plan** — Create bite-sized tasks with exact file paths and complete code
+4. **Implement** — TDD: write failing test → implement → verify passing → commit
+5. **Simplify** — Review changed code for clarity without changing behavior
+6. **Security Review** — Scan diff for the 9 patterns (secrets, injection, XSS, etc.)
+7. **Commit** — Stage specific files, descriptive message
+
+## Skip Phases When
+
+- Single-file fix or typo → start at Phase 4
+- Config value change → start at Phase 4
+- The change is obvious and < 20 lines → start at Phase 4
+
+## Hard Rules
+
+- Never write code before the design is approved
+- Never commit without running tests first
+- Never merge with [CRITICAL] or [HIGH] security findings unresolved
+- Never commit secrets, credentials, or `.env` files
