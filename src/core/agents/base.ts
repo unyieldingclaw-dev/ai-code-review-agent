@@ -40,17 +40,35 @@ export abstract class BaseAgent {
       }
     } catch { /* fall through */ }
 
-    // Stage 3: regex extract array
+    // Stage 3: balanced-bracket extraction (handles trailing prose/code with ']' chars)
     try {
-      const arrMatch = cleaned.match(/\[[\s\S]*\]/)
-      if (arrMatch) {
-        const parsed = JSON.parse(arrMatch[0])
+      const extracted = this.extractJsonArray(cleaned)
+      if (extracted) {
+        const parsed = JSON.parse(extracted)
         if (Array.isArray(parsed)) return this.validateFindings(parsed)
       }
     } catch { /* fall through */ }
 
     console.error(`[${this.name}] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
     return []
+  }
+
+  private extractJsonArray(text: string): string | null {
+    const start = text.indexOf('[')
+    if (start === -1) return null
+    let depth = 0
+    let inString = false
+    let esc = false
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i]
+      if (esc) { esc = false; continue }
+      if (ch === '\\' && inString) { esc = true; continue }
+      if (ch === '"') { inString = !inString; continue }
+      if (inString) continue
+      if (ch === '[') depth++
+      else if (ch === ']') { depth--; if (depth === 0) return text.slice(start, i + 1) }
+    }
+    return null
   }
 
   private validateFindings(items: unknown[]): Finding[] {

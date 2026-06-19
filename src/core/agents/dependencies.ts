@@ -16,7 +16,7 @@ Focus on:
 - Direct use of git URLs or unverified sources instead of registry packages
 - Deprecated packages with known security issues
 - Unnecessary dependencies that increase attack surface
-- Version ranges so broad they allow breaking changes
+- Wildcard (`*`) or version ranges so broad they allow breaking changes
 
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 

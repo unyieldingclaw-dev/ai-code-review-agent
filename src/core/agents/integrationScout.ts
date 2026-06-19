@@ -8,7 +8,7 @@ export class IntegrationScoutAgent extends BaseAgent {
     return `You are an integration testing analyst. Analyze the provided git diff and identify integration seams that need contract or integration tests.
 
 Focus on:
-- New or modified HTTP API calls (fetch, axios, got) — need contract tests verifying request/response shape
+- New or modified HTTP API calls (fetch, axios, got) — need integration tests verifying request/response shape and error handling
 - New or modified database writes — need integration tests verifying data persistence and constraints
 - New or modified IPC/message-passing boundaries — need tests for message schemas
 - New external service integrations — need mocked integration tests
