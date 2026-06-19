@@ -19,15 +19,27 @@ describe('OllamaProvider', () => {
       expect(result).not.toContain('<think>')
     })
 
-    it('passes think:true by default', async () => {
+    it('passes think:true for qwen models when think option is set', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ message: { content: 'response' } })
+      })
+      const provider = new OllamaProvider('http://localhost:11434', 'qwen3:latest')
+      await provider.chat([{ role: 'user', content: 'test' }], { think: true })
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(body.think).toBe(true)
+      expect(body.stream).toBe(false)
+    })
+
+    it('omits think for models that do not support it', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ message: { content: 'response' } })
       })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
-      await provider.chat([{ role: 'user', content: 'test' }])
+      await provider.chat([{ role: 'user', content: 'test' }], { think: true })
       const body = JSON.parse(mockFetch.mock.calls[0][1].body)
-      expect(body.think).toBe(true)
+      expect(body.think).toBeUndefined()
       expect(body.stream).toBe(false)
     })
 

@@ -8,6 +8,11 @@ export class OllamaProvider implements LLMProvider {
     private readonly model: string
   ) {}
 
+  private supportsThinking(): boolean {
+    const m = this.model.toLowerCase()
+    return m.startsWith('qwen') || m.startsWith('deepseek-r1')
+  }
+
   async chat(messages: Message[], options: ChatOptions = {}): Promise<string> {
     const res = await fetch(`${this.baseUrl}/api/chat`, {
       method: 'POST',
@@ -15,7 +20,7 @@ export class OllamaProvider implements LLMProvider {
       body: JSON.stringify({
         model: this.model,
         stream: false,
-        think: options.think ?? true,
+        ...(options.think && this.supportsThinking() ? { think: true } : {}),
         ...(options.format ? { format: options.format } : {}),
         messages
       }),
