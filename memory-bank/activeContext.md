@@ -20,7 +20,7 @@ lineage: []
 
 ## Current Focus
 
-**v0.9.1 — Calibration pass — COMPLETE.** 117 unit tests passing. Three agent prompts improved: ErrorHandlingAgent (swallowed-exception keyword guarantee + selective-rethrow exclusion), ObservabilityAgent (pure-function exclusion strengthened), MigrationSafetyAgent (safe DDL exclusion). Tagged `v0.9.1`. Next: Anthropic/Claude provider backlog OR run `calibrate.ts` with live Ollama to validate.
+**v0.9.2 — Calibration fixes — COMMITTED.** 118 unit tests passing. Four targeted fixes for 5 failing calibration cases: balanced-bracket parser in base.ts (performance + adversarial parse failures), wildcard wording in dependencies.ts, integration tests wording in integrationScout.ts, license.diff fixture changed from ffmpeg-static → node-lame (LGPL-3.0). Committed `6285207`. Next: run `calibrate.ts` with live Ollama to confirm 16/16 PASS, then Anthropic/Claude provider backlog.
 
 ## What's Working
 
@@ -56,7 +56,7 @@ lineage: []
 
 ## Next Steps
 
-- **Calibration validation**: Run `npx tsx calibration/calibrate.ts` with live Ollama to confirm all 16 cases PASS. Iterate if any fail.
+- **Calibration validation**: Run `npx tsx calibration/calibrate.ts` with live Ollama to confirm all 16 cases PASS after `6285207` fixes.
 - **Anthropic/Claude provider** (backlog): Alternative to Ollama using `claude-sonnet-4-6` via API.
 - **Marketplace publish** (VS Code extension): Explicitly DEFERRED.
 - **Parallel agent execution** (future): `Promise.allSettled` pool — cuts review time from 20–32 min to 3–6 min.
@@ -128,4 +128,5 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-13: Configurable retry logic — `withRetryTimeout` wrapper in `runner.ts`, `retryAttempts`/`retryDelayMs` config + CLI flags, 3 new tests. 80 unit tests. Committed as `c2d2387`.
 - 2026-06-18: v0.9.0 — AgentProgressEvent two-phase events, --fail-fast CLI flag, failFast/failOn on ReviewConfig, earlyExit on ReviewResult, stderr progress renderer. 117 unit tests. Published to npm.
 - 2026-06-19: v0.9.1 — Calibration pass: ErrorHandlingAgent prompt (swallowed keyword + selective-rethrow exclusion), ObservabilityAgent (pure-function exclusion), MigrationSafetyAgent (safe DDL exclusion). All 117 tests still pass.
+- 2026-06-19: v0.9.2 — Calibration fixes (5 failing cases): balanced-bracket parser in base.ts, wildcard wording in dependencies.ts, integration-tests wording in integrationScout.ts, license.diff fixture node-lame. 118 unit tests pass. Committed `6285207`.
 - 2026-06-15: v0.8.0 — 5 new specialist agents (ErrorHandlingAgent, ObservabilityAgent, MigrationSafetyAgent, SecretsAgent, ComplexityAgent), `shell.ts` runTool(), conditional MigrationSafety skip in SwarmRunner, 32 new unit tests (112 total), 5 calibration fixtures, DEFAULT_CONFIG updated to 16 agents, package.json v0.8.0, README updated. Tasks 1–9 committed. Task 10 (final verification + tag) is next.
