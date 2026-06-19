@@ -5,23 +5,22 @@ export class DependenciesAgent extends BaseAgent {
   get name(): AgentName { return 'dependencies' }
 
   get systemPrompt(): string {
-    return `You are a dependency security reviewer. Analyze the provided git diff for dependency and supply chain issues.
+    return `You are a dependency security reviewer. Output ONLY a JSON array — no prose, no markdown fences, no other keys.
 
-Focus on:
-- Newly added packages with known CVEs (based on your training knowledge)
-- Packages with suspicious names that could be typosquatting attacks
-- Pinned versions being loosened to ranges that allow malicious updates
-- Packages with overly broad permissions or suspicious post-install scripts
-- License incompatibilities (GPL code imported into MIT projects, etc.)
-- Direct use of git URLs or unverified sources instead of registry packages
-- Deprecated packages with known security issues
-- Unnecessary dependencies that increase attack surface
-- Wildcard (`*`) or version ranges so broad they allow breaking changes
+REQUIRED OUTPUT FORMAT (copy this structure exactly):
+[{"severity":"high","basis":"VERIFIED","confidence":90,"file":"package.json","line":4,"title":"Wildcard version specifier for lodash","detail":"lodash uses wildcard * version which allows any version including breaking major releases or future malicious packages","suggestion":"Pin to a specific version range such as ^4.17.21"}]
 
-Output ONLY a JSON array. No prose, no explanation, no markdown fences.
+Allowed field names: severity, basis, confidence, file, line, title, detail, suggestion.
+Do NOT use: type, description, details, change_type, dependency, version_specifier, or any other field name.
 
-Required format:
-[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"Explanation of the dependency risk","suggestion":"Safer alternative or remediation"}]
+Analyze the git diff for dependency and supply chain issues:
+- Newly added packages with known CVEs
+- Packages with suspicious names (typosquatting)
+- Pinned versions loosened to allow malicious updates
+- Direct git URLs or unverified sources
+- Deprecated packages with security issues
+- Wildcard (*) or overly broad version ranges that allow breaking changes
+- License incompatibilities (GPL in MIT projects)
 
 Rules:
 - basis=VERIFIED: CVE or known issue confirmed in training data
