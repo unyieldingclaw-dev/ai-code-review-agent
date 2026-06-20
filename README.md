@@ -78,6 +78,23 @@ npm link
 ```
 </details>
 
+## Setup Scripts
+
+Double-click to set up without opening a terminal:
+
+| Script | Platform | Who |
+|--------|----------|-----|
+| `setup.bat` | Windows | End-users |
+| `setup.command` | macOS | End-users |
+| `dev-setup.bat` | Windows | Contributors |
+| `dev-setup.command` | macOS | Contributors |
+
+**End-user scripts** (`setup.*`) check Node.js, verify Ollama is running, pull `devstral:latest`, install `ai-review-agent` globally, and run a smoke test.
+
+**Contributor scripts** (`dev-setup.*`) check Node.js, run `npm install` + `npm run build` + `npm link`, and confirm the local build is wired up correctly.
+
+> **macOS note:** If macOS blocks `setup.command` or `dev-setup.command` on first run, right-click → Open to bypass Gatekeeper.
+
 ## Cursor Integration (MCP)
 
 After installing globally, add this to `.cursor/mcp.json` in your project root (or copy from the `.cursor/mcp.json` already in this repo):
