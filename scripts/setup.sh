@@ -66,6 +66,9 @@ if ! npm install -g ai-review-agent; then
   exit 1
 fi
 
+# Refresh PATH so the newly installed binary is resolvable in this session
+export PATH="$(npm config get prefix)/bin:$PATH"
+
 # Step 5: Smoke test
 echo ""
 echo "Smoke test..."
