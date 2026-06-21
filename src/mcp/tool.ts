@@ -1,5 +1,5 @@
 // src/mcp/tool.ts
-import { execSync } from 'child_process'
+import { spawnSync } from 'child_process'
 import { resolve } from 'path'
 import { SwarmRunner } from '../core/runner.js'
 import { loadConfig } from '../core/config.js'
@@ -15,18 +15,26 @@ export interface ReviewToolParams {
   repo_path?: string
 }
 
+function gitSync(cwd: string, args: string[]): string {
+  const result = spawnSync('git', ['-C', cwd, ...args], {
+    encoding: 'utf-8',
+    maxBuffer: 50 * 1024 * 1024
+  })
+  if (result.error || result.status !== 0) return ''
+  return result.stdout
+}
+
 export async function runReviewTool(params: ReviewToolParams): Promise<string> {
   const repoPath = resolve(params.repo_path ?? process.cwd())
 
   // --- Diff acquisition (staged → HEAD fallback) ---
   let diff: string
   try {
-    diff = execSync(`git -C "${repoPath}" diff --cached`, { encoding: 'utf-8' })
+    diff = gitSync(repoPath, ['diff', '--cached'])
     if (!diff.trim()) {
-      diff = execSync(`git -C "${repoPath}" diff HEAD`, { encoding: 'utf-8' })
+      diff = gitSync(repoPath, ['diff', 'HEAD'])
     }
   } catch {
-    // Friendly message for the common case of not being in a repo
     return `## AI Code Review\n\nNot a git repository: \`${repoPath}\`.`
   }
 

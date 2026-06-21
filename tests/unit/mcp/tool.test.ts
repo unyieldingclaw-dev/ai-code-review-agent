@@ -4,7 +4,7 @@ import { runReviewTool } from '../../../src/mcp/tool.js'
 
 // Mock child_process so tests never shell out
 vi.mock('child_process', () => ({
-  execSync: vi.fn(),
+  spawnSync: vi.fn(),
 }))
 
 // Mock SwarmRunner so tests never call Ollama
@@ -42,8 +42,8 @@ vi.mock('../../../src/core/config.js', () => ({
   }),
 }))
 
-import { execSync } from 'child_process'
-const mockExecSync = vi.mocked(execSync)
+import { spawnSync } from 'child_process'
+const mockSpawnSync = vi.mocked(spawnSync)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -51,45 +51,56 @@ beforeEach(() => {
 
 describe('runReviewTool', () => {
   it('uses staged diff by default', async () => {
-    mockExecSync.mockReturnValue('diff --git a/f.ts b/f.ts\n+line' as any)
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'diff --git a/f.ts b/f.ts\n+line',
+    } as any)
     await runReviewTool({})
-    expect(mockExecSync).toHaveBeenCalledWith(
-      expect.stringContaining('diff --cached'),
+    expect(mockSpawnSync).toHaveBeenCalledWith(
+      'git',
+      expect.arrayContaining(['diff', '--cached']),
       expect.any(Object)
     )
   })
 
   it('falls back to git diff HEAD when no staged changes', async () => {
-    mockExecSync
-      .mockReturnValueOnce('' as any)            // first call: git diff --cached → empty
-      .mockReturnValueOnce('diff --git a/f.ts b/f.ts\n+line' as any) // second call: git diff HEAD
+    mockSpawnSync
+      .mockReturnValueOnce({ status: 0, stdout: '' } as any)            // first call: git diff --cached → empty
+      .mockReturnValueOnce({ status: 0, stdout: 'diff --git a/f.ts b/f.ts\n+line' } as any) // second call: git diff HEAD
     await runReviewTool({})
-    const calls = mockExecSync.mock.calls.map(c => c[0] as string)
-    expect(calls[0]).toContain('--cached')
-    expect(calls[1]).toContain('diff HEAD')
+    const calls = mockSpawnSync.mock.calls
+    expect(calls[0][1]).toContain('--cached')
+    expect(calls[1][1]).toContain('HEAD')
   })
 
   it('returns empty-diff message when no changes found', async () => {
-    mockExecSync.mockReturnValue('' as any)
+    mockSpawnSync.mockReturnValue({ status: 0, stdout: '' } as any)
     const result = await runReviewTool({})
     expect(result).toContain('No staged changes found')
   })
 
   it('uses provided repo_path in git commands', async () => {
-    mockExecSync.mockReturnValue('diff --git a/f.ts b/f.ts\n+line' as any)
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'diff --git a/f.ts b/f.ts\n+line',
+    } as any)
     await runReviewTool({ repo_path: '/tmp/myrepo' })
-    const call = mockExecSync.mock.calls[0][0] as string
-    expect(call).toContain('myrepo')
+    const call = mockSpawnSync.mock.calls[0][1] as string[]
+    expect(mockSpawnSync.mock.calls[0][0]).toBe('git')
+    expect(mockSpawnSync.mock.calls[0][2]).toHaveProperty('encoding', 'utf-8')
   })
 
   it('returns error message when git command throws (not a repo)', async () => {
-    mockExecSync.mockImplementation(() => { throw new Error('not a git repository') })
+    mockSpawnSync.mockImplementation(() => { throw new Error('not a git repository') })
     const result = await runReviewTool({})
     expect(result).toContain('Not a git repository')
   })
 
   it('returns error message when Ollama is unreachable', async () => {
-    mockExecSync.mockReturnValue('diff --git a/f.ts b/f.ts\n+line' as any)
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'diff --git a/f.ts b/f.ts\n+line',
+    } as any)
     const { SwarmRunner } = await import('../../../src/core/runner.js')
     vi.mocked(SwarmRunner).mockImplementationOnce(() => ({
       run: vi.fn().mockRejectedValue(new Error('LLM provider not available')),
@@ -99,7 +110,10 @@ describe('runReviewTool', () => {
   })
 
   it('excludes testgen from agents regardless of config', async () => {
-    mockExecSync.mockReturnValue('diff --git a/f.ts b/f.ts\n+line' as any)
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'diff --git a/f.ts b/f.ts\n+line',
+    } as any)
     const { loadConfig } = await import('../../../src/core/config.js')
     vi.mocked(loadConfig).mockReturnValueOnce({
       model: 'devstral:latest',
