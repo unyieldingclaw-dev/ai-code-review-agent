@@ -18,3 +18,10 @@ handoff.md
 # Build artifacts
 *.vsix
 *.tgz
+
+# AI-generated scratch planning/session state
+.claude/plans/
+.claude/worktrees/
+
+# Tool-neutral runtime state
+.memory-bank/state/
