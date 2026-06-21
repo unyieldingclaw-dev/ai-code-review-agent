@@ -1,5 +1,5 @@
 ---
-description: Run a deep 11-agent local AI code review on the current diff using Ollama (devstral:latest). Reviews security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, coverage, and test generation. Fully offline.
+description: Run a deep 15-agent local AI code review on the current diff using Ollama (devstral:latest). Reviews security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, coverage, error-handling, observability, migration-safety, secrets, and complexity. Fully offline.
 allowed-tools:
   - Bash(ai-review-agent *)
   - Bash(node dist/cli/index.js *)
@@ -12,12 +12,14 @@ allowed-tools:
 
 # /ai-review
 
-Run the 11-agent local AI code review swarm against the current working diff using Ollama.
+Run the 15-agent local AI code review swarm against the current working diff using Ollama.
 
 **When to use:**
 - Before committing or opening a PR — thorough, multi-domain review
 - When you want a fully offline review with no cloud API calls
 - Use `/code-review` instead for a fast Claude-native check mid-session
+
+**Test generation:** Opt-in via `--suggest-tests` or `--write-tests` flags. Default run never writes files.
 
 **Prerequisites:** Ollama must be running (`ollama serve`) with `devstral:latest` pulled.
 
