@@ -4,12 +4,10 @@ import type { AgentName, FailOnLevel } from './schema.js'
 
 export interface ReviewConfig {
   model: string
-  provider: 'ollama' | 'anthropic'
+  provider: 'ollama'
   ollamaUrl: string
-  anthropicModel: string
   maxFindings: number
   agents: AgentName[]
-  contextLines: number
   testOutputDir: string
   maxDiffLines: number
   agentTimeoutMs: number
@@ -28,14 +26,12 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   model: 'devstral:latest',
   provider: 'ollama',
   ollamaUrl: 'http://localhost:11434',
-  anthropicModel: 'claude-sonnet-4-5',
   maxFindings: 15,
   agents: [
     'security', 'performance', 'correctness', 'design', 'dependencies',
-    'coverage', 'testgen', 'adversarial', 'integration', 'breaking-change', 'license',
+    'coverage', 'adversarial', 'integration', 'breaking-change', 'license',
     'error-handling', 'observability', 'migration-safety', 'secrets', 'complexity'
   ],
-  contextLines: 10,
   testOutputDir: './ai-review-tests',
   maxDiffLines: 2000,
   agentTimeoutMs: 60000,
