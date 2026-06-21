@@ -46,4 +46,14 @@ describe('loadConfig', () => {
       unlinkSync('ai-review.config.json')
     }
   })
+
+  it('returns defaults when config file contains invalid JSON', () => {
+    writeFileSync('ai-review.config.json', '{ not valid json }')
+    try {
+      const config = loadConfig(process.cwd())
+      expect(config.model).toBe('devstral:latest')
+    } finally {
+      unlinkSync('ai-review.config.json')
+    }
+  })
 })

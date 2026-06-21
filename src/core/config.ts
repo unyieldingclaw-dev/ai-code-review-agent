@@ -17,9 +17,9 @@ export interface ReviewConfig {
   sanitize: boolean
   preferredSecretsScanner?: 'gitleaks' | 'trufflehog' | 'none'
   complexityThreshold?: number
-  failFast?: boolean
-  failOn?: FailOnLevel
-  parallel?: boolean
+  failFast: boolean
+  failOn: FailOnLevel
+  parallel: boolean
 }
 
 export const DEFAULT_CONFIG: ReviewConfig = {
