@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
-import { execSync } from 'child_process'
+import { spawnSync } from 'child_process'
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs'
-import { join, resolve } from 'path'
+import { fileURLToPath } from 'url'
+import { join, resolve, dirname } from 'path'
 import { SwarmRunner } from '../core/runner.js'
 import { loadConfig } from '../core/config.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
@@ -11,12 +12,17 @@ import type { AgentName, AgentProgressEvent } from '../core/schema.js'
 import { shouldFail, FAIL_ON_OPTIONS } from './exitCode.js'
 import type { FailOnLevel } from './exitCode.js'
 
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const { version } = JSON.parse(
+  readFileSync(join(__dirname, '../../package.json'), 'utf-8')
+) as { version: string }
+
 const program = new Command()
 
 program
   .name('ai-review-agent')
   .description('AI-powered code review using a local LLM swarm')
-  .version('0.9.4')
+  .version(version)
   .option('--diff <path>', 'Path to a .diff file to review')
   .option('--dir <path>', 'Directory to diff against HEAD (default: cwd)')
   .option('--model <model>', 'Override Ollama model')
@@ -33,6 +39,9 @@ program
   .option('--parallel', 'Run specialist agents in parallel (faster; disables fail-fast early exit)')
   .option('--ignore <pattern>', 'Exclude files matching this glob pattern (repeatable)', collect, [] as string[])
   .option('--no-sanitize', 'Skip prompt-injection sanitization of the diff')
+  .option('--suggest-tests', 'Enable testgen agent and include suggestions in report (no files written)')
+  .option('--write-tests', 'Enable testgen agent and write generated test files to testOutputDir')
+  .option('--context <mode>', 'Context mode: none (default). memory-bank coming soon.', 'none')
   .action(async (options: {
     diff?: string
     dir?: string
@@ -50,7 +59,16 @@ program
     parallel?: boolean
     ignore: string[]
     sanitize: boolean
+    suggestTests?: boolean
+    writeTests?: boolean
+    context: string
   }) => {
+    // Validate --context flag early
+    if (options.context !== 'none') {
+      console.error(`--context "${options.context}" is not yet implemented. Use --context none.`)
+      process.exit(1)
+    }
+
     const projectPath = resolve(options.dir ?? process.cwd())
     const config = loadConfig(projectPath)
 
@@ -66,6 +84,11 @@ program
     config.failOn = options.failOn
     config.failFast = !!options.failFast
     config.parallel = !!options.parallel
+
+    // testgen opt-in: only add to agents if --suggest-tests or --write-tests is passed
+    if ((options.suggestTests || options.writeTests) && !config.agents.includes('testgen')) {
+      config.agents = [...config.agents, 'testgen']
+    }
 
     const diff = getDiff(options.diff, options.dir)
     if (!diff.trim()) {
@@ -103,13 +126,16 @@ program
       }
     )
 
-    if (result.testFiles.length > 0) {
+    // Only write test files when --write-tests is explicitly passed
+    if (options.writeTests && result.testFiles.length > 0) {
       for (const tf of result.testFiles) {
         const outPath = join(projectPath, tf.path)
         mkdirSync(join(outPath, '..'), { recursive: true })
         writeFileSync(outPath, tf.content, 'utf-8')
       }
       process.stdout.write(`\n📝 Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`)
+    } else if (options.suggestTests && result.testFiles.length > 0) {
+      process.stdout.write(`\n💡 ${result.testFiles.length} test suggestion(s) included in report (use --write-tests to write files)\n`)
     }
 
     let output = options.format === 'json' ? formatJson(result) : formatMarkdown(result)
@@ -133,6 +159,13 @@ function collect(value: string, previous: string[]): string[] {
   return [...previous, value]
 }
 
+function gitSync(args: string[]): string {
+  const result = spawnSync('git', args, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
+  if (result.error) throw result.error
+  if (result.status !== 0) throw new Error(result.stderr || `git exited with status ${result.status}`)
+  return result.stdout
+}
+
 function getDiff(diffFile?: string, dir?: string): string {
   if (diffFile) {
     if (!existsSync(diffFile)) {
@@ -142,11 +175,11 @@ function getDiff(diffFile?: string, dir?: string): string {
     return readFileSync(diffFile, 'utf-8')
   }
   if (dir) {
-    return execSync(`git -C "${dir}" diff HEAD`, { encoding: 'utf-8' })
+    return gitSync(['-C', dir, 'diff', 'HEAD'])
   }
-  const staged = execSync('git diff --staged', { encoding: 'utf-8' })
+  const staged = gitSync(['diff', '--staged'])
   if (staged.trim()) return staged
-  return execSync('git diff', { encoding: 'utf-8' })
+  return gitSync(['diff'])
 }
 
 program.parse()
