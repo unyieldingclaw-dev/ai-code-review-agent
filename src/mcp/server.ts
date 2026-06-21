@@ -8,6 +8,9 @@
 // over stdin/stdout. All diagnostic output must go to stderr — stdout is the
 // MCP protocol channel.
 
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
@@ -18,8 +21,13 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import { runReviewTool } from './tool.js'
 
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const { version } = JSON.parse(
+  readFileSync(join(__dirname, '../../package.json'), 'utf-8')
+) as { version: string }
+
 const server = new Server(
-  { name: 'ai-review', version: '0.6.0' },
+  { name: 'ai-review', version },
   { capabilities: { tools: {} } }
 )
 
@@ -29,8 +37,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       name: 'review_diff',
       description:
         'Run the AI code review swarm on the current git diff. ' +
-        'Uses 10 specialist agents (security, performance, correctness, design, ' +
-        'dependencies, adversarial, integration, breaking-change, license, coverage) ' +
+        'Uses 15 specialist agents (security, performance, correctness, design, ' +
+        'dependencies, adversarial, integration, breaking-change, license, coverage, ' +
+        'error-handling, observability, migration-safety, secrets, complexity) ' +
         'powered by Ollama locally — no API costs, fully offline. ' +
         'Returns a markdown summary with full detail for critical/high findings.',
       inputSchema: {
