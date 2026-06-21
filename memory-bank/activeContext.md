@@ -20,7 +20,7 @@ lineage: []
 
 ## Current Focus
 
-**v0.9.2 — Calibration fixes — COMMITTED.** 118 unit tests passing. Four targeted fixes for 5 failing calibration cases: balanced-bracket parser in base.ts (performance + adversarial parse failures), wildcard wording in dependencies.ts, integration tests wording in integrationScout.ts, license.diff fixture changed from ffmpeg-static → node-lame (LGPL-3.0). Committed `6285207`. Next: run `calibrate.ts` with live Ollama to confirm 16/16 PASS, then Anthropic/Claude provider backlog.
+**ACR P0 Fixes — Task 2 COMPLETE.** Replaced `src/cli/index.ts`: spawnSync for git calls, `--suggest-tests`/`--write-tests` flags for testgen opt-in, version read from package.json at runtime, context flag validation. 127 unit tests passing. Committed `378f33f`. Next: Task 3 (mcp/tool.ts spawnSync replacement).
 
 ## What's Working
 
@@ -31,7 +31,7 @@ lineage: []
 - Confidence-aware hallucination check: solo Critical ≥60% confidence stays Critical; <60% → High
 - Prompt injection sanitizer: strips SYSTEM:, instruction overrides, role-play directives, long base64
 - Calibration CI: `.github/workflows/calibrate.yml` — weekly + release, skips gracefully without Ollama
-- **117 unit tests passing** across 18 test files (includes 15 new MCP tests, 3 new retry tests, 5 new agent tests × 5 agents, 5 new fail-fast/progress tests)
+- **120 unit tests passing** across 18 test files (includes 15 new MCP tests, 3 new retry tests, 5 new agent tests × 5 agents, 5 new fail-fast/progress tests, 2 new parallel tests)
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
 
 ## Guardrails (All Complete)
@@ -56,11 +56,10 @@ lineage: []
 
 ## Next Steps
 
-- **Calibration validation**: Run `npx tsx calibration/calibrate.ts` with live Ollama to confirm all 16 cases PASS after `6285207` fixes.
+- **Calibration**: 16/16 PASS confirmed (v0.9.3, commit `754ee08`). No further calibration work needed.
 - **Anthropic/Claude provider** (backlog): Alternative to Ollama using `claude-sonnet-4-6` via API.
 - **Marketplace publish** (VS Code extension): Explicitly DEFERRED.
-- **Parallel agent execution** (future): `Promise.allSettled` pool — cuts review time from 20–32 min to 3–6 min.
-- **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new token and update `NPM_TOKEN` secret before then.
+- **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new Automation token on npmjs.com and update `NPM_TOKEN` GitHub Actions secret before then.
 
 ## v0.5.0 Design Decisions (2026-06-11)
 
@@ -95,7 +94,7 @@ lineage: []
 ## Key Commands
 
 ```bash
-npm test                    # all unit tests (117 passing)
+npm test                    # all unit tests (120 passing)
 npm run typecheck           # 0 errors
 npm run build               # compile to dist/
 node dist/cli/index.js --help   # smoke test CLI
@@ -129,4 +128,5 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-18: v0.9.0 — AgentProgressEvent two-phase events, --fail-fast CLI flag, failFast/failOn on ReviewConfig, earlyExit on ReviewResult, stderr progress renderer. 117 unit tests. Published to npm.
 - 2026-06-19: v0.9.1 — Calibration pass: ErrorHandlingAgent prompt (swallowed keyword + selective-rethrow exclusion), ObservabilityAgent (pure-function exclusion), MigrationSafetyAgent (safe DDL exclusion). All 117 tests still pass.
 - 2026-06-19: v0.9.2 — Calibration fixes (5 failing cases): balanced-bracket parser in base.ts, wildcard wording in dependencies.ts, integration-tests wording in integrationScout.ts, license.diff fixture node-lame. 118 unit tests pass. Committed `6285207`.
+- 2026-06-19: v0.9.3 — DependenciesAgent prompt restructured to lead with REQUIRED OUTPUT FORMAT + few-shot example. devstral now outputs valid Finding schema for package.json diffs. 16/16 calibration PASS confirmed. Committed `754ee08`.
 - 2026-06-15: v0.8.0 — 5 new specialist agents (ErrorHandlingAgent, ObservabilityAgent, MigrationSafetyAgent, SecretsAgent, ComplexityAgent), `shell.ts` runTool(), conditional MigrationSafety skip in SwarmRunner, 32 new unit tests (112 total), 5 calibration fixtures, DEFAULT_CONFIG updated to 16 agents, package.json v0.8.0, README updated. Tasks 1–9 committed. Task 10 (final verification + tag) is next.
