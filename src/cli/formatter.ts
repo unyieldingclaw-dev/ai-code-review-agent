@@ -54,6 +54,13 @@ export function formatMarkdown(result: ReviewResult): string {
     lines.push('')
   }
 
+  if (result.context) {
+    const { mode, filesLoaded, estimatedTokens } = result.context
+    const fileList = filesLoaded.join(', ')
+    lines.push('---')
+    lines.push(`*Context: ${mode} — loaded ${fileList || 'no files'} (~${estimatedTokens} tokens)*`)
+  }
+
   return lines.join('\n')
 }
 
