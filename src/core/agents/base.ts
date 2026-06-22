@@ -1,6 +1,28 @@
 import type { LLMProvider, Message } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
-import type { Finding, ReviewInput, AgentName } from '../schema.js'
+import type { Finding, ReviewInput, AgentName, ReviewDomain } from '../schema.js'
+
+function agentDefaultDomain(name: AgentName): ReviewDomain {
+  const map: Record<AgentName, ReviewDomain> = {
+    'security': 'Security',
+    'performance': 'Performance',
+    'correctness': 'Correctness',
+    'design': 'Architecture Drift',
+    'dependencies': 'Dependencies',
+    'coverage': 'Testing',
+    'testgen': 'Testing',
+    'adversarial': 'Adversarial',
+    'integration': 'Integration',
+    'breaking-change': 'Breaking Change',
+    'license': 'License',
+    'secrets': 'Secrets',
+    'error-handling': 'Error Handling',
+    'observability': 'Observability',
+    'migration-safety': 'Migration Safety',
+    'complexity': 'Complexity'
+  }
+  return map[name] ?? 'Correctness'
+}
 
 export abstract class BaseAgent {
   constructor(
@@ -82,15 +104,25 @@ export abstract class BaseAgent {
         typeof f.line === 'number' &&
         typeof f.title === 'string' &&
         typeof f.detail === 'string' &&
-        typeof f.suggestion === 'string'
+        // Accept either suggestion (legacy) or recommendation (new) from LLM output
+        (typeof f.suggestion === 'string' || typeof f.recommendation === 'string')
       )
       .map((f, i) => {
         const rawConf = typeof f.confidence === 'number' ? f.confidence : 70
+        const suggestion = f.suggestion ?? f.recommendation ?? ''
+        const recommendation = f.recommendation ?? suggestion
         return {
           ...f,
           id: `${this.name}-${i}`,
           agent: this.name,
-          confidence: Math.max(0, Math.min(100, rawConf))
+          confidence: Math.max(0, Math.min(100, rawConf)),
+          domain: f.domain ?? agentDefaultDomain(this.name),
+          evidence: f.evidence ?? f.detail ?? '',
+          impact: f.impact ?? '',
+          recommendation,
+          suggestion,
+          blocking: f.blocking ?? (f.severity === 'critical'),
+          source: f.source ?? 'llm'
         }
       })
   }

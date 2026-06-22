@@ -20,13 +20,19 @@ function makeFinding(severity: 'critical' | 'high' | 'medium' | 'low', overrides
   return {
     id: 'f1',
     agent: 'security' as const,
+    domain: 'Security',
     severity,
     basis: 'VERIFIED' as const,
     file: 'src/auth.ts',
     line: 42,
     title: 'Test finding',
     detail: 'Detailed description',
+    evidence: 'test evidence',
+    impact: 'test impact',
+    recommendation: 'Fix it this way',
     suggestion: 'Fix it this way',
+    blocking: false,
+    source: 'llm',
     ...overrides,
   }
 }

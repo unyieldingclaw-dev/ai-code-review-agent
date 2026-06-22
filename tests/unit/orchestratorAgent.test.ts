@@ -23,6 +23,7 @@ describe('OrchestratorAgent', () => {
       {
         id: 'security-0',
         agent: 'security',
+        domain: 'Security',
         severity: 'high',
         basis: 'VERIFIED',
         confidence: 85,
@@ -30,11 +31,17 @@ describe('OrchestratorAgent', () => {
         line: 10,
         title: 'SQL injection',
         detail: 'User input not escaped',
-        suggestion: 'Use prepared statements'
+        evidence: 'User input not escaped',
+        impact: 'SQL injection possible',
+        recommendation: 'Use prepared statements',
+        suggestion: 'Use prepared statements',
+        blocking: false,
+        source: 'llm'
       },
       {
         id: 'correctness-0',
         agent: 'correctness',
+        domain: 'Correctness',
         severity: 'high',
         basis: 'VERIFIED',
         confidence: 80,
@@ -42,7 +49,12 @@ describe('OrchestratorAgent', () => {
         line: 10,
         title: 'Logic error',
         detail: 'Same location issue',
-        suggestion: 'Fix the logic'
+        evidence: 'Same location issue',
+        impact: 'Logic error impact',
+        recommendation: 'Fix the logic',
+        suggestion: 'Fix the logic',
+        blocking: false,
+        source: 'llm'
       }
     ]
     const result = agent.synthesize(findings)
@@ -57,6 +69,7 @@ describe('OrchestratorAgent', () => {
       {
         id: 'coverage-0',
         agent: 'coverage',
+        domain: 'Testing',
         severity: 'low',
         basis: 'INFERRED',
         confidence: 70,
@@ -64,7 +77,12 @@ describe('OrchestratorAgent', () => {
         line: 5,
         title: 'Untested edge case',
         detail: 'This branch has no test',
-        suggestion: 'Add a test'
+        evidence: 'This branch has no test',
+        impact: 'Low coverage',
+        recommendation: 'Add a test',
+        suggestion: 'Add a test',
+        blocking: false,
+        source: 'llm'
       }
     ]
     const result = agent.synthesize(findings)
@@ -77,6 +95,7 @@ describe('OrchestratorAgent', () => {
       {
         id: 'security-0',
         agent: 'security',
+        domain: 'Security',
         severity: 'critical',
         basis: 'INFERRED',
         confidence: 45, // Low confidence
@@ -84,11 +103,17 @@ describe('OrchestratorAgent', () => {
         line: 20,
         title: 'Possible vulnerability',
         detail: 'Might be vulnerable',
-        suggestion: 'Review carefully'
+        evidence: 'Might be vulnerable',
+        impact: 'Possible security breach',
+        recommendation: 'Review carefully',
+        suggestion: 'Review carefully',
+        blocking: true,
+        source: 'llm'
       },
       {
         id: 'performance-0',
         agent: 'performance',
+        domain: 'Performance',
         severity: 'low',
         basis: 'INFERRED',
         confidence: 70,
@@ -96,7 +121,12 @@ describe('OrchestratorAgent', () => {
         line: 5,
         title: 'Slow loop',
         detail: 'O(n^2) complexity',
-        suggestion: 'Optimize'
+        evidence: 'O(n^2) complexity',
+        impact: 'Performance degradation',
+        recommendation: 'Optimize',
+        suggestion: 'Optimize',
+        blocking: false,
+        source: 'llm'
       }
     ]
     const result = agent.synthesize(findings)
@@ -112,6 +142,7 @@ describe('OrchestratorAgent', () => {
       {
         id: 'security-0',
         agent: 'security',
+        domain: 'Security',
         severity: 'critical',
         basis: 'VERIFIED',
         confidence: 95, // High confidence
@@ -119,7 +150,12 @@ describe('OrchestratorAgent', () => {
         line: 15,
         title: 'Weak encryption',
         detail: 'Using deprecated algorithm',
-        suggestion: 'Use AES-256'
+        evidence: 'Using deprecated algorithm',
+        impact: 'Data can be decrypted',
+        recommendation: 'Use AES-256',
+        suggestion: 'Use AES-256',
+        blocking: true,
+        source: 'llm'
       }
     ]
     const result = agent.synthesize(findings)

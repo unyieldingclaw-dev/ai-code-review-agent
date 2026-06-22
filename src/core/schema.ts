@@ -20,20 +20,56 @@ export type Severity = 'critical' | 'high' | 'medium' | 'low'
 export type Basis = 'VERIFIED' | 'INFERRED' | 'SPECULATIVE'
 export type TestFramework = 'vitest' | 'jest' | 'mocha' | 'pytest'
 
+export type ReviewDomain =
+  | 'Security'
+  | 'Correctness'
+  | 'Performance'
+  | 'Maintainability'
+  | 'Testing'
+  | 'Architecture Drift'
+  | 'Dependencies'
+  | 'Secrets'
+  | 'Migration Safety'
+  | 'License'
+  | 'Observability'
+  | 'Complexity'
+  | 'Integration'
+  | 'Breaking Change'
+  | 'Error Handling'
+  | 'Adversarial'
+
+export type EvidenceSource =
+  | 'llm'
+  | 'heuristic'
+  | 'gitleaks'
+  | 'trufflehog'
+  | 'semgrep'
+  | 'npm-audit'
+  | 'osv'
+  | 'lizard'
+  | 'git'
+  | 'policy'
+
 export interface Finding {
   id: string
   agent: AgentName
+  domain: ReviewDomain
   severity: Severity
   basis: Basis
   file: string
   line: number
+  lineEnd?: number
   title: string
   detail: string
+  evidence: string
+  impact: string
+  recommendation: string
+  /** @deprecated use recommendation */
   suggestion: string
-  /** Agent's self-reported confidence 0–100. Default: 70. */
+  blocking: boolean
+  source: EvidenceSource
   confidence?: number
   relatedFindings?: string[]
-  /** Other agent names that independently flagged the same file+line */
   corroboratingAgents?: AgentName[]
 }
 
@@ -53,7 +89,6 @@ export interface GeneratedTestFile {
 
 export interface ReviewInput {
   diff: string
-  contextLines?: number
   projectPath?: string
 }
 
@@ -79,7 +114,6 @@ export const SEVERITY_RANK: Record<Severity, number> = {
 }
 
 export type FailOnLevel = 'critical' | 'high' | 'medium' | 'any' | 'never'
-
 export const FAIL_ON_OPTIONS: FailOnLevel[] = ['critical', 'high', 'medium', 'any', 'never']
 
 export interface AgentProgressEvent {

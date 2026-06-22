@@ -11,13 +11,19 @@ const makeProvider = () => ({
 const finding = (overrides: Partial<Finding> = {}): Finding => ({
   id: 'security-0',
   agent: 'security',
+  domain: 'Security',
   severity: 'high',
   basis: 'VERIFIED',
   file: 'src/auth.ts',
   line: 10,
   title: 'Test finding',
   detail: 'Detail',
+  evidence: 'test evidence',
+  impact: 'test impact',
+  recommendation: 'Fix it',
   suggestion: 'Fix it',
+  blocking: false,
+  source: 'llm',
   confidence: 70,
   ...overrides
 })
