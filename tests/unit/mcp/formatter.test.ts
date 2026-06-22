@@ -56,7 +56,7 @@ describe('formatMcpOutput', () => {
   it('renders critical finding with 🔴 icon and full detail', () => {
     const finding = makeFinding('critical', {
       id: 'f1', agent: 'security', file: 'src/auth.ts', line: 42,
-      title: 'Hardcoded secret', detail: 'Key is embedded in source.', suggestion: 'Use env var.'
+      title: 'Hardcoded secret', detail: 'Key is embedded in source.', recommendation: 'Use env var.'
     })
     const result = formatMcpOutput(makeResult({
       findings: [finding],
@@ -64,7 +64,7 @@ describe('formatMcpOutput', () => {
     }))
     expect(result).toContain('🔴')
     expect(result).toContain('CRITICAL')
-    expect(result).toContain('security')
+    expect(result).toContain('Security')
     expect(result).toContain('src/auth.ts:42')
     expect(result).toContain('Hardcoded secret')
     expect(result).toContain('Key is embedded in source.')

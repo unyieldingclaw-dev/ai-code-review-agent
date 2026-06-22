@@ -38,12 +38,16 @@ export function formatMcpOutput(result: ReviewResult): string {
 
 function renderFinding(f: Finding): string {
   const icon = SEVERITY_ICONS[f.severity as 'critical' | 'high']
-  return [
-    `### ${icon} ${f.severity.toUpperCase()} · ${f.agent} · \`${f.file}:${f.line}\``,
+  const lines = [
+    `### ${icon} ${f.severity.toUpperCase()} · ${f.domain ?? f.agent} · \`${f.file}:${f.line}\``,
     `**${f.title}**`,
     f.detail,
-    `_Suggestion: ${f.suggestion}_`,
-  ].join('\n')
+  ]
+  if (f.evidence) lines.push(`**Evidence:** ${f.evidence}`)
+  if (f.impact) lines.push(`**Impact:** ${f.impact}`)
+  lines.push(`**Recommendation:** ${f.recommendation ?? f.suggestion}`)
+  if (f.blocking != null) lines.push(`**Blocking:** ${f.blocking ? 'Yes' : 'No'}`)
+  return lines.join('\n')
 }
 
 function buildTail(medium: number, low: number): string {
