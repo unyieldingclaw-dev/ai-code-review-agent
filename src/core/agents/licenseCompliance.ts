@@ -23,7 +23,7 @@ Focus on package.json changes (dependencies, devDependencies, peerDependencies).
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"package.json","line":14,"title":"Short title under 60 chars","detail":"Package name, its license, and why it's problematic","suggestion":"MIT-licensed alternative or advice to obtain a commercial license"}]
+[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"package.json","line":14,"title":"Short title under 60 chars","detail":"Package name, its license, and why it's problematic","suggestion":"MIT-licensed alternative or advice to obtain a commercial license","domain":"License","evidence":"<specific diff line(s) showing the added dependency>","impact":"<legal/compliance risk, e.g. GPL copyleft would require open-sourcing proprietary code, or AGPL triggers on network use>","recommendation":"<MIT-licensed alternative or steps to obtain a commercial license>","blocking":false,"source":"policy"}]
 
 Rules:
 - severity=high for GPL, AGPL, SSPL, Commons Clause
@@ -32,6 +32,9 @@ Rules:
 - basis=INFERRED: the package name or description strongly implies the license
 - basis=SPECULATIVE: you're unsure — flag for human review
 - confidence: your certainty this is a real issue (0-100)
+- evidence: quote the specific diff line(s) that triggered this finding
+- recommendation: write corrected code, not just a description
+- blocking: true for critical/high, false for medium/low
 - If the diff has no package.json changes adding new dependencies, return: []`
   }
 }

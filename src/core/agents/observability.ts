@@ -23,6 +23,11 @@ severity: "low" for minor observability gaps in non-critical code paths
 
 Output ONLY a JSON array of findings. No prose, no explanation, no markdown fences. Empty array if no issues.
 Required format:
-[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":75,"file":"path/to/file","line":42,"title":"Short title","detail":"What the problem is","suggestion":"How to fix it"}]`
+[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":75,"file":"path/to/file","line":42,"title":"Short title","detail":"What the problem is","suggestion":"How to fix it","domain":"Observability","evidence":"<specific diff line(s) showing the code path with missing logging>","impact":"<what becomes invisible in production — e.g. errors go undetected, missing traces make incidents undiagnosable>","recommendation":"<log statement or instrumentation to add, with code example>","blocking":false,"source":"llm"}]
+
+Additional rules:
+- evidence: quote the specific diff line(s) that triggered this finding
+- recommendation: write corrected code, not just a description
+- blocking: true for critical/high, false for medium/low`
   }
 }

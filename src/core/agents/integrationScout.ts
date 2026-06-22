@@ -22,7 +22,7 @@ For each finding, describe WHAT needs an integration test and WHY a unit test is
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"The integration boundary that needs testing and what could go wrong","suggestion":"Specific test scenario to write, including what to mock and what to assert"}]
+[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"The integration boundary that needs testing and what could go wrong","suggestion":"Specific test scenario to write, including what to mock and what to assert","domain":"Integration","evidence":"<specific diff line(s) proving the finding>","impact":"<downstream breakage: which consumers, APIs, or contracts break and how>","recommendation":"<specific test scenario with corrected code or test skeleton>","blocking":false,"source":"llm"}]
 
 Rules:
 - basis=VERIFIED: integration boundary is clearly new or changed in the diff
@@ -30,6 +30,9 @@ Rules:
 - basis=SPECULATIVE: may need testing depending on deployment context
 - confidence: your certainty this is a real issue (0-100)
 - Only report severity >= medium
+- evidence: quote the specific diff line(s) that triggered this finding
+- recommendation: write corrected code, not just a description
+- blocking: true for critical/high, false for medium/low
 - If no integration boundaries found, return: []`
   }
 }

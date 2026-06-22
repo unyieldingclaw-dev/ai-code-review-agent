@@ -27,6 +27,12 @@ severity: "medium" for connection strings or other credential patterns
 
 Output ONLY a JSON array of findings. No prose, no explanation, no markdown fences. Empty array if no issues.
 Required format:
-[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":90,"file":"path/to/file","line":42,"title":"Short title","detail":"What the secret is","suggestion":"How to remediate"}]`
+[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":90,"file":"path/to/file","line":42,"title":"Short title","detail":"What the secret is","suggestion":"How to remediate","domain":"Secrets","evidence":"<the specific added line containing the credential pattern>","impact":"<credential exposure risk — e.g. unauthorized API access, data breach, account takeover if secret is leaked via repo history>","recommendation":"<move to environment variable or secrets manager, with corrected code example>","blocking":false,"source":"heuristic"}]
+
+Additional rules:
+- evidence: quote the specific diff line(s) that triggered this finding
+- recommendation: write corrected code, not just a description
+- blocking: true for critical/high, false for medium/low
+- source: "heuristic" for pattern-based detection; "gitleaks" if an external tool flagged it`
   }
 }

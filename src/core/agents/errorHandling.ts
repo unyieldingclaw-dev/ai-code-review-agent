@@ -20,6 +20,11 @@ severity: "medium" for log-and-continue patterns
 
 Output ONLY a JSON array of findings. No prose, no explanation, no markdown fences. Empty array if no issues.
 Required format:
-[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":80,"file":"path/to/file","line":42,"title":"Short title","detail":"What the problem is","suggestion":"How to fix it"}]`
+[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":80,"file":"path/to/file","line":42,"title":"Short title","detail":"What the problem is","suggestion":"How to fix it","domain":"Error Handling","evidence":"<specific diff line(s) showing the swallowed exception or ignored rejection>","impact":"<what fails silently or crashes when the error isn't handled — e.g. data corruption, silent auth bypass, orphaned state>","recommendation":"<corrected catch block or rejection handler with code example>","blocking":false,"source":"llm"}]
+
+Additional rules:
+- evidence: quote the specific diff line(s) that triggered this finding
+- recommendation: write corrected code, not just a description
+- blocking: true for critical/high, false for medium/low`
   }
 }

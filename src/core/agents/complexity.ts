@@ -31,7 +31,13 @@ severity: "low" for long functions that could be split but are otherwise clear
 
 Output ONLY a JSON array of findings. No prose, no explanation, no markdown fences. Empty array if no issues.
 Required format:
-[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":80,"file":"path/to/file","line":42,"title":"Short title","detail":"What the problem is","suggestion":"How to fix it"}]`
+[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":80,"file":"path/to/file","line":42,"title":"Short title","detail":"What the problem is","suggestion":"How to fix it","domain":"Complexity","evidence":"<specific diff line(s) or lizard metric showing the complexity>","impact":"<maintainability burden — e.g. harder to review, test each branch, debug, or onboard new contributors>","recommendation":"<refactored version splitting the function, with code example>","blocking":false,"source":"llm"}]
+
+Additional rules:
+- evidence: quote the specific diff line(s) that triggered this finding
+- recommendation: write corrected code, not just a description
+- blocking: true for critical/high, false for medium/low
+- source: "llm" by default; "lizard" if complexity metrics from the tool are shown in the input`
   }
 
   async run(input: ReviewInput): Promise<Finding[]> {

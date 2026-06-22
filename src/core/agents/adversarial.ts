@@ -23,7 +23,7 @@ For each finding, describe the specific breaking input and which code path it ex
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"The specific input that breaks this code and why","suggestion":"Guard condition or validation that would prevent the break"}]
+[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"The specific input that breaks this code and why","suggestion":"Guard condition or validation that would prevent the break","domain":"Adversarial","evidence":"<specific diff line(s) proving the finding>","impact":"<what an adversarial actor could exploit if this input is sent>","recommendation":"<guard condition or validation with corrected code example>","blocking":false,"source":"llm"}]
 
 Rules:
 - basis=VERIFIED: the code clearly does not handle this input
@@ -31,6 +31,10 @@ Rules:
 - basis=SPECULATIVE: might fail depending on upstream validation
 - confidence: your certainty this is a real issue (0-100)
 - Only report severity >= medium
+- evidence: quote the specific diff line(s) that triggered this finding
+- recommendation: write corrected code, not just a description
+- blocking: true for critical/high, false for medium/low
+- source: "llm" for reasoning-based findings, "heuristic" when based on a recognizable pattern match
 - If no breaking inputs found, return: []`
   }
 }

@@ -30,7 +30,13 @@ Only report the specific patterns listed above. Safe DDL operations such as CREA
 
 Output ONLY a JSON array of findings. No prose, no explanation, no markdown fences. Empty array if no issues.
 Required format:
-[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/migration","line":42,"title":"Short title","detail":"What the problem is","suggestion":"How to fix it"}]`
+[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/migration","line":42,"title":"Short title","detail":"What the problem is","suggestion":"How to fix it","domain":"Migration Safety","evidence":"<specific diff line(s) showing the dangerous DDL statement>","impact":"<data loss, downtime, or irreversible state change — e.g. NOT NULL with no DEFAULT will lock table on deploy, DROP without transaction cannot be rolled back>","recommendation":"<corrected SQL with DEFAULT value, IF EXISTS guard, or transaction wrapper>","blocking":false,"source":"llm"}]
+
+Additional rules:
+- evidence: quote the specific diff line(s) that triggered this finding
+- recommendation: write corrected code, not just a description
+- blocking: true for critical/high, false for medium/low
+- source: "git" when based on comparing schema diff (old vs new column definitions), "llm" otherwise`
   }
 }
 
