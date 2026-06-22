@@ -2,6 +2,8 @@ import type { LLMProvider } from './llm/provider.js'
 import type { ReviewConfig } from './config.js'
 import type { AgentName, Severity, Finding, ReviewInput, ReviewResult, CoverageGap, GeneratedTestFile, AgentProgressEvent } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
+import { loadAgentContext } from './contextLoader.js'
+import type { ContextResult } from './contextLoader.js'
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
 import { sanitizeDiff } from './sanitizer.js'
 import { BreakingChangeAgent } from './agents/breakingChange.js'
@@ -105,7 +107,8 @@ export class SwarmRunner {
 
   async run(
     input: ReviewInput,
-    onProgress?: (event: AgentProgressEvent) => void
+    onProgress?: (event: AgentProgressEvent) => void,
+    contextMode: 'none' | 'memory-bank' = 'none'
   ): Promise<ReviewResult> {
     const ping = await this.provider.ping()
     if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')
@@ -144,6 +147,23 @@ export class SwarmRunner {
     let coverageGaps: CoverageGap[] = []
     let testFiles: GeneratedTestFile[] = []
 
+    // Context tracking — accumulate across all agents for the final metadata block
+    const allFilesLoaded: string[] = []
+    let anyTruncated = false
+    let totalTokens = 0
+
+    // Helper: build per-agent ReviewInput with optional context prepended
+    const withContext = (agentName: AgentName): ReviewInput => {
+      if (contextMode !== 'memory-bank' || !input.projectPath) return input
+      const ctx: ContextResult = loadAgentContext(input.projectPath, agentName)
+      if (ctx.filesLoaded.length > 0) {
+        allFilesLoaded.push(...ctx.filesLoaded)
+        if (ctx.truncated) anyTruncated = true
+        totalTokens += ctx.estimatedTokens
+      }
+      return ctx.content ? { ...input, context: ctx.content } : input
+    }
+
     const timeout = this.config.agentTimeoutMs
     const retryAttempts = this.config.retryAttempts
     const retryDelayMs = this.config.retryDelayMs
@@ -168,7 +188,7 @@ export class SwarmRunner {
       onProgress?.({ phase: 'start', name: 'coverage', index, total })
       const startMs = Date.now()
       try {
-        const coverageResult = await withRetryTimeout(() => coverageAgent.runForCoverage(input), timeout, 'coverage', retryAttempts, retryDelayMs)
+        const coverageResult = await withRetryTimeout(() => coverageAgent.runForCoverage(withContext('coverage')), timeout, 'coverage', retryAttempts, retryDelayMs)
         allFindings.push(...coverageResult.findings)
         coverageGaps = coverageResult.gaps
         const shouldStop = shouldEarlyExit(this.config, allFindings)
@@ -192,7 +212,7 @@ export class SwarmRunner {
             const agentIndex = baseIndex + i + 1
             const startMs = Date.now()
             try {
-              const findings = await withRetryTimeout(() => agent.run(input), timeout, agent.name, retryAttempts, retryDelayMs)
+              const findings = await withRetryTimeout(() => agent.run(withContext(agent.name)), timeout, agent.name, retryAttempts, retryDelayMs)
               allFindings.push(...findings)
               onProgress?.({ phase: 'end', name: agent.name, index: agentIndex, total, findings, elapsedMs: Date.now() - startMs })
             } catch (err) {
@@ -208,7 +228,7 @@ export class SwarmRunner {
           onProgress?.({ phase: 'start', name: agent.name, index, total })
           const startMs = Date.now()
           try {
-            const findings = await withRetryTimeout(() => agent.run(input), timeout, agent.name, retryAttempts, retryDelayMs)
+            const findings = await withRetryTimeout(() => agent.run(withContext(agent.name)), timeout, agent.name, retryAttempts, retryDelayMs)
             allFindings.push(...findings)
             const shouldStop = shouldEarlyExit(this.config, allFindings)
             onProgress?.({ phase: 'end', name: agent.name, index, total, findings, elapsedMs: Date.now() - startMs, earlyExit: shouldStop })
@@ -228,7 +248,7 @@ export class SwarmRunner {
       const startMs = Date.now()
       if (coverageGaps.length > 0) {
         try {
-          const testResult = await withRetryTimeout(() => this.testGen.runWithGaps(input, coverageGaps), timeout, 'testgen', retryAttempts, retryDelayMs)
+          const testResult = await withRetryTimeout(() => this.testGen.runWithGaps(withContext('testgen'), coverageGaps), timeout, 'testgen', retryAttempts, retryDelayMs)
           testFiles = testResult.testFiles
         } catch (err) {
           console.warn(`[ai-review] Agent testgen timed out or failed: ${(err as Error).message}`)
@@ -258,7 +278,10 @@ export class SwarmRunner {
         byAgent,
         durationMs: Date.now() - start
       },
-      ...(earlyExitAgent ? { earlyExit: { stoppedAt: earlyExitAgent } } : {})
+      ...(earlyExitAgent ? { earlyExit: { stoppedAt: earlyExitAgent } } : {}),
+      ...(contextMode === 'memory-bank'
+        ? { context: { mode: 'memory-bank' as const, filesLoaded: [...new Set(allFilesLoaded)], truncated: anyTruncated, estimatedTokens: totalTokens } }
+        : {})
     }
   }
 }

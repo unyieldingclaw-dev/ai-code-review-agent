@@ -90,6 +90,7 @@ export interface GeneratedTestFile {
 export interface ReviewInput {
   diff: string
   projectPath?: string
+  context?: string  // pre-loaded context string to prepend to diff for this agent
 }
 
 export interface ReviewSummary {
@@ -104,6 +105,12 @@ export interface ReviewResult {
   testFiles: GeneratedTestFile[]
   summary: ReviewSummary
   earlyExit?: { stoppedAt: AgentName }
+  context?: {
+    mode: 'none' | 'memory-bank'
+    filesLoaded: string[]
+    truncated: boolean
+    estimatedTokens: number
+  }
 }
 
 export const SEVERITY_RANK: Record<Severity, number> = {

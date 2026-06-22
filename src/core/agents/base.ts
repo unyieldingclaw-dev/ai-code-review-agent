@@ -43,7 +43,10 @@ export abstract class BaseAgent {
   }
 
   protected buildUserPrompt(input: ReviewInput): string {
-    return `Review this diff and return a JSON array of findings.\n\n\`\`\`diff\n${input.diff}\n\`\`\``
+    const diffContent = input.context
+      ? `${input.context}\n\n## Diff to Review\n\n${input.diff}`
+      : input.diff
+    return `Review this diff and return a JSON array of findings.\n\n\`\`\`diff\n${diffContent}\n\`\`\``
   }
 
   protected parseFindings(raw: string): Finding[] {
