@@ -28,6 +28,19 @@ interface CalibrationCase {
   baitKeyword: string
 }
 
+const BORDER = '╔════════════════════════════════════════════════════════════╗'
+const BORDER_BOT = '╚════════════════════════════════════════════════════════════╝'
+
+function pad(t: string, w: number): string {
+  return t + ' '.repeat(Math.max(0, w - t.length))
+}
+
+function printBox(lines: string[]): void {
+  process.stderr.write('\n' + BORDER + '\n')
+  for (const l of lines) process.stderr.write(`║  ${pad(l, 56)}║\n`)
+  process.stderr.write(BORDER_BOT + '\n\n')
+}
+
 const CASES: CalibrationCase[] = [
   { name: 'security',        fixtureFile: 'calibration/fixtures/security.diff',        expectedKeyword: 'injection',      baitKeyword: 'CONFIG_KEY' },
   { name: 'performance',     fixtureFile: 'calibration/fixtures/performance.diff',      expectedKeyword: 'N+1',            baitKeyword: 'sumArray' },
@@ -48,9 +61,39 @@ const CASES: CalibrationCase[] = [
 
 async function main() {
   const provider = new OllamaProvider(DEFAULT_CONFIG.ollamaUrl, DEFAULT_CONFIG.model)
+
+  // Check 1: Ollama reachable
   const ping = await provider.ping()
   if (!ping.ok) {
-    console.error(`❌ Ollama not available: ${ping.error}`)
+    printBox([
+      'CALIBRATION SKIPPED — Ollama not reachable',
+      '',
+      'Solution:',
+      '  1. ollama serve',
+      '  2. npm run calibrate',
+    ])
+    process.exit(1)
+  }
+
+  // Check 2: Required model is pulled
+  try {
+    const res = await fetch(`${DEFAULT_CONFIG.ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(3000) })
+    const data = await res.json() as { models: Array<{ name: string }> }
+    if (!data.models.some(m => m.name === DEFAULT_CONFIG.model)) {
+      printBox([
+        'CALIBRATION SKIPPED — model not available',
+        '',
+        `  Required model: ${DEFAULT_CONFIG.model}`,
+        '  Ollama is running but this model is not pulled.',
+        '',
+        'Solution:',
+        `  ollama pull ${DEFAULT_CONFIG.model}`,
+        '  then: npm run calibrate',
+      ])
+      process.exit(1)
+    }
+  } catch {
+    printBox(['CALIBRATION SKIPPED — could not verify model list'])
     process.exit(1)
   }
 
