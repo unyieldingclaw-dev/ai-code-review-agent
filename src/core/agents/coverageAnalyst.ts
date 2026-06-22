@@ -24,7 +24,22 @@ Output ONLY a JSON object with two arrays: "findings" (coverage issues as review
 
 Required format:
 {
-  "findings": [{"severity":"medium","basis":"VERIFIED","confidence":85,"file":"path/to/file","line":42,"title":"No test for X function","detail":"The X function added in this diff has no test coverage","suggestion":"Add unit test covering the happy path and error case"}],
+  "findings": [{
+    "severity": "medium",
+    "basis": "VERIFIED",
+    "confidence": 85,
+    "domain": "Testing",
+    "file": "path/to/file",
+    "line": 42,
+    "title": "No test for X function",
+    "detail": "The X function added in this diff has no test coverage",
+    "evidence": "The specific function or branch from the diff that has no corresponding test",
+    "impact": "Bugs in this code path will remain undetected until production",
+    "recommendation": "Add unit test covering the happy path and error case — show the test skeleton",
+    "blocking": false,
+    "source": "llm",
+    "suggestion": "Add unit test covering the happy path and error case"
+  }],
   "gaps": [{"file":"path/to/file","functionName":"functionName","lineStart":10,"lineEnd":25,"description":"What the function does and what cases need testing"}]
 }
 
@@ -33,6 +48,9 @@ Rules:
 - basis=VERIFIED: function is clearly new/changed with no test file changes in the diff
 - basis=INFERRED: likely untested based on file patterns
 - confidence: your certainty this is a real issue (0-100)
+- evidence: quote or reference the specific function/branch from the diff that lacks coverage
+- recommendation: show a test skeleton, not just "add a test"
+- blocking: true for critical/high, false for medium/low
 - If fully covered, return: {"findings":[],"gaps":[]}`
   }
 

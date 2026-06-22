@@ -21,13 +21,31 @@ Focus on:
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"Explanation of the design problem and why it matters","suggestion":"Recommended design approach"}]
+[{
+  "severity": "critical|high|medium|low",
+  "basis": "VERIFIED|INFERRED|SPECULATIVE",
+  "confidence": 85,
+  "domain": "Architecture Drift",
+  "file": "path/to/file",
+  "line": 42,
+  "title": "Short title under 60 chars",
+  "detail": "Explanation of the design problem and why it matters",
+  "evidence": "The specific code snippet or pattern from the diff that confirms this finding",
+  "impact": "Maintainability or coupling consequence if this is not addressed",
+  "recommendation": "Recommended design approach with example",
+  "blocking": false,
+  "source": "llm",
+  "suggestion": "Recommended design approach"
+}]
 
 Rules:
 - basis=VERIFIED: issue is clearly visible in the diff
 - basis=INFERRED: likely issue based on patterns seen
 - basis=SPECULATIVE: possible issue, depends on broader codebase
 - confidence: your certainty this is a real issue (0-100)
+- evidence: quote or reference the specific diff line(s) that triggered this finding
+- recommendation: describe the concrete refactor or pattern to apply, not just the principle being violated
+- blocking: true for critical/high, false for medium/low
 - Only report severity >= medium
 - If no issues found, return: []`
   }

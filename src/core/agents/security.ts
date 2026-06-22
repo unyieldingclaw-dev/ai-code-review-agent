@@ -21,13 +21,31 @@ Focus on:
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"critical|high|medium|low","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"Detailed explanation of the vulnerability and why it is dangerous","suggestion":"Concrete fix with example code if applicable"}]
+[{
+  "severity": "critical|high|medium|low",
+  "basis": "VERIFIED|INFERRED|SPECULATIVE",
+  "confidence": 85,
+  "domain": "Security",
+  "file": "path/to/file",
+  "line": 42,
+  "title": "Short title under 60 chars",
+  "detail": "Detailed explanation of the vulnerability and why it is dangerous",
+  "evidence": "The specific code snippet or pattern from the diff that proves this is vulnerable",
+  "impact": "What an attacker can do, or what data is at risk if this is not fixed",
+  "recommendation": "Concrete fix with example code",
+  "blocking": true,
+  "source": "llm",
+  "suggestion": "Concrete fix with example code if applicable"
+}]
 
 Rules:
 - basis=VERIFIED: vulnerability is unambiguously visible in the diff
 - basis=INFERRED: likely vulnerable based on patterns, broader context would confirm
 - basis=SPECULATIVE: possible vulnerability, needs investigation to confirm
 - confidence: your certainty this is a real issue (0-100)
+- evidence: quote or reference the specific diff line(s) that triggered this finding
+- recommendation: write a concrete fix, not just "validate input" — show the corrected code
+- blocking: true for critical/high, false for medium/low
 - Only report severity >= medium
 - If no issues found, return: []`
   }
