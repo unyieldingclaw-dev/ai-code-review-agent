@@ -43,7 +43,7 @@ program
   .option('--no-sanitize', 'Skip prompt-injection sanitization of the diff')
   .option('--suggest-tests', 'Enable testgen agent and include suggestions in report (no files written)')
   .option('--write-tests', 'Enable testgen agent and write generated test files to testOutputDir')
-  .option('--context <mode>', 'Context mode: none (default). memory-bank coming soon.', 'none')
+  .option('--context <mode>', 'Context mode: none (default) or memory-bank (loads memory-bank/ files per agent)', 'none')
   .action(async (options: {
     diff?: string
     dir?: string
@@ -66,11 +66,7 @@ program
     writeTests?: boolean
     context: string
   }) => {
-    // Validate --context flag early
-    if (options.context !== 'none') {
-      console.error(`--context "${options.context}" is not yet implemented. Use --context none.`)
-      process.exit(1)
-    }
+    const contextMode = options.context === 'memory-bank' ? 'memory-bank' : 'none'
 
     const projectPath = resolve(options.dir ?? process.cwd())
     const config = loadConfig(projectPath)
@@ -134,7 +130,8 @@ program
             process.stderr.write(`⚡ Fail-fast: stopping swarm after ${event.name} (threshold met)\n`)
           }
         }
-      }
+      },
+      contextMode
     )
 
     // Only write test files when --write-tests is explicitly passed
