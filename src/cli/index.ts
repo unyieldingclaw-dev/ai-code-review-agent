@@ -11,6 +11,7 @@ import { formatMarkdown, formatJson } from './formatter.js'
 import type { AgentName, AgentProgressEvent } from '../core/schema.js'
 import { shouldFail, FAIL_ON_OPTIONS } from './exitCode.js'
 import type { FailOnLevel } from './exitCode.js'
+import { resolveProfile } from '../core/profiles.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(
@@ -28,6 +29,7 @@ program
   .option('--model <model>', 'Override Ollama model')
   .option('--ollama-url <url>', 'Override Ollama base URL')
   .option('--agents <list>', 'Comma-separated list of agents to run')
+  .option('--profile <name>', 'Run a named agent subset: fast, full, change-review, ui, migration, security')
   .option('--format <format>', 'Output format: markdown or json', 'markdown')
   .option('--out <path>', 'Write output to file instead of stdout')
   .option('--max-lines <n>', 'Truncate diff to this many lines (default: 2000)', parseInt)
@@ -48,6 +50,7 @@ program
     model?: string
     ollamaUrl?: string
     agents?: string
+    profile?: string
     format: 'markdown' | 'json'
     out?: string
     maxLines?: number
@@ -75,6 +78,14 @@ program
     if (options.model) config.model = options.model
     if (options.ollamaUrl) config.ollamaUrl = options.ollamaUrl
     if (options.agents) config.agents = options.agents.split(',').map(a => a.trim()) as AgentName[]
+    if (options.profile && !options.agents) {
+      try {
+        config.agents = resolveProfile(options.profile)
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err))
+        process.exit(1)
+      }
+    }
     if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
     if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
     if (options.retryAttempts !== undefined) config.retryAttempts = options.retryAttempts
