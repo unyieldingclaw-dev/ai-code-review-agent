@@ -42,7 +42,8 @@
     "test:coverage": "vitest run --coverage tests/unit",
     "calibrate": "tsx calibration/calibrate.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:extension": "npm --prefix vscode-extension test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
