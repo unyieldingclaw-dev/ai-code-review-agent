@@ -1,7 +1,11 @@
 import type { LLMProvider } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
-import type { Finding, Severity, AgentName } from '../schema.js'
+import type { Finding, Severity, AgentName, EvidenceSource } from '../schema.js'
 import { SEVERITY_RANK } from '../schema.js'
+
+const DETERMINISTIC_SOURCES: EvidenceSource[] = [
+  'gitleaks', 'trufflehog', 'semgrep', 'npm-audit', 'osv', 'lizard', 'git', 'policy'
+]
 
 // Agent priority for deduplication — higher index = higher priority kept
 const AGENT_PRIORITY: AgentName[] = [
@@ -45,6 +49,9 @@ export class OrchestratorAgent {
           .map(other => other.agent)
       )
       if (corroborators.size > 0) return f
+
+      // Deterministic tool findings are always reliable — skip downgrade
+      if (DETERMINISTIC_SOURCES.includes(f.source)) return f
 
       // Solo finding — apply confidence-aware downgrade
       const confidence = f.confidence ?? 70
