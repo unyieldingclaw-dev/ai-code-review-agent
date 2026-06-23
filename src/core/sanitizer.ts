@@ -18,6 +18,8 @@ const INJECTION_PATTERNS: InjectionPattern[] = [
 
 export interface SanitizeResult {
   sanitized: string
+  applied: boolean
+  redactedLines: number
   warnings: string[]
 }
 
@@ -28,6 +30,7 @@ export interface SanitizeResult {
  */
 export function sanitizeDiff(diff: string): SanitizeResult {
   const warnings: string[] = []
+  let redactedLines = 0
   const sanitizedLines = diff.split('\n').map(line => {
     // Only scan added lines; skip diff header lines (+++ b/...)
     if (!line.startsWith('+') || line.startsWith('+++')) return line
@@ -35,11 +38,17 @@ export function sanitizeDiff(diff: string): SanitizeResult {
     for (const { pattern, label } of INJECTION_PATTERNS) {
       if (pattern.test(line)) {
         warnings.push(`Prompt injection pattern detected (${label}): ${line.slice(0, 100)}`)
+        redactedLines++
         return line.replace(pattern, '[REDACTED]')
       }
     }
     return line
   })
 
-  return { sanitized: sanitizedLines.join('\n'), warnings }
+  return {
+    sanitized: sanitizedLines.join('\n'),
+    applied: redactedLines > 0,
+    redactedLines,
+    warnings
+  }
 }

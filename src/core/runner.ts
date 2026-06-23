@@ -1,6 +1,6 @@
 import type { LLMProvider } from './llm/provider.js'
 import type { ReviewConfig } from './config.js'
-import type { AgentName, Severity, Finding, ReviewInput, ReviewResult, CoverageGap, GeneratedTestFile, AgentProgressEvent } from './schema.js'
+import type { AgentName, Severity, Finding, ReviewInput, ReviewResult, CoverageGap, GeneratedTestFile, AgentProgressEvent, SanitizerMetadata } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
 import { loadAgentContext } from './contextLoader.js'
 import type { ContextResult } from './contextLoader.js'
@@ -122,14 +122,23 @@ export class SwarmRunner {
     }
 
     // Prompt injection sanitization — strip LLM-manipulating patterns from added lines
+    let sanitizerMeta: SanitizerMetadata
     if (this.config.sanitize !== false) {
-      const { sanitized, warnings } = sanitizeDiff(input.diff)
-      for (const w of warnings) {
+      const sanitizeResult = sanitizeDiff(input.diff)
+      for (const w of sanitizeResult.warnings) {
         console.warn(`[ai-review] ${w}`)
       }
-      if (warnings.length > 0) {
-        input = { ...input, diff: sanitized }
+      if (sanitizeResult.applied) {
+        input = { ...input, diff: sanitizeResult.sanitized }
       }
+      sanitizerMeta = {
+        enabled: true,
+        applied: sanitizeResult.applied,
+        redactedLines: sanitizeResult.redactedLines,
+        warnings: sanitizeResult.warnings
+      }
+    } else {
+      sanitizerMeta = { enabled: false, applied: false, redactedLines: 0, warnings: [] }
     }
 
     // Diff size guard — truncate oversized diffs before sending to agents
@@ -281,7 +290,8 @@ export class SwarmRunner {
       ...(earlyExitAgent ? { earlyExit: { stoppedAt: earlyExitAgent } } : {}),
       ...(contextMode === 'memory-bank'
         ? { context: { mode: 'memory-bank' as const, filesLoaded: [...new Set(allFilesLoaded)], truncated: anyTruncated, estimatedTokens: totalTokens } }
-        : {})
+        : {}),
+      sanitizer: sanitizerMeta
     }
   }
 }

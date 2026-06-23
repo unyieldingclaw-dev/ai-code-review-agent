@@ -54,6 +54,14 @@ export function formatMarkdown(result: ReviewResult): string {
     lines.push('')
   }
 
+  if (result.sanitizer?.applied) {
+    lines.push('')
+    lines.push('---')
+    lines.push(
+      `*Sanitizer: ${result.sanitizer.redactedLines} line(s) modified to remove potential prompt injection. See \`--format json\` output for details.*`
+    )
+  }
+
   if (result.context) {
     const { mode, filesLoaded, estimatedTokens } = result.context
     const fileList = filesLoaded.join(', ')

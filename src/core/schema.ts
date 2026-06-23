@@ -100,6 +100,13 @@ export interface ReviewSummary {
   durationMs: number
 }
 
+export interface SanitizerMetadata {
+  enabled: boolean
+  applied: boolean
+  redactedLines: number
+  warnings: string[]
+}
+
 export interface ReviewResult {
   findings: Finding[]
   testFiles: GeneratedTestFile[]
@@ -111,6 +118,7 @@ export interface ReviewResult {
     truncated: boolean
     estimatedTokens: number
   }
+  sanitizer?: SanitizerMetadata
 }
 
 export const SEVERITY_RANK: Record<Severity, number> = {
