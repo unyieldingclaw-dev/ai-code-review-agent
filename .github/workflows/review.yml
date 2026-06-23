@@ -51,7 +51,7 @@ jobs:
             }
             const result = JSON.parse(fs.readFileSync('findings.json', 'utf8'))
             const findings = result.findings ?? []
-            const lines = ['<!-- ai-review-bot -->', '## 🤖 AI Code Review', '']
+            const lines = ['<!-- ai-review-agent:v1 -->', '## 🤖 AI Code Review', '']
             if (findings.length === 0) {
               lines.push('✅ No issues found.')
             } else {
@@ -72,7 +72,7 @@ jobs:
             const comments = await github.rest.issues.listComments({
               owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number
             })
-            const existing = comments.data.find(c => c.body.includes('<!-- ai-review-bot -->'))
+            const existing = comments.data.find(c => c.body.includes('<!-- ai-review-agent:v1 -->'))
             if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner, repo: context.repo.repo,

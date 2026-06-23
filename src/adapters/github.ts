@@ -1,6 +1,6 @@
 import type { ReviewResult } from '../core/schema.js'
 
-const COMMENT_MARKER = '<!-- ai-review-bot -->'
+export const COMMENT_MARKER = '<!-- ai-review-agent:v1 -->'
 
 export async function upsertPRComment(
   token: string,
