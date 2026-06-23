@@ -36,7 +36,15 @@ Run the 15-agent local AI code review swarm against the current working diff usi
 /ai-review --ignore "dist/**"                     # exclude files by glob (repeatable)
 /ai-review --max-lines 500                        # limit diff size
 /ai-review --fail-on critical                     # only fail CI on critical findings
+/ai-review --profile change-review               # run the change-review agent subset
+/ai-review --profile fast                        # run security, correctness, secrets only
+/ai-review --profile fast --context memory-bank  # fast profile with memory-bank context
+/ai-review --profile security --format json      # security profile, JSON output
 ```
+
+**Profiles:** Use `--profile <name>` to run a focused subset of agents. Available: `fast` (3 agents: security, correctness, secrets), `full` (all 15), `change-review` (8 agents for PR review), `ui` (5 agents), `migration` (4 agents), `security` (4 agents). `--agents` overrides `--profile`.
+
+**Context:** Use `--context memory-bank` to load relevant `memory-bank/` files as context for each agent (bounded to ~4000 chars/agent). Only useful if the project has a `memory-bank/` directory.
 
 ## Instructions for Claude
 
@@ -70,6 +78,6 @@ Run the 15-agent local AI code review swarm against the current working diff usi
 
 4. **Stream the output** directly into the conversation.
 
-5. **After displaying findings**, ask: "Would you like me to address any of these findings?"
+5. **After displaying findings, stop.** Do not edit files, create tasks, or open PRs unless the user explicitly asks in a separate follow-up message.
 
 If the diff is empty, say so and stop — don't run the swarm against nothing.
