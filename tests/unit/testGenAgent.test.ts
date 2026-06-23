@@ -8,13 +8,13 @@ import type { ReviewInput, CoverageGap } from '../../src/core/schema.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('TestGenAgent', () => {
   const mockInput: ReviewInput = {
     diff: 'diff content',
-    projectPath: '/tmp/project'
+    projectPath: '/tmp/project',
   }
 
   it('returns empty testFiles array when given no coverage gaps', async () => {
@@ -32,8 +32,8 @@ describe('TestGenAgent', () => {
         functionName: 'validateToken',
         lineStart: 10,
         lineEnd: 20,
-        description: 'Validates JWT tokens'
-      }
+        description: 'Validates JWT tokens',
+      },
     ]
     const result = await agent.runWithGaps(mockInput, gaps)
     expect(result.testFiles.length).toBeGreaterThan(0)
@@ -48,8 +48,8 @@ describe('TestGenAgent', () => {
         functionName: 'helper',
         lineStart: 5,
         lineEnd: 10,
-        description: 'Helper function'
-      }
+        description: 'Helper function',
+      },
     ]
     const result = await agent.runWithGaps(mockInput, gaps)
     expect(result.testFiles).toEqual([])
@@ -58,22 +58,25 @@ describe('TestGenAgent', () => {
   it('groups multiple gaps by file to minimize API calls', async () => {
     const testCode = 'describe("test", () => { it("gap1", () => {}) it("gap2", () => {}) })'
     const chat = vi.fn().mockResolvedValue(testCode)
-    const agent = new TestGenAgent({ chat, ping: vi.fn().mockResolvedValue({ ok: true }) }, DEFAULT_CONFIG)
+    const agent = new TestGenAgent(
+      { chat, ping: vi.fn().mockResolvedValue({ ok: true }) },
+      DEFAULT_CONFIG
+    )
     const gaps: CoverageGap[] = [
       {
         file: 'src/auth.ts',
         functionName: 'func1',
         lineStart: 10,
         lineEnd: 15,
-        description: 'First function'
+        description: 'First function',
       },
       {
         file: 'src/auth.ts',
         functionName: 'func2',
         lineStart: 20,
         lineEnd: 25,
-        description: 'Second function'
-      }
+        description: 'Second function',
+      },
     ]
     const result = await agent.runWithGaps(mockInput, gaps)
     // Should make only 1 API call for the same file

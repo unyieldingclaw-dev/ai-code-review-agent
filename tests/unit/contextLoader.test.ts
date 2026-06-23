@@ -12,8 +12,12 @@ function setup(files: Record<string, string>) {
   }
 }
 
-beforeEach(() => { mkdirSync(TMP, { recursive: true }) })
-afterEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }) })
+beforeEach(() => {
+  mkdirSync(TMP, { recursive: true })
+})
+afterEach(() => {
+  if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true })
+})
 
 describe('loadAgentContext', () => {
   it('returns empty result when memory-bank/ does not exist', () => {
@@ -44,7 +48,7 @@ describe('loadAgentContext', () => {
     setup({
       'systemPatterns.md': 'Architecture: layered',
       'projectbrief.md': 'Goal: code review tool',
-      'techContext.md': 'Stack: Node'
+      'techContext.md': 'Stack: Node',
     })
     const result = loadAgentContext(TMP, 'design')
     expect(result.filesLoaded.length).toBeGreaterThanOrEqual(2)

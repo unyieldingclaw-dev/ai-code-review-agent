@@ -28,9 +28,21 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   ollamaUrl: 'http://localhost:11434',
   maxFindings: 15,
   agents: [
-    'security', 'performance', 'correctness', 'design', 'dependencies',
-    'coverage', 'adversarial', 'integration', 'breaking-change', 'license',
-    'error-handling', 'observability', 'migration-safety', 'secrets', 'complexity'
+    'security',
+    'performance',
+    'correctness',
+    'design',
+    'dependencies',
+    'coverage',
+    'adversarial',
+    'integration',
+    'breaking-change',
+    'license',
+    'error-handling',
+    'observability',
+    'migration-safety',
+    'secrets',
+    'complexity',
   ],
   testOutputDir: './ai-review-tests',
   maxDiffLines: 2000,
@@ -41,7 +53,7 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   sanitize: true,
   failFast: false,
   failOn: 'high',
-  parallel: false
+  parallel: false,
 }
 
 export function loadConfig(projectPath: string): ReviewConfig {

@@ -15,14 +15,7 @@ export function getConfig(extensionPath: string): ExtensionConfig {
     agents: cfg.get<string[]>('agents', []),
     maxLines: cfg.get('maxLines', 2000),
     timeoutSecs: cfg.get('timeout', 120),
-    cliPath: path.join(
-      extensionPath,
-      'node_modules',
-      'ai-review-agent',
-      'dist',
-      'cli',
-      'index.js'
-    ),
+    cliPath: path.join(extensionPath, 'node_modules', 'ai-review-agent', 'dist', 'cli', 'index.js'),
   }
 }
 
@@ -38,14 +31,22 @@ export function buildCliArgs(
 ): string[] {
   const args = [
     config.cliPath,
-    '--diff', diffFile,
-    '--dir', workspaceDir,
-    '--format', 'json',
-    '--ollama-url', config.ollamaUrl,
-    '--model', config.model,
-    '--max-lines', String(config.maxLines),
-    '--timeout', String(config.timeoutSecs * 1000),  // CLI takes milliseconds
-    '--fail-on', 'never',  // extension handles results; never let CLI gate on exit code
+    '--diff',
+    diffFile,
+    '--dir',
+    workspaceDir,
+    '--format',
+    'json',
+    '--ollama-url',
+    config.ollamaUrl,
+    '--model',
+    config.model,
+    '--max-lines',
+    String(config.maxLines),
+    '--timeout',
+    String(config.timeoutSecs * 1000), // CLI takes milliseconds
+    '--fail-on',
+    'never', // extension handles results; never let CLI gate on exit code
   ]
 
   if (config.agents.length > 0) {

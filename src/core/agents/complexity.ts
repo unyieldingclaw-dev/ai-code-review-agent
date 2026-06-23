@@ -14,7 +14,9 @@ function extractChangedFiles(diff: string): string[] {
 }
 
 export class ComplexityAgent extends BaseAgent {
-  get name(): AgentName { return 'complexity' }
+  get name(): AgentName {
+    return 'complexity'
+  }
 
   get systemPrompt(): string {
     return `You are a code reviewer specializing in code complexity.

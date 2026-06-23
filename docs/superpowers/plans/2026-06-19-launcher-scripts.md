@@ -12,23 +12,24 @@
 
 ## File Map
 
-| File | Status | Purpose |
-|------|--------|---------|
-| `setup.bat` | Create | CMD wrapper → `scripts/setup.ps1` |
-| `setup.command` | Create | Bash wrapper → `scripts/setup.sh` (macOS double-click) |
-| `scripts/setup.ps1` | Create | End-user: Node check, Ollama check, model pull, npm global install, smoke test |
-| `scripts/setup.sh` | Create | Same as above, bash |
-| `dev-setup.bat` | Create | CMD wrapper → `scripts/dev-setup.ps1` |
-| `dev-setup.command` | Create | Bash wrapper → `scripts/dev-setup.sh` (macOS double-click) |
-| `scripts/dev-setup.ps1` | Create | Contributor: Node check, npm install, build, link, smoke test |
-| `scripts/dev-setup.sh` | Create | Same as above, bash |
-| `README.md` | Modify | Add "Setup Scripts" section after Requirements |
+| File                    | Status | Purpose                                                                        |
+| ----------------------- | ------ | ------------------------------------------------------------------------------ |
+| `setup.bat`             | Create | CMD wrapper → `scripts/setup.ps1`                                              |
+| `setup.command`         | Create | Bash wrapper → `scripts/setup.sh` (macOS double-click)                         |
+| `scripts/setup.ps1`     | Create | End-user: Node check, Ollama check, model pull, npm global install, smoke test |
+| `scripts/setup.sh`      | Create | Same as above, bash                                                            |
+| `dev-setup.bat`         | Create | CMD wrapper → `scripts/dev-setup.ps1`                                          |
+| `dev-setup.command`     | Create | Bash wrapper → `scripts/dev-setup.sh` (macOS double-click)                     |
+| `scripts/dev-setup.ps1` | Create | Contributor: Node check, npm install, build, link, smoke test                  |
+| `scripts/dev-setup.sh`  | Create | Same as above, bash                                                            |
+| `README.md`             | Modify | Add "Setup Scripts" section after Requirements                                 |
 
 ---
 
 ## Task 1: `scripts/setup.ps1` — end-user PowerShell script
 
 **Files:**
+
 - Create: `scripts/setup.ps1`
 
 - [ ] **Step 1: Create the file**
@@ -114,9 +115,11 @@ Expected: five green checkmarks, final "Setup complete." line, exit 0.
 - [ ] **Step 3: Verify the Ollama-not-running error path**
 
 Stop Ollama, then run:
+
 ```powershell
 pwsh scripts/setup.ps1
 ```
+
 Expected: `[ERROR] Ollama is not running` message and exit 1.
 
 - [ ] **Step 4: Commit**
@@ -131,6 +134,7 @@ git commit -m "feat(scripts): add end-user setup script (PowerShell)"
 ## Task 2: `scripts/setup.sh` — end-user bash script
 
 **Files:**
+
 - Create: `scripts/setup.sh`
 
 - [ ] **Step 1: Create the file**
@@ -209,9 +213,11 @@ Expected: five checkmarks, "Setup complete." line, exit 0.
 - [ ] **Step 4: Verify the Ollama-not-running error path**
 
 Stop Ollama, then run:
+
 ```bash
 bash scripts/setup.sh
 ```
+
 Expected: `[ERROR] Ollama is not running` and exit 1.
 
 - [ ] **Step 5: Commit**
@@ -226,6 +232,7 @@ git commit -m "feat(scripts): add end-user setup script (bash)"
 ## Task 3: `setup.bat` + `setup.command` — end-user wrappers
 
 **Files:**
+
 - Create: `setup.bat`
 - Create: `setup.command`
 
@@ -256,17 +263,21 @@ chmod +x setup.command
 - [ ] **Step 4: Verify `setup.bat` (Windows)**
 
 Double-click `setup.bat` in Windows Explorer, or run:
+
 ```cmd
 setup.bat
 ```
+
 Expected: PowerShell window opens, runs `scripts/setup.ps1`, same output as Task 1 Step 2.
 
 - [ ] **Step 5: Verify `setup.command` (macOS)**
 
 Double-click `setup.command` in Finder, or run:
+
 ```bash
 ./setup.command
 ```
+
 Expected: Terminal opens, runs `scripts/setup.sh`, same output as Task 2 Step 3.
 
 - [ ] **Step 6: Commit**
@@ -281,6 +292,7 @@ git commit -m "feat: add end-user launcher wrappers (setup.bat, setup.command)"
 ## Task 4: `scripts/dev-setup.ps1` — contributor PowerShell script
 
 **Files:**
+
 - Create: `scripts/dev-setup.ps1`
 
 - [ ] **Step 1: Create the file**
@@ -373,6 +385,7 @@ Expected: Node check passes, deps install, build succeeds, link succeeds, `ai-re
 cd C:\Windows\Temp
 pwsh C:\path\to\repo\scripts\dev-setup.ps1
 ```
+
 Expected: `[ERROR] package.json not found` and exit 1.
 
 - [ ] **Step 4: Commit**
@@ -387,6 +400,7 @@ git commit -m "feat(scripts): add contributor dev-setup script (PowerShell)"
 ## Task 5: `scripts/dev-setup.sh` — contributor bash script
 
 **Files:**
+
 - Create: `scripts/dev-setup.sh`
 
 - [ ] **Step 1: Create the file**
@@ -476,6 +490,7 @@ git commit -m "feat(scripts): add contributor dev-setup script (bash)"
 ## Task 6: `dev-setup.bat` + `dev-setup.command` — contributor wrappers
 
 **Files:**
+
 - Create: `dev-setup.bat`
 - Create: `dev-setup.command`
 
@@ -506,6 +521,7 @@ chmod +x dev-setup.command
 ```cmd
 dev-setup.bat
 ```
+
 Expected: PowerShell window opens, runs `scripts/dev-setup.ps1`, same output as Task 4 Step 2.
 
 - [ ] **Step 5: Verify `dev-setup.command` (macOS)**
@@ -513,6 +529,7 @@ Expected: PowerShell window opens, runs `scripts/dev-setup.ps1`, same output as 
 ```bash
 ./dev-setup.command
 ```
+
 Expected: Terminal opens, runs `scripts/dev-setup.sh`, same output as Task 5 Step 3.
 
 - [ ] **Step 6: Commit**
@@ -527,6 +544,7 @@ git commit -m "feat: add contributor launcher wrappers (dev-setup.bat, dev-setup
 ## Task 7: README update
 
 **Files:**
+
 - Modify: `README.md`
 
 Add a "Setup Scripts" section immediately after the `## Requirements` section (after line ~47 in the current file). Insert this block:
@@ -536,19 +554,18 @@ Add a "Setup Scripts" section immediately after the `## Requirements` section (a
 
 Double-click to set up without opening a terminal:
 
-| Script | Platform | Who |
-|--------|----------|-----|
-| `setup.bat` | Windows | End-users |
-| `setup.command` | macOS | End-users |
-| `dev-setup.bat` | Windows | Contributors |
-| `dev-setup.command` | macOS | Contributors |
+| Script              | Platform | Who          |
+| ------------------- | -------- | ------------ |
+| `setup.bat`         | Windows  | End-users    |
+| `setup.command`     | macOS    | End-users    |
+| `dev-setup.bat`     | Windows  | Contributors |
+| `dev-setup.command` | macOS    | Contributors |
 
 **End-user scripts** (`setup.*`) check Node.js, verify Ollama is running, pull `devstral:latest`, install `ai-review-agent` globally, and run a smoke test.
 
 **Contributor scripts** (`dev-setup.*`) check Node.js, run `npm install` + `npm run build` + `npm link`, and confirm the local build is wired up correctly.
 
 > **macOS note:** If macOS blocks `setup.command` or `dev-setup.command` on first run, right-click → Open to bypass Gatekeeper.
-
 ```
 
 - [ ] **Step 1: Insert the section into README.md**
@@ -561,6 +578,7 @@ Open `README.md`. Find the line `## Cursor Integration (MCP)` (approximately lin
 # Quick sanity check — confirm the new section heading appears
 grep -n "Setup Scripts" README.md
 ```
+
 Expected: one match at the inserted line number.
 
 - [ ] **Step 3: Commit**

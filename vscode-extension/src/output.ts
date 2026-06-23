@@ -5,9 +5,9 @@ type OutputChannel = vscode.OutputChannel
 
 const HEADER: Record<Severity, string> = {
   critical: '🔴 CRITICAL',
-  high:     '🟠 HIGH',
-  medium:   '🟡 MEDIUM',
-  low:      '🔵 LOW',
+  high: '🟠 HIGH',
+  medium: '🟡 MEDIUM',
+  low: '🔵 LOW',
 }
 
 /**
@@ -32,7 +32,7 @@ export function renderReport(channel: OutputChannel, result: ReviewResult): void
   }
 
   for (const severity of ['critical', 'high', 'medium', 'low'] as Severity[]) {
-    const group = findings.filter(f => f.severity === severity)
+    const group = findings.filter((f) => f.severity === severity)
     if (group.length === 0) continue
 
     channel.appendLine(`## ${HEADER[severity]} (${group.length})`)
@@ -41,7 +41,9 @@ export function renderReport(channel: OutputChannel, result: ReviewResult): void
     for (const f of group) {
       const confidence = f.confidence !== undefined ? `${f.confidence}%` : '—'
       channel.appendLine(`### ${f.title}`)
-      channel.appendLine(`Agent: ${f.agent}  |  ${f.file}:${f.line}  |  Confidence: ${confidence}  |  Basis: ${f.basis}`)
+      channel.appendLine(
+        `Agent: ${f.agent}  |  ${f.file}:${f.line}  |  Confidence: ${confidence}  |  Basis: ${f.basis}`
+      )
       channel.appendLine('')
       channel.appendLine(f.detail)
       channel.appendLine('')

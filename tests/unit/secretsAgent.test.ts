@@ -5,7 +5,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 const FAKE_DIFF = `--- a/src/config.ts
@@ -28,16 +28,18 @@ describe('SecretsAgent', () => {
   })
 
   it('parses LLM finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'high',
-      basis: 'VERIFIED',
-      confidence: 90,
-      file: 'src/config.ts',
-      line: 2,
-      title: 'Hardcoded API key',
-      detail: 'API key found in source code',
-      suggestion: 'Move to environment variable'
-    }])
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        confidence: 90,
+        file: 'src/config.ts',
+        line: 2,
+        title: 'Hardcoded API key',
+        detail: 'API key found in source code',
+        suggestion: 'Move to environment variable',
+      },
+    ])
     const agent = new SecretsAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: FAKE_DIFF })
     expect(findings).toHaveLength(1)

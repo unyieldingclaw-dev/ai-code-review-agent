@@ -14,26 +14,27 @@
 
 ## File Map
 
-| Operation | File |
-|---|---|
-| Create | `tests/helpers/requireOllama.ts` |
-| Modify | `tests/integration/e2e.test.ts` |
-| Create | `tests/unit/securityAgent.test.ts` |
-| Create | `tests/unit/performanceAgent.test.ts` |
-| Create | `tests/unit/correctnessAgent.test.ts` |
-| Create | `tests/unit/designAgent.test.ts` |
-| Create | `tests/unit/dependenciesAgent.test.ts` |
-| Create | `tests/unit/coverageAnalystAgent.test.ts` |
-| Create | `tests/unit/adversarialAgent.test.ts` |
-| Create | `tests/unit/integrationScoutAgent.test.ts` |
-| Create | `tests/unit/orchestratorAgent.test.ts` |
-| Create | `tests/unit/testGenAgent.test.ts` |
+| Operation | File                                       |
+| --------- | ------------------------------------------ |
+| Create    | `tests/helpers/requireOllama.ts`           |
+| Modify    | `tests/integration/e2e.test.ts`            |
+| Create    | `tests/unit/securityAgent.test.ts`         |
+| Create    | `tests/unit/performanceAgent.test.ts`      |
+| Create    | `tests/unit/correctnessAgent.test.ts`      |
+| Create    | `tests/unit/designAgent.test.ts`           |
+| Create    | `tests/unit/dependenciesAgent.test.ts`     |
+| Create    | `tests/unit/coverageAnalystAgent.test.ts`  |
+| Create    | `tests/unit/adversarialAgent.test.ts`      |
+| Create    | `tests/unit/integrationScoutAgent.test.ts` |
+| Create    | `tests/unit/orchestratorAgent.test.ts`     |
+| Create    | `tests/unit/testGenAgent.test.ts`          |
 
 ---
 
 ### Task 1: Create requireOllama helper
 
 **Files:**
+
 - Create: `tests/helpers/requireOllama.ts`
 
 - [ ] **Step 1: Create the helper**
@@ -82,7 +83,7 @@ export async function checkOllamaModel(
   let tagsResponse: Response
   try {
     tagsResponse = await fetch(`${ollamaUrl}/api/tags`, {
-      signal: AbortSignal.timeout(2000)
+      signal: AbortSignal.timeout(2000),
     })
   } catch {
     printSkipBox([
@@ -109,8 +110,8 @@ export async function checkOllamaModel(
   }
 
   // Check 2: Is the required model pulled?
-  const data = await tagsResponse.json() as { models: Array<{ name: string }> }
-  const available = data.models.map(m => m.name)
+  const data = (await tagsResponse.json()) as { models: Array<{ name: string }> }
+  const available = data.models.map((m) => m.name)
   if (!available.includes(model)) {
     printSkipBox([
       'INTEGRATION TESTS SKIPPED — model not available',
@@ -149,6 +150,7 @@ git commit -m "test: add requireOllamaModel helper with visible skip messages"
 ### Task 2: Apply helper to e2e.test.ts
 
 **Files:**
+
 - Modify: `tests/integration/e2e.test.ts`
 
 - [ ] **Step 1: Update e2e.test.ts**
@@ -211,52 +213,49 @@ const TEST_CONFIG = {
   ollamaUrl: OLLAMA_URL,
   model: OLLAMA_MODEL,
   agents: ['security', 'correctness'] as typeof DEFAULT_CONFIG.agents,
-  maxFindings: 10
+  maxFindings: 10,
 }
 
-describe.skipIf(SKIP)(
-  'E2E — full pipeline against live Ollama',
-  () => {
-    let result: ReviewResult
+describe.skipIf(SKIP)('E2E — full pipeline against live Ollama', () => {
+  let result: ReviewResult
 
-    beforeAll(async () => {
-      const provider = new OllamaProvider(OLLAMA_URL, OLLAMA_MODEL)
-      const runner = new SwarmRunner(TEST_CONFIG, provider)
-      result = await runner.run({ diff: SAMPLE_DIFF })
-    }, 300_000) // 5-minute cap for the swarm run
+  beforeAll(async () => {
+    const provider = new OllamaProvider(OLLAMA_URL, OLLAMA_MODEL)
+    const runner = new SwarmRunner(TEST_CONFIG, provider)
+    result = await runner.run({ diff: SAMPLE_DIFF })
+  }, 300_000) // 5-minute cap for the swarm run
 
-    it('produces at least one finding', () => {
-      expect(result.findings).toBeInstanceOf(Array)
-      expect(result.findings.length).toBeGreaterThan(0)
-    })
+  it('produces at least one finding', () => {
+    expect(result.findings).toBeInstanceOf(Array)
+    expect(result.findings.length).toBeGreaterThan(0)
+  })
 
-    it('summary counters are consistent', () => {
-      expect(result.summary.totalFindings).toBe(result.findings.length)
-      expect(result.summary.durationMs).toBeGreaterThan(0)
-    })
+  it('summary counters are consistent', () => {
+    expect(result.summary.totalFindings).toBe(result.findings.length)
+    expect(result.summary.durationMs).toBeGreaterThan(0)
+  })
 
-    it('every finding conforms to the Finding schema', () => {
-      const SEVERITIES = ['critical', 'high', 'medium', 'low']
-      const BASES = ['VERIFIED', 'INFERRED', 'SPECULATIVE']
-      for (const f of result.findings) {
-        expect(SEVERITIES, `unexpected severity on finding ${f.id}`).toContain(f.severity)
-        expect(BASES, `unexpected basis on finding ${f.id}`).toContain(f.basis)
-        expect(typeof f.title).toBe('string')
-        expect(f.title.length).toBeGreaterThan(0)
-        expect(typeof f.detail).toBe('string')
-        expect(typeof f.suggestion).toBe('string')
-      }
-    })
+  it('every finding conforms to the Finding schema', () => {
+    const SEVERITIES = ['critical', 'high', 'medium', 'low']
+    const BASES = ['VERIFIED', 'INFERRED', 'SPECULATIVE']
+    for (const f of result.findings) {
+      expect(SEVERITIES, `unexpected severity on finding ${f.id}`).toContain(f.severity)
+      expect(BASES, `unexpected basis on finding ${f.id}`).toContain(f.basis)
+      expect(typeof f.title).toBe('string')
+      expect(f.title.length).toBeGreaterThan(0)
+      expect(typeof f.detail).toBe('string')
+      expect(typeof f.suggestion).toBe('string')
+    }
+  })
 
-    it('security agent flags at least one issue in the diff', () => {
-      const securityFindings = result.findings.filter(f => f.agent === 'security')
-      expect(
-        securityFindings.length,
-        'expected security agent to flag hardcoded secret, weak hash, or SQL injection'
-      ).toBeGreaterThan(0)
-    })
-  }
-)
+  it('security agent flags at least one issue in the diff', () => {
+    const securityFindings = result.findings.filter((f) => f.agent === 'security')
+    expect(
+      securityFindings.length,
+      'expected security agent to flag hardcoded secret, weak hash, or SQL injection'
+    ).toBeGreaterThan(0)
+  })
+})
 ```
 
 - [ ] **Step 2: Run unit tests to verify no regressions**
@@ -279,6 +278,7 @@ git commit -m "test: apply requireOllamaModel helper to e2e — no more silent s
 ### Task 3: Unit tests for SecurityAgent
 
 **Files:**
+
 - Create: `tests/unit/securityAgent.test.ts`
 
 - [ ] **Step 1: Create the test file**
@@ -293,7 +293,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('SecurityAgent', () => {
@@ -307,17 +307,21 @@ describe('SecurityAgent', () => {
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'critical',
-      basis: 'VERIFIED',
-      confidence: 90,
-      file: 'src/auth.ts',
-      line: 4,
-      title: 'Hardcoded API secret',
-      detail: 'API_SECRET is committed to source',
-      suggestion: 'Move to environment variable'
-    }])
-    const findings = await new SecurityAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
+    const raw = JSON.stringify([
+      {
+        severity: 'critical',
+        basis: 'VERIFIED',
+        confidence: 90,
+        file: 'src/auth.ts',
+        line: 4,
+        title: 'Hardcoded API secret',
+        detail: 'API_SECRET is committed to source',
+        suggestion: 'Move to environment variable',
+      },
+    ])
+    const findings = await new SecurityAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: 'diff',
+    })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('security')
     expect(findings[0].id).toBe('security-0')
@@ -357,6 +361,7 @@ git commit -m "test: add unit tests for SecurityAgent"
 ### Task 4: Unit tests for PerformanceAgent
 
 **Files:**
+
 - Create: `tests/unit/performanceAgent.test.ts`
 
 - [ ] **Step 1: Create the test file**
@@ -371,7 +376,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('PerformanceAgent', () => {
@@ -380,28 +385,36 @@ describe('PerformanceAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new PerformanceAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new PerformanceAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'medium',
-      basis: 'INFERRED',
-      confidence: 70,
-      file: 'src/api.ts',
-      line: 22,
-      title: 'N+1 query in loop',
-      detail: 'Each iteration issues a separate DB query',
-      suggestion: 'Batch the queries outside the loop'
-    }])
-    const findings = await new PerformanceAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
+    const raw = JSON.stringify([
+      {
+        severity: 'medium',
+        basis: 'INFERRED',
+        confidence: 70,
+        file: 'src/api.ts',
+        line: 22,
+        title: 'N+1 query in loop',
+        detail: 'Each iteration issues a separate DB query',
+        suggestion: 'Batch the queries outside the loop',
+      },
+    ])
+    const findings = await new PerformanceAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: 'diff',
+    })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('performance')
     expect(findings[0].id).toBe('performance-0')
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new PerformanceAgent(makeProvider('{bad}'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new PerformanceAgent(makeProvider('{bad}'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('system prompt mentions performance or efficiency', () => {
@@ -431,6 +444,7 @@ git commit -m "test: add unit tests for PerformanceAgent"
 ### Task 5: Unit tests for CorrectnessAgent
 
 **Files:**
+
 - Create: `tests/unit/correctnessAgent.test.ts`
 
 - [ ] **Step 1: Create the test file**
@@ -445,7 +459,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('CorrectnessAgent', () => {
@@ -454,28 +468,36 @@ describe('CorrectnessAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new CorrectnessAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new CorrectnessAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'high',
-      basis: 'VERIFIED',
-      confidence: 85,
-      file: 'src/utils.ts',
-      line: 15,
-      title: 'Off-by-one in slice',
-      detail: 'Array slice uses wrong end index, drops last element',
-      suggestion: 'Change arr.slice(0, n-1) to arr.slice(0, n)'
-    }])
-    const findings = await new CorrectnessAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        confidence: 85,
+        file: 'src/utils.ts',
+        line: 15,
+        title: 'Off-by-one in slice',
+        detail: 'Array slice uses wrong end index, drops last element',
+        suggestion: 'Change arr.slice(0, n-1) to arr.slice(0, n)',
+      },
+    ])
+    const findings = await new CorrectnessAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: 'diff',
+    })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('correctness')
     expect(findings[0].id).toBe('correctness-0')
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new CorrectnessAgent(makeProvider('undefined'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new CorrectnessAgent(makeProvider('undefined'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('system prompt mentions correctness or logic', () => {
@@ -505,6 +527,7 @@ git commit -m "test: add unit tests for CorrectnessAgent"
 ### Task 6: Unit tests for DesignAgent
 
 **Files:**
+
 - Create: `tests/unit/designAgent.test.ts`
 
 - [ ] **Step 1: Create the test file**
@@ -519,7 +542,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('DesignAgent', () => {
@@ -528,20 +551,24 @@ describe('DesignAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new DesignAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(await new DesignAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual(
+      []
+    )
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'medium',
-      basis: 'INFERRED',
-      confidence: 65,
-      file: 'src/service.ts',
-      line: 8,
-      title: 'Business logic in controller layer',
-      detail: 'Validation belongs in service, not route handler',
-      suggestion: 'Extract validation to a service method'
-    }])
+    const raw = JSON.stringify([
+      {
+        severity: 'medium',
+        basis: 'INFERRED',
+        confidence: 65,
+        file: 'src/service.ts',
+        line: 8,
+        title: 'Business logic in controller layer',
+        detail: 'Validation belongs in service, not route handler',
+        suggestion: 'Extract validation to a service method',
+      },
+    ])
     const findings = await new DesignAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('design')
@@ -549,7 +576,9 @@ describe('DesignAgent', () => {
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new DesignAgent(makeProvider('null'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new DesignAgent(makeProvider('null'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('system prompt mentions design or architecture', () => {
@@ -579,6 +608,7 @@ git commit -m "test: add unit tests for DesignAgent"
 ### Task 7: Unit tests for DependenciesAgent
 
 **Files:**
+
 - Create: `tests/unit/dependenciesAgent.test.ts`
 
 - [ ] **Step 1: Create the test file**
@@ -593,7 +623,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('DependenciesAgent', () => {
@@ -602,28 +632,36 @@ describe('DependenciesAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new DependenciesAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new DependenciesAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'high',
-      basis: 'VERIFIED',
-      confidence: 88,
-      file: 'package.json',
-      line: 12,
-      title: 'Vulnerable dependency: lodash < 4.17.21',
-      detail: 'Prototype pollution CVE-2021-23337',
-      suggestion: 'Upgrade to lodash@4.17.21'
-    }])
-    const findings = await new DependenciesAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        confidence: 88,
+        file: 'package.json',
+        line: 12,
+        title: 'Vulnerable dependency: lodash < 4.17.21',
+        detail: 'Prototype pollution CVE-2021-23337',
+        suggestion: 'Upgrade to lodash@4.17.21',
+      },
+    ])
+    const findings = await new DependenciesAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: 'diff',
+    })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('dependencies')
     expect(findings[0].id).toBe('dependencies-0')
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new DependenciesAgent(makeProvider(''), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new DependenciesAgent(makeProvider(''), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('system prompt mentions dependencies or packages', () => {
@@ -653,6 +691,7 @@ git commit -m "test: add unit tests for DependenciesAgent"
 ### Task 8: Unit tests for CoverageAnalystAgent
 
 **Files:**
+
 - Create: `tests/unit/coverageAnalystAgent.test.ts`
 
 - [ ] **Step 1: Create the test file**
@@ -667,7 +706,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('CoverageAnalystAgent', () => {
@@ -676,28 +715,38 @@ describe('CoverageAnalystAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new CoverageAnalystAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new CoverageAnalystAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'medium',
-      basis: 'INFERRED',
-      confidence: 75,
-      file: 'src/auth.ts',
-      line: 20,
-      title: 'No test for error branch',
-      detail: 'The catch block in validateToken has no test coverage',
-      suggestion: 'Add a test that passes an invalid token'
-    }])
-    const findings = await new CoverageAnalystAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
+    const raw = JSON.stringify([
+      {
+        severity: 'medium',
+        basis: 'INFERRED',
+        confidence: 75,
+        file: 'src/auth.ts',
+        line: 20,
+        title: 'No test for error branch',
+        detail: 'The catch block in validateToken has no test coverage',
+        suggestion: 'Add a test that passes an invalid token',
+      },
+    ])
+    const findings = await new CoverageAnalystAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: 'diff',
+    })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('coverage')
     expect(findings[0].id).toBe('coverage-0')
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new CoverageAnalystAgent(makeProvider('[invalid]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new CoverageAnalystAgent(makeProvider('[invalid]'), DEFAULT_CONFIG).run({
+        diff: 'diff',
+      })
+    ).toEqual([])
   })
 
   it('system prompt mentions coverage or testing', () => {
@@ -727,6 +776,7 @@ git commit -m "test: add unit tests for CoverageAnalystAgent"
 ### Task 9: Unit tests for AdversarialAgent
 
 **Files:**
+
 - Create: `tests/unit/adversarialAgent.test.ts`
 
 - [ ] **Step 1: Create the test file**
@@ -741,7 +791,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('AdversarialAgent', () => {
@@ -750,28 +800,36 @@ describe('AdversarialAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new AdversarialAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new AdversarialAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'high',
-      basis: 'SPECULATIVE',
-      confidence: 60,
-      file: 'src/parser.ts',
-      line: 33,
-      title: 'Denial of service via regex backtracking',
-      detail: 'The regex /^(a+)+$/ is vulnerable to ReDoS on adversarial input',
-      suggestion: 'Replace with a linear-time parser or add input length guard'
-    }])
-    const findings = await new AdversarialAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'SPECULATIVE',
+        confidence: 60,
+        file: 'src/parser.ts',
+        line: 33,
+        title: 'Denial of service via regex backtracking',
+        detail: 'The regex /^(a+)+$/ is vulnerable to ReDoS on adversarial input',
+        suggestion: 'Replace with a linear-time parser or add input length guard',
+      },
+    ])
+    const findings = await new AdversarialAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: 'diff',
+    })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('adversarial')
     expect(findings[0].id).toBe('adversarial-0')
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new AdversarialAgent(makeProvider('{}'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new AdversarialAgent(makeProvider('{}'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('system prompt mentions adversarial or abuse', () => {
@@ -801,6 +859,7 @@ git commit -m "test: add unit tests for AdversarialAgent"
 ### Task 10: Unit tests for IntegrationScoutAgent
 
 **Files:**
+
 - Create: `tests/unit/integrationScoutAgent.test.ts`
 
 - [ ] **Step 1: Create the test file**
@@ -815,7 +874,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('IntegrationScoutAgent', () => {
@@ -824,28 +883,38 @@ describe('IntegrationScoutAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new IntegrationScoutAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new IntegrationScoutAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'high',
-      basis: 'INFERRED',
-      confidence: 72,
-      file: 'src/gateway.ts',
-      line: 45,
-      title: 'Breaking change to external API contract',
-      detail: 'Renamed field userId to user_id breaks downstream consumers',
-      suggestion: 'Add a migration shim or version the endpoint'
-    }])
-    const findings = await new IntegrationScoutAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'INFERRED',
+        confidence: 72,
+        file: 'src/gateway.ts',
+        line: 45,
+        title: 'Breaking change to external API contract',
+        detail: 'Renamed field userId to user_id breaks downstream consumers',
+        suggestion: 'Add a migration shim or version the endpoint',
+      },
+    ])
+    const findings = await new IntegrationScoutAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: 'diff',
+    })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('integration')
     expect(findings[0].id).toBe('integration-0')
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new IntegrationScoutAgent(makeProvider('not-json'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new IntegrationScoutAgent(makeProvider('not-json'), DEFAULT_CONFIG).run({
+        diff: 'diff',
+      })
+    ).toEqual([])
   })
 
   it('system prompt mentions integration or contract', () => {
@@ -875,6 +944,7 @@ git commit -m "test: add unit tests for IntegrationScoutAgent"
 ### Task 11: Unit tests for OrchestratorAgent
 
 **Files:**
+
 - Create: `tests/unit/orchestratorAgent.test.ts`
 
 Note: The orchestrator test is different — it tests dedup, escalation, and cap logic, not LLM parsing.
@@ -902,7 +972,7 @@ import type { Finding } from '../../src/core/schema.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 const makeFinding = (overrides: Partial<Finding> = {}): Finding => ({
@@ -916,7 +986,7 @@ const makeFinding = (overrides: Partial<Finding> = {}): Finding => ({
   detail: 'Detail',
   suggestion: 'Fix it',
   confidence: 80,
-  ...overrides
+  ...overrides,
 })
 
 describe('OrchestratorAgent', () => {
@@ -936,7 +1006,7 @@ describe('OrchestratorAgent', () => {
     const agent = new OrchestratorAgent(makeProvider('[]'), DEFAULT_CONFIG)
     const findings = [
       makeFinding({ id: 'security-0', file: 'src/a.ts', line: 1 }),
-      makeFinding({ id: 'correctness-0', agent: 'correctness', file: 'src/b.ts', line: 5 })
+      makeFinding({ id: 'correctness-0', agent: 'correctness', file: 'src/b.ts', line: 5 }),
     ]
     // If orchestrator takes pre-run findings via a different method, test that
     // Otherwise test via run() with findings embedded in the diff context
@@ -986,6 +1056,7 @@ git commit -m "test: add unit tests for OrchestratorAgent class interface"
 ### Task 12: Unit tests for TestGenAgent
 
 **Files:**
+
 - Create: `tests/unit/testGenAgent.test.ts`
 
 - [ ] **Step 1: Create the test file**
@@ -1002,7 +1073,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('TestGenAgent', () => {

@@ -5,7 +5,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('BreakingChangeAgent', () => {
@@ -21,15 +21,17 @@ describe('BreakingChangeAgent', () => {
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'high',
-      basis: 'VERIFIED',
-      file: 'src/api.ts',
-      line: 42,
-      title: 'Removed export: createUser',
-      detail: 'The exported function createUser was deleted',
-      suggestion: 'Add a deprecation shim or update all callers'
-    }])
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'src/api.ts',
+        line: 42,
+        title: 'Removed export: createUser',
+        detail: 'The exported function createUser was deleted',
+        suggestion: 'Add a deprecation shim or update all callers',
+      },
+    ])
     const agent = new BreakingChangeAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)

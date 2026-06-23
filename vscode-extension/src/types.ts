@@ -9,7 +9,7 @@ export interface Finding {
   severity: Severity
   basis: string
   file: string
-  line: number   // 1-based line number in the source file
+  line: number // 1-based line number in the source file
   title: string
   detail: string
   suggestion: string
@@ -40,8 +40,8 @@ export interface ReviewResult {
 export interface ExtensionConfig {
   ollamaUrl: string
   model: string
-  agents: string[]    // empty = all agents
+  agents: string[] // empty = all agents
   maxLines: number
   timeoutSecs: number // seconds; converted to ms before passing to CLI
-  cliPath: string     // absolute path to bundled CLI index.js
+  cliPath: string // absolute path to bundled CLI index.js
 }

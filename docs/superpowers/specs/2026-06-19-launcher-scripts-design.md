@@ -34,7 +34,7 @@ Installs the tool for someone who wants to use `ai-review-agent` globally.
 Steps (exit 1 with a clear message on any failure):
 
 1. **Node.js check** — verify `node` is in PATH and version ≥18. On failure: print Node.js download URL and exit 1.
-2. **Ollama running check** — HTTP GET `http://localhost:11434`. On failure: print "Start Ollama and re-run this script" and exit 1. *(Cannot auto-install Ollama — requires an OS-level installer.)*
+2. **Ollama running check** — HTTP GET `http://localhost:11434`. On failure: print "Start Ollama and re-run this script" and exit 1. _(Cannot auto-install Ollama — requires an OS-level installer.)_
 3. **Pull model** — `ollama pull devstral:latest`. Idempotent — no-op if already present.
 4. **Global install** — `npm install -g ai-review-agent`.
 5. **Smoke test** — `ai-review-agent --version`. On success: print success message and exit 0.

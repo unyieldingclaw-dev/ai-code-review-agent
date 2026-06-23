@@ -41,7 +41,7 @@ export async function checkOllamaModel(
   let tagsResponse: Response
   try {
     tagsResponse = await fetch(`${ollamaUrl}/api/tags`, {
-      signal: AbortSignal.timeout(2000)
+      signal: AbortSignal.timeout(2000),
     })
   } catch {
     printSkipBox([
@@ -68,8 +68,8 @@ export async function checkOllamaModel(
   }
 
   // Check 2: Is the required model pulled?
-  const data = await tagsResponse.json() as { models: Array<{ name: string }> }
-  const available = data.models.map(m => m.name)
+  const data = (await tagsResponse.json()) as { models: Array<{ name: string }> }
+  const available = data.models.map((m) => m.name)
   if (!available.includes(model)) {
     printSkipBox([
       'INTEGRATION TESTS SKIPPED — model not available',

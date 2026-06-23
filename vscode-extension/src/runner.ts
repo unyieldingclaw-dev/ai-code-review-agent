@@ -30,7 +30,11 @@ export async function runReview(
   try {
     return await spawnCli(config, workspaceDir, tempFile, token)
   } finally {
-    try { unlinkSync(tempFile) } catch { /* ignore cleanup failure */ }
+    try {
+      unlinkSync(tempFile)
+    } catch {
+      /* ignore cleanup failure */
+    }
   }
 }
 
@@ -73,8 +77,12 @@ function spawnCli(
     let stdout = ''
     let stderr = ''
 
-    child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
-    child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString()
+    })
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
 
     child.on('close', (code: number) => {
       cancelDisposable.dispose()

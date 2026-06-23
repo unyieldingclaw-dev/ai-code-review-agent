@@ -8,7 +8,9 @@ export interface CoverageAnalystResult {
 }
 
 export class CoverageAnalystAgent extends BaseAgent {
-  get name(): AgentName { return 'coverage' }
+  get name(): AgentName {
+    return 'coverage'
+  }
 
   get systemPrompt(): string {
     return `You are a test coverage analyst. Analyze the provided git diff and identify code paths that lack test coverage.
@@ -57,7 +59,7 @@ Rules:
   async runForCoverage(input: ReviewInput): Promise<CoverageAnalystResult> {
     const messages: Message[] = [
       { role: 'system', content: this.systemPrompt },
-      { role: 'user', content: this.buildUserPrompt(input) }
+      { role: 'user', content: this.buildUserPrompt(input) },
     ]
     const raw = await this.provider.chat(messages, { think: true })
     return this.parseCoverageResult(raw, input)
@@ -78,24 +80,27 @@ Rules:
           const parsed = JSON.parse(objMatch[0]) as { findings?: unknown[]; gaps?: unknown[] }
           return {
             findings: this.parseFindings(JSON.stringify(parsed.findings ?? [])),
-            gaps: this.validateGaps(parsed.gaps ?? [])
+            gaps: this.validateGaps(parsed.gaps ?? []),
           }
         }
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
       console.error(`[coverage] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
       return { findings: [], gaps: [] }
     }
   }
 
   private validateGaps(items: unknown[]): CoverageGap[] {
-    return (items as CoverageGap[]).filter(g =>
-      typeof g === 'object' &&
-      g !== null &&
-      typeof g.file === 'string' &&
-      typeof g.functionName === 'string' &&
-      typeof g.lineStart === 'number' &&
-      typeof g.lineEnd === 'number' &&
-      typeof g.description === 'string'
+    return (items as CoverageGap[]).filter(
+      (g) =>
+        typeof g === 'object' &&
+        g !== null &&
+        typeof g.file === 'string' &&
+        typeof g.functionName === 'string' &&
+        typeof g.lineStart === 'number' &&
+        typeof g.lineEnd === 'number' &&
+        typeof g.description === 'string'
     )
   }
 }

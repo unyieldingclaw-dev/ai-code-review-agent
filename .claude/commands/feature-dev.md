@@ -23,6 +23,7 @@ Invoke code-simplifier on all changed files. Improve clarity and consistency wit
 Run /security-review on the current diff. Resolve all [CRITICAL] and [HIGH] findings before proceeding.
 
 **Phase 7 — Commit**
+
 ```bash
 git add <specific changed files>
 git commit -m "feat: <what was built and why>"

@@ -2,7 +2,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class IntegrationScoutAgent extends BaseAgent {
-  get name(): AgentName { return 'integration' }
+  get name(): AgentName {
+    return 'integration'
+  }
 
   get systemPrompt(): string {
     return `You are an integration testing analyst. Analyze the provided git diff and identify integration seams that need contract or integration tests.

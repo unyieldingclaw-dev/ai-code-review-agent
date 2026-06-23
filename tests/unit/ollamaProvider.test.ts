@@ -11,7 +11,9 @@ describe('OllamaProvider', () => {
     it('strips think tags from response', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ message: { content: '<think>reasoning here</think>\n{"findings":[]}' } })
+        json: async () => ({
+          message: { content: '<think>reasoning here</think>\n{"findings":[]}' },
+        }),
       })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
       const result = await provider.chat([{ role: 'user', content: 'test' }])
@@ -22,7 +24,7 @@ describe('OllamaProvider', () => {
     it('passes think:true for qwen models when think option is set', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ message: { content: 'response' } })
+        json: async () => ({ message: { content: 'response' } }),
       })
       const provider = new OllamaProvider('http://localhost:11434', 'qwen3:latest')
       await provider.chat([{ role: 'user', content: 'test' }], { think: true })
@@ -34,7 +36,7 @@ describe('OllamaProvider', () => {
     it('omits think for models that do not support it', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ message: { content: 'response' } })
+        json: async () => ({ message: { content: 'response' } }),
       })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
       await provider.chat([{ role: 'user', content: 'test' }], { think: true })
@@ -46,7 +48,9 @@ describe('OllamaProvider', () => {
     it('throws on non-ok response', async () => {
       mockFetch.mockResolvedValueOnce({ ok: false, status: 500 })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
-      await expect(provider.chat([{ role: 'user', content: 'test' }])).rejects.toThrow('Ollama HTTP 500')
+      await expect(provider.chat([{ role: 'user', content: 'test' }])).rejects.toThrow(
+        'Ollama HTTP 500'
+      )
     })
   })
 
@@ -54,7 +58,7 @@ describe('OllamaProvider', () => {
     it('returns ok:true when model is present', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ models: [{ name: 'devstral:latest' }] })
+        json: async () => ({ models: [{ name: 'devstral:latest' }] }),
       })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
       const result = await provider.ping()
@@ -64,7 +68,7 @@ describe('OllamaProvider', () => {
     it('returns ok:false when model is missing', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ models: [{ name: 'other-model:latest' }] })
+        json: async () => ({ models: [{ name: 'other-model:latest' }] }),
       })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
       const result = await provider.ping()

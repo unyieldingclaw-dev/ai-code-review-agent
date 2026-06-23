@@ -74,12 +74,14 @@ lineage: []
 **Diff source**: Staged changes (`git diff --cached`). If nothing staged, show clear error: "No staged changes found. Stage your changes with `git add` and try again." No fallback magic.
 
 **Output surfaces** (both):
+
 1. `vscode.languages.createDiagnosticCollection` → squiggles in editor + Problems panel entries, click-to-navigate to file/line. Cleared on next run.
 2. `vscode.window.createOutputChannel("AI Review")` → full markdown report, same content as CLI output. No webview.
 
 **Repo structure**: `vscode-extension/` subfolder in existing repo. Standalone package, no pnpm workspace needed (subprocess approach requires no shared source).
 
 **Rejected alternatives**:
+
 - Monorepo (Option 2): too much restructuring risk for first extension release
 - Workspace dep (Option 3): half the monorepo pain with fewer benefits
 - Webview output: OutputChannel gives 90% of value at 10% complexity

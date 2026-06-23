@@ -2,7 +2,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class AdversarialAgent extends BaseAgent {
-  get name(): AgentName { return 'adversarial' }
+  get name(): AgentName {
+    return 'adversarial'
+  }
 
   get systemPrompt(): string {
     return `You are an adversarial testing agent. Analyze the provided git diff and identify inputs that would break the changed code.

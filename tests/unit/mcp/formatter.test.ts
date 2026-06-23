@@ -16,7 +16,10 @@ function makeResult(overrides: Partial<ReviewResult> = {}): ReviewResult {
   }
 }
 
-function makeFinding(severity: 'critical' | 'high' | 'medium' | 'low', overrides: Partial<Finding> = {}): Finding {
+function makeFinding(
+  severity: 'critical' | 'high' | 'medium' | 'low',
+  overrides: Partial<Finding> = {}
+): Finding {
   return {
     id: 'f1',
     agent: 'security' as const,
@@ -44,10 +47,17 @@ describe('formatMcpOutput', () => {
   })
 
   it('returns no-critical/high message when only medium/low exist', () => {
-    const result = formatMcpOutput(makeResult({
-      findings: [makeFinding('medium'), makeFinding('low')],
-      summary: { totalFindings: 2, bySeverity: { medium: 1, low: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [makeFinding('medium'), makeFinding('low')],
+        summary: {
+          totalFindings: 2,
+          bySeverity: { medium: 1, low: 1 },
+          byAgent: {},
+          durationMs: 100,
+        },
+      })
+    )
     expect(result).toContain('✅ No critical or high findings')
     expect(result).toContain('1 medium')
     expect(result).toContain('1 low')
@@ -55,13 +65,25 @@ describe('formatMcpOutput', () => {
 
   it('renders critical finding with 🔴 icon and full detail', () => {
     const finding = makeFinding('critical', {
-      id: 'f1', agent: 'security', file: 'src/auth.ts', line: 42,
-      title: 'Hardcoded secret', detail: 'Key is embedded in source.', recommendation: 'Use env var.'
+      id: 'f1',
+      agent: 'security',
+      file: 'src/auth.ts',
+      line: 42,
+      title: 'Hardcoded secret',
+      detail: 'Key is embedded in source.',
+      recommendation: 'Use env var.',
     })
-    const result = formatMcpOutput(makeResult({
-      findings: [finding],
-      summary: { totalFindings: 1, bySeverity: { critical: 1 }, byAgent: { security: 1 }, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [finding],
+        summary: {
+          totalFindings: 1,
+          bySeverity: { critical: 1 },
+          byAgent: { security: 1 },
+          durationMs: 100,
+        },
+      })
+    )
     expect(result).toContain('🔴')
     expect(result).toContain('CRITICAL')
     expect(result).toContain('Security')
@@ -73,22 +95,34 @@ describe('formatMcpOutput', () => {
 
   it('renders high finding with 🟠 icon', () => {
     const finding = makeFinding('high')
-    const result = formatMcpOutput(makeResult({
-      findings: [finding],
-      summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [finding],
+        summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: {}, durationMs: 100 },
+      })
+    )
     expect(result).toContain('🟠')
     expect(result).toContain('HIGH')
   })
 
   it('shows medium/low count tail when both exist', () => {
     const findings = [
-      makeFinding('critical'), makeFinding('medium'), makeFinding('medium'), makeFinding('low')
+      makeFinding('critical'),
+      makeFinding('medium'),
+      makeFinding('medium'),
+      makeFinding('low'),
     ]
-    const result = formatMcpOutput(makeResult({
-      findings,
-      summary: { totalFindings: 4, bySeverity: { critical: 1, medium: 2, low: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings,
+        summary: {
+          totalFindings: 4,
+          bySeverity: { critical: 1, medium: 2, low: 1 },
+          byAgent: {},
+          durationMs: 100,
+        },
+      })
+    )
     expect(result).toContain('2 medium')
     expect(result).toContain('1 low')
     expect(result).toContain('ai-review-agent')
@@ -96,10 +130,12 @@ describe('formatMcpOutput', () => {
 
   it('omits tail when no medium/low findings', () => {
     const finding = makeFinding('critical')
-    const result = formatMcpOutput(makeResult({
-      findings: [finding],
-      summary: { totalFindings: 1, bySeverity: { critical: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [finding],
+        summary: { totalFindings: 1, bySeverity: { critical: 1 }, byAgent: {}, durationMs: 100 },
+      })
+    )
     expect(result).not.toContain('medium')
     expect(result).not.toContain('low')
     expect(result).not.toContain('ai-review-agent')
@@ -107,19 +143,33 @@ describe('formatMcpOutput', () => {
 
   it('header shows count of critical+high only', () => {
     const findings = [makeFinding('critical'), makeFinding('high'), makeFinding('medium')]
-    const result = formatMcpOutput(makeResult({
-      findings,
-      summary: { totalFindings: 3, bySeverity: { critical: 1, high: 1, medium: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings,
+        summary: {
+          totalFindings: 3,
+          bySeverity: { critical: 1, high: 1, medium: 1 },
+          byAgent: {},
+          durationMs: 100,
+        },
+      })
+    )
     expect(result).toContain('2 findings')
   })
 
   it('shows only medium count in tail when no low findings', () => {
     const finding = makeFinding('critical')
-    const result = formatMcpOutput(makeResult({
-      findings: [finding, makeFinding('medium')],
-      summary: { totalFindings: 2, bySeverity: { critical: 1, medium: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [finding, makeFinding('medium')],
+        summary: {
+          totalFindings: 2,
+          bySeverity: { critical: 1, medium: 1 },
+          byAgent: {},
+          durationMs: 100,
+        },
+      })
+    )
     expect(result).toContain('1 medium')
     expect(result).not.toContain('low')
     expect(result).toContain('ai-review-agent')

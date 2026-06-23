@@ -14,14 +14,14 @@
 
 ## File Map
 
-| File | Operation | Responsibility |
-|------|-----------|----------------|
-| `src/mcp/formatter.ts` | Create | A+C hybrid markdown renderer — pure function, no I/O |
-| `src/mcp/tool.ts` | Create | Tool handler: get diff, load config, run SwarmRunner, catch errors |
-| `src/mcp/server.ts` | Create | MCP server entry: register tool, connect stdio transport |
-| `tests/unit/mcp/formatter.test.ts` | Create | Unit tests for all formatter output cases |
-| `tests/unit/mcp/tool.test.ts` | Create | Unit tests for diff acquisition and error handling |
-| `package.json` | Modify | Add `ai-review-mcp` bin, add `@modelcontextprotocol/sdk` dep |
+| File                               | Operation | Responsibility                                                     |
+| ---------------------------------- | --------- | ------------------------------------------------------------------ |
+| `src/mcp/formatter.ts`             | Create    | A+C hybrid markdown renderer — pure function, no I/O               |
+| `src/mcp/tool.ts`                  | Create    | Tool handler: get diff, load config, run SwarmRunner, catch errors |
+| `src/mcp/server.ts`                | Create    | MCP server entry: register tool, connect stdio transport           |
+| `tests/unit/mcp/formatter.test.ts` | Create    | Unit tests for all formatter output cases                          |
+| `tests/unit/mcp/tool.test.ts`      | Create    | Unit tests for diff acquisition and error handling                 |
+| `package.json`                     | Modify    | Add `ai-review-mcp` bin, add `@modelcontextprotocol/sdk` dep       |
 
 ---
 
@@ -30,6 +30,7 @@
 The formatter is a pure function: takes `ReviewResult`, returns a markdown string. No I/O, no external dependencies. Start here — it defines the output contract everything else depends on.
 
 **Files:**
+
 - Create: `src/mcp/formatter.ts`
 - Create: `tests/unit/mcp/formatter.test.ts`
 
@@ -77,10 +78,17 @@ describe('formatMcpOutput', () => {
   })
 
   it('returns no-critical/high message when only medium/low exist', () => {
-    const result = formatMcpOutput(makeResult({
-      findings: [makeFinding('medium'), makeFinding('low')],
-      summary: { totalFindings: 2, bySeverity: { medium: 1, low: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [makeFinding('medium'), makeFinding('low')],
+        summary: {
+          totalFindings: 2,
+          bySeverity: { medium: 1, low: 1 },
+          byAgent: {},
+          durationMs: 100,
+        },
+      })
+    )
     expect(result).toContain('✅ No critical or high findings')
     expect(result).toContain('1 medium')
     expect(result).toContain('1 low')
@@ -88,13 +96,25 @@ describe('formatMcpOutput', () => {
 
   it('renders critical finding with 🔴 icon and full detail', () => {
     const finding = makeFinding('critical', {
-      id: 'f1', agent: 'security', file: 'src/auth.ts', line: 42,
-      title: 'Hardcoded secret', detail: 'Key is embedded in source.', suggestion: 'Use env var.'
+      id: 'f1',
+      agent: 'security',
+      file: 'src/auth.ts',
+      line: 42,
+      title: 'Hardcoded secret',
+      detail: 'Key is embedded in source.',
+      suggestion: 'Use env var.',
     })
-    const result = formatMcpOutput(makeResult({
-      findings: [finding],
-      summary: { totalFindings: 1, bySeverity: { critical: 1 }, byAgent: { security: 1 }, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [finding],
+        summary: {
+          totalFindings: 1,
+          bySeverity: { critical: 1 },
+          byAgent: { security: 1 },
+          durationMs: 100,
+        },
+      })
+    )
     expect(result).toContain('🔴')
     expect(result).toContain('CRITICAL')
     expect(result).toContain('security')
@@ -106,22 +126,34 @@ describe('formatMcpOutput', () => {
 
   it('renders high finding with 🟠 icon', () => {
     const finding = makeFinding('high')
-    const result = formatMcpOutput(makeResult({
-      findings: [finding],
-      summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [finding],
+        summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: {}, durationMs: 100 },
+      })
+    )
     expect(result).toContain('🟠')
     expect(result).toContain('HIGH')
   })
 
   it('shows medium/low count tail when both exist', () => {
     const findings = [
-      makeFinding('critical'), makeFinding('medium'), makeFinding('medium'), makeFinding('low')
+      makeFinding('critical'),
+      makeFinding('medium'),
+      makeFinding('medium'),
+      makeFinding('low'),
     ]
-    const result = formatMcpOutput(makeResult({
-      findings,
-      summary: { totalFindings: 4, bySeverity: { critical: 1, medium: 2, low: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings,
+        summary: {
+          totalFindings: 4,
+          bySeverity: { critical: 1, medium: 2, low: 1 },
+          byAgent: {},
+          durationMs: 100,
+        },
+      })
+    )
     expect(result).toContain('2 medium')
     expect(result).toContain('1 low')
     expect(result).toContain('ai-review-agent')
@@ -129,10 +161,12 @@ describe('formatMcpOutput', () => {
 
   it('omits tail when no medium/low findings', () => {
     const finding = makeFinding('critical')
-    const result = formatMcpOutput(makeResult({
-      findings: [finding],
-      summary: { totalFindings: 1, bySeverity: { critical: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [finding],
+        summary: { totalFindings: 1, bySeverity: { critical: 1 }, byAgent: {}, durationMs: 100 },
+      })
+    )
     expect(result).not.toContain('medium')
     expect(result).not.toContain('low')
     expect(result).not.toContain('ai-review-agent')
@@ -140,10 +174,17 @@ describe('formatMcpOutput', () => {
 
   it('header shows count of critical+high only', () => {
     const findings = [makeFinding('critical'), makeFinding('high'), makeFinding('medium')]
-    const result = formatMcpOutput(makeResult({
-      findings,
-      summary: { totalFindings: 3, bySeverity: { critical: 1, high: 1, medium: 1 }, byAgent: {}, durationMs: 100 }
-    }))
+    const result = formatMcpOutput(
+      makeResult({
+        findings,
+        summary: {
+          totalFindings: 3,
+          bySeverity: { critical: 1, high: 1, medium: 1 },
+          byAgent: {},
+          durationMs: 100,
+        },
+      })
+    )
     expect(result).toContain('2 findings')
   })
 })
@@ -170,9 +211,7 @@ export function formatMcpOutput(result: ReviewResult): string {
     return '## AI Code Review — ✅ No findings\n'
   }
 
-  const actionable = findings.filter(
-    f => f.severity === 'critical' || f.severity === 'high'
-  )
+  const actionable = findings.filter((f) => f.severity === 'critical' || f.severity === 'high')
   const mediumCount = summary.bySeverity.medium ?? 0
   const lowCount = summary.bySeverity.low ?? 0
 
@@ -231,6 +270,7 @@ git commit -m "feat(mcp): add A+C hybrid markdown formatter"
 The tool handler orchestrates everything: get the diff, load config, run the swarm, catch errors, return text. Test the diff acquisition logic and all error paths with mocks — don't actually call git or Ollama in unit tests.
 
 **Files:**
+
 - Create: `src/mcp/tool.ts`
 - Create: `tests/unit/mcp/tool.test.ts`
 
@@ -270,8 +310,18 @@ vi.mock('../../../src/core/config.js', () => ({
     ollamaUrl: 'http://localhost:11434',
     anthropicModel: '',
     maxFindings: 15,
-    agents: ['security', 'performance', 'correctness', 'design', 'dependencies',
-             'coverage', 'adversarial', 'integration', 'breaking-change', 'license'],
+    agents: [
+      'security',
+      'performance',
+      'correctness',
+      'design',
+      'dependencies',
+      'coverage',
+      'adversarial',
+      'integration',
+      'breaking-change',
+      'license',
+    ],
     contextLines: 10,
     testOutputDir: './ai-review-tests',
     maxDiffLines: 2000,
@@ -300,10 +350,10 @@ describe('runReviewTool', () => {
 
   it('falls back to git diff HEAD when no staged changes', async () => {
     mockExecSync
-      .mockReturnValueOnce('' as any)            // first call: git diff --cached → empty
+      .mockReturnValueOnce('' as any) // first call: git diff --cached → empty
       .mockReturnValueOnce('diff --git a/f.ts b/f.ts\n+line' as any) // second call: git diff HEAD
     await runReviewTool({})
-    const calls = mockExecSync.mock.calls.map(c => c[0] as string)
+    const calls = mockExecSync.mock.calls.map((c) => c[0] as string)
     expect(calls[0]).toContain('--cached')
     expect(calls[1]).toContain('diff HEAD')
   })
@@ -322,7 +372,9 @@ describe('runReviewTool', () => {
   })
 
   it('returns error message when git command throws (not a repo)', async () => {
-    mockExecSync.mockImplementation(() => { throw new Error('not a git repository') })
+    mockExecSync.mockImplementation(() => {
+      throw new Error('not a git repository')
+    })
     const result = await runReviewTool({})
     expect(result).toContain('Not a git repository')
   })
@@ -330,9 +382,12 @@ describe('runReviewTool', () => {
   it('returns error message when Ollama is unreachable', async () => {
     mockExecSync.mockReturnValue('diff --git a/f.ts b/f.ts\n+line' as any)
     const { SwarmRunner } = await import('../../../src/core/runner.js')
-    vi.mocked(SwarmRunner).mockImplementationOnce(() => ({
-      run: vi.fn().mockRejectedValue(new Error('LLM provider not available')),
-    }) as any)
+    vi.mocked(SwarmRunner).mockImplementationOnce(
+      () =>
+        ({
+          run: vi.fn().mockRejectedValue(new Error('LLM provider not available')),
+        }) as any
+    )
     const result = await runReviewTool({})
     expect(result).toContain('Ollama is not reachable')
   })
@@ -346,7 +401,7 @@ describe('runReviewTool', () => {
       ollamaUrl: 'http://localhost:11434',
       anthropicModel: '',
       maxFindings: 15,
-      agents: ['security', 'testgen', 'coverage'],  // testgen present in config
+      agents: ['security', 'testgen', 'coverage'], // testgen present in config
       contextLines: 10,
       testOutputDir: './ai-review-tests',
       maxDiffLines: 2000,
@@ -356,8 +411,9 @@ describe('runReviewTool', () => {
     })
     const { SwarmRunner } = await import('../../../src/core/runner.js')
     const runMock = vi.fn().mockResolvedValue({
-      findings: [], testFiles: [],
-      summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 }
+      findings: [],
+      testFiles: [],
+      summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
     })
     vi.mocked(SwarmRunner).mockImplementationOnce((config: any) => {
       expect(config.agents).not.toContain('testgen')
@@ -419,9 +475,7 @@ export async function runReviewTool(params: ReviewToolParams): Promise<string> {
   // --- Config ---
   const config = loadConfig(repoPath)
   // Remove testgen regardless of what the config file says
-  config.agents = config.agents.filter(
-    (a): a is AgentName => !MCP_EXCLUDED_AGENTS.includes(a)
-  )
+  config.agents = config.agents.filter((a): a is AgentName => !MCP_EXCLUDED_AGENTS.includes(a))
 
   // --- Run swarm ---
   const provider = new OllamaProvider(config.ollamaUrl, config.model)
@@ -432,7 +486,11 @@ export async function runReviewTool(params: ReviewToolParams): Promise<string> {
     return formatMcpOutput(result)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('provider not available') || msg.includes('ECONNREFUSED') || msg.includes('fetch')) {
+    if (
+      msg.includes('provider not available') ||
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('fetch')
+    ) {
       return `## AI Code Review\n\nOllama is not reachable at \`${config.ollamaUrl}\`. Start Ollama and try again.\n\n_${msg}_`
     }
     return `## AI Code Review\n\nReview failed: ${msg}`
@@ -462,6 +520,7 @@ git commit -m "feat(mcp): add review_diff tool handler"
 The MCP server entry point. Registers the `review_diff` tool with the MCP SDK and connects the stdio transport. This is glue code — keep it thin. All logic lives in `tool.ts`.
 
 **Files:**
+
 - Create: `src/mcp/server.ts`
 
 No unit tests for the server entry point — the MCP SDK's transport layer is an integration concern. The smoke test in Task 5 verifies it.
@@ -497,10 +556,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import { runReviewTool } from './tool.js'
 
-const server = new Server(
-  { name: 'ai-review', version: '0.6.0' },
-  { capabilities: { tools: {} } }
-)
+const server = new Server({ name: 'ai-review', version: '0.6.0' }, { capabilities: { tools: {} } })
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
@@ -519,7 +575,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: 'string',
             description:
               'Absolute path to the repository root. ' +
-              'Defaults to the server\'s working directory (Cursor sets this to the workspace root).',
+              "Defaults to the server's working directory (Cursor sets this to the workspace root).",
           },
         },
         required: [],
@@ -576,17 +632,21 @@ git commit -m "feat(mcp): add MCP server entry point (stdio transport)"
 Add the `ai-review-mcp` bin entry. The MCP SDK is already in `dependencies` from the `npm install` in Task 3 — just verify and commit.
 
 **Files:**
+
 - Modify: `package.json`
 
 - [ ] **Step 1: Add the bin entry**
 
 Edit `package.json` — change the `bin` field from:
+
 ```json
 "bin": {
   "ai-review-agent": "./dist/cli/index.js"
 }
 ```
+
 to:
+
 ```json
 "bin": {
   "ai-review-agent": "./dist/cli/index.js",
@@ -632,19 +692,23 @@ npm run build
 ```
 
 Expected: exits 0. Verify the new file exists:
+
 ```
 ls dist/mcp/server.js
 ```
+
 Expected: file present
 
 - [ ] **Step 2: Smoke test — tools/list**
 
 On Windows (PowerShell):
+
 ```powershell
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | node dist/mcp/server.js
 ```
 
 On macOS/Linux:
+
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | node dist/mcp/server.js
 ```
@@ -652,6 +716,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | node dist/mc
 Expected: JSON response containing `review_diff` in the tools array. Stderr may show `[ai-review-mcp] Server starting...` and `[ai-review-mcp] Server ready.`
 
 Example expected stdout:
+
 ```json
 {"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"review_diff","description":"...","inputSchema":{...}}]}}
 ```
@@ -670,6 +735,7 @@ git commit -m "chore: build dist for v0.6.0 MCP server"
 Add the Cursor config file and document how to connect the server.
 
 **Files:**
+
 - Create: `.cursor/mcp.json`
 - Modify: `README.md` — add MCP / Cursor section
 
@@ -694,7 +760,7 @@ Note: this file configures Cursor for this project. Users who install `ai-review
 
 Add the following section to `README.md` after the existing "Install" section:
 
-```markdown
+````markdown
 ## Cursor Integration (MCP)
 
 After installing globally, add this to `.cursor/mcp.json` in your project root:
@@ -709,6 +775,7 @@ After installing globally, add this to `.cursor/mcp.json` in your project root:
   }
 }
 ```
+````
 
 Restart Cursor. The `review_diff` tool will appear in **Settings → MCP**. In Cursor's chat panel, ask:
 
@@ -719,13 +786,16 @@ or invoke directly:
 > @ai-review review_diff
 
 Requires Ollama running locally with `devstral:latest` pulled. The tool runs 10 agents (security, performance, correctness, design, dependencies, adversarial, integration, breaking-change, license, coverage). For generated test files, use the CLI (`ai-review-agent`).
+
 ```
 
 - [ ] **Step 3: Run full test suite one final time**
 
 ```
+
 npm test
-```
+
+````
 
 Expected: all tests PASS
 
@@ -734,7 +804,7 @@ Expected: all tests PASS
 ```bash
 git add .cursor/mcp.json README.md
 git commit -m "docs: add Cursor MCP config and README section for review_diff tool"
-```
+````
 
 ---
 

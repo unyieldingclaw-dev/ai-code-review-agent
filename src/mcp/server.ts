@@ -22,14 +22,11 @@ import {
 import { runReviewTool } from './tool.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const { version } = JSON.parse(
-  readFileSync(join(__dirname, '../../package.json'), 'utf-8')
-) as { version: string }
+const { version } = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8')) as {
+  version: string
+}
 
-const server = new Server(
-  { name: 'ai-review', version },
-  { capabilities: { tools: {} } }
-)
+const server = new Server({ name: 'ai-review', version }, { capabilities: { tools: {} } })
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
@@ -49,7 +46,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: 'string',
             description:
               'Absolute path to the repository root. ' +
-              'Defaults to the server\'s working directory (Cursor sets this to the workspace root).',
+              "Defaults to the server's working directory (Cursor sets this to the workspace root).",
           },
         },
         required: [],

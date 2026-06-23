@@ -25,11 +25,13 @@ lineage: []
 **Decision**: One abstract `BaseAgent`, nine concrete specialist subclasses, one `Orchestrator`, driven by `SwarmRunner`.
 
 **Rationale**:
+
 - Specialist agents don't bias each other (each sees only the diff + its own system prompt)
 - Orchestrator deduplicates and cross-references after all agents complete
 - Matches how humans divide code review by domain
 
 **Implementation**:
+
 ```
 SwarmRunner
   └─ ping check (Ollama live?)
@@ -63,6 +65,7 @@ SwarmRunner
 ### BaseAgent — 3-Stage JSON Parse
 
 LLMs produce messy output. Parse in order:
+
 1. Parse entire response as JSON array
 2. Parse `{"findings": [...]}` wrapped object
 3. Regex-extract first JSON array from fenced block

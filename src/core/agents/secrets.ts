@@ -4,7 +4,9 @@ import type { ReviewConfig } from '../config.js'
 import type { AgentName } from '../schema.js'
 
 export class SecretsAgent extends BaseAgent {
-  get name(): AgentName { return 'secrets' }
+  get name(): AgentName {
+    return 'secrets'
+  }
 
   get systemPrompt(): string {
     return `You are a code reviewer specializing in secrets and credentials detection.

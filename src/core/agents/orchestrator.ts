@@ -4,14 +4,34 @@ import type { Finding, Severity, AgentName, EvidenceSource } from '../schema.js'
 import { SEVERITY_RANK } from '../schema.js'
 
 const DETERMINISTIC_SOURCES: EvidenceSource[] = [
-  'gitleaks', 'trufflehog', 'semgrep', 'npm-audit', 'osv', 'lizard', 'git', 'policy'
+  'gitleaks',
+  'trufflehog',
+  'semgrep',
+  'npm-audit',
+  'osv',
+  'lizard',
+  'git',
+  'policy',
 ]
 
 // Agent priority for deduplication — higher index = higher priority kept
 const AGENT_PRIORITY: AgentName[] = [
-  'integration', 'breaking-change', 'coverage', 'testgen', 'adversarial',
-  'design', 'dependencies', 'license', 'correctness', 'performance', 'security',
-  'complexity', 'migration-safety', 'observability', 'error-handling', 'secrets'
+  'integration',
+  'breaking-change',
+  'coverage',
+  'testgen',
+  'adversarial',
+  'design',
+  'dependencies',
+  'license',
+  'correctness',
+  'performance',
+  'security',
+  'complexity',
+  'migration-safety',
+  'observability',
+  'error-handling',
+  'secrets',
 ]
 
 export class OrchestratorAgent {
@@ -33,20 +53,21 @@ export class OrchestratorAgent {
   }
 
   private hallucinationCrossCheck(findings: Finding[]): Finding[] {
-    const agentsPresent = new Set(findings.map(f => f.agent))
+    const agentsPresent = new Set(findings.map((f) => f.agent))
     if (agentsPresent.size <= 1) return findings
 
-    return findings.map(f => {
+    return findings.map((f) => {
       if (f.severity !== 'critical' && f.severity !== 'high') return f
       const corroborators = new Set(
         findings
-          .filter(other =>
-            other.id !== f.id &&
-            other.agent !== f.agent &&
-            other.file === f.file &&
-            Math.abs(other.line - f.line) <= 5
+          .filter(
+            (other) =>
+              other.id !== f.id &&
+              other.agent !== f.agent &&
+              other.file === f.file &&
+              Math.abs(other.line - f.line) <= 5
           )
-          .map(other => other.agent)
+          .map((other) => other.agent)
       )
       if (corroborators.size > 0) return f
 
@@ -57,9 +78,7 @@ export class OrchestratorAgent {
       const confidence = f.confidence ?? 70
       if (f.severity === 'critical') {
         // High-confidence solo Critical stays Critical; low-confidence → High (not Medium)
-        return confidence < 60
-          ? { ...f, severity: 'high' as Severity }
-          : f
+        return confidence < 60 ? { ...f, severity: 'high' as Severity } : f
       }
       // Solo High → Medium (unchanged behavior)
       return { ...f, severity: 'medium' as Severity }
@@ -80,7 +99,7 @@ export class OrchestratorAgent {
 
     const result: Finding[] = []
     for (const group of byLocation.values()) {
-      const agents = new Set(group.map(f => f.agent))
+      const agents = new Set(group.map((f) => f.agent))
       if (agents.size === 1) {
         // All from same agent — keep all as-is
         result.push(...group)
@@ -96,35 +115,47 @@ export class OrchestratorAgent {
             bestAgent = agent
           }
         }
-        const kept = group.filter(f => f.agent === bestAgent)
-        const dropped = group.filter(f => f.agent !== bestAgent)
-        const droppedAgents = [...new Set(dropped.map(f => f.agent))]
-        const droppedIds = dropped.map(f => f.id)
-        result.push(...kept.map(f => ({
-          ...f,
-          corroboratingAgents: [...new Set([...(f.corroboratingAgents ?? []), ...droppedAgents])],
-          relatedFindings: [...(f.relatedFindings ?? []), ...droppedIds]
-        })))
+        const kept = group.filter((f) => f.agent === bestAgent)
+        const dropped = group.filter((f) => f.agent !== bestAgent)
+        const droppedAgents = [...new Set(dropped.map((f) => f.agent))]
+        const droppedIds = dropped.map((f) => f.id)
+        result.push(
+          ...kept.map((f) => ({
+            ...f,
+            corroboratingAgents: [...new Set([...(f.corroboratingAgents ?? []), ...droppedAgents])],
+            relatedFindings: [...(f.relatedFindings ?? []), ...droppedIds],
+          }))
+        )
       }
     }
     return result
   }
 
   private crossReference(findings: Finding[]): Finding[] {
-    return findings.map(f => {
+    return findings.map((f) => {
       // Correctness bug at same file:line as a coverage gap → escalate severity
       if (f.agent === 'correctness') {
         const coverageGap = findings.find(
-          other => other.agent === 'coverage' && other.file === f.file && Math.abs(other.line - f.line) <= 5
+          (other) =>
+            other.agent === 'coverage' &&
+            other.file === f.file &&
+            Math.abs(other.line - f.line) <= 5
         )
         if (coverageGap) {
-          return { ...f, severity: this.escalate(f.severity), relatedFindings: [...(f.relatedFindings ?? []), coverageGap.id] }
+          return {
+            ...f,
+            severity: this.escalate(f.severity),
+            relatedFindings: [...(f.relatedFindings ?? []), coverageGap.id],
+          }
         }
       }
       // Security finding at same location as adversarial → escalate
       if (f.agent === 'security') {
         const hasAdversarial = findings.some(
-          other => other.agent === 'adversarial' && other.file === f.file && Math.abs(other.line - f.line) <= 5
+          (other) =>
+            other.agent === 'adversarial' &&
+            other.file === f.file &&
+            Math.abs(other.line - f.line) <= 5
         )
         if (hasAdversarial) {
           return { ...f, severity: this.escalate(f.severity) }
@@ -141,9 +172,10 @@ export class OrchestratorAgent {
   }
 
   private applyPublicationFilter(findings: Finding[]): Finding[] {
-    return findings.filter(f => {
+    return findings.filter((f) => {
       if (f.severity === 'low') return false
-      if (f.basis === 'SPECULATIVE' && SEVERITY_RANK[f.severity] < SEVERITY_RANK['high']) return false
+      if (f.basis === 'SPECULATIVE' && SEVERITY_RANK[f.severity] < SEVERITY_RANK['high'])
+        return false
       return true
     })
   }

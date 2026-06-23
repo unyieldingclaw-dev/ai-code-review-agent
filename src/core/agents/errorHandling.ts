@@ -2,7 +2,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class ErrorHandlingAgent extends BaseAgent {
-  get name(): AgentName { return 'error-handling' }
+  get name(): AgentName {
+    return 'error-handling'
+  }
 
   get systemPrompt(): string {
     return `You are a code reviewer specializing in error handling quality.

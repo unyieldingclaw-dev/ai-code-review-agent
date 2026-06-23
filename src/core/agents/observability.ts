@@ -2,7 +2,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class ObservabilityAgent extends BaseAgent {
-  get name(): AgentName { return 'observability' }
+  get name(): AgentName {
+    return 'observability'
+  }
 
   get systemPrompt(): string {
     return `You are a code reviewer specializing in observability and logging quality.

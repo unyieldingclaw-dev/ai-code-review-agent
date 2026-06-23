@@ -2,14 +2,14 @@ name: Calibration
 
 on:
   schedule:
-    - cron: '0 6 * * 1'   # Every Monday at 06:00 UTC
+    - cron: '0 6 * * 1' # Every Monday at 06:00 UTC
   release:
     types: [published]
-  workflow_dispatch:       # Manual trigger
+  workflow_dispatch: # Manual trigger
 
 jobs:
   calibrate:
-    runs-on: self-hosted   # Requires Ollama on the runner (same machine as review workflow)
+    runs-on: self-hosted # Requires Ollama on the runner (same machine as review workflow)
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
     steps:

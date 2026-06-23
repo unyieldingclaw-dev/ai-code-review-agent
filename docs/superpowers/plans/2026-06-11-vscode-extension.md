@@ -12,41 +12,45 @@
 
 ## File Map
 
-| Path | Responsibility |
-|------|----------------|
-| `src/cli/index.ts` | **Modify**: add `--ollama-url` CLI flag (3-line change) |
-| `vscode-extension/package.json` | Extension manifest, VS Code settings schema, dependencies |
-| `vscode-extension/tsconfig.json` | CommonJS, ES2020, strict, `src/` → `dist/` |
-| `vscode-extension/vitest.config.ts` | Alias `vscode` module to test mock |
-| `vscode-extension/esbuild.config.js` | Bundle `src/extension.ts` → `dist/extension.js` |
-| `vscode-extension/.vscodeignore` | Exclude src/tests/docs from `.vsix` |
-| `vscode-extension/tests/__mocks__/vscode.ts` | Stub the VS Code API for unit tests |
-| `vscode-extension/src/types.ts` | Local mirror of `FindingResult` types (avoids ESM/CJS import issues) |
-| `vscode-extension/src/config.ts` | Read `aiReview.*` workspace settings, build CLI arg array |
-| `vscode-extension/src/runner.ts` | Get staged diff, spawn CLI subprocess, parse stdout JSON |
-| `vscode-extension/src/diagnostics.ts` | Map `Finding[]` to `vscode.DiagnosticCollection` |
-| `vscode-extension/src/output.ts` | Format `ReviewResult` as markdown in OutputChannel |
-| `vscode-extension/src/extension.ts` | `activate()` — register command, wire components together |
-| `vscode-extension/tests/config.test.ts` | Unit tests: settings read, defaults, CLI arg assembly |
-| `vscode-extension/tests/runner.test.ts` | Unit tests: spawn mock, JSON parse, error detection, cancel |
-| `vscode-extension/tests/diagnostics.test.ts` | Unit tests: severity mapping, line offset, collection clear |
-| `vscode-extension/README.md` | Marketplace description, install steps, usage |
+| Path                                         | Responsibility                                                       |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| `src/cli/index.ts`                           | **Modify**: add `--ollama-url` CLI flag (3-line change)              |
+| `vscode-extension/package.json`              | Extension manifest, VS Code settings schema, dependencies            |
+| `vscode-extension/tsconfig.json`             | CommonJS, ES2020, strict, `src/` → `dist/`                           |
+| `vscode-extension/vitest.config.ts`          | Alias `vscode` module to test mock                                   |
+| `vscode-extension/esbuild.config.js`         | Bundle `src/extension.ts` → `dist/extension.js`                      |
+| `vscode-extension/.vscodeignore`             | Exclude src/tests/docs from `.vsix`                                  |
+| `vscode-extension/tests/__mocks__/vscode.ts` | Stub the VS Code API for unit tests                                  |
+| `vscode-extension/src/types.ts`              | Local mirror of `FindingResult` types (avoids ESM/CJS import issues) |
+| `vscode-extension/src/config.ts`             | Read `aiReview.*` workspace settings, build CLI arg array            |
+| `vscode-extension/src/runner.ts`             | Get staged diff, spawn CLI subprocess, parse stdout JSON             |
+| `vscode-extension/src/diagnostics.ts`        | Map `Finding[]` to `vscode.DiagnosticCollection`                     |
+| `vscode-extension/src/output.ts`             | Format `ReviewResult` as markdown in OutputChannel                   |
+| `vscode-extension/src/extension.ts`          | `activate()` — register command, wire components together            |
+| `vscode-extension/tests/config.test.ts`      | Unit tests: settings read, defaults, CLI arg assembly                |
+| `vscode-extension/tests/runner.test.ts`      | Unit tests: spawn mock, JSON parse, error detection, cancel          |
+| `vscode-extension/tests/diagnostics.test.ts` | Unit tests: severity mapping, line offset, collection clear          |
+| `vscode-extension/README.md`                 | Marketplace description, install steps, usage                        |
 
 ---
 
 ## Critical Background (read before touching any file)
 
 **stdout has mixed content.** The CLI always writes progress lines before the JSON:
+
 ```
 \n🔍 Running ai-review-agent with 11 agents...\n\n  ✓ security\n...
 \n{"findings":[...], "testFiles":[], "summary":{...}}\n
 ```
+
 The runner must find the first `{` in stdout and parse from there. `JSON.parse(stdout)` will fail.
 
 **`ReviewResult` shape, not `Finding[]`.** The CLI's `--format json` output is:
+
 ```typescript
 { findings: Finding[], testFiles: GeneratedTestFile[], summary: ReviewSummary }
 ```
+
 Parse `result.findings`, NOT the top-level stdout as an array.
 
 **Do NOT pass `--dir` for staged diff.** With `--dir`, the CLI runs `git diff HEAD` (unstaged). Instead: the extension runs `git diff --cached` itself, writes to a temp file, then passes `--diff <tempFile> --dir <workspaceDir>`. The `--dir` is still needed for config file loading (`ai-review.config.json`) and test file output paths — but `getDiff` in the CLI skips the dir when `--diff` is provided.
@@ -58,6 +62,7 @@ Parse `result.findings`, NOT the top-level stdout as an array.
 **Finding.line is 1-based.** VS Code Diagnostics use 0-based lines. Subtract 1: `finding.line - 1`.
 
 **CLI path inside `.vsix`.** `context.extensionPath` is the extension install dir. The bundled CLI is at:
+
 ```
 <extensionPath>/node_modules/ai-review-agent/dist/cli/index.js
 ```
@@ -69,6 +74,7 @@ Parse `result.findings`, NOT the top-level stdout as an array.
 ## Task 0: Add `--ollama-url` to the CLI
 
 **Files:**
+
 - Modify: `src/cli/index.ts`
 
 The extension setting `aiReview.ollamaUrl` needs a corresponding CLI flag. This is a 3-line addition to `src/cli/index.ts`.
@@ -115,9 +121,9 @@ In the `.action(async (options: { ... })` block, add `ollamaUrl?: string` alongs
 Find the block where `options.model` is applied to config (around line 47) and add the URL override on the next line:
 
 ```typescript
-    if (options.model) config.model = options.model
-    if (options.ollamaUrl) config.ollamaUrl = options.ollamaUrl  // ← add this line
-    if (options.agents) config.agents = options.agents.split(',').map(a => a.trim()) as AgentName[]
+if (options.model) config.model = options.model
+if (options.ollamaUrl) config.ollamaUrl = options.ollamaUrl // ← add this line
+if (options.agents) config.agents = options.agents.split(',').map((a) => a.trim()) as AgentName[]
 ```
 
 - [ ] **Step 4: Verify CLI still works**
@@ -141,6 +147,7 @@ git commit -m "feat(cli): add --ollama-url flag for extension integration"
 ## Task 1: Extension Project Scaffold
 
 **Files:**
+
 - Create: `vscode-extension/package.json`
 - Create: `vscode-extension/tsconfig.json`
 - Create: `vscode-extension/vitest.config.ts`
@@ -268,16 +275,18 @@ export default defineConfig({
 - [ ] **Step 4: Create `vscode-extension/esbuild.config.js`**
 
 ```js
-require('esbuild').build({
-  entryPoints: ['src/extension.ts'],
-  bundle: true,
-  outfile: 'dist/extension.js',
-  platform: 'node',
-  target: 'node18',
-  format: 'cjs',
-  external: ['vscode'],
-  sourcemap: true,
-}).catch(() => process.exit(1))
+require('esbuild')
+  .build({
+    entryPoints: ['src/extension.ts'],
+    bundle: true,
+    outfile: 'dist/extension.js',
+    platform: 'node',
+    target: 'node18',
+    format: 'cjs',
+    external: ['vscode'],
+    sourcemap: true,
+  })
+  .catch(() => process.exit(1))
 ```
 
 - [ ] **Step 5: Create `vscode-extension/.vscodeignore`**
@@ -311,6 +320,7 @@ npm install
 Expected: `node_modules/` created, `ai-review-agent/dist/cli/index.js` present.
 
 Verify:
+
 ```bash
 ls node_modules/ai-review-agent/dist/cli/index.js
 ```
@@ -327,6 +337,7 @@ git commit -m "feat(vscode): extension scaffold — package.json, tsconfig, esbu
 ## Task 2: VS Code API Mock + types.ts
 
 **Files:**
+
 - Create: `vscode-extension/tests/__mocks__/vscode.ts`
 - Create: `vscode-extension/src/types.ts`
 
@@ -426,7 +437,7 @@ export interface Finding {
   severity: Severity
   basis: string
   file: string
-  line: number   // 1-based line number in the source file
+  line: number // 1-based line number in the source file
   title: string
   detail: string
   suggestion: string
@@ -457,10 +468,10 @@ export interface ReviewResult {
 export interface ExtensionConfig {
   ollamaUrl: string
   model: string
-  agents: string[]    // empty = all agents
+  agents: string[] // empty = all agents
   maxLines: number
   timeoutSecs: number // seconds; converted to ms before passing to CLI
-  cliPath: string     // absolute path to bundled CLI index.js
+  cliPath: string // absolute path to bundled CLI index.js
 }
 ```
 
@@ -476,6 +487,7 @@ git commit -m "feat(vscode): add vscode API mock + local type mirrors"
 ## Task 3: `config.ts` + Tests
 
 **Files:**
+
 - Create: `vscode-extension/src/config.ts`
 - Create: `vscode-extension/tests/config.test.ts`
 
@@ -626,14 +638,7 @@ export function getConfig(extensionPath: string): ExtensionConfig {
     agents: cfg.get<string[]>('agents', []),
     maxLines: cfg.get('maxLines', 2000),
     timeoutSecs: cfg.get('timeout', 120),
-    cliPath: path.join(
-      extensionPath,
-      'node_modules',
-      'ai-review-agent',
-      'dist',
-      'cli',
-      'index.js'
-    ),
+    cliPath: path.join(extensionPath, 'node_modules', 'ai-review-agent', 'dist', 'cli', 'index.js'),
   }
 }
 
@@ -649,14 +654,22 @@ export function buildCliArgs(
 ): string[] {
   const args = [
     config.cliPath,
-    '--diff', diffFile,
-    '--dir', workspaceDir,
-    '--format', 'json',
-    '--ollama-url', config.ollamaUrl,
-    '--model', config.model,
-    '--max-lines', String(config.maxLines),
-    '--timeout', String(config.timeoutSecs * 1000),  // CLI takes milliseconds
-    '--fail-on', 'never',  // extension handles results; never let CLI gate on exit code
+    '--diff',
+    diffFile,
+    '--dir',
+    workspaceDir,
+    '--format',
+    'json',
+    '--ollama-url',
+    config.ollamaUrl,
+    '--model',
+    config.model,
+    '--max-lines',
+    String(config.maxLines),
+    '--timeout',
+    String(config.timeoutSecs * 1000), // CLI takes milliseconds
+    '--fail-on',
+    'never', // extension handles results; never let CLI gate on exit code
   ]
 
   if (config.agents.length > 0) {
@@ -688,6 +701,7 @@ git commit -m "feat(vscode): config.ts — read settings, build CLI arg array"
 ## Task 4: `runner.ts` + Tests
 
 **Files:**
+
 - Create: `vscode-extension/src/runner.ts`
 - Create: `vscode-extension/tests/runner.test.ts`
 
@@ -769,7 +783,9 @@ describe('runReview', () => {
 
   it('throws "nothing-staged" when git diff --cached returns empty string', async () => {
     vi.mocked(execSync).mockReturnValue('')
-    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow('nothing-staged')
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'nothing-staged'
+    )
   })
 
   it('throws "git not found" when execSync throws with spawn error', async () => {
@@ -778,7 +794,9 @@ describe('runReview', () => {
       err.code = 'ENOENT'
       throw err
     })
-    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow('git not found')
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'git not found'
+    )
   })
 
   it('writes staged diff to a temp file and deletes it after run', async () => {
@@ -806,17 +824,30 @@ describe('runReview', () => {
     const mockResult = {
       findings: [
         {
-          id: 'f1', agent: 'security', severity: 'high', basis: 'VERIFIED',
-          file: 'src/auth.ts', line: 42, title: 'SQL Injection',
-          detail: 'Unsanitized input', suggestion: 'Use parameterized queries',
+          id: 'f1',
+          agent: 'security',
+          severity: 'high',
+          basis: 'VERIFIED',
+          file: 'src/auth.ts',
+          line: 42,
+          title: 'SQL Injection',
+          detail: 'Unsanitized input',
+          suggestion: 'Use parameterized queries',
           confidence: 85,
         },
       ],
       testFiles: [],
-      summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: { security: 1 }, durationMs: 8000 },
+      summary: {
+        totalFindings: 1,
+        bySeverity: { high: 1 },
+        byAgent: { security: 1 },
+        durationMs: 8000,
+      },
     }
     // CLI stdout has progress noise before the JSON
-    const cliOutput = '\n🔍 Running ai-review-agent with 11 agents...\n\n  ✓ security\n\n' + JSON.stringify(mockResult)
+    const cliOutput =
+      '\n🔍 Running ai-review-agent with 11 agents...\n\n  ✓ security\n\n' +
+      JSON.stringify(mockResult)
 
     vi.mocked(execSync).mockReturnValue('some staged diff content')
     vi.mocked(spawn).mockReturnValue(makeChild(cliOutput) as any)
@@ -834,26 +865,27 @@ describe('runReview', () => {
       makeChild('', 1, 'Error: connect ECONNREFUSED 127.0.0.1:11434') as any
     )
 
-    await expect(runReview(mockConfig, '/workspace', mockToken as any))
-      .rejects.toThrow('ollama-unreachable:')
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'ollama-unreachable:'
+    )
   })
 
   it('throws "cli-error" for non-zero exit with unrecognised stderr', async () => {
     vi.mocked(execSync).mockReturnValue('some staged diff')
-    vi.mocked(spawn).mockReturnValue(
-      makeChild('', 1, 'Some unexpected crash') as any
-    )
+    vi.mocked(spawn).mockReturnValue(makeChild('', 1, 'Some unexpected crash') as any)
 
-    await expect(runReview(mockConfig, '/workspace', mockToken as any))
-      .rejects.toThrow('cli-error:')
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'cli-error:'
+    )
   })
 
   it('throws "parse-error" when stdout has no JSON object', async () => {
     vi.mocked(execSync).mockReturnValue('some staged diff')
     vi.mocked(spawn).mockReturnValue(makeChild('no json here', 0) as any)
 
-    await expect(runReview(mockConfig, '/workspace', mockToken as any))
-      .rejects.toThrow('parse-error:')
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'parse-error:'
+    )
   })
 
   it('kills child process and throws "cancelled" when cancellation token fires', async () => {
@@ -872,7 +904,7 @@ describe('runReview', () => {
       stdout: { on: vi.fn() },
       stderr: { on: vi.fn() },
       kill: vi.fn(),
-      on: vi.fn(),  // never calls 'close'
+      on: vi.fn(), // never calls 'close'
     }
 
     vi.mocked(execSync).mockReturnValue('some staged diff')
@@ -934,7 +966,11 @@ export async function runReview(
   try {
     return await spawnCli(config, workspaceDir, tempFile, token)
   } finally {
-    try { unlinkSync(tempFile) } catch { /* ignore cleanup failure */ }
+    try {
+      unlinkSync(tempFile)
+    } catch {
+      /* ignore cleanup failure */
+    }
   }
 }
 
@@ -977,8 +1013,12 @@ function spawnCli(
     let stdout = ''
     let stderr = ''
 
-    child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
-    child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString()
+    })
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
 
     child.on('close', (code: number) => {
       cancelDisposable.dispose()
@@ -1031,6 +1071,7 @@ git commit -m "feat(vscode): runner.ts — staged diff, subprocess spawn, JSON p
 ## Task 5: `diagnostics.ts` + Tests
 
 **Files:**
+
 - Create: `vscode-extension/src/diagnostics.ts`
 - Create: `vscode-extension/tests/diagnostics.test.ts`
 
@@ -1054,9 +1095,15 @@ describe('applyDiagnostics', () => {
 
   function makefinding(overrides: Partial<Finding> = {}): Finding {
     return {
-      id: 'f1', agent: 'security', severity: 'high', basis: 'VERIFIED',
-      file: 'src/auth.ts', line: 10, title: 'Test Finding',
-      detail: 'Detail text', suggestion: 'Fix it',
+      id: 'f1',
+      agent: 'security',
+      severity: 'high',
+      basis: 'VERIFIED',
+      file: 'src/auth.ts',
+      line: 10,
+      title: 'Test Finding',
+      detail: 'Detail text',
+      suggestion: 'Fix it',
       ...overrides,
     }
   }
@@ -1170,9 +1217,15 @@ describe('applyDiagnostics', () => {
 // Helper used in tests — note: must match what's in the test file scope
 function makeinding(overrides: Partial<Finding> = {}): Finding {
   return {
-    id: 'f1', agent: 'security', severity: 'high', basis: 'VERIFIED',
-    file: 'src/auth.ts', line: 10, title: 'Test Finding',
-    detail: 'Detail text', suggestion: 'Fix it',
+    id: 'f1',
+    agent: 'security',
+    severity: 'high',
+    basis: 'VERIFIED',
+    file: 'src/auth.ts',
+    line: 10,
+    title: 'Test Finding',
+    detail: 'Detail text',
+    suggestion: 'Fix it',
     ...overrides,
   }
 }
@@ -1195,9 +1248,15 @@ import type { Finding } from '../src/types'
 
 function makeFinding(overrides: Partial<Finding> = {}): Finding {
   return {
-    id: 'f1', agent: 'security', severity: 'high', basis: 'VERIFIED',
-    file: 'src/auth.ts', line: 10, title: 'Test Finding',
-    detail: 'Detail text', suggestion: 'Fix it',
+    id: 'f1',
+    agent: 'security',
+    severity: 'high',
+    basis: 'VERIFIED',
+    file: 'src/auth.ts',
+    line: 10,
+    title: 'Test Finding',
+    detail: 'Detail text',
+    suggestion: 'Fix it',
     ...overrides,
   }
 }
@@ -1221,7 +1280,9 @@ describe('applyDiagnostics', () => {
     applyDiagnostics(collection as any, [makeFinding({ severity: 'critical' })], '/workspace')
     expect(collection.set).toHaveBeenCalledWith(
       expect.anything(),
-      expect.arrayContaining([expect.objectContaining({ severity: vscode.DiagnosticSeverity.Error })])
+      expect.arrayContaining([
+        expect.objectContaining({ severity: vscode.DiagnosticSeverity.Error }),
+      ])
     )
   })
 
@@ -1230,7 +1291,9 @@ describe('applyDiagnostics', () => {
     applyDiagnostics(collection as any, [makeFinding({ severity: 'high' })], '/workspace')
     expect(collection.set).toHaveBeenCalledWith(
       expect.anything(),
-      expect.arrayContaining([expect.objectContaining({ severity: vscode.DiagnosticSeverity.Error })])
+      expect.arrayContaining([
+        expect.objectContaining({ severity: vscode.DiagnosticSeverity.Error }),
+      ])
     )
   })
 
@@ -1239,7 +1302,9 @@ describe('applyDiagnostics', () => {
     applyDiagnostics(collection as any, [makeFinding({ severity: 'medium' })], '/workspace')
     expect(collection.set).toHaveBeenCalledWith(
       expect.anything(),
-      expect.arrayContaining([expect.objectContaining({ severity: vscode.DiagnosticSeverity.Warning })])
+      expect.arrayContaining([
+        expect.objectContaining({ severity: vscode.DiagnosticSeverity.Warning }),
+      ])
     )
   })
 
@@ -1248,7 +1313,9 @@ describe('applyDiagnostics', () => {
     applyDiagnostics(collection as any, [makeFinding({ severity: 'low' })], '/workspace')
     expect(collection.set).toHaveBeenCalledWith(
       expect.anything(),
-      expect.arrayContaining([expect.objectContaining({ severity: vscode.DiagnosticSeverity.Information })])
+      expect.arrayContaining([
+        expect.objectContaining({ severity: vscode.DiagnosticSeverity.Information }),
+      ])
     )
   })
 
@@ -1280,10 +1347,14 @@ describe('applyDiagnostics', () => {
 
   it('calls collection.set once per unique file', async () => {
     const { applyDiagnostics } = await import('../src/diagnostics')
-    applyDiagnostics(collection as any, [
-      makeFinding({ id: 'f1', file: 'src/a.ts', line: 1 }),
-      makeFinding({ id: 'f2', file: 'src/b.ts', line: 2 }),
-    ], '/workspace')
+    applyDiagnostics(
+      collection as any,
+      [
+        makeFinding({ id: 'f1', file: 'src/a.ts', line: 1 }),
+        makeFinding({ id: 'f2', file: 'src/b.ts', line: 2 }),
+      ],
+      '/workspace'
+    )
     expect(collection.set).toHaveBeenCalledTimes(2)
   })
 
@@ -1314,9 +1385,9 @@ import type { Finding, Severity } from './types'
 
 const SEVERITY_MAP: Record<Severity, vscode.DiagnosticSeverity> = {
   critical: vscode.DiagnosticSeverity.Error,
-  high:     vscode.DiagnosticSeverity.Error,
-  medium:   vscode.DiagnosticSeverity.Warning,
-  low:      vscode.DiagnosticSeverity.Information,
+  high: vscode.DiagnosticSeverity.Error,
+  medium: vscode.DiagnosticSeverity.Warning,
+  low: vscode.DiagnosticSeverity.Information,
 }
 
 /**
@@ -1342,7 +1413,7 @@ export function applyDiagnostics(
     const uri = vscode.Uri.file(path.join(workspaceDir, finding.file))
     const key = uri.fsPath
 
-    const line = Math.max(0, finding.line - 1)  // 1-based → 0-based
+    const line = Math.max(0, finding.line - 1) // 1-based → 0-based
     const range = new vscode.Range(line, 0, line, Number.MAX_SAFE_INTEGER)
     const severity = SEVERITY_MAP[finding.severity] ?? vscode.DiagnosticSeverity.Information
 
@@ -1387,6 +1458,7 @@ git commit -m "feat(vscode): diagnostics.ts — map findings to DiagnosticCollec
 ## Task 6: `output.ts`
 
 **Files:**
+
 - Create: `vscode-extension/src/output.ts`
 
 No unit test — this is pure string formatting with no branching that isn't already exercised by the smoke test checklist. The function takes an OutputChannel and a ReviewResult; it formats and writes. A unit test would just assert on `appendLine` call counts which gives no real confidence.
@@ -1401,9 +1473,9 @@ type OutputChannel = vscode.OutputChannel
 
 const HEADER: Record<Severity, string> = {
   critical: '🔴 CRITICAL',
-  high:     '🟠 HIGH',
-  medium:   '🟡 MEDIUM',
-  low:      '🔵 LOW',
+  high: '🟠 HIGH',
+  medium: '🟡 MEDIUM',
+  low: '🔵 LOW',
 }
 
 /**
@@ -1428,7 +1500,7 @@ export function renderReport(channel: OutputChannel, result: ReviewResult): void
   }
 
   for (const severity of ['critical', 'high', 'medium', 'low'] as Severity[]) {
-    const group = findings.filter(f => f.severity === severity)
+    const group = findings.filter((f) => f.severity === severity)
     if (group.length === 0) continue
 
     channel.appendLine(`## ${HEADER[severity]} (${group.length})`)
@@ -1437,7 +1509,9 @@ export function renderReport(channel: OutputChannel, result: ReviewResult): void
     for (const f of group) {
       const confidence = f.confidence !== undefined ? `${f.confidence}%` : '—'
       channel.appendLine(`### ${f.title}`)
-      channel.appendLine(`Agent: ${f.agent}  |  ${f.file}:${f.line}  |  Confidence: ${confidence}  |  Basis: ${f.basis}`)
+      channel.appendLine(
+        `Agent: ${f.agent}  |  ${f.file}:${f.line}  |  Confidence: ${confidence}  |  Basis: ${f.basis}`
+      )
       channel.appendLine('')
       channel.appendLine(f.detail)
       channel.appendLine('')
@@ -1461,6 +1535,7 @@ git commit -m "feat(vscode): output.ts — format ReviewResult into OutputChanne
 ## Task 7: `extension.ts`
 
 **Files:**
+
 - Create: `vscode-extension/src/extension.ts`
 
 This is wiring code — it owns the DiagnosticCollection and OutputChannel lifecycles, registers the command, orchestrates the other modules, and maps error types to user-friendly notifications.
@@ -1481,48 +1556,45 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(collection)
   context.subscriptions.push(channel)
 
-  const command = vscode.commands.registerCommand(
-    'aiReview.reviewStagedChanges',
-    async () => {
-      const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-      if (!workspaceDir) {
-        vscode.window.showErrorMessage('AI Review: No workspace folder open.')
-        return
-      }
-
-      const config = getConfig(context.extensionPath)
-
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: 'AI Review running…',
-          cancellable: true,
-        },
-        async (_progress, token) => {
-          try {
-            const result = await runReview(config, workspaceDir, token)
-
-            // Diagnostics cleared and replaced atomically after the run completes
-            applyDiagnostics(collection, result.findings, workspaceDir)
-            renderReport(channel, result)
-
-            // Show the report but keep editor focus (preserveFocus = true)
-            channel.show(true)
-
-            const count = result.summary.totalFindings
-            const plural = count === 1 ? 'finding' : 'findings'
-            const summary = `AI Review complete — ${count} ${plural}`
-            const choice = await vscode.window.showInformationMessage(summary, 'View Report')
-            if (choice === 'View Report') {
-              channel.show(false)
-            }
-          } catch (err) {
-            handleRunError(err as Error, config.ollamaUrl, channel)
-          }
-        }
-      )
+  const command = vscode.commands.registerCommand('aiReview.reviewStagedChanges', async () => {
+    const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    if (!workspaceDir) {
+      vscode.window.showErrorMessage('AI Review: No workspace folder open.')
+      return
     }
-  )
+
+    const config = getConfig(context.extensionPath)
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'AI Review running…',
+        cancellable: true,
+      },
+      async (_progress, token) => {
+        try {
+          const result = await runReview(config, workspaceDir, token)
+
+          // Diagnostics cleared and replaced atomically after the run completes
+          applyDiagnostics(collection, result.findings, workspaceDir)
+          renderReport(channel, result)
+
+          // Show the report but keep editor focus (preserveFocus = true)
+          channel.show(true)
+
+          const count = result.summary.totalFindings
+          const plural = count === 1 ? 'finding' : 'findings'
+          const summary = `AI Review complete — ${count} ${plural}`
+          const choice = await vscode.window.showInformationMessage(summary, 'View Report')
+          if (choice === 'View Report') {
+            channel.show(false)
+          }
+        } catch (err) {
+          handleRunError(err as Error, config.ollamaUrl, channel)
+        }
+      }
+    )
+  })
 
   context.subscriptions.push(command)
 }
@@ -1531,15 +1603,11 @@ export function deactivate(): void {
   // VS Code disposes subscriptions automatically; nothing to clean up here
 }
 
-function handleRunError(
-  err: Error,
-  ollamaUrl: string,
-  channel: vscode.OutputChannel
-): void {
+function handleRunError(err: Error, ollamaUrl: string, channel: vscode.OutputChannel): void {
   const msg = err.message
 
   if (msg === 'cancelled') {
-    return  // user clicked Cancel — no notification needed
+    return // user clicked Cancel — no notification needed
   }
 
   if (msg === 'nothing-staged') {
@@ -1558,14 +1626,16 @@ function handleRunError(
 
   if (msg.startsWith('ollama-unreachable:')) {
     const url = msg.slice('ollama-unreachable:'.length)
-    vscode.window.showErrorMessage(
-      `AI Review: Ollama is not running at ${url}. Start it with \`ollama serve\`.`,
-      'Open Settings'
-    ).then(choice => {
-      if (choice === 'Open Settings') {
-        vscode.commands.executeCommand('workbench.action.openSettings', 'aiReview.ollamaUrl')
-      }
-    })
+    vscode.window
+      .showErrorMessage(
+        `AI Review: Ollama is not running at ${url}. Start it with \`ollama serve\`.`,
+        'Open Settings'
+      )
+      .then((choice) => {
+        if (choice === 'Open Settings') {
+          vscode.commands.executeCommand('workbench.action.openSettings', 'aiReview.ollamaUrl')
+        }
+      })
     return
   }
 
@@ -1582,9 +1652,7 @@ function handleRunError(
   // cli-error or anything else
   channel.appendLine(`\n--- Error ---\n${msg}`)
   channel.show(true)
-  vscode.window.showErrorMessage(
-    'AI Review failed. See the "AI Review" output panel for details.'
-  )
+  vscode.window.showErrorMessage('AI Review failed. See the "AI Review" output panel for details.')
 }
 ```
 
@@ -1629,6 +1697,7 @@ npm run compile
 Expected: `dist/extension.js` created. No errors. Output is ~50 KB.
 
 Verify:
+
 ```bash
 ls -lh dist/extension.js
 ```
@@ -1650,12 +1719,14 @@ npx vsce ls
 ```
 
 Expected output must include:
+
 - `dist/extension.js`
 - `node_modules/ai-review-agent/dist/cli/index.js`
 - `node_modules/ai-review-agent/dist/core/...` (runner, agents, etc.)
 - `README.md`
 
 Must NOT include:
+
 - `src/`
 - `tests/`
 - `node_modules/ai-review-agent/src/`
@@ -1688,13 +1759,14 @@ git commit -m "chore: ignore .vsix build artifacts"
 ## Task 9: Extension README + Memory Bank Update
 
 **Files:**
+
 - Create: `vscode-extension/README.md`
 - Modify: `memory-bank/progress.md`
 - Modify: `memory-bank/activeContext.md`
 
 - [ ] **Step 1: Create `vscode-extension/README.md`**
 
-```markdown
+````markdown
 # AI Review Agent — VS Code / Cursor Extension
 
 Run an 11-agent local AI code review swarm on your staged git changes, directly from the command palette. Findings appear as inline editor squiggles (Problems panel) and a full markdown report in the Output panel.
@@ -1718,6 +1790,7 @@ Run an 11-agent local AI code review swarm on your staged git changes, directly 
    ollama serve          # start Ollama (keep this running)
    ollama pull devstral:latest
    ```
+````
 
 ---
 
@@ -1739,17 +1812,18 @@ Run an 11-agent local AI code review swarm on your staged git changes, directly 
 
 All settings are under **Preferences → Settings → AI Review**:
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `aiReview.ollamaUrl` | `http://localhost:11434` | Ollama base URL |
-| `aiReview.model` | `devstral:latest` | Model name |
-| `aiReview.agents` | `[]` (all 11) | Subset of agents to run |
-| `aiReview.maxLines` | `2000` | Max diff lines sent for review |
-| `aiReview.timeout` | `120` | Per-agent timeout (seconds) |
+| Setting              | Default                  | Description                    |
+| -------------------- | ------------------------ | ------------------------------ |
+| `aiReview.ollamaUrl` | `http://localhost:11434` | Ollama base URL                |
+| `aiReview.model`     | `devstral:latest`        | Model name                     |
+| `aiReview.agents`    | `[]` (all 11)            | Subset of agents to run        |
+| `aiReview.maxLines`  | `2000`                   | Max diff lines sent for review |
+| `aiReview.timeout`   | `120`                    | Per-agent timeout (seconds)    |
 
 **Available agents:** `security`, `performance`, `correctness`, `design`, `dependencies`, `coverage`, `testgen`, `adversarial`, `integration`, `breaking-change`, `license`
 
 To run only security and performance checks:
+
 ```json
 "aiReview.agents": ["security", "performance"]
 ```
@@ -1758,30 +1832,31 @@ To run only security and performance checks:
 
 ## Troubleshooting
 
-| Error | Fix |
-|-------|-----|
-| "Ollama is not running" | Run `ollama serve` in a terminal, keep it open |
-| "No staged changes found" | Run `git add <files>` before invoking the extension |
-| "git not found" | Ensure `git` is on your PATH |
-| Findings don't appear after run | Check the "AI Review" output panel for details |
+| Error                           | Fix                                                 |
+| ------------------------------- | --------------------------------------------------- |
+| "Ollama is not running"         | Run `ollama serve` in a terminal, keep it open      |
+| "No staged changes found"       | Run `git add <files>` before invoking the extension |
+| "git not found"                 | Ensure `git` is on your PATH                        |
+| Findings don't appear after run | Check the "AI Review" output panel for details      |
 
 ---
 
 ## Agents
 
-| Agent | What it checks |
-|-------|----------------|
-| Security | Injection, auth, secrets, input validation |
-| Performance | N+1 queries, blocking I/O, O(n²) loops |
-| Correctness | Off-by-one, null dereference, edge cases |
-| Design | SOLID violations, coupling, naming |
-| Dependencies | Outdated packages, CVEs, license conflicts |
-| Coverage | Untested paths, missing assertions |
-| TestGen | Generates test stubs for new code |
-| Adversarial | Prompt injection, misuse scenarios |
-| Integration | Contract mismatches, API breakage |
-| Breaking Change | Removed exports, signature changes |
-| License | GPL/AGPL/SSPL incompatible dependencies |
+| Agent           | What it checks                             |
+| --------------- | ------------------------------------------ |
+| Security        | Injection, auth, secrets, input validation |
+| Performance     | N+1 queries, blocking I/O, O(n²) loops     |
+| Correctness     | Off-by-one, null dereference, edge cases   |
+| Design          | SOLID violations, coupling, naming         |
+| Dependencies    | Outdated packages, CVEs, license conflicts |
+| Coverage        | Untested paths, missing assertions         |
+| TestGen         | Generates test stubs for new code          |
+| Adversarial     | Prompt injection, misuse scenarios         |
+| Integration     | Contract mismatches, API breakage          |
+| Breaking Change | Removed exports, signature changes         |
+| License         | GPL/AGPL/SSPL incompatible dependencies    |
+
 ```
 
 - [ ] **Step 2: Update `memory-bank/progress.md`**
@@ -1789,8 +1864,10 @@ To run only security and performance checks:
 Mark V5-1 through V5-7 as complete and update the version history. Find the `## 🔜 Planned: v0.5.0` section and change each `- [ ]` to `- [x]`, then add the v0.5.0 entry to the version history table:
 
 ```
+
 | 0.5.0 | 2026-06-11 | Cursor/VS Code extension: subprocess architecture, bundled install, command palette trigger, DiagnosticCollection + OutputChannel (V5-1–V5-7) |
-```
+
+````
 
 - [ ] **Step 3: Update `memory-bank/activeContext.md`**
 
@@ -1801,7 +1878,7 @@ Update **Current Focus** to reflect v0.5.0 as complete and note the next focus (
 ```bash
 git add vscode-extension/README.md memory-bank/progress.md memory-bank/activeContext.md
 git commit -m "feat(vscode): README + memory bank update for v0.5.0 complete"
-```
+````
 
 ---
 
@@ -1809,9 +1886,9 @@ git commit -m "feat(vscode): README + memory bank update for v0.5.0 complete"
 
 After Task 8 packaging, install the `.vsix` in Cursor and run through these:
 
-- [ ] **Smoke 1 — Nothing staged**: Ensure nothing is staged (`git reset HEAD .`). Run command → error notification: *"No staged changes found."*
+- [ ] **Smoke 1 — Nothing staged**: Ensure nothing is staged (`git reset HEAD .`). Run command → error notification: _"No staged changes found."_
 
-- [ ] **Smoke 2 — Ollama off**: Stop Ollama. Stage a file. Run command → error notification: *"Ollama is not running at http://localhost:11434"* with **Open Settings** button. Clicking it opens VS Code settings at `aiReview.ollamaUrl`.
+- [ ] **Smoke 2 — Ollama off**: Stop Ollama. Stage a file. Run command → error notification: _"Ollama is not running at http://localhost:11434"_ with **Open Settings** button. Clicking it opens VS Code settings at `aiReview.ollamaUrl`.
 
 - [ ] **Smoke 3 — Happy path**: Start Ollama. Stage a real change. Run command → progress notification appears with Cancel button → squiggles appear in the editor → "AI Review" output panel opens with full report → summary notification shows finding count.
 
@@ -1827,38 +1904,38 @@ After Task 8 packaging, install the `.vsix` in Cursor and run through these:
 
 ### Spec coverage
 
-| Spec requirement | Covered by |
-|-----------------|-----------|
-| Subprocess architecture — shell out to `node <cli-path> --format json` | Task 4: `runner.ts` |
-| Bundled install — `ai-review-agent` in `node_modules` inside `.vsix` | Task 1 (`package.json` deps), Task 8 (`.vscodeignore`) |
-| Command palette trigger `aiReview.reviewStagedChanges` | Task 1 (`contributes.commands`), Task 7 |
-| Staged changes via `git diff --cached` | Task 4 `getStagedDiff()` |
-| Nothing-staged error | Task 4 `getStagedDiff()` throws `'nothing-staged'`, Task 7 maps to notification |
-| Ollama-unreachable error | Task 4 detects `ECONNREFUSED`, Task 7 maps with Open Settings button |
-| git-not-found error | Task 4 detects `ENOENT`, Task 7 maps to notification |
-| DiagnosticCollection + squiggles | Task 5 `diagnostics.ts` |
-| OutputChannel markdown report | Task 6 `output.ts` |
-| Progress notification with Cancel | Task 7 `withProgress(cancellable: true)` |
-| Severity mapping (critical/high→Error, medium→Warning, low→Info) | Task 5 `SEVERITY_MAP` |
-| 1-based → 0-based line conversion | Task 5 `finding.line - 1` |
-| `aiReview.ollamaUrl` setting + `--ollama-url` CLI flag | Task 0 (CLI), Task 3 (config) |
-| `aiReview.timeout` in seconds, CLI takes ms | Task 3 `buildCliArgs` multiplies by 1000 |
-| `--fail-on never` so extension handles exit code | Task 3 `buildCliArgs` hardcodes `--fail-on never` |
-| esbuild bundle, `external: ['vscode']` | Task 1 `esbuild.config.js` |
-| `.vscodeignore` excludes source, keeps dist | Task 1 `.vscodeignore` |
-| `extensionKind: ["workspace"]` | Task 1 `package.json` |
-| Unit tests: runner, diagnostics, config | Tasks 3, 4, 5 |
+| Spec requirement                                                       | Covered by                                                                      |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Subprocess architecture — shell out to `node <cli-path> --format json` | Task 4: `runner.ts`                                                             |
+| Bundled install — `ai-review-agent` in `node_modules` inside `.vsix`   | Task 1 (`package.json` deps), Task 8 (`.vscodeignore`)                          |
+| Command palette trigger `aiReview.reviewStagedChanges`                 | Task 1 (`contributes.commands`), Task 7                                         |
+| Staged changes via `git diff --cached`                                 | Task 4 `getStagedDiff()`                                                        |
+| Nothing-staged error                                                   | Task 4 `getStagedDiff()` throws `'nothing-staged'`, Task 7 maps to notification |
+| Ollama-unreachable error                                               | Task 4 detects `ECONNREFUSED`, Task 7 maps with Open Settings button            |
+| git-not-found error                                                    | Task 4 detects `ENOENT`, Task 7 maps to notification                            |
+| DiagnosticCollection + squiggles                                       | Task 5 `diagnostics.ts`                                                         |
+| OutputChannel markdown report                                          | Task 6 `output.ts`                                                              |
+| Progress notification with Cancel                                      | Task 7 `withProgress(cancellable: true)`                                        |
+| Severity mapping (critical/high→Error, medium→Warning, low→Info)       | Task 5 `SEVERITY_MAP`                                                           |
+| 1-based → 0-based line conversion                                      | Task 5 `finding.line - 1`                                                       |
+| `aiReview.ollamaUrl` setting + `--ollama-url` CLI flag                 | Task 0 (CLI), Task 3 (config)                                                   |
+| `aiReview.timeout` in seconds, CLI takes ms                            | Task 3 `buildCliArgs` multiplies by 1000                                        |
+| `--fail-on never` so extension handles exit code                       | Task 3 `buildCliArgs` hardcodes `--fail-on never`                               |
+| esbuild bundle, `external: ['vscode']`                                 | Task 1 `esbuild.config.js`                                                      |
+| `.vscodeignore` excludes source, keeps dist                            | Task 1 `.vscodeignore`                                                          |
+| `extensionKind: ["workspace"]`                                         | Task 1 `package.json`                                                           |
+| Unit tests: runner, diagnostics, config                                | Tasks 3, 4, 5                                                                   |
 
 ### Type consistency
 
-| Name defined | Used in |
-|-------------|---------|
-| `ExtensionConfig` (types.ts) | config.ts (return), runner.ts (param), extension.ts (param) |
-| `ReviewResult` (types.ts) | runner.ts (return), output.ts (param), extension.ts (local) |
-| `Finding` (types.ts) | diagnostics.ts (param), output.ts (indexed) |
-| `buildCliArgs(config, workspaceDir, diffFile)` (config.ts) | runner.ts calls it |
-| `applyDiagnostics(collection, findings, workspaceDir)` (diagnostics.ts) | extension.ts calls it |
-| `renderReport(channel, result)` (output.ts) | extension.ts calls it |
-| `runReview(config, workspaceDir, token)` (runner.ts) | extension.ts calls it |
+| Name defined                                                            | Used in                                                     |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `ExtensionConfig` (types.ts)                                            | config.ts (return), runner.ts (param), extension.ts (param) |
+| `ReviewResult` (types.ts)                                               | runner.ts (return), output.ts (param), extension.ts (local) |
+| `Finding` (types.ts)                                                    | diagnostics.ts (param), output.ts (indexed)                 |
+| `buildCliArgs(config, workspaceDir, diffFile)` (config.ts)              | runner.ts calls it                                          |
+| `applyDiagnostics(collection, findings, workspaceDir)` (diagnostics.ts) | extension.ts calls it                                       |
+| `renderReport(channel, result)` (output.ts)                             | extension.ts calls it                                       |
+| `runReview(config, workspaceDir, token)` (runner.ts)                    | extension.ts calls it                                       |
 
 All consistent. ✅

@@ -2,7 +2,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class DesignAgent extends BaseAgent {
-  get name(): AgentName { return 'design' }
+  get name(): AgentName {
+    return 'design'
+  }
 
   get systemPrompt(): string {
     return `You are a software design code reviewer. Analyze the provided git diff for design and architecture issues.

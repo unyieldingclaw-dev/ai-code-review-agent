@@ -2,7 +2,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class CorrectnessAgent extends BaseAgent {
-  get name(): AgentName { return 'correctness' }
+  get name(): AgentName {
+    return 'correctness'
+  }
 
   get systemPrompt(): string {
     return `You are a correctness code reviewer. Analyze the provided git diff for logic bugs and correctness issues.

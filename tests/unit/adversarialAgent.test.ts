@@ -6,7 +6,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('AdversarialAgent', () => {
@@ -15,19 +15,36 @@ describe('AdversarialAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new AdversarialAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new AdversarialAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{ severity: 'high', basis: 'SPECULATIVE', confidence: 60, file: 'src/parser.ts', line: 33, title: 'Denial of service via regex backtracking', detail: 'The regex /^(a+)+$/ is vulnerable to ReDoS', suggestion: 'Replace with a linear-time parser' }])
-    const findings = await new AdversarialAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'SPECULATIVE',
+        confidence: 60,
+        file: 'src/parser.ts',
+        line: 33,
+        title: 'Denial of service via regex backtracking',
+        detail: 'The regex /^(a+)+$/ is vulnerable to ReDoS',
+        suggestion: 'Replace with a linear-time parser',
+      },
+    ])
+    const findings = await new AdversarialAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: 'diff',
+    })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('adversarial')
     expect(findings[0].id).toBe('adversarial-0')
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new AdversarialAgent(makeProvider('{}'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new AdversarialAgent(makeProvider('{}'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('system prompt mentions adversarial or abuse', () => {

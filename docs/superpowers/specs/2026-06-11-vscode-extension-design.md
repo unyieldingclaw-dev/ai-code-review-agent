@@ -36,23 +36,23 @@ vscode-extension/           # new subfolder in existing repo
 
 ### Components
 
-| File | Responsibility |
-|------|----------------|
-| `extension.ts` | Activate extension, register command, own DiagnosticCollection + OutputChannel lifecycle |
-| `runner.ts` | Spawn `node <cli-path> --format json`, collect stdout, parse `Finding[]`, kill on cancel |
-| `diagnostics.ts` | Map `Finding` severity to `vscode.DiagnosticSeverity`, push to collection |
-| `output.ts` | Format `Finding[]` as markdown, write to OutputChannel |
-| `config.ts` | Read `aiReview.*` settings, resolve bundled CLI path, build CLI arg array |
+| File             | Responsibility                                                                           |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| `extension.ts`   | Activate extension, register command, own DiagnosticCollection + OutputChannel lifecycle |
+| `runner.ts`      | Spawn `node <cli-path> --format json`, collect stdout, parse `Finding[]`, kill on cancel |
+| `diagnostics.ts` | Map `Finding` severity to `vscode.DiagnosticSeverity`, push to collection                |
+| `output.ts`      | Format `Finding[]` as markdown, write to OutputChannel                                   |
+| `config.ts`      | Read `aiReview.*` settings, resolve bundled CLI path, build CLI arg array                |
 
 ### VS Code Settings
 
-| Setting | Type | Default | Purpose |
-|---------|------|---------|---------|
-| `aiReview.ollamaUrl` | string | `http://localhost:11434` | Ollama base URL |
-| `aiReview.model` | string | `devstral:latest` | Model name passed to CLI |
-| `aiReview.agents` | string[] | `[]` (all agents) | Subset of agents to run |
-| `aiReview.maxLines` | number | `2000` | Max diff lines (`--max-lines`) |
-| `aiReview.timeout` | number | `120` | Per-agent timeout seconds (`--timeout`) |
+| Setting              | Type     | Default                  | Purpose                                 |
+| -------------------- | -------- | ------------------------ | --------------------------------------- |
+| `aiReview.ollamaUrl` | string   | `http://localhost:11434` | Ollama base URL                         |
+| `aiReview.model`     | string   | `devstral:latest`        | Model name passed to CLI                |
+| `aiReview.agents`    | string[] | `[]` (all agents)        | Subset of agents to run                 |
+| `aiReview.maxLines`  | number   | `2000`                   | Max diff lines (`--max-lines`)          |
+| `aiReview.timeout`   | number   | `120`                    | Per-agent timeout seconds (`--timeout`) |
 
 ### Command
 
@@ -78,6 +78,7 @@ User: "AI Review: Review Staged Changes"
 ```
 
 **Key constraints:**
+
 - CLI invoked as `node <absolute-path-to-cli>` — not a shell command — to avoid Windows PATH resolution issues.
 - DiagnosticCollection is cleared **immediately before** pushing new findings (after the CLI returns), so old findings remain visible while the review is running and are replaced atomically when results arrive.
 - Cancellation kills the child process via `childProcess.kill()`; no diagnostics change on cancel.
@@ -102,7 +103,7 @@ require('esbuild').build({
   format: 'cjs',
   external: ['vscode'],
   sourcemap: true,
-});
+})
 ```
 
 ### CLI bundling inside `.vsix`
@@ -171,24 +172,24 @@ tsconfig.json
 
 All errors surface as VS Code notification messages. The Output Channel shows detailed context where relevant.
 
-| Condition | User sees |
-|-----------|-----------|
-| Nothing staged (`git diff --cached` is empty) | Error notification: *"No staged changes found. Run `git add` first."* |
-| Ollama not running / wrong URL | Error notification: *"Ollama is not running at \<url\>. Start it with `ollama serve`."* + **Open Settings** button |
-| `git` not in PATH | Error notification: *"git not found. Ensure git is installed and in your PATH."* |
-| Diff exceeds `maxLines` | CLI exits with descriptive message; extension shows it in OutputChannel + warning notification |
-| Agent timeout (partial results) | CLI exits 0 with partial `Finding[]`; extension renders what it has; OutputChannel shows timeout lines from CLI stderr |
-| JSON parse failure (malformed stdout) | OutputChannel shows raw CLI stderr; error notification: *"AI Review returned unexpected output. See Output panel for details."* |
-| User cancels | Child process killed, progress dismissed, no diagnostics change |
+| Condition                                     | User sees                                                                                                                       |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Nothing staged (`git diff --cached` is empty) | Error notification: _"No staged changes found. Run `git add` first."_                                                           |
+| Ollama not running / wrong URL                | Error notification: _"Ollama is not running at \<url\>. Start it with `ollama serve`."_ + **Open Settings** button              |
+| `git` not in PATH                             | Error notification: _"git not found. Ensure git is installed and in your PATH."_                                                |
+| Diff exceeds `maxLines`                       | CLI exits with descriptive message; extension shows it in OutputChannel + warning notification                                  |
+| Agent timeout (partial results)               | CLI exits 0 with partial `Finding[]`; extension renders what it has; OutputChannel shows timeout lines from CLI stderr          |
+| JSON parse failure (malformed stdout)         | OutputChannel shows raw CLI stderr; error notification: _"AI Review returned unexpected output. See Output panel for details."_ |
+| User cancels                                  | Child process killed, progress dismissed, no diagnostics change                                                                 |
 
 **Severity mapping** (Finding → DiagnosticSeverity):
 
 | Finding severity | VS Code severity |
-|-----------------|-----------------|
-| `critical` | `Error` |
-| `high` | `Error` |
-| `medium` | `Warning` |
-| `low` | `Information` |
+| ---------------- | ---------------- |
+| `critical`       | `Error`          |
+| `high`           | `Error`          |
+| `medium`         | `Warning`        |
+| `low`            | `Information`    |
 
 ---
 
@@ -198,11 +199,11 @@ All errors surface as VS Code notification messages. The Output Channel shows de
 
 Three test files, mocking the subprocess layer:
 
-| File | What it covers |
-|------|----------------|
-| `tests/runner.test.ts` | Spawn mock, stdout parse, stderr Ollama-error detection, empty-staged-changes guard, cancel (kill called) |
+| File                        | What it covers                                                                                             |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `tests/runner.test.ts`      | Spawn mock, stdout parse, stderr Ollama-error detection, empty-staged-changes guard, cancel (kill called)  |
 | `tests/diagnostics.test.ts` | Severity mapping, line/col offset (Finding is 1-based → Diagnostic is 0-based), collection clear on re-run |
-| `tests/config.test.ts` | Settings read, defaults applied when unset, CLI arg array assembly |
+| `tests/config.test.ts`      | Settings read, defaults applied when unset, CLI arg array assembly                                         |
 
 ### Manual smoke test checklist (in Cursor)
 
@@ -217,13 +218,13 @@ Three test files, mocking the subprocess layer:
 
 ## 6. Rejected Alternatives
 
-| Option | Why rejected |
-|--------|-------------|
-| Monorepo with pnpm workspaces | Too much restructuring risk for a first extension release; subprocess avoids touching existing codebase |
-| Shared workspace dep (Option 3) | Half the monorepo complexity with fewer benefits |
-| Webview output panel | OutputChannel gives 90% of the value at 10% the complexity |
-| Quick-pick diff source selection | Adds decision fatigue for the common case; explicit second command can be added later if needed |
-| Global `ai-review-agent` install | Requires user setup step; bundled install is zero-friction |
+| Option                           | Why rejected                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Monorepo with pnpm workspaces    | Too much restructuring risk for a first extension release; subprocess avoids touching existing codebase |
+| Shared workspace dep (Option 3)  | Half the monorepo complexity with fewer benefits                                                        |
+| Webview output panel             | OutputChannel gives 90% of the value at 10% the complexity                                              |
+| Quick-pick diff source selection | Adds decision fatigue for the common case; explicit second command can be added later if needed         |
+| Global `ai-review-agent` install | Requires user setup step; bundled install is zero-friction                                              |
 
 ---
 

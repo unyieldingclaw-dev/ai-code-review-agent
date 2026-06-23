@@ -90,7 +90,7 @@ export interface GeneratedTestFile {
 export interface ReviewInput {
   diff: string
   projectPath?: string
-  context?: string  // pre-loaded context string to prepend to diff for this agent
+  context?: string // pre-loaded context string to prepend to diff for this agent
 }
 
 export interface ReviewSummary {
@@ -125,7 +125,7 @@ export const SEVERITY_RANK: Record<Severity, number> = {
   critical: 4,
   high: 3,
   medium: 2,
-  low: 1
+  low: 1,
 }
 
 export type FailOnLevel = 'critical' | 'high' | 'medium' | 'any' | 'never'

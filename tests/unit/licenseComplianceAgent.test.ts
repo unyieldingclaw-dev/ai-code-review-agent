@@ -5,7 +5,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('LicenseComplianceAgent', () => {
@@ -21,15 +21,17 @@ describe('LicenseComplianceAgent', () => {
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'high',
-      basis: 'VERIFIED',
-      file: 'package.json',
-      line: 14,
-      title: 'GPL-3.0 dependency: some-gpl-lib',
-      detail: 'some-gpl-lib uses GPL-3.0 which is incompatible with commercial use',
-      suggestion: 'Replace with an MIT-licensed alternative or obtain a commercial license'
-    }])
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'package.json',
+        line: 14,
+        title: 'GPL-3.0 dependency: some-gpl-lib',
+        detail: 'some-gpl-lib uses GPL-3.0 which is incompatible with commercial use',
+        suggestion: 'Replace with an MIT-licensed alternative or obtain a commercial license',
+      },
+    ])
     const agent = new LicenseComplianceAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)

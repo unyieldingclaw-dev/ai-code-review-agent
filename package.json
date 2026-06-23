@@ -43,7 +43,9 @@
     "calibrate": "tsx calibration/calibrate.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "test:extension": "npm --prefix vscode-extension test"
+    "test:extension": "npm --prefix vscode-extension test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -52,6 +54,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@vitest/coverage-v8": "^2.0.0",
+    "prettier": "^3.8.4",
     "tsx": "^4.0.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"

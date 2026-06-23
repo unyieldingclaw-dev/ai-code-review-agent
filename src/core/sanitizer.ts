@@ -6,12 +6,18 @@ interface InjectionPattern {
 const INJECTION_PATTERNS: InjectionPattern[] = [
   { pattern: /SYSTEM:/i, label: 'SYSTEM: directive' },
   { pattern: /ignore\s+(?:all\s+)?previous\s+instructions?/i, label: 'instruction override' },
-  { pattern: /you\s+are\s+now\s+(?:a\s+|an\s+)?[\w\s]{1,30}(?:AI|assistant|bot|model)/i, label: 'role reassignment' },
+  {
+    pattern: /you\s+are\s+now\s+(?:a\s+|an\s+)?[\w\s]{1,30}(?:AI|assistant|bot|model)/i,
+    label: 'role reassignment',
+  },
   { pattern: /act\s+as\s+(?:a|an)\s+/i, label: 'role-play directive' },
   { pattern: /pretend\s+(?:you\s+are|to\s+be)\s+/i, label: 'role-play directive' },
   { pattern: /forget\s+(?:your|all)\s+(?:previous|prior)\s+/i, label: 'instruction wipe' },
   { pattern: /disregard\s+(?:the\s+)?(?:previous|prior|above)\s+/i, label: 'instruction wipe' },
-  { pattern: /new\s+(?:role|persona|system\s+prompt|instructions?)\s*:/i, label: 'persona injection' },
+  {
+    pattern: /new\s+(?:role|persona|system\s+prompt|instructions?)\s*:/i,
+    label: 'persona injection',
+  },
   { pattern: /\[\[INSTRUCTIONS?\]\]/i, label: 'instruction tag' },
   { pattern: /[A-Za-z0-9+/]{80,}={0,2}/, label: 'potential base64 payload' },
 ]
@@ -31,7 +37,7 @@ export interface SanitizeResult {
 export function sanitizeDiff(diff: string): SanitizeResult {
   const warnings: string[] = []
   let redactedLines = 0
-  const sanitizedLines = diff.split('\n').map(line => {
+  const sanitizedLines = diff.split('\n').map((line) => {
     // Only scan added lines; skip diff header lines (+++ b/...)
     if (!line.startsWith('+') || line.startsWith('+++')) return line
 
@@ -49,6 +55,6 @@ export function sanitizeDiff(diff: string): SanitizeResult {
     sanitized: sanitizedLines.join('\n'),
     applied: redactedLines > 0,
     redactedLines,
-    warnings
+    warnings,
   }
 }

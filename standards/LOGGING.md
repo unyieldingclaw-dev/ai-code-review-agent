@@ -31,23 +31,23 @@ logger.info(f"User {username} logged in with password {password}")  # Never
 
 ```typescript
 const log = (level: string, event: string, data?: Record<string, unknown>) =>
-  console.log(JSON.stringify({ ts: new Date().toISOString(), level, event, ...data }));
+  console.log(JSON.stringify({ ts: new Date().toISOString(), level, event, ...data }))
 
 // Good
-log("INFO", "user_authenticated", { userId });
+log('INFO', 'user_authenticated', { userId })
 
 // Bad: logging secrets
-log("INFO", "db_connect", { password });  // Never
+log('INFO', 'db_connect', { password }) // Never
 ```
 
 ## Log Level Guide
 
-| Level | When to use |
-|-------|-------------|
+| Level   | When to use                               |
+| ------- | ----------------------------------------- |
 | `DEBUG` | Dev details — gate behind env var in prod |
-| `INFO` | Successful significant events |
-| `WARN` | Handled edge cases, degraded behavior |
-| `ERROR` | Failures that need attention |
+| `INFO`  | Successful significant events             |
+| `WARN`  | Handled edge cases, degraded behavior     |
+| `ERROR` | Failures that need attention              |
 
 ## What Never to Log
 

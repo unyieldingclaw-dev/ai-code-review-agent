@@ -5,6 +5,7 @@ Structured feature development from idea to committed code. Prevents the most co
 ## The Problem
 
 AI assistants default to writing code immediately. This produces:
+
 - Code that solves the wrong problem
 - Designs that don't survive contact with the actual codebase
 - Security issues discovered after implementation
@@ -21,6 +22,7 @@ A 7-phase workflow that front-loads understanding and defers code until the desi
 **Trigger:** Any non-trivial feature, bug fix with unclear root cause, or architectural change.
 
 **What happens:**
+
 - Explore the codebase to understand existing patterns
 - Ask clarifying questions one at a time to understand purpose, constraints, success criteria
 - Propose 2–3 approaches with trade-offs
@@ -35,6 +37,7 @@ A 7-phase workflow that front-loads understanding and defers code until the desi
 ### Phase 2 — Spec
 
 **What happens:**
+
 - Write the validated design to `docs/specs/YYYY-MM-DD-<topic>.md`
 - Include: context (why), architecture, components, data flow, error handling, verification steps
 - Self-review: no TBDs, no contradictions, no ambiguity
@@ -49,6 +52,7 @@ A 7-phase workflow that front-loads understanding and defers code until the desi
 ### Phase 3 — Plan
 
 **What happens:**
+
 - Map out every file to be created or modified
 - Break implementation into bite-sized tasks (2–5 minutes each)
 - Each task includes: exact file paths, complete code, exact test commands, expected output
@@ -63,6 +67,7 @@ A 7-phase workflow that front-loads understanding and defers code until the desi
 ### Phase 4 — Implement (TDD)
 
 **Verification-First:** Before asking Claude to start implementing, state upfront:
+
 - Test cases or expected outputs (even informal: "function should return X given Y")
 - The success criteria (what does "done" look like?)
 - Any constraints (must not change the API, must stay under N ms, etc.)
@@ -88,6 +93,7 @@ Never write implementation before the failing test exists.
 ### Phase 5 — Simplify
 
 After implementation is complete:
+
 - Review all changed files for clarity, consistency, and maintainability
 - Remove dead code, redundant logic, unnecessary abstraction
 - Rename for clarity where needed
@@ -101,12 +107,12 @@ After implementation is complete:
 
 Scan the current diff against 9 patterns:
 
-| Severity | Patterns |
-|----------|---------|
-| `[CRITICAL]` | Hardcoded secrets, command injection, SQL injection |
-| `[HIGH]` | Unvalidated external input, missing auth checks, insecure deserialization |
-| `[MEDIUM]` | XSS, exposed error details, unsafe eval/exec |
-| `[LOW]` | Patterns safe now but risky under future changes |
+| Severity     | Patterns                                                                  |
+| ------------ | ------------------------------------------------------------------------- |
+| `[CRITICAL]` | Hardcoded secrets, command injection, SQL injection                       |
+| `[HIGH]`     | Unvalidated external input, missing auth checks, insecure deserialization |
+| `[MEDIUM]`   | XSS, exposed error details, unsafe eval/exec                              |
+| `[LOW]`      | Patterns safe now but risky under future changes                          |
 
 **Resolution:** All `[CRITICAL]` and `[HIGH]` findings must be resolved before proceeding. `[MEDIUM]` and `[LOW]` are documented in the PR.
 
@@ -125,27 +131,27 @@ Never commit `.env`, credentials, or unrelated changes.
 
 ## Quick Reference
 
-| Phase | Skip when | Output |
-|-------|-----------|--------|
-| 1. Brainstorm | Trivial change | Agreed approach |
-| 2. Spec | No spec needed | docs/specs/*.md |
-| 3. Plan | No spec needed | docs/plans/*.md |
-| 4. Implement | — | Committed, tested code |
-| 5. Simplify | — | Clean committed code |
-| 6. Security Review | — | Resolved findings |
-| 7. Commit | — | Clean commit |
+| Phase              | Skip when      | Output                 |
+| ------------------ | -------------- | ---------------------- |
+| 1. Brainstorm      | Trivial change | Agreed approach        |
+| 2. Spec            | No spec needed | docs/specs/\*.md       |
+| 3. Plan            | No spec needed | docs/plans/\*.md       |
+| 4. Implement       | —              | Committed, tested code |
+| 5. Simplify        | —              | Clean committed code   |
+| 6. Security Review | —              | Resolved findings      |
+| 7. Commit          | —              | Clean commit           |
 
 ## Claude Code Integration
 
 If using the Superpowers plugin, each phase maps to a skill:
 
-| Phase | Skill |
-|-------|-------|
-| Brainstorm | `superpowers:brainstorming` |
-| Plan | `superpowers:writing-plans` |
-| Implement | `superpowers:executing-plans` or `superpowers:subagent-driven-development` |
-| Simplify | `code-simplifier` plugin |
-| Security Review | `security` plugin or `/security-review` command |
+| Phase           | Skill                                                                      |
+| --------------- | -------------------------------------------------------------------------- |
+| Brainstorm      | `superpowers:brainstorming`                                                |
+| Plan            | `superpowers:writing-plans`                                                |
+| Implement       | `superpowers:executing-plans` or `superpowers:subagent-driven-development` |
+| Simplify        | `code-simplifier` plugin                                                   |
+| Security Review | `security` plugin or `/security-review` command                            |
 
 Run `/feature-dev` in Claude Code to trigger the full workflow automatically.
 

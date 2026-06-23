@@ -78,6 +78,7 @@ vitest.config.ts
 ## Task 1: Project Scaffolding
 
 **Files:**
+
 - Create: `package.json`
 - Create: `tsconfig.json`
 - Create: `vitest.config.ts`
@@ -163,9 +164,9 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json'],
       include: ['src/**/*.ts'],
-      exclude: ['src/cli/**', 'src/adapters/**']
-    }
-  }
+      exclude: ['src/cli/**', 'src/adapters/**'],
+    },
+  },
 })
 ```
 
@@ -178,8 +179,15 @@ export default defineConfig({
   "ollamaUrl": "http://localhost:11434",
   "maxFindings": 15,
   "agents": [
-    "security", "performance", "correctness", "design",
-    "dependencies", "coverage", "testgen", "adversarial", "integration"
+    "security",
+    "performance",
+    "correctness",
+    "design",
+    "dependencies",
+    "coverage",
+    "testgen",
+    "adversarial",
+    "integration"
   ],
   "contextLines": 10,
   "testOutputDir": "./ai-review-tests"
@@ -226,6 +234,7 @@ git commit -m "chore: project scaffolding — package.json, tsconfig, vitest"
 ## Task 2: Core Types & Schema
 
 **Files:**
+
 - Create: `src/core/schema.ts`
 - Create: `src/core/llm/provider.ts`
 
@@ -297,7 +306,7 @@ export const SEVERITY_RANK: Record<Severity, number> = {
   critical: 4,
   high: 3,
   medium: 2,
-  low: 1
+  low: 1,
 }
 ```
 
@@ -341,6 +350,7 @@ git commit -m "feat: core types — Finding schema, LLMProvider interface"
 ## Task 3: Config Loading
 
 **Files:**
+
 - Create: `src/core/config.ts`
 - Create: `tests/unit/config.test.ts`
 
@@ -361,7 +371,10 @@ describe('loadConfig', () => {
   })
 
   it('merges project config over defaults', () => {
-    writeFileSync('ai-review.config.json', JSON.stringify({ model: 'qwen3:latest', maxFindings: 5 }))
+    writeFileSync(
+      'ai-review.config.json',
+      JSON.stringify({ model: 'qwen3:latest', maxFindings: 5 })
+    )
     try {
       const config = loadConfig(process.cwd())
       expect(config.model).toBe('qwen3:latest')
@@ -406,9 +419,19 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   ollamaUrl: 'http://localhost:11434',
   anthropicModel: 'claude-sonnet-4-5',
   maxFindings: 15,
-  agents: ['security', 'performance', 'correctness', 'design', 'dependencies', 'coverage', 'testgen', 'adversarial', 'integration'],
+  agents: [
+    'security',
+    'performance',
+    'correctness',
+    'design',
+    'dependencies',
+    'coverage',
+    'testgen',
+    'adversarial',
+    'integration',
+  ],
   contextLines: 10,
-  testOutputDir: './ai-review-tests'
+  testOutputDir: './ai-review-tests',
 }
 
 export function loadConfig(projectPath: string): ReviewConfig {
@@ -444,6 +467,7 @@ git commit -m "feat: config loading with defaults and project override"
 ## Task 4: OllamaProvider
 
 **Files:**
+
 - Create: `src/core/llm/ollamaProvider.ts`
 - Create: `tests/unit/ollamaProvider.test.ts`
 
@@ -464,7 +488,9 @@ describe('OllamaProvider', () => {
     it('strips think tags from response', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ message: { content: '<think>reasoning here</think>\n{"findings":[]}' } })
+        json: async () => ({
+          message: { content: '<think>reasoning here</think>\n{"findings":[]}' },
+        }),
       })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
       const result = await provider.chat([{ role: 'user', content: 'test' }])
@@ -475,7 +501,7 @@ describe('OllamaProvider', () => {
     it('passes think:true by default', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ message: { content: 'response' } })
+        json: async () => ({ message: { content: 'response' } }),
       })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
       await provider.chat([{ role: 'user', content: 'test' }])
@@ -487,7 +513,9 @@ describe('OllamaProvider', () => {
     it('throws on non-ok response', async () => {
       mockFetch.mockResolvedValueOnce({ ok: false, status: 500 })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
-      await expect(provider.chat([{ role: 'user', content: 'test' }])).rejects.toThrow('Ollama HTTP 500')
+      await expect(provider.chat([{ role: 'user', content: 'test' }])).rejects.toThrow(
+        'Ollama HTTP 500'
+      )
     })
   })
 
@@ -495,7 +523,7 @@ describe('OllamaProvider', () => {
     it('returns ok:true when model is present', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ models: [{ name: 'devstral:latest' }] })
+        json: async () => ({ models: [{ name: 'devstral:latest' }] }),
       })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
       const result = await provider.ping()
@@ -505,7 +533,7 @@ describe('OllamaProvider', () => {
     it('returns ok:false when model is missing', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ models: [{ name: 'other-model:latest' }] })
+        json: async () => ({ models: [{ name: 'other-model:latest' }] }),
       })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
       const result = await provider.ping()
@@ -547,12 +575,12 @@ export class OllamaProvider implements LLMProvider {
         stream: false,
         think: options.think ?? true,
         ...(options.format ? { format: options.format } : {}),
-        messages
+        messages,
       }),
-      signal: AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS)
+      signal: AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS),
     })
     if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`)
-    const data = await res.json() as { message?: { content?: string } }
+    const data = (await res.json()) as { message?: { content?: string } }
     const raw = data.message?.content ?? ''
     return this.stripThinkTags(raw)
   }
@@ -560,18 +588,21 @@ export class OllamaProvider implements LLMProvider {
   async ping(): Promise<{ ok: boolean; error?: string }> {
     try {
       const res = await fetch(`${this.baseUrl}/api/tags`, {
-        signal: AbortSignal.timeout(5_000)
+        signal: AbortSignal.timeout(5_000),
       })
       if (!res.ok) return { ok: false, error: `Ollama returned HTTP ${res.status}` }
-      const data = await res.json() as { models?: Array<{ name: string }> }
+      const data = (await res.json()) as { models?: Array<{ name: string }> }
       const modelBase = this.model.split(':')[0].toLowerCase()
-      const hasModel = (data.models ?? []).some(m => m.name.toLowerCase().includes(modelBase))
+      const hasModel = (data.models ?? []).some((m) => m.name.toLowerCase().includes(modelBase))
       if (!hasModel) {
         return { ok: false, error: `Model ${this.model} not found. Run: ollama pull ${this.model}` }
       }
       return { ok: true }
     } catch (err) {
-      return { ok: false, error: `Ollama not reachable at ${this.baseUrl}: ${(err as Error).message}` }
+      return {
+        ok: false,
+        error: `Ollama not reachable at ${this.baseUrl}: ${(err as Error).message}`,
+      }
     }
   }
 
@@ -601,12 +632,13 @@ git commit -m "feat: OllamaProvider with think-tag stripping and ping"
 ## Task 5: BaseAgent
 
 **Files:**
+
 - Create: `src/core/agents/base.ts`
 - Create: `tests/unit/baseAgent.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-```typescript
+````typescript
 // tests/unit/baseAgent.test.ts
 import { describe, it, expect, vi } from 'vitest'
 import { BaseAgent } from '../../src/core/agents/base.js'
@@ -616,18 +648,32 @@ import { DEFAULT_CONFIG } from '../../src/core/config.js'
 
 // Concrete subclass for testing
 class TestAgent extends BaseAgent {
-  get name() { return 'security' as const }
-  get systemPrompt() { return 'You are a test agent.' }
+  get name() {
+    return 'security' as const
+  }
+  get systemPrompt() {
+    return 'You are a test agent.'
+  }
 }
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('BaseAgent', () => {
   it('parses bare JSON array', async () => {
-    const raw = JSON.stringify([{ severity: 'high', basis: 'VERIFIED', file: 'src/foo.ts', line: 10, title: 'T', detail: 'D', suggestion: 'S' }])
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'src/foo.ts',
+        line: 10,
+        title: 'T',
+        detail: 'D',
+        suggestion: 'S',
+      },
+    ])
     const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff content' })
     expect(findings).toHaveLength(1)
@@ -637,14 +683,27 @@ describe('BaseAgent', () => {
   })
 
   it('parses JSON wrapped in markdown code fence', async () => {
-    const raw = '```json\n[{"severity":"high","basis":"VERIFIED","file":"f.ts","line":1,"title":"T","detail":"D","suggestion":"S"}]\n```'
+    const raw =
+      '```json\n[{"severity":"high","basis":"VERIFIED","file":"f.ts","line":1,"title":"T","detail":"D","suggestion":"S"}]\n```'
     const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
   })
 
   it('parses object with findings array', async () => {
-    const raw = JSON.stringify({ findings: [{ severity: 'medium', basis: 'INFERRED', file: 'x.ts', line: 5, title: 'T', detail: 'D', suggestion: 'S' }] })
+    const raw = JSON.stringify({
+      findings: [
+        {
+          severity: 'medium',
+          basis: 'INFERRED',
+          file: 'x.ts',
+          line: 5,
+          title: 'T',
+          detail: 'D',
+          suggestion: 'S',
+        },
+      ],
+    })
     const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
@@ -658,15 +717,23 @@ describe('BaseAgent', () => {
 
   it('filters out findings missing required fields', async () => {
     const raw = JSON.stringify([
-      { severity: 'high', basis: 'VERIFIED', file: 'f.ts', line: 1, title: 'T', detail: 'D', suggestion: 'S' },
-      { severity: 'high' } // missing required fields
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'f.ts',
+        line: 1,
+        title: 'T',
+        detail: 'D',
+        suggestion: 'S',
+      },
+      { severity: 'high' }, // missing required fields
     ])
     const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
   })
 })
-```
+````
 
 - [ ] **Step 2: Run test — expect FAIL**
 
@@ -678,7 +745,7 @@ Expected: FAIL with "Cannot find module"
 
 - [ ] **Step 3: Write src/core/agents/base.ts**
 
-```typescript
+````typescript
 import type { LLMProvider, Message } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
 import type { Finding, ReviewInput, AgentName } from '../schema.js'
@@ -695,7 +762,7 @@ export abstract class BaseAgent {
   async run(input: ReviewInput): Promise<Finding[]> {
     const messages: Message[] = [
       { role: 'system', content: this.systemPrompt },
-      { role: 'user', content: this.buildUserPrompt(input) }
+      { role: 'user', content: this.buildUserPrompt(input) },
     ]
     const raw = await this.provider.chat(messages, { think: true })
     return this.parseFindings(raw)
@@ -719,7 +786,9 @@ export abstract class BaseAgent {
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.findings)) {
         return this.validateFindings(parsed.findings)
       }
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
 
     // Stage 3: regex extract array
     try {
@@ -728,7 +797,9 @@ export abstract class BaseAgent {
         const parsed = JSON.parse(arrMatch[0])
         if (Array.isArray(parsed)) return this.validateFindings(parsed)
       }
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
 
     console.error(`[${this.name}] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
     return []
@@ -736,25 +807,26 @@ export abstract class BaseAgent {
 
   private validateFindings(items: unknown[]): Finding[] {
     return (items as Finding[])
-      .filter(f =>
-        typeof f === 'object' &&
-        f !== null &&
-        typeof f.severity === 'string' &&
-        typeof f.basis === 'string' &&
-        typeof f.file === 'string' &&
-        typeof f.line === 'number' &&
-        typeof f.title === 'string' &&
-        typeof f.detail === 'string' &&
-        typeof f.suggestion === 'string'
+      .filter(
+        (f) =>
+          typeof f === 'object' &&
+          f !== null &&
+          typeof f.severity === 'string' &&
+          typeof f.basis === 'string' &&
+          typeof f.file === 'string' &&
+          typeof f.line === 'number' &&
+          typeof f.title === 'string' &&
+          typeof f.detail === 'string' &&
+          typeof f.suggestion === 'string'
       )
       .map((f, i) => ({
         ...f,
         id: `${this.name}-${i}`,
-        agent: this.name
+        agent: this.name,
       }))
   }
 }
-```
+````
 
 - [ ] **Step 4: Run test — expect PASS**
 
@@ -776,6 +848,7 @@ git commit -m "feat: BaseAgent with 3-stage JSON parse (bare array, wrapped, reg
 ## Task 6: Security + Performance + Correctness Agents
 
 **Files:**
+
 - Create: `src/core/agents/security.ts`
 - Create: `src/core/agents/performance.ts`
 - Create: `src/core/agents/correctness.ts`
@@ -789,7 +862,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class SecurityAgent extends BaseAgent {
-  get name(): AgentName { return 'security' }
+  get name(): AgentName {
+    return 'security'
+  }
 
   get systemPrompt(): string {
     return `You are a security code reviewer. Analyze the provided git diff for security vulnerabilities.
@@ -827,7 +902,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class PerformanceAgent extends BaseAgent {
-  get name(): AgentName { return 'performance' }
+  get name(): AgentName {
+    return 'performance'
+  }
 
   get systemPrompt(): string {
     return `You are a performance code reviewer. Analyze the provided git diff for performance issues.
@@ -865,7 +942,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class CorrectnessAgent extends BaseAgent {
-  get name(): AgentName { return 'correctness' }
+  get name(): AgentName {
+    return 'correctness'
+  }
 
   get systemPrompt(): string {
     return `You are a correctness code reviewer. Analyze the provided git diff for logic bugs and correctness issues.
@@ -917,6 +996,7 @@ git commit -m "feat: SecurityAgent, PerformanceAgent, CorrectnessAgent"
 ## Task 7: Design + Dependencies + Adversarial + IntegrationScout Agents
 
 **Files:**
+
 - Create: `src/core/agents/design.ts`
 - Create: `src/core/agents/dependencies.ts`
 - Create: `src/core/agents/adversarial.ts`
@@ -929,7 +1009,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class DesignAgent extends BaseAgent {
-  get name(): AgentName { return 'design' }
+  get name(): AgentName {
+    return 'design'
+  }
 
   get systemPrompt(): string {
     return `You are a software design code reviewer. Analyze the provided git diff for design and architecture issues.
@@ -967,7 +1049,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class DependenciesAgent extends BaseAgent {
-  get name(): AgentName { return 'dependencies' }
+  get name(): AgentName {
+    return 'dependencies'
+  }
 
   get systemPrompt(): string {
     return `You are a dependency security reviewer. Analyze the provided git diff for dependency and supply chain issues.
@@ -1005,7 +1089,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class AdversarialAgent extends BaseAgent {
-  get name(): AgentName { return 'adversarial' }
+  get name(): AgentName {
+    return 'adversarial'
+  }
 
   get systemPrompt(): string {
     return `You are an adversarial testing agent. Analyze the provided git diff and identify inputs that would break the changed code.
@@ -1045,7 +1131,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class IntegrationScoutAgent extends BaseAgent {
-  get name(): AgentName { return 'integration' }
+  get name(): AgentName {
+    return 'integration'
+  }
 
   get systemPrompt(): string {
     return `You are an integration testing analyst. Analyze the provided git diff and identify integration seams that need contract or integration tests.
@@ -1099,12 +1187,13 @@ git commit -m "feat: DesignAgent, DependenciesAgent, AdversarialAgent, Integrati
 These two are special — CoverageAnalyst returns both `Finding[]` and `CoverageGap[]`; TestGen consumes gaps and produces test files instead of findings.
 
 **Files:**
+
 - Create: `src/core/agents/coverageAnalyst.ts`
 - Create: `src/core/agents/testGen.ts`
 
 - [ ] **Step 1: Write src/core/agents/coverageAnalyst.ts**
 
-```typescript
+````typescript
 import { BaseAgent } from './base.js'
 import type { AgentName, CoverageGap, Finding, ReviewInput } from '../schema.js'
 import type { Message } from '../llm/provider.js'
@@ -1115,7 +1204,9 @@ export interface CoverageAnalystResult {
 }
 
 export class CoverageAnalystAgent extends BaseAgent {
-  get name(): AgentName { return 'coverage' }
+  get name(): AgentName {
+    return 'coverage'
+  }
 
   get systemPrompt(): string {
     return `You are a test coverage analyst. Analyze the provided git diff and identify code paths that lack test coverage.
@@ -1145,7 +1236,7 @@ Rules:
   async runForCoverage(input: ReviewInput): Promise<CoverageAnalystResult> {
     const messages: Message[] = [
       { role: 'system', content: this.systemPrompt },
-      { role: 'user', content: this.buildUserPrompt(input) }
+      { role: 'user', content: this.buildUserPrompt(input) },
     ]
     const raw = await this.provider.chat(messages, { think: true })
     return this.parseCoverageResult(raw, input)
@@ -1166,32 +1257,35 @@ Rules:
           const parsed = JSON.parse(objMatch[0]) as { findings?: unknown[]; gaps?: unknown[] }
           return {
             findings: this.parseFindings(JSON.stringify(parsed.findings ?? [])),
-            gaps: this.validateGaps(parsed.gaps ?? [])
+            gaps: this.validateGaps(parsed.gaps ?? []),
           }
         }
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
       console.error(`[coverage] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
       return { findings: [], gaps: [] }
     }
   }
 
   private validateGaps(items: unknown[]): CoverageGap[] {
-    return (items as CoverageGap[]).filter(g =>
-      typeof g === 'object' &&
-      g !== null &&
-      typeof g.file === 'string' &&
-      typeof g.functionName === 'string' &&
-      typeof g.lineStart === 'number' &&
-      typeof g.lineEnd === 'number' &&
-      typeof g.description === 'string'
+    return (items as CoverageGap[]).filter(
+      (g) =>
+        typeof g === 'object' &&
+        g !== null &&
+        typeof g.file === 'string' &&
+        typeof g.functionName === 'string' &&
+        typeof g.lineStart === 'number' &&
+        typeof g.lineEnd === 'number' &&
+        typeof g.description === 'string'
     )
   }
 }
-```
+````
 
 - [ ] **Step 2: Write src/core/agents/testGen.ts**
 
-```typescript
+````typescript
 import type { LLMProvider, Message } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
 import type { CoverageGap, GeneratedTestFile, ReviewInput, TestFramework } from '../schema.js'
@@ -1204,7 +1298,10 @@ export class TestGenAgent {
     private readonly config: ReviewConfig
   ) {}
 
-  async runWithGaps(input: ReviewInput, gaps: CoverageGap[]): Promise<{ testFiles: GeneratedTestFile[] }> {
+  async runWithGaps(
+    input: ReviewInput,
+    gaps: CoverageGap[]
+  ): Promise<{ testFiles: GeneratedTestFile[] }> {
     if (gaps.length === 0) return { testFiles: [] }
 
     const framework = this.detectFramework(input.projectPath)
@@ -1232,21 +1329,24 @@ export class TestGenAgent {
     framework: TestFramework,
     input: ReviewInput
   ): Promise<GeneratedTestFile | null> {
-    const gapDescriptions = gaps.map(g =>
-      `- Function: ${g.functionName} (lines ${g.lineStart}-${g.lineEnd})\n  What it does: ${g.description}`
-    ).join('\n')
+    const gapDescriptions = gaps
+      .map(
+        (g) =>
+          `- Function: ${g.functionName} (lines ${g.lineStart}-${g.lineEnd})\n  What it does: ${g.description}`
+      )
+      .join('\n')
 
     const messages: Message[] = [
       {
         role: 'system',
         content: `You are a test generation agent. Write complete, runnable test code using ${framework}.
 Output ONLY valid ${framework} test code. No explanation, no markdown fences, no prose.
-Tests must: import the module under test, cover the happy path, cover the error/edge case, use descriptive test names.`
+Tests must: import the module under test, cover the happy path, cover the error/edge case, use descriptive test names.`,
       },
       {
         role: 'user',
-        content: `Generate tests for these uncovered functions in ${sourceFile}:\n\n${gapDescriptions}\n\nContext from diff:\n\`\`\`diff\n${input.diff.slice(0, 8000)}\n\`\`\``
-      }
+        content: `Generate tests for these uncovered functions in ${sourceFile}:\n\n${gapDescriptions}\n\nContext from diff:\n\`\`\`diff\n${input.diff.slice(0, 8000)}\n\`\`\``,
+      },
     ]
 
     const raw = await this.provider.chat(messages, { think: false })
@@ -1263,11 +1363,16 @@ Tests must: import the module under test, cover the happy path, cover the error/
     if (existsSync(pkgPath)) {
       try {
         const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>
-        const deps = { ...(pkg.dependencies as object ?? {}), ...(pkg.devDependencies as object ?? {}) }
+        const deps = {
+          ...((pkg.dependencies as object) ?? {}),
+          ...((pkg.devDependencies as object) ?? {}),
+        }
         if ('vitest' in deps) return 'vitest'
         if ('jest' in deps) return 'jest'
         if ('mocha' in deps) return 'mocha'
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
     }
     const reqPath = join(projectPath, 'requirements.txt')
     if (existsSync(reqPath)) return 'pytest'
@@ -1280,7 +1385,7 @@ Tests must: import the module under test, cover the happy path, cover the error/
     return `${this.config.testOutputDir}/${base.replace(/^src\//, '')}${ext}`
   }
 }
-```
+````
 
 - [ ] **Step 3: Verify TypeScript**
 
@@ -1302,6 +1407,7 @@ git commit -m "feat: CoverageAnalystAgent (gaps + findings) and TestGenAgent (pr
 ## Task 9: Orchestrator
 
 **Files:**
+
 - Create: `src/core/agents/orchestrator.ts`
 - Create: `tests/unit/orchestrator.test.ts`
 
@@ -1317,7 +1423,7 @@ import { vi } from 'vitest'
 
 const makeProvider = () => ({
   chat: vi.fn(),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 const finding = (overrides: Partial<Finding> = {}): Finding => ({
@@ -1330,7 +1436,7 @@ const finding = (overrides: Partial<Finding> = {}): Finding => ({
   title: 'Test finding',
   detail: 'Detail',
   suggestion: 'Fix it',
-  ...overrides
+  ...overrides,
 })
 
 describe('OrchestratorAgent', () => {
@@ -1338,8 +1444,20 @@ describe('OrchestratorAgent', () => {
     it('removes duplicate findings at same file:line from different agents', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', file: 'src/auth.ts', line: 10, title: 'SQL injection' }),
-        finding({ id: 'correctness-0', agent: 'correctness', file: 'src/auth.ts', line: 10, title: 'Null pointer' })
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          file: 'src/auth.ts',
+          line: 10,
+          title: 'SQL injection',
+        }),
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          file: 'src/auth.ts',
+          line: 10,
+          title: 'Null pointer',
+        }),
       ]
       const result = orch.synthesize(findings)
       expect(result).toHaveLength(1)
@@ -1352,11 +1470,25 @@ describe('OrchestratorAgent', () => {
     it('escalates severity when correctness bug has no test coverage at same location', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'correctness-0', agent: 'correctness', severity: 'medium', file: 'src/foo.ts', line: 20, title: 'Logic bug' }),
-        finding({ id: 'coverage-0', agent: 'coverage', severity: 'medium', file: 'src/foo.ts', line: 20, title: 'No test coverage' })
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          severity: 'medium',
+          file: 'src/foo.ts',
+          line: 20,
+          title: 'Logic bug',
+        }),
+        finding({
+          id: 'coverage-0',
+          agent: 'coverage',
+          severity: 'medium',
+          file: 'src/foo.ts',
+          line: 20,
+          title: 'No test coverage',
+        }),
       ]
       const result = orch.synthesize(findings)
-      const corrFinding = result.find(f => f.agent === 'correctness')
+      const corrFinding = result.find((f) => f.agent === 'correctness')
       expect(corrFinding?.severity).toBe('high') // escalated from medium
     })
   })
@@ -1366,11 +1498,16 @@ describe('OrchestratorAgent', () => {
       const config = { ...DEFAULT_CONFIG, maxFindings: 3 }
       const orch = new OrchestratorAgent(makeProvider(), config)
       const findings = Array.from({ length: 10 }, (_, i) =>
-        finding({ id: `security-${i}`, line: i + 1, title: `Finding ${i}`, severity: i < 3 ? 'critical' : 'medium' })
+        finding({
+          id: `security-${i}`,
+          line: i + 1,
+          title: `Finding ${i}`,
+          severity: i < 3 ? 'critical' : 'medium',
+        })
       )
       const result = orch.synthesize(findings)
       expect(result).toHaveLength(3)
-      expect(result.every(f => f.severity === 'critical')).toBe(true)
+      expect(result.every((f) => f.severity === 'critical')).toBe(true)
     })
   })
 
@@ -1380,12 +1517,12 @@ describe('OrchestratorAgent', () => {
       const findings = [
         finding({ id: 'security-0', severity: 'medium', basis: 'SPECULATIVE' }),
         finding({ id: 'security-1', severity: 'high', basis: 'SPECULATIVE' }),
-        finding({ id: 'security-2', severity: 'medium', basis: 'VERIFIED' })
+        finding({ id: 'security-2', severity: 'medium', basis: 'VERIFIED' }),
       ]
       const result = orch.synthesize(findings)
-      expect(result.find(f => f.id === 'security-0')).toBeUndefined()
-      expect(result.find(f => f.id === 'security-1')).toBeDefined()
-      expect(result.find(f => f.id === 'security-2')).toBeDefined()
+      expect(result.find((f) => f.id === 'security-0')).toBeUndefined()
+      expect(result.find((f) => f.id === 'security-1')).toBeDefined()
+      expect(result.find((f) => f.id === 'security-2')).toBeDefined()
     })
   })
 })
@@ -1409,8 +1546,15 @@ import { SEVERITY_RANK } from '../schema.js'
 
 // Agent priority for deduplication — higher index = higher priority kept
 const AGENT_PRIORITY: AgentName[] = [
-  'integration', 'coverage', 'testgen', 'adversarial',
-  'design', 'dependencies', 'correctness', 'performance', 'security'
+  'integration',
+  'coverage',
+  'testgen',
+  'adversarial',
+  'design',
+  'dependencies',
+  'correctness',
+  'performance',
+  'security',
 ]
 
 export class OrchestratorAgent {
@@ -1448,20 +1592,30 @@ export class OrchestratorAgent {
   }
 
   private crossReference(findings: Finding[]): Finding[] {
-    return findings.map(f => {
+    return findings.map((f) => {
       // Correctness bug at same file:line as a coverage gap → escalate severity
       if (f.agent === 'correctness') {
         const hasCoverageGap = findings.some(
-          other => other.agent === 'coverage' && other.file === f.file && Math.abs(other.line - f.line) <= 5
+          (other) =>
+            other.agent === 'coverage' &&
+            other.file === f.file &&
+            Math.abs(other.line - f.line) <= 5
         )
         if (hasCoverageGap) {
-          return { ...f, severity: this.escalate(f.severity), relatedFindings: [...(f.relatedFindings ?? []), 'coverage'] }
+          return {
+            ...f,
+            severity: this.escalate(f.severity),
+            relatedFindings: [...(f.relatedFindings ?? []), 'coverage'],
+          }
         }
       }
       // Security finding at same location as adversarial → escalate
       if (f.agent === 'security') {
         const hasAdversarial = findings.some(
-          other => other.agent === 'adversarial' && other.file === f.file && Math.abs(other.line - f.line) <= 5
+          (other) =>
+            other.agent === 'adversarial' &&
+            other.file === f.file &&
+            Math.abs(other.line - f.line) <= 5
         )
         if (hasAdversarial) {
           return { ...f, severity: this.escalate(f.severity) }
@@ -1478,9 +1632,10 @@ export class OrchestratorAgent {
   }
 
   private applyPublicationFilter(findings: Finding[]): Finding[] {
-    return findings.filter(f => {
+    return findings.filter((f) => {
       if (f.severity === 'low') return false
-      if (f.basis === 'SPECULATIVE' && SEVERITY_RANK[f.severity] < SEVERITY_RANK['high']) return false
+      if (f.basis === 'SPECULATIVE' && SEVERITY_RANK[f.severity] < SEVERITY_RANK['high'])
+        return false
       return true
     })
   }
@@ -1519,6 +1674,7 @@ git commit -m "feat: OrchestratorAgent — dedup, cross-reference escalation, pu
 ## Task 10: SwarmRunner
 
 **Files:**
+
 - Create: `src/core/runner.ts`
 - Create: `tests/unit/runner.test.ts`
 
@@ -1533,7 +1689,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response = '[]'): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('SwarmRunner', () => {
@@ -1557,7 +1713,7 @@ describe('SwarmRunner', () => {
   it('aborts with error when ping fails', async () => {
     const provider: LLMProvider = {
       chat: vi.fn(),
-      ping: vi.fn().mockResolvedValue({ ok: false, error: 'Ollama not running' })
+      ping: vi.fn().mockResolvedValue({ ok: false, error: 'Ollama not running' }),
     }
     const runner = new SwarmRunner(DEFAULT_CONFIG, provider)
     await expect(runner.run({ diff: 'diff' })).rejects.toThrow('Ollama not running')
@@ -1578,7 +1734,14 @@ Expected: FAIL with "Cannot find module"
 ```typescript
 import type { LLMProvider } from './llm/provider.js'
 import type { ReviewConfig } from './config.js'
-import type { AgentName, Finding, ReviewInput, ReviewResult, CoverageGap, GeneratedTestFile } from './schema.js'
+import type {
+  AgentName,
+  Finding,
+  ReviewInput,
+  ReviewResult,
+  CoverageGap,
+  GeneratedTestFile,
+} from './schema.js'
 import { BaseAgent } from './agents/base.js'
 import { SecurityAgent } from './agents/security.js'
 import { PerformanceAgent } from './agents/performance.js'
@@ -1599,13 +1762,13 @@ function buildAgents(config: ReviewConfig, provider: LLMProvider): BaseAgent[] {
     design: () => new DesignAgent(provider, config),
     dependencies: () => new DependenciesAgent(provider, config),
     coverage: () => new CoverageAnalystAgent(provider, config),
-    testgen: () => { throw new Error('testgen handled separately') },
+    testgen: () => {
+      throw new Error('testgen handled separately')
+    },
     adversarial: () => new AdversarialAgent(provider, config),
-    integration: () => new IntegrationScoutAgent(provider, config)
+    integration: () => new IntegrationScoutAgent(provider, config),
   }
-  return config.agents
-    .filter(a => a !== 'testgen' && a !== 'coverage')
-    .map(a => map[a]())
+  return config.agents.filter((a) => a !== 'testgen' && a !== 'coverage').map((a) => map[a]())
 }
 
 export class SwarmRunner {
@@ -1620,10 +1783,7 @@ export class SwarmRunner {
     this.testGen = new TestGenAgent(provider, config)
   }
 
-  async run(
-    input: ReviewInput,
-    onProgress?: (agent: AgentName) => void
-  ): Promise<ReviewResult> {
+  async run(input: ReviewInput, onProgress?: (agent: AgentName) => void): Promise<ReviewResult> {
     const ping = await this.provider.ping()
     if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')
 
@@ -1658,15 +1818,21 @@ export class SwarmRunner {
 
     const findings = this.orchestrator.synthesize(allFindings)
 
-    const bySeverity = findings.reduce((acc, f) => {
-      acc[f.severity] = (acc[f.severity] ?? 0) + 1
-      return acc
-    }, {} as Record<string, number>)
+    const bySeverity = findings.reduce(
+      (acc, f) => {
+        acc[f.severity] = (acc[f.severity] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
 
-    const byAgent = findings.reduce((acc, f) => {
-      acc[f.agent] = (acc[f.agent] ?? 0) + 1
-      return acc
-    }, {} as Record<string, number>)
+    const byAgent = findings.reduce(
+      (acc, f) => {
+        acc[f.agent] = (acc[f.agent] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
 
     return {
       findings,
@@ -1675,8 +1841,8 @@ export class SwarmRunner {
         totalFindings: findings.length,
         bySeverity,
         byAgent,
-        durationMs: Date.now() - start
-      }
+        durationMs: Date.now() - start,
+      },
     }
   }
 }
@@ -1710,6 +1876,7 @@ git commit -m "feat: SwarmRunner — sequential agent orchestration with coverag
 ## Task 11: CLI
 
 **Files:**
+
 - Create: `src/cli/formatter.ts`
 - Create: `src/cli/index.ts`
 
@@ -1722,7 +1889,7 @@ const SEVERITY_EMOJI: Record<Severity, string> = {
   critical: '🔴',
   high: '🟠',
   medium: '🟡',
-  low: '🔵'
+  low: '🔵',
 }
 
 export function formatMarkdown(result: ReviewResult): string {
@@ -1731,7 +1898,9 @@ export function formatMarkdown(result: ReviewResult): string {
 
   lines.push('# AI Code Review Report')
   lines.push('')
-  lines.push(`**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`)
+  lines.push(
+    `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`
+  )
   lines.push('')
 
   if (findings.length === 0) {
@@ -1739,7 +1908,7 @@ export function formatMarkdown(result: ReviewResult): string {
     return lines.join('\n')
   }
 
-  const bySeverity = groupBy(findings, f => f.severity)
+  const bySeverity = groupBy(findings, (f) => f.severity)
   for (const severity of ['critical', 'high', 'medium', 'low'] as Severity[]) {
     const group = bySeverity.get(severity)
     if (!group?.length) continue
@@ -1747,7 +1916,9 @@ export function formatMarkdown(result: ReviewResult): string {
     lines.push('')
     for (const f of group) {
       lines.push(`### ${f.title}`)
-      lines.push(`**Agent:** ${f.agent} | **Basis:** ${f.basis} | **File:** \`${f.file}:${f.line}\``)
+      lines.push(
+        `**Agent:** ${f.agent} | **Basis:** ${f.basis} | **File:** \`${f.file}:${f.line}\``
+      )
       lines.push('')
       lines.push(f.detail)
       lines.push('')
@@ -1820,59 +1991,65 @@ program
   .option('--agents <list>', 'Comma-separated list of agents to run')
   .option('--format <format>', 'Output format: markdown or json', 'markdown')
   .option('--out <path>', 'Write output to file instead of stdout')
-  .action(async (options: {
-    diff?: string
-    path?: string
-    model?: string
-    agents?: string
-    format: 'markdown' | 'json'
-    out?: string
-  }) => {
-    const projectPath = resolve(options.path ?? process.cwd())
-    const config = loadConfig(projectPath)
+  .action(
+    async (options: {
+      diff?: string
+      path?: string
+      model?: string
+      agents?: string
+      format: 'markdown' | 'json'
+      out?: string
+    }) => {
+      const projectPath = resolve(options.path ?? process.cwd())
+      const config = loadConfig(projectPath)
 
-    if (options.model) config.model = options.model
-    if (options.agents) config.agents = options.agents.split(',').map(a => a.trim()) as AgentName[]
+      if (options.model) config.model = options.model
+      if (options.agents)
+        config.agents = options.agents.split(',').map((a) => a.trim()) as AgentName[]
 
-    const diff = getDiff(options.diff, options.path)
-    if (!diff.trim()) {
-      console.error('No diff to review. Stage changes or provide --diff.')
-      process.exit(1)
-    }
-
-    const provider = new OllamaProvider(config.ollamaUrl, config.model)
-    const runner = new SwarmRunner(config, provider)
-
-    process.stdout.write(`\n🔍 Running ai-review with ${config.agents.length} agents...\n\n`)
-
-    const result = await runner.run(
-      { diff, projectPath },
-      (agent) => process.stdout.write(`  ✓ ${agent}\n`)
-    )
-
-    // Write generated test files
-    if (result.testFiles.length > 0) {
-      for (const tf of result.testFiles) {
-        const outPath = join(projectPath, tf.path)
-        mkdirSync(join(outPath, '..'), { recursive: true })
-        writeFileSync(outPath, tf.content, 'utf-8')
+      const diff = getDiff(options.diff, options.path)
+      if (!diff.trim()) {
+        console.error('No diff to review. Stage changes or provide --diff.')
+        process.exit(1)
       }
-      process.stdout.write(`\n📝 Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`)
+
+      const provider = new OllamaProvider(config.ollamaUrl, config.model)
+      const runner = new SwarmRunner(config, provider)
+
+      process.stdout.write(`\n🔍 Running ai-review with ${config.agents.length} agents...\n\n`)
+
+      const result = await runner.run({ diff, projectPath }, (agent) =>
+        process.stdout.write(`  ✓ ${agent}\n`)
+      )
+
+      // Write generated test files
+      if (result.testFiles.length > 0) {
+        for (const tf of result.testFiles) {
+          const outPath = join(projectPath, tf.path)
+          mkdirSync(join(outPath, '..'), { recursive: true })
+          writeFileSync(outPath, tf.content, 'utf-8')
+        }
+        process.stdout.write(
+          `\n📝 Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`
+        )
+      }
+
+      const output = options.format === 'json' ? formatJson(result) : formatMarkdown(result)
+
+      if (options.out) {
+        writeFileSync(options.out, output, 'utf-8')
+        process.stdout.write(`\n✅ Report written to ${options.out}\n`)
+      } else {
+        process.stdout.write('\n' + output + '\n')
+      }
+
+      // Exit 1 if any critical/high findings (useful for CI)
+      const hasBlocker = result.findings.some(
+        (f) => f.severity === 'critical' || f.severity === 'high'
+      )
+      process.exit(hasBlocker ? 1 : 0)
     }
-
-    const output = options.format === 'json' ? formatJson(result) : formatMarkdown(result)
-
-    if (options.out) {
-      writeFileSync(options.out, output, 'utf-8')
-      process.stdout.write(`\n✅ Report written to ${options.out}\n`)
-    } else {
-      process.stdout.write('\n' + output + '\n')
-    }
-
-    // Exit 1 if any critical/high findings (useful for CI)
-    const hasBlocker = result.findings.some(f => f.severity === 'critical' || f.severity === 'high')
-    process.exit(hasBlocker ? 1 : 0)
-  })
+  )
 
 function getDiff(diffFile?: string, pathOverride?: string): string {
   if (diffFile) {
@@ -1923,6 +2100,7 @@ git commit -m "feat: CLI — commander entry point, markdown/json formatters, st
 ## Task 12: GitHub Actions Adapter + Workflow
 
 **Files:**
+
 - Create: `src/adapters/github.ts`
 - Create: `.github/workflows/review.yml`
 
@@ -1947,7 +2125,7 @@ export async function upsertPRComment(
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
     'Content-Type': 'application/json',
-    'X-GitHub-Api-Version': '2022-11-28'
+    'X-GitHub-Api-Version': '2022-11-28',
   }
 
   const fullBody = `${COMMENT_MARKER}\n${body}`
@@ -1958,8 +2136,8 @@ export async function upsertPRComment(
     { headers }
   )
   if (!listRes.ok) throw new Error(`GitHub API list comments failed: ${listRes.status}`)
-  const comments = await listRes.json() as Array<{ id: number; body: string }>
-  const existing = comments.find(c => c.body.includes(COMMENT_MARKER))
+  const comments = (await listRes.json()) as Array<{ id: number; body: string }>
+  const existing = comments.find((c) => c.body.includes(COMMENT_MARKER))
 
   if (existing) {
     // PATCH to update existing comment
@@ -1979,9 +2157,9 @@ export async function upsertPRComment(
 }
 
 export function buildStepSummary(result: import('../core/schema.js').ReviewResult): string {
-  const rows = result.findings.map(f =>
-    `| ${f.severity} | ${f.agent} | ${f.file}:${f.line} | ${f.title} | ${f.basis} |`
-  ).join('\n')
+  const rows = result.findings
+    .map((f) => `| ${f.severity} | ${f.agent} | ${f.file}:${f.line} | ${f.title} | ${f.basis} |`)
+    .join('\n')
 
   return `## AI Review Summary
 | Severity | Agent | Location | Issue | Basis |
@@ -2003,7 +2181,7 @@ on:
 
 jobs:
   ai-review:
-    runs-on: self-hosted  # Requires Ollama on the runner
+    runs-on: self-hosted # Requires Ollama on the runner
     permissions:
       pull-requests: write
       contents: read
@@ -2120,6 +2298,7 @@ git commit -m "feat: GitHub Actions adapter with PR comment upsert and Step Summ
 ## Task 13: Claude Code Slash Command
 
 **Files:**
+
 - Create: `.claude/commands/ai-review.md`
 
 - [ ] **Step 1: Write .claude/commands/ai-review.md**
@@ -2130,15 +2309,18 @@ git commit -m "feat: GitHub Actions adapter with PR comment upsert and Step Summ
 Run a deep 9-agent code review on the current working diff using local Ollama (devstral:latest).
 
 **When to use:**
+
 - Before committing or opening a PR for thorough review
 - Use `/code-review` instead for a quick Claude-native check mid-session
 
 **Usage:**
 ```
-/ai-review              # reviews staged changes
-/ai-review --agents security,correctness   # run specific agents only
-/ai-review --model qwen3:latest            # override model
-```
+
+/ai-review # reviews staged changes
+/ai-review --agents security,correctness # run specific agents only
+/ai-review --model qwen3:latest # override model
+
+````
 
 ## Instructions for Claude
 
@@ -2146,7 +2328,7 @@ Run the following in the project root:
 
 ```bash
 ai-review --format markdown
-```
+````
 
 If `ai-review` is not installed globally, run:
 
@@ -2157,20 +2339,22 @@ npx ai-review --format markdown
 Stream the output directly into the conversation. If Ollama is not running, say so and suggest running `ollama serve`.
 
 After displaying findings, ask: "Would you like me to address any of these findings?"
-```
+
+````
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add .claude/commands/ai-review.md
 git commit -m "feat: /ai-review Claude Code slash command"
-```
+````
 
 ---
 
 ## Task 14: Calibration Suite
 
 **Files:**
+
 - Create: `calibration/fixtures/security.diff` (and 8 more)
 - Create: `calibration/calibrate.ts`
 
@@ -2274,6 +2458,7 @@ index 000000..111111 100644
 - [ ] **Step 5: Write remaining fixture diffs**
 
 Create `calibration/fixtures/design.diff`:
+
 ```diff
 diff --git a/src/reports/generator.ts b/src/reports/generator.ts
 index 000000..111111 100644
@@ -2300,6 +2485,7 @@ index 000000..111111 100644
 ```
 
 Create `calibration/fixtures/dependencies.diff`:
+
 ```diff
 diff --git a/package.json b/package.json
 index 000000..111111 100644
@@ -2317,6 +2503,7 @@ index 000000..111111 100644
 ```
 
 Create `calibration/fixtures/adversarial.diff`:
+
 ```diff
 diff --git a/src/api/handler.ts b/src/api/handler.ts
 index 000000..111111 100644
@@ -2335,6 +2522,7 @@ index 000000..111111 100644
 ```
 
 Create `calibration/fixtures/integration.diff`:
+
 ```diff
 diff --git a/src/webhooks/handler.ts b/src/webhooks/handler.ts
 index 000000..111111 100644
@@ -2358,6 +2546,7 @@ index 000000..111111 100644
 ```
 
 Create `calibration/fixtures/testgen.diff` (same as coverage.diff — TestGen reads CoverageAnalyst output):
+
 ```diff
 diff --git a/src/billing/invoice.ts b/src/billing/invoice.ts
 index 000000..111111 100644
@@ -2390,14 +2579,29 @@ import type { Finding } from '../src/core/schema.js'
 interface CalibrationCase {
   name: string
   fixtureFile: string
-  expectedKeyword: string   // word that should appear in a legitimate finding title
-  baitKeyword: string       // word that should NOT appear in findings (false positive)
+  expectedKeyword: string // word that should appear in a legitimate finding title
+  baitKeyword: string // word that should NOT appear in findings (false positive)
 }
 
 const CASES: CalibrationCase[] = [
-  { name: 'Security', fixtureFile: 'calibration/fixtures/security.diff', expectedKeyword: 'injection', baitKeyword: 'CONFIG_KEY' },
-  { name: 'Performance', fixtureFile: 'calibration/fixtures/performance.diff', expectedKeyword: 'N+1', baitKeyword: 'sumArray' },
-  { name: 'Correctness', fixtureFile: 'calibration/fixtures/correctness.diff', expectedKeyword: 'off-by-one', baitKeyword: 'isAdult' }
+  {
+    name: 'Security',
+    fixtureFile: 'calibration/fixtures/security.diff',
+    expectedKeyword: 'injection',
+    baitKeyword: 'CONFIG_KEY',
+  },
+  {
+    name: 'Performance',
+    fixtureFile: 'calibration/fixtures/performance.diff',
+    expectedKeyword: 'N+1',
+    baitKeyword: 'sumArray',
+  },
+  {
+    name: 'Correctness',
+    fixtureFile: 'calibration/fixtures/correctness.diff',
+    expectedKeyword: 'off-by-one',
+    baitKeyword: 'isAdult',
+  },
 ]
 
 async function main() {
@@ -2419,18 +2623,19 @@ async function main() {
     const agentMap: Record<string, { run: (input: { diff: string }) => Promise<Finding[]> }> = {
       Security: new SecurityAgent(provider, DEFAULT_CONFIG),
       Performance: new PerformanceAgent(provider, DEFAULT_CONFIG),
-      Correctness: new CorrectnessAgent(provider, DEFAULT_CONFIG)
+      Correctness: new CorrectnessAgent(provider, DEFAULT_CONFIG),
     }
 
     const rawFindings = await agentMap[c.name].run({ diff })
     const findings = orch.synthesize(rawFindings)
 
-    const hasLegitimate = findings.some(f =>
-      f.title.toLowerCase().includes(c.expectedKeyword.toLowerCase()) ||
-      f.detail.toLowerCase().includes(c.expectedKeyword.toLowerCase())
+    const hasLegitimate = findings.some(
+      (f) =>
+        f.title.toLowerCase().includes(c.expectedKeyword.toLowerCase()) ||
+        f.detail.toLowerCase().includes(c.expectedKeyword.toLowerCase())
     )
-    const hasBait = findings.some(f =>
-      f.title.includes(c.baitKeyword) || f.detail.includes(c.baitKeyword)
+    const hasBait = findings.some(
+      (f) => f.title.includes(c.baitKeyword) || f.detail.includes(c.baitKeyword)
     )
 
     if (hasLegitimate && !hasBait) {
@@ -2447,7 +2652,10 @@ async function main() {
   process.exit(failed > 0 ? 1 : 0)
 }
 
-main().catch(err => { console.error(err); process.exit(1) })
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})
 ```
 
 - [ ] **Step 7: Commit**
@@ -2462,6 +2670,7 @@ git commit -m "feat: calibration suite — per-agent fixtures with real findings
 ## Task 15: Integration Test
 
 **Files:**
+
 - Create: `tests/integration/e2e.test.ts`
 
 - [ ] **Step 1: Write tests/integration/e2e.test.ts**
@@ -2494,10 +2703,11 @@ describe('SwarmRunner e2e (requires Ollama)', () => {
     const result = await runner.run({ diff })
 
     expect(result.findings.length).toBeGreaterThan(0)
-    const hasSQLFinding = result.findings.some(f =>
-      f.detail.toLowerCase().includes('injection') ||
-      f.title.toLowerCase().includes('injection') ||
-      f.detail.toLowerCase().includes('sql')
+    const hasSQLFinding = result.findings.some(
+      (f) =>
+        f.detail.toLowerCase().includes('injection') ||
+        f.title.toLowerCase().includes('injection') ||
+        f.detail.toLowerCase().includes('sql')
     )
     expect(hasSQLFinding).toBe(true)
     expect(result.summary.durationMs).toBeGreaterThan(0)
@@ -2517,6 +2727,7 @@ git commit -m "test: integration e2e test against real Ollama (security fixture)
 ## Task 16: Final Wiring + Spec Doc Commit
 
 **Files:**
+
 - Verify: `src/core/` barrel exports work end-to-end
 - Copy spec to: `docs/superpowers/specs/2026-06-04-ai-code-review-agent-design.md` (already created)
 
@@ -2578,8 +2789,8 @@ npm run test:integration   # e2e — requires Ollama
 
 ## Key Reuse Notes
 
-| Source file | Reuse target | What to port |
-|---|---|---|
-| `Google-Organizer/src/workers/ollamaClient.ts` | `src/core/llm/ollamaProvider.ts` | `pingOllama`, fetch pattern, think-tag strip, multi-stage parse |
-| `ai-code-review-agent` branch `review-agent.js` | `src/adapters/github.ts` | Comment upsert PATCH pattern, Step Summary table |
-| PMB `standards/CODE-REVIEW.md` | `src/core/schema.ts` | `Basis` values (VERIFIED/INFERRED/SPECULATIVE) |
+| Source file                                     | Reuse target                     | What to port                                                    |
+| ----------------------------------------------- | -------------------------------- | --------------------------------------------------------------- |
+| `Google-Organizer/src/workers/ollamaClient.ts`  | `src/core/llm/ollamaProvider.ts` | `pingOllama`, fetch pattern, think-tag strip, multi-stage parse |
+| `ai-code-review-agent` branch `review-agent.js` | `src/adapters/github.ts`         | Comment upsert PATCH pattern, Step Summary table                |
+| PMB `standards/CODE-REVIEW.md`                  | `src/core/schema.ts`             | `Basis` values (VERIFIED/INFERRED/SPECULATIVE)                  |

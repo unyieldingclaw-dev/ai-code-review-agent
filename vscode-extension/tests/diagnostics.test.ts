@@ -4,9 +4,15 @@ import type { Finding } from '../src/types'
 
 function makeFinding(overrides: Partial<Finding> = {}): Finding {
   return {
-    id: 'f1', agent: 'security', severity: 'high', basis: 'VERIFIED',
-    file: 'src/auth.ts', line: 10, title: 'Test Finding',
-    detail: 'Detail text', suggestion: 'Fix it',
+    id: 'f1',
+    agent: 'security',
+    severity: 'high',
+    basis: 'VERIFIED',
+    file: 'src/auth.ts',
+    line: 10,
+    title: 'Test Finding',
+    detail: 'Detail text',
+    suggestion: 'Fix it',
     ...overrides,
   }
 }
@@ -30,7 +36,9 @@ describe('applyDiagnostics', () => {
     applyDiagnostics(collection as any, [makeFinding({ severity: 'critical' })], '/workspace')
     expect(collection.set).toHaveBeenCalledWith(
       expect.anything(),
-      expect.arrayContaining([expect.objectContaining({ severity: vscode.DiagnosticSeverity.Error })])
+      expect.arrayContaining([
+        expect.objectContaining({ severity: vscode.DiagnosticSeverity.Error }),
+      ])
     )
   })
 
@@ -39,7 +47,9 @@ describe('applyDiagnostics', () => {
     applyDiagnostics(collection as any, [makeFinding({ severity: 'high' })], '/workspace')
     expect(collection.set).toHaveBeenCalledWith(
       expect.anything(),
-      expect.arrayContaining([expect.objectContaining({ severity: vscode.DiagnosticSeverity.Error })])
+      expect.arrayContaining([
+        expect.objectContaining({ severity: vscode.DiagnosticSeverity.Error }),
+      ])
     )
   })
 
@@ -48,7 +58,9 @@ describe('applyDiagnostics', () => {
     applyDiagnostics(collection as any, [makeFinding({ severity: 'medium' })], '/workspace')
     expect(collection.set).toHaveBeenCalledWith(
       expect.anything(),
-      expect.arrayContaining([expect.objectContaining({ severity: vscode.DiagnosticSeverity.Warning })])
+      expect.arrayContaining([
+        expect.objectContaining({ severity: vscode.DiagnosticSeverity.Warning }),
+      ])
     )
   })
 
@@ -57,7 +69,9 @@ describe('applyDiagnostics', () => {
     applyDiagnostics(collection as any, [makeFinding({ severity: 'low' })], '/workspace')
     expect(collection.set).toHaveBeenCalledWith(
       expect.anything(),
-      expect.arrayContaining([expect.objectContaining({ severity: vscode.DiagnosticSeverity.Information })])
+      expect.arrayContaining([
+        expect.objectContaining({ severity: vscode.DiagnosticSeverity.Information }),
+      ])
     )
   })
 
@@ -91,10 +105,14 @@ describe('applyDiagnostics', () => {
 
   it('calls collection.set once per unique file', async () => {
     const { applyDiagnostics } = await import('../src/diagnostics')
-    applyDiagnostics(collection as any, [
-      makeFinding({ id: 'f1', file: 'src/a.ts', line: 1 }),
-      makeFinding({ id: 'f2', file: 'src/b.ts', line: 2 }),
-    ], '/workspace')
+    applyDiagnostics(
+      collection as any,
+      [
+        makeFinding({ id: 'f1', file: 'src/a.ts', line: 1 }),
+        makeFinding({ id: 'f2', file: 'src/b.ts', line: 2 }),
+      ],
+      '/workspace'
+    )
     expect(collection.set).toHaveBeenCalledTimes(2)
   })
 

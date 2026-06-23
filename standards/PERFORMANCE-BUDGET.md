@@ -20,14 +20,14 @@ This document defines explicit limits to prevent gradual context bloat.
 
 ## Limits
 
-| Dimension | Limit | Action if Exceeded |
-|-----------|-------|-------------------|
-| Standards files (`standards/`) | ≤ 20 | Archive or merge redundant standards |
-| Memory bank entries (lines in `progress.md`) | ≤ 50 | Run `mb archive` |
-| Agent delegations per command | ≤ 1 | Refactor to inline or batch |
-| Default scan scope | Changed files first | Full-repo is explicit opt-in only |
-| Full-repo scan | Explicit request only | Never triggered automatically |
-| Fixture files per security rule | 1 | Keep fixtures minimal |
+| Dimension                                    | Limit                 | Action if Exceeded                   |
+| -------------------------------------------- | --------------------- | ------------------------------------ |
+| Standards files (`standards/`)               | ≤ 20                  | Archive or merge redundant standards |
+| Memory bank entries (lines in `progress.md`) | ≤ 50                  | Run `mb archive`                     |
+| Agent delegations per command                | ≤ 1                   | Refactor to inline or batch          |
+| Default scan scope                           | Changed files first   | Full-repo is explicit opt-in only    |
+| Full-repo scan                               | Explicit request only | Never triggered automatically        |
+| Fixture files per security rule              | 1                     | Keep fixtures minimal                |
 
 ## Why These Limits
 

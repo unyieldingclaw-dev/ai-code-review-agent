@@ -12,34 +12,34 @@
 
 ## File Map
 
-| File | Operation | Responsibility |
-|------|-----------|----------------|
-| `src/core/schema.ts` | Modify | Add 5 new AgentName union members |
-| `src/core/config.ts` | Modify | Add `preferredSecretsScanner?` and `complexityThreshold?` to interface; add 5 agents to DEFAULT_CONFIG in Step 9 only |
-| `src/core/runner.ts` | Modify | Add helpers + 5 imports + 5 buildAgents entries + migration conditional |
-| `src/core/agents/orchestrator.ts` | Modify | Append 5 new names to AGENT_PRIORITY array |
-| `src/utils/shell.ts` | Create | `runTool()` — spawn helper, null on ENOENT, resolve on close event |
-| `src/core/agents/errorHandling.ts` | Create | Pure LLM agent for swallowed exceptions and ignored rejections |
-| `src/core/agents/observability.ts` | Create | Pure LLM agent for missing log output on new code paths |
-| `src/core/agents/migrationSafety.ts` | Create | Pure LLM agent for migration anti-patterns (conditional execution) |
-| `src/core/agents/secrets.ts` | Create | Hybrid: gitleaks/trufflehog + LLM, deduped by file:line |
-| `src/core/agents/complexity.ts` | Create | Hybrid: lizard CCN metrics + LLM, threshold configurable |
-| `tests/unit/errorHandlingAgent.test.ts` | Create | 5 tests |
-| `tests/unit/observabilityAgent.test.ts` | Create | 5 tests |
-| `tests/unit/migrationSafetyAgent.test.ts` | Create | 5 tests |
-| `tests/unit/secretsAgent.test.ts` | Create | 5 tests (mocks shell.ts) |
-| `tests/unit/complexityAgent.test.ts` | Create | 5 tests (mocks shell.ts) |
-| `tests/unit/runner.test.ts` | Modify | Fix onProgress test + add migration exclusion test |
-| `calibration/calibrate.ts` | Modify | 5 new imports + 5 CASES + 5 agentMap entries |
-| `calibration/fixtures/secrets.diff` | Create | Fixture with hardcoded Stripe live key |
-| `calibration/fixtures/error-handling.diff` | Create | Fixture with empty catch block |
-| `calibration/fixtures/observability.diff` | Create | Fixture with unlogged payment failure path |
-| `calibration/fixtures/migration-safety.diff` | Create | Fixture with NOT NULL without DEFAULT |
-| `calibration/fixtures/complexity.diff` | Create | Fixture with high-CCN invoice processor |
-| `package.json` | Modify | Bump version to 0.8.0 (Step 9) |
-| `README.md` | Modify | Document new agents and config fields (Step 9) |
-| `memory-bank/activeContext.md` | Modify | Update current focus (Step 9) |
-| `memory-bank/progress.md` | Modify | Mark v0.8.0 complete (Step 9) |
+| File                                         | Operation | Responsibility                                                                                                        |
+| -------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------- |
+| `src/core/schema.ts`                         | Modify    | Add 5 new AgentName union members                                                                                     |
+| `src/core/config.ts`                         | Modify    | Add `preferredSecretsScanner?` and `complexityThreshold?` to interface; add 5 agents to DEFAULT_CONFIG in Step 9 only |
+| `src/core/runner.ts`                         | Modify    | Add helpers + 5 imports + 5 buildAgents entries + migration conditional                                               |
+| `src/core/agents/orchestrator.ts`            | Modify    | Append 5 new names to AGENT_PRIORITY array                                                                            |
+| `src/utils/shell.ts`                         | Create    | `runTool()` — spawn helper, null on ENOENT, resolve on close event                                                    |
+| `src/core/agents/errorHandling.ts`           | Create    | Pure LLM agent for swallowed exceptions and ignored rejections                                                        |
+| `src/core/agents/observability.ts`           | Create    | Pure LLM agent for missing log output on new code paths                                                               |
+| `src/core/agents/migrationSafety.ts`         | Create    | Pure LLM agent for migration anti-patterns (conditional execution)                                                    |
+| `src/core/agents/secrets.ts`                 | Create    | Hybrid: gitleaks/trufflehog + LLM, deduped by file:line                                                               |
+| `src/core/agents/complexity.ts`              | Create    | Hybrid: lizard CCN metrics + LLM, threshold configurable                                                              |
+| `tests/unit/errorHandlingAgent.test.ts`      | Create    | 5 tests                                                                                                               |
+| `tests/unit/observabilityAgent.test.ts`      | Create    | 5 tests                                                                                                               |
+| `tests/unit/migrationSafetyAgent.test.ts`    | Create    | 5 tests                                                                                                               |
+| `tests/unit/secretsAgent.test.ts`            | Create    | 5 tests (mocks shell.ts)                                                                                              |
+| `tests/unit/complexityAgent.test.ts`         | Create    | 5 tests (mocks shell.ts)                                                                                              |
+| `tests/unit/runner.test.ts`                  | Modify    | Fix onProgress test + add migration exclusion test                                                                    |
+| `calibration/calibrate.ts`                   | Modify    | 5 new imports + 5 CASES + 5 agentMap entries                                                                          |
+| `calibration/fixtures/secrets.diff`          | Create    | Fixture with hardcoded Stripe live key                                                                                |
+| `calibration/fixtures/error-handling.diff`   | Create    | Fixture with empty catch block                                                                                        |
+| `calibration/fixtures/observability.diff`    | Create    | Fixture with unlogged payment failure path                                                                            |
+| `calibration/fixtures/migration-safety.diff` | Create    | Fixture with NOT NULL without DEFAULT                                                                                 |
+| `calibration/fixtures/complexity.diff`       | Create    | Fixture with high-CCN invoice processor                                                                               |
+| `package.json`                               | Modify    | Bump version to 0.8.0 (Step 9)                                                                                        |
+| `README.md`                                  | Modify    | Document new agents and config fields (Step 9)                                                                        |
+| `memory-bank/activeContext.md`               | Modify    | Update current focus (Step 9)                                                                                         |
+| `memory-bank/progress.md`                    | Modify    | Mark v0.8.0 complete (Step 9)                                                                                         |
 
 **CRITICAL ordering rule:** Do NOT add new agent names to `DEFAULT_CONFIG.agents` until Step 9. If added before being registered in the `buildAgents` Map, runner.ts warns and returns `[]` for unknown agents — `onProgress` is never called for them — causing the `progress.length` assertion in runner.test.ts to fail.
 
@@ -48,6 +48,7 @@
 ## Task 0: Write and commit design doc
 
 **Files:**
+
 - Create: `docs/superpowers/specs/2026-06-14-new-specialist-agents-design.md`
 
 - [ ] **Step 1: Write the design doc**
@@ -70,6 +71,7 @@ git commit -m "docs: add v0.8.0 new specialist agents design spec"
 ## Task 1: Foundation — schema, config interface, shell utility
 
 **Files:**
+
 - Modify: `src/core/schema.ts`
 - Modify: `src/core/config.ts`
 - Create: `src/utils/shell.ts`
@@ -81,14 +83,36 @@ Find the current AgentName type (11 members) and append 5 new ones:
 ```typescript
 // Before (line ~5):
 export type AgentName =
-  'security' | 'performance' | 'correctness' | 'design' | 'dependencies' |
-  'coverage' | 'testgen' | 'adversarial' | 'integration' | 'breaking-change' | 'license'
+  | 'security'
+  | 'performance'
+  | 'correctness'
+  | 'design'
+  | 'dependencies'
+  | 'coverage'
+  | 'testgen'
+  | 'adversarial'
+  | 'integration'
+  | 'breaking-change'
+  | 'license'
 
 // After:
 export type AgentName =
-  'security' | 'performance' | 'correctness' | 'design' | 'dependencies' |
-  'coverage' | 'testgen' | 'adversarial' | 'integration' | 'breaking-change' | 'license' |
-  'secrets' | 'error-handling' | 'observability' | 'migration-safety' | 'complexity'
+  | 'security'
+  | 'performance'
+  | 'correctness'
+  | 'design'
+  | 'dependencies'
+  | 'coverage'
+  | 'testgen'
+  | 'adversarial'
+  | 'integration'
+  | 'breaking-change'
+  | 'license'
+  | 'secrets'
+  | 'error-handling'
+  | 'observability'
+  | 'migration-safety'
+  | 'complexity'
 ```
 
 - [ ] **Step 2: Add 2 optional fields to `ReviewConfig` interface in `src/core/config.ts`**
@@ -111,9 +135,11 @@ export function runTool(cmd: string, args: string[], stdinData?: string): Promis
   return new Promise((resolve, reject) => {
     let stdout = ''
     const proc = spawn(cmd, args, {
-      stdio: stdinData !== undefined ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe']
+      stdio: stdinData !== undefined ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'],
     })
-    proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
+    proc.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString()
+    })
     proc.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'ENOENT') resolve(null)
       else reject(err)
@@ -149,6 +175,7 @@ git commit -m "feat: foundation for v0.8.0 — schema, config interface, shell u
 ## Task 2: ErrorHandlingAgent (pure LLM)
 
 **Files:**
+
 - Create: `tests/unit/errorHandlingAgent.test.ts`
 - Create: `src/core/agents/errorHandling.ts`
 - Modify: `src/core/runner.ts`
@@ -165,7 +192,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('ErrorHandlingAgent', () => {
@@ -180,12 +207,17 @@ describe('ErrorHandlingAgent', () => {
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'high', basis: 'VERIFIED', file: 'src/api.ts', line: 10,
-      title: 'Swallowed exception in fetchUser',
-      detail: 'The catch block is empty',
-      suggestion: 'Rethrow the error'
-    }])
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'src/api.ts',
+        line: 10,
+        title: 'Swallowed exception in fetchUser',
+        detail: 'The catch block is empty',
+        suggestion: 'Rethrow the error',
+      },
+    ])
     const agent = new ErrorHandlingAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
@@ -221,7 +253,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class ErrorHandlingAgent extends BaseAgent {
-  get name(): AgentName { return 'error-handling' }
+  get name(): AgentName {
+    return 'error-handling'
+  }
 
   get systemPrompt(): string {
     return `You are a code reviewer specializing in error handling quality.
@@ -244,11 +278,13 @@ Required format:
 - [ ] **Step 4: Register in `src/core/runner.ts`**
 
 Add import after existing imports:
+
 ```typescript
 import { ErrorHandlingAgent } from './agents/errorHandling.js'
 ```
 
 Add entry to the `builders` Map inside `buildAgents()`:
+
 ```typescript
 ['error-handling', () => new ErrorHandlingAgent(provider, config)],
 ```
@@ -281,6 +317,7 @@ git commit -m "feat: add ErrorHandlingAgent"
 ## Task 3: ObservabilityAgent (pure LLM)
 
 **Files:**
+
 - Create: `tests/unit/observabilityAgent.test.ts`
 - Create: `src/core/agents/observability.ts`
 - Modify: `src/core/runner.ts`
@@ -297,7 +334,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('ObservabilityAgent', () => {
@@ -307,16 +344,23 @@ describe('ObservabilityAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new ObservabilityAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new ObservabilityAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'medium', basis: 'INFERRED', file: 'src/payment.ts', line: 15,
-      title: 'Missing log on payment failure path',
-      detail: 'The error branch returns false with no log output',
-      suggestion: 'Add a structured log entry on payment failure'
-    }])
+    const raw = JSON.stringify([
+      {
+        severity: 'medium',
+        basis: 'INFERRED',
+        file: 'src/payment.ts',
+        line: 15,
+        title: 'Missing log on payment failure path',
+        detail: 'The error branch returns false with no log output',
+        suggestion: 'Add a structured log entry on payment failure',
+      },
+    ])
     const agent = new ObservabilityAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
@@ -325,7 +369,9 @@ describe('ObservabilityAgent', () => {
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new ObservabilityAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new ObservabilityAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('system prompt mentions logging and observability', () => {
@@ -351,7 +397,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class ObservabilityAgent extends BaseAgent {
-  get name(): AgentName { return 'observability' }
+  get name(): AgentName {
+    return 'observability'
+  }
 
   get systemPrompt(): string {
     return `You are a code reviewer specializing in observability and logging quality.
@@ -373,11 +421,13 @@ Required format:
 - [ ] **Step 4: Register in `src/core/runner.ts`**
 
 Add import:
+
 ```typescript
 import { ObservabilityAgent } from './agents/observability.js'
 ```
 
 Add entry to builders Map:
+
 ```typescript
 ['observability', () => new ObservabilityAgent(provider, config)],
 ```
@@ -410,6 +460,7 @@ git commit -m "feat: add ObservabilityAgent"
 ## Task 4: MigrationSafetyAgent (pure LLM + conditional runner)
 
 **Files:**
+
 - Create: `tests/unit/migrationSafetyAgent.test.ts`
 - Create: `src/core/agents/migrationSafety.ts`
 - Modify: `src/core/runner.ts` (helpers + import + Map entry + conditional logic)
@@ -427,26 +478,35 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('MigrationSafetyAgent', () => {
   it('has name migration-safety', () => {
-    expect(new MigrationSafetyAgent(makeProvider('[]'), DEFAULT_CONFIG).name).toBe('migration-safety')
+    expect(new MigrationSafetyAgent(makeProvider('[]'), DEFAULT_CONFIG).name).toBe(
+      'migration-safety'
+    )
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new MigrationSafetyAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'sql' })).toEqual([])
+    expect(
+      await new MigrationSafetyAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'sql' })
+    ).toEqual([])
   })
 
   it('parses a critical finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{
-      severity: 'critical', basis: 'VERIFIED', confidence: 80,
-      file: 'migrations/20260614_add_col.sql', line: 3,
-      title: 'NOT NULL column without DEFAULT',
-      detail: 'Adding NOT NULL column without DEFAULT fails on non-empty tables',
-      suggestion: 'Add a DEFAULT value or make the column nullable initially'
-    }])
+    const raw = JSON.stringify([
+      {
+        severity: 'critical',
+        basis: 'VERIFIED',
+        confidence: 80,
+        file: 'migrations/20260614_add_col.sql',
+        line: 3,
+        title: 'NOT NULL column without DEFAULT',
+        detail: 'Adding NOT NULL column without DEFAULT fails on non-empty tables',
+        suggestion: 'Add a DEFAULT value or make the column nullable initially',
+      },
+    ])
     const agent = new MigrationSafetyAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
@@ -455,7 +515,9 @@ describe('MigrationSafetyAgent', () => {
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new MigrationSafetyAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new MigrationSafetyAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('system prompt mentions NOT NULL and DROP statements', () => {
@@ -481,7 +543,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class MigrationSafetyAgent extends BaseAgent {
-  get name(): AgentName { return 'migration-safety' }
+  get name(): AgentName {
+    return 'migration-safety'
+  }
 
   get systemPrompt(): string {
     return `You are a database migration safety reviewer.
@@ -520,21 +584,24 @@ function extractFilePaths(diff: string): string[] {
 }
 
 function hasMigrationFiles(diff: string): boolean {
-  return extractFilePaths(diff).some(f =>
-    /migrations\//.test(f) ||
-    /\.migration\.(ts|js|sql)$/.test(f) ||
-    /versions\//.test(f) ||
-    /_up\.sql$/.test(f)
+  return extractFilePaths(diff).some(
+    (f) =>
+      /migrations\//.test(f) ||
+      /\.migration\.(ts|js|sql)$/.test(f) ||
+      /versions\//.test(f) ||
+      /_up\.sql$/.test(f)
   )
 }
 ```
 
 Add import:
+
 ```typescript
 import { MigrationSafetyAgent } from './agents/migrationSafety.js'
 ```
 
 Add entry to builders Map:
+
 ```typescript
 ['migration-safety', () => new MigrationSafetyAgent(provider, config)],
 ```
@@ -544,7 +611,7 @@ Replace line 146 (`const agents = buildAgents(this.config, this.provider)`) with
 ```typescript
 const effectiveAgents = hasMigrationFiles(input.diff)
   ? this.config.agents
-  : this.config.agents.filter(a => a !== 'migration-safety')
+  : this.config.agents.filter((a) => a !== 'migration-safety')
 const agents = buildAgents({ ...this.config, agents: effectiveAgents }, this.provider)
 ```
 
@@ -598,6 +665,7 @@ git commit -m "feat: add MigrationSafetyAgent with conditional execution"
 ## Task 5: SecretsAgent (hybrid — gitleaks/trufflehog + LLM)
 
 **Files:**
+
 - Create: `tests/unit/secretsAgent.test.ts`
 - Create: `src/core/agents/secrets.ts`
 - Modify: `src/core/runner.ts`
@@ -617,11 +685,13 @@ vi.mock('../../src/utils/shell.js', () => ({ runTool: vi.fn() }))
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('SecretsAgent', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('has name secrets', () => {
     expect(new SecretsAgent(makeProvider('[]'), DEFAULT_CONFIG).name).toBe('secrets')
@@ -629,10 +699,17 @@ describe('SecretsAgent', () => {
 
   it('returns LLM findings when scanner returns null (tool not installed)', async () => {
     vi.mocked(runTool).mockResolvedValue(null)
-    const raw = JSON.stringify([{
-      severity: 'high', basis: 'INFERRED', file: 'src/config.ts', line: 5,
-      title: 'Hardcoded credential', detail: 'Looks like an API key', suggestion: 'Use env var'
-    }])
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'INFERRED',
+        file: 'src/config.ts',
+        line: 5,
+        title: 'Hardcoded credential',
+        detail: 'Looks like an API key',
+        suggestion: 'Use env var',
+      },
+    ])
     const agent = new SecretsAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: '+const KEY = "abc123"' })
     expect(findings).toHaveLength(1)
@@ -640,10 +717,15 @@ describe('SecretsAgent', () => {
   })
 
   it('converts gitleaks JSON output to a critical finding', async () => {
-    const gitleaksOutput = JSON.stringify([{
-      Description: 'AWS Access Key', StartLine: 42, File: 'src/config.ts',
-      Secret: 'AKIAIOSFODNN7EXAMPLE', RuleID: 'aws-access-key-id'
-    }])
+    const gitleaksOutput = JSON.stringify([
+      {
+        Description: 'AWS Access Key',
+        StartLine: 42,
+        File: 'src/config.ts',
+        Secret: 'AKIAIOSFODNN7EXAMPLE',
+        RuleID: 'aws-access-key-id',
+      },
+    ])
     vi.mocked(runTool).mockResolvedValue(gitleaksOutput)
     const agent = new SecretsAgent(makeProvider('[]'), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: '+const KEY = "AKIAIOSFODNN7EXAMPLE"' })
@@ -653,14 +735,28 @@ describe('SecretsAgent', () => {
   })
 
   it('deduplicates tool and LLM findings at the same file:line', async () => {
-    vi.mocked(runTool).mockResolvedValue(JSON.stringify([{
-      Description: 'AWS Access Key', StartLine: 42, File: 'src/config.ts',
-      Secret: 'AKIAIOSFODNN7EXAMPLE', RuleID: 'aws-access-key-id'
-    }]))
-    const llmFinding = JSON.stringify([{
-      severity: 'high', basis: 'INFERRED', file: 'src/config.ts', line: 42,
-      title: 'Possible secret', detail: 'Looks like an API key', suggestion: 'Use env var'
-    }])
+    vi.mocked(runTool).mockResolvedValue(
+      JSON.stringify([
+        {
+          Description: 'AWS Access Key',
+          StartLine: 42,
+          File: 'src/config.ts',
+          Secret: 'AKIAIOSFODNN7EXAMPLE',
+          RuleID: 'aws-access-key-id',
+        },
+      ])
+    )
+    const llmFinding = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'INFERRED',
+        file: 'src/config.ts',
+        line: 42,
+        title: 'Possible secret',
+        detail: 'Looks like an API key',
+        suggestion: 'Use env var',
+      },
+    ])
     const agent = new SecretsAgent(makeProvider(llmFinding), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: '+const KEY = "AKIAIOSFODNN7EXAMPLE"' })
     expect(findings).toHaveLength(1)
@@ -668,10 +764,17 @@ describe('SecretsAgent', () => {
 
   it('skips scanner and uses LLM only when preferredSecretsScanner is none', async () => {
     const config = { ...DEFAULT_CONFIG, preferredSecretsScanner: 'none' as const }
-    const raw = JSON.stringify([{
-      severity: 'high', basis: 'INFERRED', file: 'src/auth.ts', line: 3,
-      title: 'Hardcoded token', detail: 'Base64 encoded credential', suggestion: 'Use env var'
-    }])
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'INFERRED',
+        file: 'src/auth.ts',
+        line: 3,
+        title: 'Hardcoded token',
+        detail: 'Base64 encoded credential',
+        suggestion: 'Use env var',
+      },
+    ])
     const agent = new SecretsAgent(makeProvider(raw), config)
     await agent.run({ diff: '+const TOKEN = "dXNlcjpwYXNz"' })
     expect(vi.mocked(runTool)).not.toHaveBeenCalled()
@@ -695,7 +798,9 @@ import { runTool } from '../../utils/shell.js'
 import type { AgentName, Finding, ReviewInput } from '../schema.js'
 
 export class SecretsAgent extends BaseAgent {
-  get name(): AgentName { return 'secrets' }
+  get name(): AgentName {
+    return 'secrets'
+  }
 
   get systemPrompt(): string {
     return `You are a security reviewer specializing in secret and credential detection.
@@ -721,7 +826,7 @@ Required format:
     }
     const [toolFindings, llmFindings] = await Promise.all([
       this.runScanner(scanner, input.diff),
-      super.run(input)
+      super.run(input),
     ])
     return this.mergeDedup([...toolFindings, ...llmFindings])
   }
@@ -740,7 +845,11 @@ Required format:
     if (!output) return []
     try {
       const hits = JSON.parse(output) as Array<{
-        Description: string; StartLine: number; File: string; Secret: string; RuleID: string
+        Description: string
+        StartLine: number
+        File: string
+        Secret: string
+        RuleID: string
       }>
       return hits.map((h, i) => ({
         id: `secrets-tool-${i}`,
@@ -752,9 +861,12 @@ Required format:
         line: h.StartLine,
         title: `Secret detected: ${h.Description}`,
         detail: `Rule ${h.RuleID} matched. Secret present in diff.`,
-        suggestion: 'Remove the secret from source, rotate it immediately, and use environment variables or a secrets manager.'
+        suggestion:
+          'Remove the secret from source, rotate it immediately, and use environment variables or a secrets manager.',
       }))
-    } catch { return [] }
+    } catch {
+      return []
+    }
   }
 
   private async runTrufflehog(diff: string): Promise<Finding[]> {
@@ -771,14 +883,21 @@ Required format:
         }
         const meta = hit.SourceMetadata?.Data?.Filesystem
         findings.push({
-          id: `secrets-tool-${i++}`, agent: this.name,
-          severity: 'critical' as const, basis: 'VERIFIED' as const, confidence: 95,
-          file: meta?.file ?? 'unknown', line: meta?.line ?? 0,
+          id: `secrets-tool-${i++}`,
+          agent: this.name,
+          severity: 'critical' as const,
+          basis: 'VERIFIED' as const,
+          confidence: 95,
+          file: meta?.file ?? 'unknown',
+          line: meta?.line ?? 0,
           title: `Secret detected: ${hit.DetectorName}`,
           detail: `TruffleHog detected a credential of type ${hit.DetectorName}.`,
-          suggestion: 'Remove the secret from source, rotate it immediately, and use environment variables or a secrets manager.'
+          suggestion:
+            'Remove the secret from source, rotate it immediately, and use environment variables or a secrets manager.',
         })
-      } catch { /* skip malformed lines */ }
+      } catch {
+        /* skip malformed lines */
+      }
     }
     return findings
   }
@@ -797,11 +916,13 @@ Required format:
 - [ ] **Step 4: Register in `src/core/runner.ts`**
 
 Add import:
+
 ```typescript
 import { SecretsAgent } from './agents/secrets.js'
 ```
 
 Add entry to builders Map:
+
 ```typescript
 ['secrets', () => new SecretsAgent(provider, config)],
 ```
@@ -834,6 +955,7 @@ git commit -m "feat: add SecretsAgent (hybrid gitleaks/LLM)"
 ## Task 6: ComplexityAgent (hybrid — lizard + LLM)
 
 **Files:**
+
 - Create: `tests/unit/complexityAgent.test.ts`
 - Create: `src/core/agents/complexity.ts`
 - Modify: `src/core/runner.ts`
@@ -853,11 +975,13 @@ vi.mock('../../src/utils/shell.js', () => ({ runTool: vi.fn() }))
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('ComplexityAgent', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('has name complexity', () => {
     expect(new ComplexityAgent(makeProvider('[]'), DEFAULT_CONFIG).name).toBe('complexity')
@@ -866,7 +990,7 @@ describe('ComplexityAgent', () => {
   it('falls back to LLM-only when lizard returns null', async () => {
     vi.mocked(runTool).mockResolvedValue(null)
     const findings = await new ComplexityAgent(makeProvider('[]'), DEFAULT_CONFIG).run({
-      diff: '+++ b/src/api.ts\n+const x = 1'
+      diff: '+++ b/src/api.ts\n+const x = 1',
     })
     expect(findings).toEqual([])
   })
@@ -874,7 +998,7 @@ describe('ComplexityAgent', () => {
   it('augments diff with COMPLEXITY METRICS when lizard finds high-CCN function', async () => {
     const csvOutput = [
       'NLOC,CCN,token_count,param_count,length,location,file_name,method_name,long_name,start_line,end_line',
-      '50,15,200,3,60,src/processor.ts:10,src/processor.ts,processData,processData( input ),10,70'
+      '50,15,200,3,60,src/processor.ts:10,src/processor.ts,processData,processData( input ),10,70',
     ].join('\n')
     vi.mocked(runTool).mockResolvedValue(csvOutput)
     const provider = makeProvider('[]')
@@ -888,11 +1012,13 @@ describe('ComplexityAgent', () => {
   it('does not prepend metrics when all functions are below threshold', async () => {
     const csvOutput = [
       'NLOC,CCN,token_count,param_count,length,location,file_name,method_name,long_name,start_line,end_line',
-      '10,5,50,1,12,src/utils.ts:1,src/utils.ts,helper,helper( x ),1,12'
+      '10,5,50,1,12,src/utils.ts:1,src/utils.ts,helper,helper( x ),1,12',
     ].join('\n')
     vi.mocked(runTool).mockResolvedValue(csvOutput)
     const provider = makeProvider('[]')
-    await new ComplexityAgent(provider, DEFAULT_CONFIG).run({ diff: '+++ b/src/utils.ts\n+function helper(x) {}' })
+    await new ComplexityAgent(provider, DEFAULT_CONFIG).run({
+      diff: '+++ b/src/utils.ts\n+function helper(x) {}',
+    })
     const messages = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(messages[1].content).not.toContain('COMPLEXITY METRICS')
   })
@@ -900,12 +1026,14 @@ describe('ComplexityAgent', () => {
   it('uses complexityThreshold from config', async () => {
     const csvOutput = [
       'NLOC,CCN,token_count,param_count,length,location,file_name,method_name,long_name,start_line,end_line',
-      '20,8,80,2,25,src/utils.ts:1,src/utils.ts,helper,helper( x ),1,25'
+      '20,8,80,2,25,src/utils.ts:1,src/utils.ts,helper,helper( x ),1,25',
     ].join('\n')
     vi.mocked(runTool).mockResolvedValue(csvOutput)
     const config = { ...DEFAULT_CONFIG, complexityThreshold: 7 }
     const provider = makeProvider('[]')
-    await new ComplexityAgent(provider, config).run({ diff: '+++ b/src/utils.ts\n+function helper(x) {}' })
+    await new ComplexityAgent(provider, config).run({
+      diff: '+++ b/src/utils.ts\n+function helper(x) {}',
+    })
     const messages = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(messages[1].content).toContain('COMPLEXITY METRICS')
     expect(messages[1].content).toContain('CCN=8')
@@ -929,7 +1057,9 @@ import { runTool } from '../../utils/shell.js'
 import type { AgentName, ReviewInput, Finding } from '../schema.js'
 
 export class ComplexityAgent extends BaseAgent {
-  get name(): AgentName { return 'complexity' }
+  get name(): AgentName {
+    return 'complexity'
+  }
 
   get systemPrompt(): string {
     return `You are a code reviewer specializing in cyclomatic complexity and maintainability.
@@ -967,9 +1097,13 @@ Required format:
       }
     }
 
-    const augmented: ReviewInput = metricsLines.length > 0
-      ? { ...input, diff: `[COMPLEXITY METRICS (threshold=${threshold})]\n${metricsLines.join('\n')}\n\n${input.diff}` }
-      : input
+    const augmented: ReviewInput =
+      metricsLines.length > 0
+        ? {
+            ...input,
+            diff: `[COMPLEXITY METRICS (threshold=${threshold})]\n${metricsLines.join('\n')}\n\n${input.diff}`,
+          }
+        : input
 
     return super.run(augmented)
   }
@@ -988,11 +1122,13 @@ Required format:
 - [ ] **Step 4: Register in `src/core/runner.ts`**
 
 Add import:
+
 ```typescript
 import { ComplexityAgent } from './agents/complexity.js'
 ```
 
 Add entry to builders Map:
+
 ```typescript
 ['complexity', () => new ComplexityAgent(provider, config)],
 ```
@@ -1025,6 +1161,7 @@ git commit -m "feat: add ComplexityAgent (hybrid lizard/LLM)"
 ## Task 7: OrchestratorAgent — append 5 names to AGENT_PRIORITY
 
 **Files:**
+
 - Modify: `src/core/agents/orchestrator.ts`
 
 Note: OrchestratorAgent is pure algorithmic — it has NO system prompt. Only the `AGENT_PRIORITY` array needs updating.
@@ -1036,15 +1173,37 @@ Find the current AGENT_PRIORITY array (should be at lines 7-10) and append the 5
 ```typescript
 // Before:
 const AGENT_PRIORITY: AgentName[] = [
-  'integration', 'breaking-change', 'coverage', 'testgen', 'adversarial',
-  'design', 'dependencies', 'license', 'correctness', 'performance', 'security'
+  'integration',
+  'breaking-change',
+  'coverage',
+  'testgen',
+  'adversarial',
+  'design',
+  'dependencies',
+  'license',
+  'correctness',
+  'performance',
+  'security',
 ]
 
 // After:
 const AGENT_PRIORITY: AgentName[] = [
-  'integration', 'breaking-change', 'coverage', 'testgen', 'adversarial',
-  'design', 'dependencies', 'license', 'correctness', 'performance', 'security',
-  'secrets', 'error-handling', 'observability', 'migration-safety', 'complexity'
+  'integration',
+  'breaking-change',
+  'coverage',
+  'testgen',
+  'adversarial',
+  'design',
+  'dependencies',
+  'license',
+  'correctness',
+  'performance',
+  'security',
+  'secrets',
+  'error-handling',
+  'observability',
+  'migration-safety',
+  'complexity',
 ]
 ```
 
@@ -1068,6 +1227,7 @@ git commit -m "feat: register 5 new agents in orchestrator priority list"
 ## Task 8: Calibration fixtures and calibrate.ts
 
 **Files:**
+
 - Create: `calibration/fixtures/secrets.diff`
 - Create: `calibration/fixtures/error-handling.diff`
 - Create: `calibration/fixtures/observability.diff`
@@ -1236,6 +1396,7 @@ git commit -m "feat: add calibration fixtures and entries for 5 new agents"
 ## Task 9: Wire up DEFAULT_CONFIG + docs + version bump
 
 **Files:**
+
 - Modify: `src/core/config.ts` (add 5 agents to DEFAULT_CONFIG.agents)
 - Modify: `package.json` (bump to 0.8.0)
 - Modify: `README.md`
@@ -1288,20 +1449,20 @@ Add a row for each new agent to the agent table. Add a new "Optional Dependencie
 
 These tools enhance specific agents when installed:
 
-| Tool | Agent | Install | Purpose |
-|------|-------|---------|---------|
-| `gitleaks` | SecretsAgent | [github.com/gitleaks/gitleaks](https://github.com/gitleaks/gitleaks) | High-confidence secret scanning via rule engine |
-| `trufflehog` | SecretsAgent | [github.com/trufflesecurity/trufflehog](https://github.com/trufflesecurity/trufflehog) | Alternative secrets scanner |
-| `lizard` | ComplexityAgent | `pip install lizard` | Per-function cyclomatic complexity metrics |
+| Tool         | Agent           | Install                                                                                | Purpose                                         |
+| ------------ | --------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `gitleaks`   | SecretsAgent    | [github.com/gitleaks/gitleaks](https://github.com/gitleaks/gitleaks)                   | High-confidence secret scanning via rule engine |
+| `trufflehog` | SecretsAgent    | [github.com/trufflesecurity/trufflehog](https://github.com/trufflesecurity/trufflehog) | Alternative secrets scanner                     |
+| `lizard`     | ComplexityAgent | `pip install lizard`                                                                   | Per-function cyclomatic complexity metrics      |
 
 Agents fall back to LLM-only analysis when tools are not installed.
 
 ## New Config Fields (v0.8.0)
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| Field                     | Type                                   | Default      | Description                                      |
+| ------------------------- | -------------------------------------- | ------------ | ------------------------------------------------ |
 | `preferredSecretsScanner` | `'gitleaks' \| 'trufflehog' \| 'none'` | `'gitleaks'` | Scanner for SecretsAgent; `'none'` uses LLM only |
-| `complexityThreshold` | `number` | `10` | Minimum CCN to flag in ComplexityAgent |
+| `complexityThreshold`     | `number`                               | `10`         | Minimum CCN to flag in ComplexityAgent           |
 ```
 
 - [ ] **Step 5: Update memory-bank files**
@@ -1370,6 +1531,7 @@ Expected: CI triggers, npm publish workflow runs.
 ## Self-Review Checklist
 
 **Spec coverage:**
+
 - SecretsAgent (hybrid + dedup + config) — Tasks 5, 8, 9 ✓
 - ErrorHandlingAgent (pure LLM) — Tasks 2, 8, 9 ✓
 - ObservabilityAgent (pure LLM) — Tasks 3, 8, 9 ✓
@@ -1381,6 +1543,7 @@ Expected: CI triggers, npm publish workflow runs.
 - DEFAULT_CONFIG ordering constraint — documented in file map and Task 9 ✓
 
 **Type consistency:**
+
 - `runTool` signature: `(cmd: string, args: string[], stdinData?: string): Promise<string | null>` — consistent across shell.ts, secrets.ts, complexity.ts, tests
 - `AgentName` new members: `'secrets' | 'error-handling' | 'observability' | 'migration-safety' | 'complexity'` — added in schema.ts Task 1, used in all agent `get name()` returns
 - `Finding` shape with explicit `id` and `agent` fields — tool-constructed findings in secrets.ts set these manually before `mergeDedup` re-assigns IDs

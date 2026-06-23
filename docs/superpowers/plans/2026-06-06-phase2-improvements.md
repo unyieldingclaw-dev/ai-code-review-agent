@@ -12,29 +12,29 @@
 
 ## File Map
 
-| File | Action | Responsible for |
-|------|--------|-----------------|
-| `src/core/schema.ts` | Modify | Add `confidence` to Finding; add 'breaking-change' \| 'license' to AgentName |
-| `src/core/config.ts` | Modify | Add `sanitize: boolean`; add new agents to DEFAULT_CONFIG |
-| `src/core/sanitizer.ts` | **Create** | Prompt injection detection and redaction |
-| `src/core/agents/breakingChange.ts` | **Create** | Breaking-change detection agent |
-| `src/core/agents/licenseCompliance.ts` | **Create** | License compliance detection agent |
-| `src/core/agents/base.ts` | Modify | Default `confidence: 70` in validateFindings |
-| `src/core/agents/orchestrator.ts` | Modify | Confidence-aware hallucination downgrade; AGENT_PRIORITY additions |
-| `src/core/runner.ts` | Modify | Sanitizer call; wire BreakingChangeAgent and LicenseComplianceAgent |
-| `src/cli/index.ts` | Modify | Flatten review subcommand; rename flags; add --no-sanitize |
-| `src/cli/formatter.ts` | Modify | Show confidence in markdown output |
-| `tests/unit/sanitizer.test.ts` | **Create** | Sanitizer unit tests |
-| `tests/unit/breakingChangeAgent.test.ts` | **Create** | BreakingChangeAgent unit tests |
-| `tests/unit/licenseComplianceAgent.test.ts` | **Create** | LicenseComplianceAgent unit tests |
-| `tests/unit/confidence.test.ts` | **Create** | Confidence-scoring orchestrator tests |
-| `tests/unit/orchestrator.test.ts` | Modify | Update hallucination test to match new confidence-aware logic |
-| `.github/workflows/calibrate.yml` | **Create** | Weekly + release calibration CI job |
-| `README.md` | Modify | Full update: new flags, agents, confidence, sanitizer |
-| `CHANGELOG.md` | **Create** | Keep a Changelog format starting at v0.2.0 |
-| `memory-bank/activeContext.md` | Modify | Reflect completed phase 2 |
-| `memory-bank/progress.md` | Modify | Add phase 2 entries |
-| `.claude/commands/ai-review.md` | Modify | Updated flags in examples |
+| File                                        | Action     | Responsible for                                                              |
+| ------------------------------------------- | ---------- | ---------------------------------------------------------------------------- |
+| `src/core/schema.ts`                        | Modify     | Add `confidence` to Finding; add 'breaking-change' \| 'license' to AgentName |
+| `src/core/config.ts`                        | Modify     | Add `sanitize: boolean`; add new agents to DEFAULT_CONFIG                    |
+| `src/core/sanitizer.ts`                     | **Create** | Prompt injection detection and redaction                                     |
+| `src/core/agents/breakingChange.ts`         | **Create** | Breaking-change detection agent                                              |
+| `src/core/agents/licenseCompliance.ts`      | **Create** | License compliance detection agent                                           |
+| `src/core/agents/base.ts`                   | Modify     | Default `confidence: 70` in validateFindings                                 |
+| `src/core/agents/orchestrator.ts`           | Modify     | Confidence-aware hallucination downgrade; AGENT_PRIORITY additions           |
+| `src/core/runner.ts`                        | Modify     | Sanitizer call; wire BreakingChangeAgent and LicenseComplianceAgent          |
+| `src/cli/index.ts`                          | Modify     | Flatten review subcommand; rename flags; add --no-sanitize                   |
+| `src/cli/formatter.ts`                      | Modify     | Show confidence in markdown output                                           |
+| `tests/unit/sanitizer.test.ts`              | **Create** | Sanitizer unit tests                                                         |
+| `tests/unit/breakingChangeAgent.test.ts`    | **Create** | BreakingChangeAgent unit tests                                               |
+| `tests/unit/licenseComplianceAgent.test.ts` | **Create** | LicenseComplianceAgent unit tests                                            |
+| `tests/unit/confidence.test.ts`             | **Create** | Confidence-scoring orchestrator tests                                        |
+| `tests/unit/orchestrator.test.ts`           | Modify     | Update hallucination test to match new confidence-aware logic                |
+| `.github/workflows/calibrate.yml`           | **Create** | Weekly + release calibration CI job                                          |
+| `README.md`                                 | Modify     | Full update: new flags, agents, confidence, sanitizer                        |
+| `CHANGELOG.md`                              | **Create** | Keep a Changelog format starting at v0.2.0                                   |
+| `memory-bank/activeContext.md`              | Modify     | Reflect completed phase 2                                                    |
+| `memory-bank/progress.md`                   | Modify     | Add phase 2 entries                                                          |
+| `.claude/commands/ai-review.md`             | Modify     | Updated flags in examples                                                    |
 
 ---
 
@@ -43,6 +43,7 @@
 **Goal:** Flatten the implicit `review` subcommand into top-level flags. Rename three confusing flags. Add the `--no-sanitize` stub (wired in Task 3).
 
 **Files:**
+
 - Modify: `src/cli/index.ts`
 
 - [ ] **Step 1: Write the test (manual smoke — no unit test file for CLI flags)**
@@ -95,69 +96,83 @@
     .option('--out <path>', 'Write output to file instead of stdout')
     .option('--max-lines <n>', 'Truncate diff to this many lines (default: 2000)', parseInt)
     .option('--timeout <ms>', 'Per-agent timeout in milliseconds (default: 60000)', parseInt)
-    .option('--fail-on <level>', `Exit 1 when any finding meets this severity (${FAIL_ON_OPTIONS.join('|')}; default: high)`, 'high')
-    .option('--ignore <pattern>', 'Exclude files matching this glob pattern (repeatable)', collect, [] as string[])
+    .option(
+      '--fail-on <level>',
+      `Exit 1 when any finding meets this severity (${FAIL_ON_OPTIONS.join('|')}; default: high)`,
+      'high'
+    )
+    .option(
+      '--ignore <pattern>',
+      'Exclude files matching this glob pattern (repeatable)',
+      collect,
+      [] as string[]
+    )
     .option('--no-sanitize', 'Skip prompt-injection sanitization of the diff')
-    .action(async (options: {
-      diff?: string
-      dir?: string
-      model?: string
-      agents?: string
-      format: 'markdown' | 'json'
-      out?: string
-      maxLines?: number
-      timeout?: number
-      failOn: FailOnLevel
-      ignore: string[]
-      sanitize: boolean
-    }) => {
-      const projectPath = resolve(options.dir ?? process.cwd())
-      const config = loadConfig(projectPath)
+    .action(
+      async (options: {
+        diff?: string
+        dir?: string
+        model?: string
+        agents?: string
+        format: 'markdown' | 'json'
+        out?: string
+        maxLines?: number
+        timeout?: number
+        failOn: FailOnLevel
+        ignore: string[]
+        sanitize: boolean
+      }) => {
+        const projectPath = resolve(options.dir ?? process.cwd())
+        const config = loadConfig(projectPath)
 
-      if (options.model) config.model = options.model
-      if (options.agents) config.agents = options.agents.split(',').map(a => a.trim()) as AgentName[]
-      if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
-      if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
-      if (options.ignore.length > 0) config.ignorePaths = [...config.ignorePaths, ...options.ignore]
-      if (!options.sanitize) config.sanitize = false
+        if (options.model) config.model = options.model
+        if (options.agents)
+          config.agents = options.agents.split(',').map((a) => a.trim()) as AgentName[]
+        if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
+        if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
+        if (options.ignore.length > 0)
+          config.ignorePaths = [...config.ignorePaths, ...options.ignore]
+        if (!options.sanitize) config.sanitize = false
 
-      const diff = getDiff(options.diff, options.dir)
-      if (!diff.trim()) {
-        console.error('No diff to review. Stage changes or provide --diff.')
-        process.exit(1)
-      }
-
-      const provider = new OllamaProvider(config.ollamaUrl, config.model)
-      const runner = new SwarmRunner(config, provider)
-
-      process.stdout.write(`\n🔍 Running ai-review with ${config.agents.length} agents...\n\n`)
-
-      const result = await runner.run(
-        { diff, projectPath },
-        (agent) => process.stdout.write(`  ✓ ${agent}\n`)
-      )
-
-      if (result.testFiles.length > 0) {
-        for (const tf of result.testFiles) {
-          const outPath = join(projectPath, tf.path)
-          mkdirSync(join(outPath, '..'), { recursive: true })
-          writeFileSync(outPath, tf.content, 'utf-8')
+        const diff = getDiff(options.diff, options.dir)
+        if (!diff.trim()) {
+          console.error('No diff to review. Stage changes or provide --diff.')
+          process.exit(1)
         }
-        process.stdout.write(`\n📝 Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`)
+
+        const provider = new OllamaProvider(config.ollamaUrl, config.model)
+        const runner = new SwarmRunner(config, provider)
+
+        process.stdout.write(`\n🔍 Running ai-review with ${config.agents.length} agents...\n\n`)
+
+        const result = await runner.run({ diff, projectPath }, (agent) =>
+          process.stdout.write(`  ✓ ${agent}\n`)
+        )
+
+        if (result.testFiles.length > 0) {
+          for (const tf of result.testFiles) {
+            const outPath = join(projectPath, tf.path)
+            mkdirSync(join(outPath, '..'), { recursive: true })
+            writeFileSync(outPath, tf.content, 'utf-8')
+          }
+          process.stdout.write(
+            `\n📝 Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`
+          )
+        }
+
+        const output = options.format === 'json' ? formatJson(result) : formatMarkdown(result)
+
+        if (options.out) {
+          writeFileSync(options.out, output, 'utf-8')
+          process.stdout.write(`\n✅ Report written to ${options.out}\n`)
+        } else {
+          process.stdout.write('\n' + output + '\n')
+        }
+
+        const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
+        process.exit(hasBlocker ? 1 : 0)
       }
-
-      const output = options.format === 'json' ? formatJson(result) : formatMarkdown(result)
-
-      if (options.out) {
-        writeFileSync(options.out, output, 'utf-8')
-        process.stdout.write(`\n✅ Report written to ${options.out}\n`)
-      } else {
-        process.stdout.write('\n' + output + '\n')
-      }
-
-      const hasBlocker = result.findings.some(f => shouldFail(f.severity, options.failOn))
-      process.exit(hasBlocker ? 1 : 0)
-    })
+    )
 
   function collect(value: string, previous: string[]): string[] {
     return [...previous, value]
@@ -205,6 +220,7 @@
 **Goal:** Add `'breaking-change'` and `'license'` to `AgentName`; add optional `confidence` field to `Finding`; add `sanitize: boolean` to `ReviewConfig`.
 
 **Files:**
+
 - Modify: `src/core/schema.ts`
 - Modify: `src/core/config.ts`
 
@@ -284,7 +300,7 @@
     critical: 4,
     high: 3,
     medium: 2,
-    low: 1
+    low: 1,
   }
   ```
 
@@ -319,16 +335,24 @@
     anthropicModel: 'claude-sonnet-4-5',
     maxFindings: 15,
     agents: [
-      'security', 'performance', 'correctness', 'design', 'dependencies',
-      'coverage', 'testgen', 'adversarial', 'integration',
-      'breaking-change', 'license'
+      'security',
+      'performance',
+      'correctness',
+      'design',
+      'dependencies',
+      'coverage',
+      'testgen',
+      'adversarial',
+      'integration',
+      'breaking-change',
+      'license',
     ],
     contextLines: 10,
     testOutputDir: './ai-review-tests',
     maxDiffLines: 2000,
     agentTimeoutMs: 60000,
     ignorePaths: [],
-    sanitize: true
+    sanitize: true,
   }
 
   export function loadConfig(projectPath: string): ReviewConfig {
@@ -366,6 +390,7 @@
 **Goal:** Before any diff reaches agents, detect LLM-manipulating patterns in added lines and replace them with `[REDACTED]`. Wire into SwarmRunner respecting `config.sanitize`.
 
 **Files:**
+
 - Create: `src/core/sanitizer.ts`
 - Modify: `src/core/runner.ts`
 - Create: `tests/unit/sanitizer.test.ts`
@@ -429,7 +454,7 @@
     })
 
     it('does NOT redact short base64-looking strings (< 80 chars)', () => {
-      const short = 'SGVsbG8gV29ybGQ='  // "Hello World" — 16 chars
+      const short = 'SGVsbG8gV29ybGQ=' // "Hello World" — 16 chars
       const diff = `+const token = "${short}"`
       const { sanitized, warnings } = sanitizeDiff(diff)
       expect(sanitized).toBe(diff)
@@ -469,12 +494,18 @@
   const INJECTION_PATTERNS: InjectionPattern[] = [
     { pattern: /SYSTEM:/i, label: 'SYSTEM: directive' },
     { pattern: /ignore\s+(?:all\s+)?previous\s+instructions?/i, label: 'instruction override' },
-    { pattern: /you\s+are\s+now\s+(?:a\s+|an\s+)?[\w\s]{1,30}(?:AI|assistant|bot|model)/i, label: 'role reassignment' },
+    {
+      pattern: /you\s+are\s+now\s+(?:a\s+|an\s+)?[\w\s]{1,30}(?:AI|assistant|bot|model)/i,
+      label: 'role reassignment',
+    },
     { pattern: /act\s+as\s+(?:a|an)\s+/i, label: 'role-play directive' },
     { pattern: /pretend\s+(?:you\s+are|to\s+be)\s+/i, label: 'role-play directive' },
     { pattern: /forget\s+(?:your|all)\s+(?:previous|prior)\s+/i, label: 'instruction wipe' },
     { pattern: /disregard\s+(?:the\s+)?(?:previous|prior|above)\s+/i, label: 'instruction wipe' },
-    { pattern: /new\s+(?:role|persona|system\s+prompt|instructions?)\s*:/i, label: 'persona injection' },
+    {
+      pattern: /new\s+(?:role|persona|system\s+prompt|instructions?)\s*:/i,
+      label: 'persona injection',
+    },
     { pattern: /\[\[INSTRUCTIONS?\]\]/i, label: 'instruction tag' },
     { pattern: /[A-Za-z0-9+/]{80,}={0,2}/, label: 'potential base64 payload' },
   ]
@@ -491,7 +522,7 @@
    */
   export function sanitizeDiff(diff: string): SanitizeResult {
     const warnings: string[] = []
-    const sanitizedLines = diff.split('\n').map(line => {
+    const sanitizedLines = diff.split('\n').map((line) => {
       // Only scan added lines, skip the diff header lines ('+++ b/...')
       if (!line.startsWith('+') || line.startsWith('+++')) return line
 
@@ -567,6 +598,7 @@
 **Goal:** Add a specialist agent that detects API/interface signature changes that could break callers. Reports as High severity.
 
 **Files:**
+
 - Create: `src/core/agents/breakingChange.ts`
 - Modify: `src/core/runner.ts`
 - Modify: `src/core/agents/orchestrator.ts` (AGENT_PRIORITY)
@@ -582,7 +614,7 @@
 
   const makeProvider = (response: string): LLMProvider => ({
     chat: vi.fn().mockResolvedValue(response),
-    ping: vi.fn().mockResolvedValue({ ok: true })
+    ping: vi.fn().mockResolvedValue({ ok: true }),
   })
 
   describe('BreakingChangeAgent', () => {
@@ -598,15 +630,17 @@
     })
 
     it('parses a valid finding and stamps agent name', async () => {
-      const raw = JSON.stringify([{
-        severity: 'high',
-        basis: 'VERIFIED',
-        file: 'src/api.ts',
-        line: 42,
-        title: 'Removed export: createUser',
-        detail: 'The exported function createUser was deleted',
-        suggestion: 'Add a deprecation shim or update all callers'
-      }])
+      const raw = JSON.stringify([
+        {
+          severity: 'high',
+          basis: 'VERIFIED',
+          file: 'src/api.ts',
+          line: 42,
+          title: 'Removed export: createUser',
+          detail: 'The exported function createUser was deleted',
+          suggestion: 'Add a deprecation shim or update all callers',
+        },
+      ])
       const agent = new BreakingChangeAgent(makeProvider(raw), DEFAULT_CONFIG)
       const findings = await agent.run({ diff: 'diff' })
       expect(findings).toHaveLength(1)
@@ -643,11 +677,13 @@
   import type { AgentName } from '../schema.js'
 
   export class BreakingChangeAgent extends BaseAgent {
-    get name(): AgentName { return 'breaking-change' }
+    get name(): AgentName {
+      return 'breaking-change'
+    }
 
     get systemPrompt(): string {
       return `You are an API compatibility reviewer. Analyze the provided git diff for breaking changes that could break callers of this code.
-
+  
   Focus on:
   - Removed exported functions, classes, constants, or types
   - Changed function signature: added required parameters, removed parameters, reordered parameters
@@ -658,12 +694,12 @@
   - Changed default parameter values that callers rely on
   - Removed or renamed exported enum values
   - Changed module exports (default vs named)
-
+  
   Output ONLY a JSON array. No prose, no explanation, no markdown fences.
-
+  
   Required format:
   [{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","file":"path/to/file","line":42,"title":"Short title under 60 chars","detail":"Explanation of what changed and how callers break","suggestion":"Migration path or backward-compatible alternative"}]
-
+  
   Rules:
   - basis=VERIFIED: the breaking change is clearly visible in the diff (e.g., removed export)
   - basis=INFERRED: likely breaking based on visible patterns (e.g., signature change without callers visible)
@@ -702,7 +738,9 @@
     adversarial: () => new AdversarialAgent(provider, config),
     integration: () => new IntegrationScoutAgent(provider, config),
     'breaking-change': () => new BreakingChangeAgent(provider, config),
-    license: () => { throw new Error('LicenseComplianceAgent not yet wired') }
+    license: () => {
+      throw new Error('LicenseComplianceAgent not yet wired')
+    },
   }
   ```
 
@@ -711,18 +749,36 @@
 - [ ] **Step 6: Update AGENT_PRIORITY in `src/core/agents/orchestrator.ts`**
 
   Find the line:
+
   ```typescript
   const AGENT_PRIORITY: AgentName[] = [
-    'integration', 'coverage', 'testgen', 'adversarial',
-    'design', 'dependencies', 'correctness', 'performance', 'security'
+    'integration',
+    'coverage',
+    'testgen',
+    'adversarial',
+    'design',
+    'dependencies',
+    'correctness',
+    'performance',
+    'security',
   ]
   ```
 
   Replace with:
+
   ```typescript
   const AGENT_PRIORITY: AgentName[] = [
-    'integration', 'breaking-change', 'coverage', 'testgen', 'adversarial',
-    'design', 'dependencies', 'license', 'correctness', 'performance', 'security'
+    'integration',
+    'breaking-change',
+    'coverage',
+    'testgen',
+    'adversarial',
+    'design',
+    'dependencies',
+    'license',
+    'correctness',
+    'performance',
+    'security',
   ]
   ```
 
@@ -748,6 +804,7 @@
 **Goal:** Add a specialist agent that detects new dependencies with commercially-incompatible licenses (GPL, AGPL, SSPL, Commons Clause) in package.json changes.
 
 **Files:**
+
 - Create: `src/core/agents/licenseCompliance.ts`
 - Modify: `src/core/runner.ts`
 - Create: `tests/unit/licenseComplianceAgent.test.ts`
@@ -762,7 +819,7 @@
 
   const makeProvider = (response: string): LLMProvider => ({
     chat: vi.fn().mockResolvedValue(response),
-    ping: vi.fn().mockResolvedValue({ ok: true })
+    ping: vi.fn().mockResolvedValue({ ok: true }),
   })
 
   describe('LicenseComplianceAgent', () => {
@@ -778,15 +835,17 @@
     })
 
     it('parses a valid finding and stamps agent name', async () => {
-      const raw = JSON.stringify([{
-        severity: 'high',
-        basis: 'VERIFIED',
-        file: 'package.json',
-        line: 14,
-        title: 'GPL-3.0 dependency: some-gpl-lib',
-        detail: 'some-gpl-lib uses GPL-3.0 which is incompatible with commercial use',
-        suggestion: 'Replace with an MIT-licensed alternative or obtain a commercial license'
-      }])
+      const raw = JSON.stringify([
+        {
+          severity: 'high',
+          basis: 'VERIFIED',
+          file: 'package.json',
+          line: 14,
+          title: 'GPL-3.0 dependency: some-gpl-lib',
+          detail: 'some-gpl-lib uses GPL-3.0 which is incompatible with commercial use',
+          suggestion: 'Replace with an MIT-licensed alternative or obtain a commercial license',
+        },
+      ])
       const agent = new LicenseComplianceAgent(makeProvider(raw), DEFAULT_CONFIG)
       const findings = await agent.run({ diff: 'diff' })
       expect(findings).toHaveLength(1)
@@ -825,11 +884,13 @@
   import type { AgentName } from '../schema.js'
 
   export class LicenseComplianceAgent extends BaseAgent {
-    get name(): AgentName { return 'license' }
+    get name(): AgentName {
+      return 'license'
+    }
 
     get systemPrompt(): string {
       return `You are a license compliance reviewer. Analyze the provided git diff for newly added dependencies with licenses incompatible with commercial use.
-
+  
   Focus on package.json changes (dependencies, devDependencies, peerDependencies). For each newly added package (lines starting with +):
   - Identify the package name and look up its license from your training knowledge
   - Flag any package with these commercially-incompatible licenses:
@@ -842,12 +903,12 @@
     - LGPL is often OK for dynamic linking but flag it as medium severity for review
   - Permissive licenses (MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD) are fine — do not flag these
   - If you are uncertain about a package's license, use basis=SPECULATIVE
-
+  
   Output ONLY a JSON array. No prose, no explanation, no markdown fences.
-
+  
   Required format:
   [{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","file":"package.json","line":14,"title":"Short title under 60 chars","detail":"Package name, its license, and why it's problematic","suggestion":"MIT-licensed alternative or advice to obtain a commercial license"}]
-
+  
   Rules:
   - severity=high for GPL, AGPL, SSPL, Commons Clause
   - severity=medium for LGPL, EUPL, CDDL or uncertain cases
@@ -927,6 +988,7 @@
 **Goal:** Add `confidence` (0–100) to the Finding schema flow. Agents self-report it (defaulting to 70). The orchestrator uses confidence to decide the severity of solo Critical findings: solo Critical + confidence < 60 → downgraded to High (not Medium as before); solo Critical + confidence ≥ 60 → kept as Critical. Update formatter to display confidence.
 
 **Files:**
+
 - Modify: `src/core/agents/base.ts`
 - Modify: `src/core/agents/orchestrator.ts`
 - Modify: `src/cli/formatter.ts`
@@ -943,7 +1005,7 @@
 
   const makeProvider = () => ({
     chat: vi.fn(),
-    ping: vi.fn().mockResolvedValue({ ok: true })
+    ping: vi.fn().mockResolvedValue({ ok: true }),
   })
 
   const finding = (overrides: Partial<Finding> = {}): Finding => ({
@@ -957,18 +1019,32 @@
     detail: 'Detail',
     suggestion: 'Fix it',
     confidence: 70,
-    ...overrides
+    ...overrides,
   })
 
   describe('confidence-aware hallucination cross-check', () => {
     it('keeps solo Critical when confidence >= 60', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', severity: 'critical', confidence: 75, file: 'src/foo.ts', line: 5 }),
-        finding({ id: 'correctness-0', agent: 'correctness', severity: 'low', confidence: 80, file: 'src/bar.ts', line: 99 })
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          severity: 'critical',
+          confidence: 75,
+          file: 'src/foo.ts',
+          line: 5,
+        }),
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          severity: 'low',
+          confidence: 80,
+          file: 'src/bar.ts',
+          line: 99,
+        }),
       ]
       const result = orch.synthesize(findings)
-      const f = result.find(r => r.id === 'security-0')
+      const f = result.find((r) => r.id === 'security-0')
       // confidence=75 >= 60: solo Critical stays Critical
       expect(f?.severity).toBe('critical')
     })
@@ -976,11 +1052,25 @@
     it('downgrades solo Critical to High (not Medium) when confidence < 60', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', severity: 'critical', confidence: 45, file: 'src/foo.ts', line: 5 }),
-        finding({ id: 'correctness-0', agent: 'correctness', severity: 'low', confidence: 80, file: 'src/bar.ts', line: 99 })
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          severity: 'critical',
+          confidence: 45,
+          file: 'src/foo.ts',
+          line: 5,
+        }),
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          severity: 'low',
+          confidence: 80,
+          file: 'src/bar.ts',
+          line: 99,
+        }),
       ]
       const result = orch.synthesize(findings)
-      const f = result.find(r => r.id === 'security-0')
+      const f = result.find((r) => r.id === 'security-0')
       // low confidence solo Critical → High, not Medium
       expect(f?.severity).toBe('high')
     })
@@ -988,23 +1078,51 @@
     it('keeps Critical when corroborated, regardless of confidence', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', severity: 'critical', confidence: 40, file: 'src/foo.ts', line: 10 }),
-        finding({ id: 'correctness-0', agent: 'correctness', severity: 'high', confidence: 80, file: 'src/foo.ts', line: 12 })
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          severity: 'critical',
+          confidence: 40,
+          file: 'src/foo.ts',
+          line: 10,
+        }),
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          severity: 'high',
+          confidence: 80,
+          file: 'src/foo.ts',
+          line: 12,
+        }),
       ]
       const result = orch.synthesize(findings)
       // corroborated: stays Critical even with confidence=40
-      const secFinding = result.find(f => f.agent === 'security')
+      const secFinding = result.find((f) => f.agent === 'security')
       expect(secFinding?.severity).toBe('critical')
     })
 
     it('solo High still downgrades to Medium regardless of confidence', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', severity: 'high', confidence: 90, file: 'src/foo.ts', line: 5 }),
-        finding({ id: 'correctness-0', agent: 'correctness', severity: 'low', confidence: 80, file: 'src/bar.ts', line: 99 })
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          severity: 'high',
+          confidence: 90,
+          file: 'src/foo.ts',
+          line: 5,
+        }),
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          severity: 'low',
+          confidence: 80,
+          file: 'src/bar.ts',
+          line: 99,
+        }),
       ]
       const result = orch.synthesize(findings)
-      const f = result.find(r => r.id === 'security-0')
+      const f = result.find((r) => r.id === 'security-0')
       // solo High always → Medium (unchanged behavior)
       expect(f?.severity).toBe('medium')
     })
@@ -1014,13 +1132,29 @@
     it('assigns confidence=70 when agent does not output confidence field', async () => {
       const { BaseAgent } = await import('../../src/core/agents/base.js')
       class TestAgent extends BaseAgent {
-        get name() { return 'security' as const }
-        get systemPrompt() { return 'test' }
+        get name() {
+          return 'security' as const
+        }
+        get systemPrompt() {
+          return 'test'
+        }
       }
-      const provider = { chat: vi.fn().mockResolvedValue(JSON.stringify([{
-        severity: 'high', basis: 'VERIFIED', file: 'f.ts', line: 1,
-        title: 'T', detail: 'D', suggestion: 'S'
-      }])), ping: vi.fn() }
+      const provider = {
+        chat: vi.fn().mockResolvedValue(
+          JSON.stringify([
+            {
+              severity: 'high',
+              basis: 'VERIFIED',
+              file: 'f.ts',
+              line: 1,
+              title: 'T',
+              detail: 'D',
+              suggestion: 'S',
+            },
+          ])
+        ),
+        ping: vi.fn(),
+      }
       const agent = new TestAgent(provider, DEFAULT_CONFIG)
       const findings = await agent.run({ diff: 'diff' })
       expect(findings[0].confidence).toBe(70)
@@ -1029,13 +1163,30 @@
     it('uses agent-reported confidence when present and clamps to 0-100', async () => {
       const { BaseAgent } = await import('../../src/core/agents/base.js')
       class TestAgent extends BaseAgent {
-        get name() { return 'security' as const }
-        get systemPrompt() { return 'test' }
+        get name() {
+          return 'security' as const
+        }
+        get systemPrompt() {
+          return 'test'
+        }
       }
-      const provider = { chat: vi.fn().mockResolvedValue(JSON.stringify([{
-        severity: 'high', basis: 'VERIFIED', file: 'f.ts', line: 1,
-        title: 'T', detail: 'D', suggestion: 'S', confidence: 150
-      }])), ping: vi.fn() }
+      const provider = {
+        chat: vi.fn().mockResolvedValue(
+          JSON.stringify([
+            {
+              severity: 'high',
+              basis: 'VERIFIED',
+              file: 'f.ts',
+              line: 1,
+              title: 'T',
+              detail: 'D',
+              suggestion: 'S',
+              confidence: 150,
+            },
+          ])
+        ),
+        ping: vi.fn(),
+      }
       const agent = new TestAgent(provider, DEFAULT_CONFIG)
       const findings = await agent.run({ diff: 'diff' })
       expect(findings[0].confidence).toBe(100)
@@ -1056,6 +1207,7 @@
   In the `validateFindings` private method, update the `.map()` call:
 
   Find:
+
   ```typescript
   .map((f, i) => ({
     ...f,
@@ -1065,6 +1217,7 @@
   ```
 
   Replace with:
+
   ```typescript
   .map((f, i) => ({
     ...f,
@@ -1079,6 +1232,7 @@
   Also add the Finding import at the top (it's already imported via the AgentName import but add it to the destructured import):
 
   Find:
+
   ```typescript
   import type { Finding, ReviewInput, AgentName } from '../schema.js'
   ```
@@ -1090,6 +1244,7 @@
   Replace the `hallucinationCrossCheck` method body:
 
   Find the entire method:
+
   ```typescript
   private hallucinationCrossCheck(findings: Finding[]): Finding[] {
     // Only meaningful when multiple agents ran
@@ -1119,6 +1274,7 @@
   ```
 
   Replace with:
+
   ```typescript
   private hallucinationCrossCheck(findings: Finding[]): Finding[] {
     const agentsPresent = new Set(findings.map(f => f.agent))
@@ -1165,30 +1321,57 @@
   The existing test "downgrades critical finding to medium when only one agent flags it in a multi-agent run" used default confidence (70), which now makes the critical STAY critical. Update it to use confidence: 45 and expect 'high' (not 'medium'):
 
   Find:
+
   ```typescript
   it('downgrades critical finding to medium when only one agent flags it in a multi-agent run', () => {
     const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
     const findings = [
-      finding({ id: 'security-0', agent: 'security', severity: 'critical', file: 'src/foo.ts', line: 5 }),
+      finding({
+        id: 'security-0',
+        agent: 'security',
+        severity: 'critical',
+        file: 'src/foo.ts',
+        line: 5,
+      }),
       // Second agent at a completely different file — no corroboration for security-0
-      finding({ id: 'correctness-0', agent: 'correctness', severity: 'low', file: 'src/bar.ts', line: 99 })
+      finding({
+        id: 'correctness-0',
+        agent: 'correctness',
+        severity: 'low',
+        file: 'src/bar.ts',
+        line: 99,
+      }),
     ]
     const result = orch.synthesize(findings)
-    const f = result.find(r => r.id === 'security-0')
+    const f = result.find((r) => r.id === 'security-0')
     expect(f?.severity).toBe('medium')
   })
   ```
 
   Replace with:
+
   ```typescript
   it('downgrades solo Critical to High (not Medium) when confidence < 60', () => {
     const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
     const findings = [
-      finding({ id: 'security-0', agent: 'security', severity: 'critical', confidence: 45, file: 'src/foo.ts', line: 5 }),
-      finding({ id: 'correctness-0', agent: 'correctness', severity: 'low', file: 'src/bar.ts', line: 99 })
+      finding({
+        id: 'security-0',
+        agent: 'security',
+        severity: 'critical',
+        confidence: 45,
+        file: 'src/foo.ts',
+        line: 5,
+      }),
+      finding({
+        id: 'correctness-0',
+        agent: 'correctness',
+        severity: 'low',
+        file: 'src/bar.ts',
+        line: 99,
+      }),
     ]
     const result = orch.synthesize(findings)
-    const f = result.find(r => r.id === 'security-0')
+    const f = result.find((r) => r.id === 'security-0')
     // confidence < 60 → downgraded to high, not medium
     expect(f?.severity).toBe('high')
   })
@@ -1197,14 +1380,18 @@
 - [ ] **Step 7: Update formatter to show confidence in `src/cli/formatter.ts`**
 
   Find:
+
   ```typescript
   lines.push(`**Agent:** ${f.agent} | **Basis:** ${f.basis} | **File:** \`${f.file}:${f.line}\``)
   ```
 
   Replace with:
+
   ```typescript
   const conf = f.confidence ?? 70
-  lines.push(`**Agent:** ${f.agent} | **Basis:** ${f.basis} | **Confidence:** ${conf}% | **File:** \`${f.file}:${f.line}\``)
+  lines.push(
+    `**Agent:** ${f.agent} | **Basis:** ${f.basis} | **Confidence:** ${conf}% | **File:** \`${f.file}:${f.line}\``
+  )
   ```
 
 - [ ] **Step 8: Run all unit tests**
@@ -1237,6 +1424,7 @@
 **Goal:** Run `npm run calibrate` in GitHub Actions weekly and on releases. Skip gracefully when Ollama is not available on the runner.
 
 **Files:**
+
 - Create: `.github/workflows/calibrate.yml`
 
 - [ ] **Step 1: Create `.github/workflows/calibrate.yml`**
@@ -1246,14 +1434,14 @@
 
   on:
     schedule:
-      - cron: '0 6 * * 1'   # Every Monday at 06:00 UTC
+      - cron: '0 6 * * 1' # Every Monday at 06:00 UTC
     release:
       types: [published]
-    workflow_dispatch:       # Manual trigger
+    workflow_dispatch: # Manual trigger
 
   jobs:
     calibrate:
-      runs-on: self-hosted   # Requires Ollama on the runner (same as review workflow)
+      runs-on: self-hosted # Requires Ollama on the runner (same as review workflow)
       steps:
         - name: Checkout
           uses: actions/checkout@v4
@@ -1310,6 +1498,7 @@
 **Goal:** Update README with all changes since v0.1.1. Create CHANGELOG.md. Update slash command. Update memory-bank.
 
 **Files:**
+
 - Modify: `README.md`
 - Create: `CHANGELOG.md`
 - Modify: `.claude/commands/ai-review.md`
@@ -1335,20 +1524,20 @@
 
   ### Agents
 
-  | Agent | Domain |
-  |---|---|
-  | SecurityAgent | Injection, auth flaws, secrets, unsafe deserialization |
-  | PerformanceAgent | Hot paths, N+1 queries, memory pressure |
-  | CorrectnessAgent | Logic bugs, null dereferences, off-by-one errors |
-  | DesignAgent | SOLID violations, coupling, abstraction leaks |
-  | DependenciesAgent | Outdated/vulnerable packages, supply chain risks |
-  | BreakingChangeAgent | Removed exports, changed signatures, renamed public APIs |
-  | LicenseComplianceAgent | GPL/AGPL/SSPL/Commons Clause dependencies |
-  | AdversarialAgent | Adversarial inputs — null/empty/boundary values, concurrent access |
-  | IntegrationScoutAgent | API contract breaks, schema mismatches |
-  | CoverageAnalystAgent | Test coverage gaps, untested branches |
-  | TestGenAgent | Generates test stubs for coverage gaps |
-  | OrchestratorAgent | Dedup, cross-reference escalation, confidence scoring, severity cap |
+  | Agent                  | Domain                                                              |
+  | ---------------------- | ------------------------------------------------------------------- |
+  | SecurityAgent          | Injection, auth flaws, secrets, unsafe deserialization              |
+  | PerformanceAgent       | Hot paths, N+1 queries, memory pressure                             |
+  | CorrectnessAgent       | Logic bugs, null dereferences, off-by-one errors                    |
+  | DesignAgent            | SOLID violations, coupling, abstraction leaks                       |
+  | DependenciesAgent      | Outdated/vulnerable packages, supply chain risks                    |
+  | BreakingChangeAgent    | Removed exports, changed signatures, renamed public APIs            |
+  | LicenseComplianceAgent | GPL/AGPL/SSPL/Commons Clause dependencies                           |
+  | AdversarialAgent       | Adversarial inputs — null/empty/boundary values, concurrent access  |
+  | IntegrationScoutAgent  | API contract breaks, schema mismatches                              |
+  | CoverageAnalystAgent   | Test coverage gaps, untested branches                               |
+  | TestGenAgent           | Generates test stubs for coverage gaps                              |
+  | OrchestratorAgent      | Dedup, cross-reference escalation, confidence scoring, severity cap |
 
   ## Requirements
 
@@ -1420,19 +1609,19 @@
 
   **Flag reference:**
 
-  | Flag | Default | Description |
-  |------|---------|-------------|
-  | `--diff <path>` | — | Review a saved .diff file |
-  | `--dir <path>` | cwd | Diff the given directory against HEAD |
-  | `--model <model>` | devstral:latest | Override Ollama model |
-  | `--agents <list>` | all 11 agents | Comma-separated agent list |
-  | `--format <fmt>` | markdown | `markdown` or `json` |
-  | `--out <path>` | stdout | Write report to file |
-  | `--max-lines <n>` | 2000 | Truncate diff before review |
-  | `--timeout <ms>` | 60000 | Per-agent timeout |
-  | `--fail-on <level>` | high | Exit 1 when severity ≥ level |
-  | `--ignore <glob>` | — | Exclude matching files (repeatable) |
-  | `--no-sanitize` | — | Skip prompt injection sanitization |
+  | Flag                | Default         | Description                           |
+  | ------------------- | --------------- | ------------------------------------- |
+  | `--diff <path>`     | —               | Review a saved .diff file             |
+  | `--dir <path>`      | cwd             | Diff the given directory against HEAD |
+  | `--model <model>`   | devstral:latest | Override Ollama model                 |
+  | `--agents <list>`   | all 11 agents   | Comma-separated agent list            |
+  | `--format <fmt>`    | markdown        | `markdown` or `json`                  |
+  | `--out <path>`      | stdout          | Write report to file                  |
+  | `--max-lines <n>`   | 2000            | Truncate diff before review           |
+  | `--timeout <ms>`    | 60000           | Per-agent timeout                     |
+  | `--fail-on <level>` | high            | Exit 1 when severity ≥ level          |
+  | `--ignore <glob>`   | —               | Exclude matching files (repeatable)   |
+  | `--no-sanitize`     | —               | Skip prompt injection sanitization    |
 
   Exit code `1` when any finding meets the `--fail-on` threshold (default: `high`).
 
@@ -1455,9 +1644,19 @@
     "model": "devstral:latest",
     "ollamaUrl": "http://localhost:11434",
     "maxFindings": 20,
-    "agents": ["security", "correctness", "performance", "design", "dependencies",
-               "adversarial", "integration", "breaking-change", "license",
-               "coverage", "testgen"],
+    "agents": [
+      "security",
+      "correctness",
+      "performance",
+      "design",
+      "dependencies",
+      "adversarial",
+      "integration",
+      "breaking-change",
+      "license",
+      "coverage",
+      "testgen"
+    ],
     "testOutputDir": "ai-review-tests",
     "sanitize": true
   }
@@ -1475,15 +1674,15 @@
 
   ## Guardrails
 
-  | Guardrail | CLI flag | Default |
-  |-----------|----------|---------|
-  | Diff size limit | `--max-lines` | 2000 lines |
-  | Per-agent timeout | `--timeout` | 60 s |
-  | Severity gating | `--fail-on` | high |
-  | Path exclusions | `--ignore` / `.aiignore` | — |
-  | Prompt injection sanitization | `--no-sanitize` to disable | enabled |
-  | Hallucination cross-check | always on | Critical/High require corroboration or ≥60% confidence |
-  | Finding deduplication | always on | same file:line across agents merged with `corroboratingAgents` |
+  | Guardrail                     | CLI flag                   | Default                                                        |
+  | ----------------------------- | -------------------------- | -------------------------------------------------------------- |
+  | Diff size limit               | `--max-lines`              | 2000 lines                                                     |
+  | Per-agent timeout             | `--timeout`                | 60 s                                                           |
+  | Severity gating               | `--fail-on`                | high                                                           |
+  | Path exclusions               | `--ignore` / `.aiignore`   | —                                                              |
+  | Prompt injection sanitization | `--no-sanitize` to disable | enabled                                                        |
+  | Hallucination cross-check     | always on                  | Critical/High require corroboration or ≥60% confidence         |
+  | Finding deduplication         | always on                  | same file:line across agents merged with `corroboratingAgents` |
 
   ## Confidence Scoring
 
@@ -1518,6 +1717,7 @@
   ## [0.2.0] — 2026-06-06
 
   ### Added
+
   - **BreakingChangeAgent**: detects removed exports, changed function signatures, renamed public APIs, and incompatible return type changes. Reports as High severity.
   - **LicenseComplianceAgent**: detects newly-added dependencies with GPL, AGPL, SSPL, or Commons Clause licenses that are incompatible with commercial use. Reports as High severity.
   - **Prompt injection sanitizer**: scans added lines in the diff for LLM-manipulating patterns (SYSTEM: directives, instruction overrides, role-play directives, long base64 payloads) and redacts them before agents run. Enabled by default; disable with `--no-sanitize`.
@@ -1525,6 +1725,7 @@
   - **Calibration CI** (`.github/workflows/calibrate.yml`): runs `npm run calibrate` weekly and on releases on a self-hosted runner; skips gracefully when Ollama is unavailable.
 
   ### Changed
+
   - **CLI flags consolidated**: `--path` renamed to `--dir`; `--max-diff-lines` renamed to `--max-lines`; `--ignore-path` renamed to `--ignore`. The implicit `review` subcommand has been removed — all flags are now top-level.
   - **Hallucination cross-check** is now confidence-aware: solo Critical + confidence ≥ 60 keeps its severity (instead of always downgrading to Medium); solo Critical + confidence < 60 downgrades to High (not Medium). Solo High still downgrades to Medium.
   - Version bumped to **0.2.0**.
@@ -1532,6 +1733,7 @@
   ## [0.1.1] — 2026-06-06
 
   ### Added
+
   - Guardrail G1: hallucination cross-check — Critical/High requires ≥2 agents at same file±5 lines
   - Guardrail G2: diff size guard — `--max-diff-lines` flag (now `--max-lines`)
   - Guardrail G3: finding deduplication merge — `corroboratingAgents` field on Finding schema
@@ -1542,6 +1744,7 @@
   ## [0.1.0] — 2026-06-06
 
   ### Added
+
   - Initial release: 9-agent swarm (SecurityAgent, PerformanceAgent, CorrectnessAgent, DesignAgent, DependenciesAgent, AdversarialAgent, IntegrationScoutAgent, CoverageAnalystAgent, TestGenAgent) + OrchestratorAgent
   - CLI (`ai-review`) with Commander
   - GitHub Actions workflow for PR review
@@ -1572,6 +1775,7 @@
   Run the 11-agent local AI code review swarm against the current working diff using Ollama.
 
   **When to use:**
+
   - Before committing or opening a PR — thorough, multi-domain review
   - When you want a fully offline review with no cloud API calls
   - Use `/code-review` instead for a fast Claude-native check mid-session
@@ -1673,24 +1877,24 @@
 
 ### Spec Coverage Check
 
-| Requirement | Task |
-|-------------|------|
-| CLI consolidation: merge/rename flags | Task 1 |
-| --no-sanitize flag | Task 1 |
-| Prompt injection sanitization | Task 3 |
-| Calibration suite in CI (weekly + releases) | Task 7 |
-| Skip gracefully when Ollama unavailable | Task 7 |
-| Breaking change agent | Task 4 |
-| License compliance agent (GPL/AGPL/SSPL/Commons Clause) | Task 5 |
-| Confidence field 0–100 on Finding schema | Task 2 |
-| Agent self-reports confidence | Task 3 (base.ts) / Task 6 |
-| Solo Critical <60% confidence → High not Medium | Task 6 |
-| Confidence shown in markdown output | Task 6 |
-| README update | Task 8 |
-| CHANGELOG | Task 8 |
-| Memory-bank update | Task 8 |
-| Slash command update | Task 8 |
-| Tests after each step | Every task |
+| Requirement                                             | Task                      |
+| ------------------------------------------------------- | ------------------------- |
+| CLI consolidation: merge/rename flags                   | Task 1                    |
+| --no-sanitize flag                                      | Task 1                    |
+| Prompt injection sanitization                           | Task 3                    |
+| Calibration suite in CI (weekly + releases)             | Task 7                    |
+| Skip gracefully when Ollama unavailable                 | Task 7                    |
+| Breaking change agent                                   | Task 4                    |
+| License compliance agent (GPL/AGPL/SSPL/Commons Clause) | Task 5                    |
+| Confidence field 0–100 on Finding schema                | Task 2                    |
+| Agent self-reports confidence                           | Task 3 (base.ts) / Task 6 |
+| Solo Critical <60% confidence → High not Medium         | Task 6                    |
+| Confidence shown in markdown output                     | Task 6                    |
+| README update                                           | Task 8                    |
+| CHANGELOG                                               | Task 8                    |
+| Memory-bank update                                      | Task 8                    |
+| Slash command update                                    | Task 8                    |
+| Tests after each step                                   | Every task                |
 
 ### Placeholder Scan
 

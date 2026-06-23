@@ -28,7 +28,7 @@ export function filterDiff(diff: string, patterns: string[]): string {
   // Split on diff --git boundaries, preserving the marker in each chunk
   const sections = diff.split(/(?=^diff --git )/m)
   return sections
-    .filter(section => {
+    .filter((section) => {
       if (!section.startsWith('diff --git ')) return true
       const filePath = extractFilePath(section)
       if (!filePath) return true
@@ -54,7 +54,7 @@ function extractFilePath(section: string): string | null {
 }
 
 function matchesAnyPattern(filePath: string, patterns: string[]): boolean {
-  return patterns.some(p => matchPattern(filePath, p))
+  return patterns.some((p) => matchPattern(filePath, p))
 }
 
 function matchPattern(filePath: string, pattern: string): boolean {
@@ -64,11 +64,11 @@ function matchPattern(filePath: string, pattern: string): boolean {
 
   // Convert gitignore glob to regex
   const regexStr = normalised
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')   // escape regex special chars
-    .replace(/\*\*/g, '\x00')                 // placeholder for **
-    .replace(/\*/g, '[^/]*')                  // * = non-slash run
-    .replace(/\?/g, '[^/]')                   // ? = one non-slash char
-    .replace(/\x00/g, '.*')                   // ** = anything
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&') // escape regex special chars
+    .replace(/\*\*/g, '\x00') // placeholder for **
+    .replace(/\*/g, '[^/]*') // * = non-slash run
+    .replace(/\?/g, '[^/]') // ? = one non-slash char
+    .replace(/\x00/g, '.*') // ** = anything
 
   const suffix = isDir ? '(/.*)?$' : '$'
 

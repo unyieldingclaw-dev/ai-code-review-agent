@@ -1,0 +1,5 @@
+node_modules/
+dist/
+coverage/
+*.min.js
+vscode-extension/node_modules/

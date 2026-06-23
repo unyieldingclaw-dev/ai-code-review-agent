@@ -2,7 +2,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class DependenciesAgent extends BaseAgent {
-  get name(): AgentName { return 'dependencies' }
+  get name(): AgentName {
+    return 'dependencies'
+  }
 
   get systemPrompt(): string {
     return `You are a dependency security reviewer. Output ONLY a JSON array — no prose, no markdown fences, no other keys.

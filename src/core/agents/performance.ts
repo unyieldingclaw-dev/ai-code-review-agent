@@ -2,7 +2,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class PerformanceAgent extends BaseAgent {
-  get name(): AgentName { return 'performance' }
+  get name(): AgentName {
+    return 'performance'
+  }
 
   get systemPrompt(): string {
     return `You are a performance code reviewer. Analyze the provided git diff for performance issues.

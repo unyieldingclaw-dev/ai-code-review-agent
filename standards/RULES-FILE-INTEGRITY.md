@@ -1,19 +1,18 @@
 # Rules-File Integrity
 
-
 Rule files such as `.cursorrules`, `CLAUDE.md`, `AGENTS.md`, and anything under `.cursor/rules/*.mdc` or `.claude/commands/*.md` are **executable input to AI assistants**. They travel with repositories, survive context summarization, and are treated as authoritative directives by Cursor and Claude Code. This makes them a high-value attack target — a compromised rules file can silently redirect an agent's behavior across every downstream project that installs it.
 
 This standard defines the hygiene rules that must be applied to all rules files in the Memory-Bank ecosystem.
 
 ## Threat model (2024–2026)
 
-| Attack | Evidence | Mitigation |
-|--------|----------|-----------|
-| Malicious `.cursorrules` distributed with a repo instructs the agent to "source project env before actions," exfiltrating credentials | arxiv/2601.17548v1 — *Prompt Injection on Agentic Coding Assistants* | Treat rules files like code; review every diff by a human |
-| Invisible Unicode / zero-width characters hide instructions inside otherwise-harmless-looking rules files | arxiv/2509.22040v1 — *Documentation-Based Prompt Injection* | Strip non-printable Unicode on diff review; lint for suspicious codepoints |
-| HTML comments (`<!-- ... -->`) embed hidden directives a human skimmer will miss | GitHub Copilot agent guidance (2025) | Block HTML comments in rules files; require plain-Markdown prose only |
-| "Ignore previous instructions" / "disable guardrails" / "bypass CONFIRM" patterns | Standard prompt-injection corpus | Explicit lint pattern list (below) |
-| Rules-file rug-pull: trusted repo later adds a malicious rule in a minor release | Supply-chain parallel (e.g., xz-utils, PhantomRaven) | Pin and review rules-file updates as dependency upgrades; require explicit PR approval |
+| Attack                                                                                                                                | Evidence                                                             | Mitigation                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Malicious `.cursorrules` distributed with a repo instructs the agent to "source project env before actions," exfiltrating credentials | arxiv/2601.17548v1 — _Prompt Injection on Agentic Coding Assistants_ | Treat rules files like code; review every diff by a human                              |
+| Invisible Unicode / zero-width characters hide instructions inside otherwise-harmless-looking rules files                             | arxiv/2509.22040v1 — _Documentation-Based Prompt Injection_          | Strip non-printable Unicode on diff review; lint for suspicious codepoints             |
+| HTML comments (`<!-- ... -->`) embed hidden directives a human skimmer will miss                                                      | GitHub Copilot agent guidance (2025)                                 | Block HTML comments in rules files; require plain-Markdown prose only                  |
+| "Ignore previous instructions" / "disable guardrails" / "bypass CONFIRM" patterns                                                     | Standard prompt-injection corpus                                     | Explicit lint pattern list (below)                                                     |
+| Rules-file rug-pull: trusted repo later adds a malicious rule in a minor release                                                      | Supply-chain parallel (e.g., xz-utils, PhantomRaven)                 | Pin and review rules-file updates as dependency upgrades; require explicit PR approval |
 
 ## Hygiene rules (hard requirements)
 
@@ -75,8 +74,8 @@ For `CLAUDE.md` / `AGENTS.md`, the first section must be human-readable prose na
 
 ## References
 
-- arxiv/2601.17548v1 — *Prompt Injection on Agentic Coding Assistants*
-- arxiv/2509.22040v1 — *Documentation-Based Prompt Injection*
+- arxiv/2601.17548v1 — _Prompt Injection on Agentic Coding Assistants_
+- arxiv/2509.22040v1 — _Documentation-Based Prompt Injection_
 - GitHub Copilot agentic security principles (2025) — https://github.blog/ai-and-ml/github-copilot/how-githubs-agentic-security-principles-make-our-ai-agents-as-secure-as-possible/
 - OWASP LLM Top 10 (2025), LLM01 Prompt Injection
 

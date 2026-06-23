@@ -4,10 +4,12 @@ export function runTool(cmd: string, args: string[], stdinData?: string): Promis
   return new Promise((resolve, reject) => {
     let stdout = ''
     const proc = spawn(cmd, args, {
-      stdio: stdinData !== undefined ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe']
+      stdio: stdinData !== undefined ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'],
     })
     if (proc.stdout) {
-      proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
+      proc.stdout.on('data', (chunk: Buffer) => {
+        stdout += chunk.toString()
+      })
     }
     proc.stderr?.on('data', () => {})
     proc.on('error', (err: Error) => {

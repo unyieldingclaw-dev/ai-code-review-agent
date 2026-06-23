@@ -54,7 +54,7 @@ describe('sanitizeDiff', () => {
   })
 
   it('does NOT redact short base64-looking strings (< 80 chars)', () => {
-    const short = 'SGVsbG8gV29ybGQ='  // "Hello World" — 16 chars
+    const short = 'SGVsbG8gV29ybGQ=' // "Hello World" — 16 chars
     const diff = `+const token = "${short}"`
     const { sanitized, warnings } = sanitizeDiff(diff)
     expect(sanitized).toBe(diff)

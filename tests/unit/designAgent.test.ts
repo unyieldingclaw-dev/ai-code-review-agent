@@ -6,7 +6,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('DesignAgent', () => {
@@ -15,11 +15,24 @@ describe('DesignAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new DesignAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(await new DesignAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual(
+      []
+    )
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{ severity: 'medium', basis: 'INFERRED', confidence: 65, file: 'src/service.ts', line: 8, title: 'Business logic in controller layer', detail: 'Validation belongs in service, not route handler', suggestion: 'Extract validation to a service method' }])
+    const raw = JSON.stringify([
+      {
+        severity: 'medium',
+        basis: 'INFERRED',
+        confidence: 65,
+        file: 'src/service.ts',
+        line: 8,
+        title: 'Business logic in controller layer',
+        detail: 'Validation belongs in service, not route handler',
+        suggestion: 'Extract validation to a service method',
+      },
+    ])
     const findings = await new DesignAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('design')
@@ -27,7 +40,9 @@ describe('DesignAgent', () => {
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new DesignAgent(makeProvider('null'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new DesignAgent(makeProvider('null'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('system prompt mentions design or architecture', () => {

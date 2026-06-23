@@ -15,25 +15,33 @@ const CONTEXT_BUDGET_CHARS = 4000
 // Files are loaded in order until the budget is exhausted.
 // 'never blindly load every memory file' — omit activeContext.md and progress.md from most agents.
 const AGENT_CONTEXT_FILES: Partial<Record<AgentName, string[]>> = {
-  'security':        ['memory-bank/techContext.md'],
-  'secrets':         ['memory-bank/techContext.md'],
-  'design':          ['memory-bank/systemPatterns.md', 'memory-bank/projectbrief.md', 'memory-bank/techContext.md'],
-  'integration':     ['memory-bank/systemPatterns.md', 'memory-bank/projectbrief.md', 'memory-bank/techContext.md'],
-  'migration-safety':['memory-bank/systemPatterns.md'],
-  'observability':   ['memory-bank/techContext.md'],
-  'coverage':        ['memory-bank/progress.md'],
-  'testgen':         ['memory-bank/progress.md'],
-  'correctness':     ['memory-bank/techContext.md'],
-  'dependencies':    ['memory-bank/techContext.md'],
+  security: ['memory-bank/techContext.md'],
+  secrets: ['memory-bank/techContext.md'],
+  design: [
+    'memory-bank/systemPatterns.md',
+    'memory-bank/projectbrief.md',
+    'memory-bank/techContext.md',
+  ],
+  integration: [
+    'memory-bank/systemPatterns.md',
+    'memory-bank/projectbrief.md',
+    'memory-bank/techContext.md',
+  ],
+  'migration-safety': ['memory-bank/systemPatterns.md'],
+  observability: ['memory-bank/techContext.md'],
+  coverage: ['memory-bank/progress.md'],
+  testgen: ['memory-bank/progress.md'],
+  correctness: ['memory-bank/techContext.md'],
+  dependencies: ['memory-bank/techContext.md'],
   'breaking-change': ['memory-bank/systemPatterns.md', 'memory-bank/techContext.md'],
   // performance, adversarial, error-handling, license, complexity: no memory-bank context by default
 }
 
 export interface ContextResult {
-  content: string          // formatted context string to prepend to the diff
-  filesLoaded: string[]    // relative paths actually loaded
-  truncated: boolean       // true if budget was hit before loading all files
-  estimatedTokens: number  // rough estimate: chars / 4
+  content: string // formatted context string to prepend to the diff
+  filesLoaded: string[] // relative paths actually loaded
+  truncated: boolean // true if budget was hit before loading all files
+  estimatedTokens: number // rough estimate: chars / 4
 }
 
 export interface ContextMetadata {
@@ -86,7 +94,7 @@ export function loadAgentContext(projectPath: string, agentName: AgentName): Con
     content,
     filesLoaded,
     truncated,
-    estimatedTokens: Math.round(charsUsed / 4)
+    estimatedTokens: Math.round(charsUsed / 4),
   }
 }
 

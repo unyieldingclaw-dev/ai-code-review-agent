@@ -7,9 +7,15 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "extensionKind": ["workspace"],
-  "categories": ["Linters"],
-  "activationEvents": ["onCommand:aiReview.reviewStagedChanges"],
+  "extensionKind": [
+    "workspace"
+  ],
+  "categories": [
+    "Linters"
+  ],
+  "activationEvents": [
+    "onCommand:aiReview.reviewStagedChanges"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -33,7 +39,9 @@
         },
         "aiReview.agents": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Agents to run. Empty array runs all 11 agents. Valid values: security, performance, correctness, design, dependencies, coverage, testgen, adversarial, integration, breaking-change, license"
         },

@@ -20,9 +20,11 @@ memory-bank/
 ## File Purposes
 
 ### projectbrief.md
+
 **The "constitution" of your project** - fundamental requirements that rarely change.
 
 Contains:
+
 - Core business purpose and goals
 - Non-negotiable constraints (performance, compliance, technical)
 - Success metrics
@@ -31,9 +33,11 @@ Contains:
 Update when: Core requirements change (rare)
 
 ### systemPatterns.md
+
 **Established architectural patterns** that AI must follow.
 
 Contains:
+
 - Architecture decisions (microservices, monolith, etc.)
 - Code patterns (error handling, async patterns, etc.)
 - Frontend patterns (state management, styling, etc.)
@@ -43,9 +47,11 @@ Contains:
 Update when: New patterns established, anti-patterns discovered
 
 ### techContext.md
+
 **Complete technical environment** specification.
 
 Contains:
+
 - Development environment (OS, IDE, tools)
 - Backend stack (languages, frameworks, databases)
 - Frontend stack (frameworks, build tools, UI libraries)
@@ -55,9 +61,11 @@ Contains:
 Update when: Dependencies change, services added, config updated
 
 ### activeContext.md
+
 **Current session state** - what you're working on right now.
 
 Contains:
+
 - Current focus area
 - Recent decisions made this session
 - Next steps (priority ordered)
@@ -67,9 +75,11 @@ Contains:
 Update when: Every session, when focus changes, at milestones
 
 ### progress.md
+
 **Project-wide progress tracker**.
 
 Contains:
+
 - Completed features (checked off)
 - In-progress work
 - Planned work (backlog)
@@ -84,12 +94,12 @@ Memory Bank files have explicit authority levels. When an agent encounters a con
 between files, the higher-tier file governs. The agent must surface the conflict and ask
 the user to resolve it before changing a higher-tier decision.
 
-| Tier | Level | Files | Behavior |
-|------|-------|-------|----------|
-| 1 | IMMUTABLE | projectbrief.md | Never negotiated; overrides all other files |
-| 2 | STABLE | systemPatterns.md, techContext.md | Change requires deliberate decision + user confirm |
-| 3 | VOLATILE | activeContext.md | Session state; evict stale content weekly |
-| 4 | ACCUMULATING | progress.md | Archive to flat `docs/archive/` with date-prefixed filenames |
+| Tier | Level        | Files                             | Behavior                                                     |
+| ---- | ------------ | --------------------------------- | ------------------------------------------------------------ |
+| 1    | IMMUTABLE    | projectbrief.md                   | Never negotiated; overrides all other files                  |
+| 2    | STABLE       | systemPatterns.md, techContext.md | Change requires deliberate decision + user confirm           |
+| 3    | VOLATILE     | activeContext.md                  | Session state; evict stale content weekly                    |
+| 4    | ACCUMULATING | progress.md                       | Archive to flat `docs/archive/` with date-prefixed filenames |
 
 **Conflict resolution:** `projectbrief.md` > `systemPatterns.md` / `techContext.md` >
 `activeContext.md` > `progress.md`. Agents must not silently reconcile contradictions —
@@ -100,33 +110,35 @@ they must flag them.
 Every memory-bank file carries YAML frontmatter with two groups of fields:
 
 **Governance fields** (authority, freshness, retrieval):
+
 ```yaml
-authority: immutable        # immutable | stable | volatile | accumulating
-review-cycle: never         # never | 7d | 30d | 90d
-retention: permanent        # permanent | archive-after-6m | archive-after-1y
-staleness-threshold: 365d   # age after last-reviewed before mb audit flags [STALE]
+authority: immutable # immutable | stable | volatile | accumulating
+review-cycle: never # never | 7d | 30d | 90d
+retention: permanent # permanent | archive-after-6m | archive-after-1y
+staleness-threshold: 365d # age after last-reviewed before mb audit flags [STALE]
 tags:
   - requirements/core
 last-reviewed: YYYY-MM-DD
 ```
 
 **Provenance fields** (compaction lineage and confidence):
+
 ```yaml
-compaction_generation: 0    # 0=human-authored, 1=first AI summary, 2+=risk increases
-source_type: canonical      # canonical | compacted | derived
-confidence: high            # high | medium | low — proxy for generation + lineage coherence
-lineage: []                 # additive chain of all ancestor files (empty for canonical)
+compaction_generation: 0 # 0=human-authored, 1=first AI summary, 2+=risk increases
+source_type: canonical # canonical | compacted | derived
+confidence: high # high | medium | low — proxy for generation + lineage coherence
+lineage: [] # additive chain of all ancestor files (empty for canonical)
 ```
 
 ### Compaction generation thresholds
 
-| Generation | Status | Meaning |
-|------------|--------|---------|
-| 0 | Healthy | Human-authored canonical source |
-| 1 | Healthy | First AI summary — still trustworthy |
-| 2 | Caution | Recursive abstraction risk |
-| 3+ | Degraded | Regenerate from lower-generation sources |
-| 5+ | Unreliable | Likely information loss; do not trust without verification |
+| Generation | Status     | Meaning                                                    |
+| ---------- | ---------- | ---------------------------------------------------------- |
+| 0          | Healthy    | Human-authored canonical source                            |
+| 1          | Healthy    | First AI summary — still trustworthy                       |
+| 2          | Caution    | Recursive abstraction risk                                 |
+| 3+         | Degraded   | Regenerate from lower-generation sources                   |
+| 5+         | Unreliable | Likely information loss; do not trust without verification |
 
 When `mb compact` rewrites a file, increment `compaction_generation` and add parent files to `lineage`.
 Use git commit refs for verifiability: `activeContext.md@a81d2f`.
@@ -144,6 +156,7 @@ generations; additive lineage enables partial reconstruction and canonical-sourc
 detection.
 
 `mb doctor` runs integrity heuristics against these fields:
+
 - Warns when any file reaches generation ≥ 2
 - Warns when lineage entries reference files that no longer exist (canonical-source absence)
 
@@ -151,25 +164,25 @@ detection.
 
 Keep Memory Bank files focused and scannable:
 
-| File | Target | Max | If Exceeded |
-|------|--------|-----|-------------|
-| projectbrief.md | 50-80 lines | 150 | Review - should rarely grow |
+| File              | Target        | Max | If Exceeded                  |
+| ----------------- | ------------- | --- | ---------------------------- |
+| projectbrief.md   | 50-80 lines   | 150 | Review - should rarely grow  |
 | systemPatterns.md | 100-180 lines | 300 | Consolidate similar patterns |
-| techContext.md | 150-250 lines | 400 | Move details to docs/ |
-| activeContext.md | 50-100 lines | 150 | Archive to `docs/archive/` |
-| progress.md | 100-250 lines | 400 | Archive old versions |
+| techContext.md    | 150-250 lines | 400 | Move details to docs/        |
+| activeContext.md  | 50-100 lines  | 150 | Archive to `docs/archive/`   |
+| progress.md       | 100-250 lines | 400 | Archive old versions         |
 
 ## Eviction Criteria
 
 Content should leave Memory Bank files on objective criteria, not agent judgment.
 
-| File | Condition | Action |
-|------|-----------|--------|
-| activeContext.md | Entry > 14 days old and not an active blocker | Move to `docs/archive/context-YYYY-MM-<topic>.md` |
-| activeContext.md | "Next Steps" item completed | Move to `progress.md` immediately |
-| activeContext.md | Issue marked resolved | Delete — do not archive |
-| progress.md | Work completed > 6 months ago | Move to `docs/archive/progress-YYYY-MM-<topic>.md` |
-| progress.md | Bug fixed > 3 months ago | Move to `docs/archive/progress-YYYY-MM-<topic>.md` |
+| File             | Condition                                     | Action                                             |
+| ---------------- | --------------------------------------------- | -------------------------------------------------- |
+| activeContext.md | Entry > 14 days old and not an active blocker | Move to `docs/archive/context-YYYY-MM-<topic>.md`  |
+| activeContext.md | "Next Steps" item completed                   | Move to `progress.md` immediately                  |
+| activeContext.md | Issue marked resolved                         | Delete — do not archive                            |
+| progress.md      | Work completed > 6 months ago                 | Move to `docs/archive/progress-YYYY-MM-<topic>.md` |
+| progress.md      | Bug fixed > 3 months ago                      | Move to `docs/archive/progress-YYYY-MM-<topic>.md` |
 
 Run `mb audit` to surface files that are stale or due for review.
 
@@ -253,25 +266,30 @@ the memory-bank is shared state.
 These two tools load memory-bank rules differently — the difference matters for context management.
 
 ### Cursor IDE
+
 `.cursor/rules/memory-bank.mdc` with `alwaysApply: true` **re-injects** the memory-bank instruction on every response. Even after context fills, rules are always present.
 
 ### Claude Code
+
 `CLAUDE.md` loads **once at session start** as part of the system prompt. It is NOT re-injected after auto-compaction.
 
 Claude Code auto-compacts at approximately **50% context** (via `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50` in settings.json; default without override is ~95%) — silently, with no hook or notification to the agent. The session continues with a compressed summary; detailed history is lost.
 
 ### Implications for Handoff Thresholds
 
-| Tool | Handoff Threshold | Why |
-|------|------------------|-----|
-| Claude Code | **40%** | Manual compact before 50% auto-compact fires |
-| Cursor | **80%** | Rules re-inject automatically; compaction less critical |
+| Tool        | Handoff Threshold | Why                                                     |
+| ----------- | ----------------- | ------------------------------------------------------- |
+| Claude Code | **40%**           | Manual compact before 50% auto-compact fires            |
+| Cursor      | **80%**           | Rules re-inject automatically; compaction less critical |
 
 ### Post-Compaction Recovery (Claude Code)
+
 If compaction fires before handoff, instruct the agent to re-read all `memory-bank/` files:
+
 ```
 Please re-read all memory-bank/ files to restore full context
 ```
+
 The `templates/CLAUDE.md` includes a compaction recovery instruction block that handles this automatically when observed.
 
 ## Handoff Protocol
@@ -279,12 +297,14 @@ The `templates/CLAUDE.md` includes a compaction recovery instruction block that 
 When context fills up (user reports 40% in Claude Code, 80% in Cursor), create a handoff:
 
 ### Trigger
+
 - User types "Handoff"
 - User reports context >= 40% (Claude Code) or >= 80% (Cursor)
   - Claude Code auto-compacts at ~50%; 40% fires before that
   - Cursor rules re-inject on every response; 80% is safe
 
 ### Agent Actions
+
 1. **STOP** all work immediately
 2. **CREATE** `handoff.md` in project root:
    - Summary of accomplishments
@@ -297,6 +317,7 @@ When context fills up (user reports 40% in Claude Code, 80% in Cursor), create a
 4. **STOP RESPONDING** - do not continue
 
 ### Next Session
+
 1. Check for `handoff.md` - if exists, read it FIRST
 2. Continue work from where previous agent stopped
 3. Merge handoff info into Memory Bank when appropriate
@@ -310,43 +331,47 @@ For multi-session work, create `plan.md`:
 # Plan: [Feature Name]
 
 ## Scope
+
 Brief description of what we're building.
 
 ## Chunks (each fits one session)
+
 - [ ] Chunk 1: Backend API endpoints
 - [ ] Chunk 2: Database schema + migrations
 - [ ] Chunk 3: Frontend components
 - [ ] Chunk 4: Integration + testing
 
 ## Handoff Points
+
 After each chunk, update activeContext.md and commit.
 
 ## Dependencies
+
 - Chunk 2 depends on Chunk 1
 - Chunks 3-4 can start after Chunk 2
 ```
 
 ### Scope Heuristics
 
-| Task Type | Estimated Sessions | Planning |
-|-----------|-------------------|----------|
-| Single file change | < 1 | No planning needed |
-| Feature (1 component) | 1 | May need handoff |
-| Feature (multi-file) | 1-2 | Consider plan.md |
-| New service/module | 2-3 | Definitely plan.md |
-| Large refactor | 3+ | Break into phases |
+| Task Type             | Estimated Sessions | Planning           |
+| --------------------- | ------------------ | ------------------ |
+| Single file change    | < 1                | No planning needed |
+| Feature (1 component) | 1                  | May need handoff   |
+| Feature (multi-file)  | 1-2                | Consider plan.md   |
+| New service/module    | 2-3                | Definitely plan.md |
+| Large refactor        | 3+                 | Break into phases  |
 
 ## Quick Commands
 
 Teach AI to recognize these shortcuts:
 
-| Command | Action |
-|---------|--------|
-| `mb update` | Update all relevant Memory Bank files |
-| `mb status` | Show file sizes, timestamps, health check |
-| `mb archive` | Move old history to `docs/archive/` |
-| `mb slim` | Trim activeContext.md to essentials |
-| `mb commit` | Stage and commit Memory Bank changes |
+| Command      | Action                                    |
+| ------------ | ----------------------------------------- |
+| `mb update`  | Update all relevant Memory Bank files     |
+| `mb status`  | Show file sizes, timestamps, health check |
+| `mb archive` | Move old history to `docs/archive/`       |
+| `mb slim`    | Trim activeContext.md to essentials       |
+| `mb commit`  | Stage and commit Memory Bank changes      |
 
 ## Auto-Update Behavior
 
@@ -385,6 +410,7 @@ summarizes, deduplicates, and resolves contradictions across all memory-bank fil
 exceeds 60 KB. Run `mb compact` to get a structured AI prompt for the operation.
 
 **What compaction does (AI-driven):**
+
 1. Reads all files in authority order
 2. Identifies: duplicate decisions, contradictory claims, orphaned sections, entries
    already captured elsewhere
@@ -405,6 +431,7 @@ If your project uses AGENTS.md for session history:
 ## Success Indicators
 
 Memory Bank is working when:
+
 - ✅ AI never asks for your tech stack
 - ✅ AI follows established patterns without prompting
 - ✅ New sessions start immediately productive
@@ -415,18 +442,21 @@ Memory Bank is working when:
 ## Troubleshooting
 
 ### AI Not Loading Memory Bank
+
 1. Check rule file exists (`.cursor/rules/memory-bank.mdc` or `CLAUDE.md`)
 2. Verify `alwaysApply: true` is set (Cursor)
 3. Restart IDE
 4. Explicitly reference: `@memory-bank/projectbrief.md`
 
 ### Memory Bank Getting Stale
+
 1. Review `activeContext.md` weekly
 2. Archive old decisions to `docs/archive/`
 3. Update `progress.md` after each milestone
 4. Clean up outdated information
 
 ### Memory Bank Too Large
+
 1. Move detailed session logs to `docs/archive/`
 2. Remove implementation details (keep decisions only)
 3. Consolidate related patterns

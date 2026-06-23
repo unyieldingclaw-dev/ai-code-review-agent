@@ -6,18 +6,32 @@ import { DEFAULT_CONFIG } from '../../src/core/config.js'
 
 // Concrete subclass for testing
 class TestAgent extends BaseAgent {
-  get name() { return 'security' as const }
-  get systemPrompt() { return 'You are a test agent.' }
+  get name() {
+    return 'security' as const
+  }
+  get systemPrompt() {
+    return 'You are a test agent.'
+  }
 }
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('BaseAgent', () => {
   it('parses bare JSON array', async () => {
-    const raw = JSON.stringify([{ severity: 'high', basis: 'VERIFIED', file: 'src/foo.ts', line: 10, title: 'T', detail: 'D', suggestion: 'S' }])
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'src/foo.ts',
+        line: 10,
+        title: 'T',
+        detail: 'D',
+        suggestion: 'S',
+      },
+    ])
     const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff content' })
     expect(findings).toHaveLength(1)
@@ -27,14 +41,27 @@ describe('BaseAgent', () => {
   })
 
   it('parses JSON wrapped in markdown code fence', async () => {
-    const raw = '```json\n[{"severity":"high","basis":"VERIFIED","file":"f.ts","line":1,"title":"T","detail":"D","suggestion":"S"}]\n```'
+    const raw =
+      '```json\n[{"severity":"high","basis":"VERIFIED","file":"f.ts","line":1,"title":"T","detail":"D","suggestion":"S"}]\n```'
     const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
   })
 
   it('parses object with findings array', async () => {
-    const raw = JSON.stringify({ findings: [{ severity: 'medium', basis: 'INFERRED', file: 'x.ts', line: 5, title: 'T', detail: 'D', suggestion: 'S' }] })
+    const raw = JSON.stringify({
+      findings: [
+        {
+          severity: 'medium',
+          basis: 'INFERRED',
+          file: 'x.ts',
+          line: 5,
+          title: 'T',
+          detail: 'D',
+          suggestion: 'S',
+        },
+      ],
+    })
     const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
@@ -48,8 +75,16 @@ describe('BaseAgent', () => {
 
   it('filters out findings missing required fields', async () => {
     const raw = JSON.stringify([
-      { severity: 'high', basis: 'VERIFIED', file: 'f.ts', line: 1, title: 'T', detail: 'D', suggestion: 'S' },
-      { severity: 'high' } // missing required fields
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'f.ts',
+        line: 1,
+        title: 'T',
+        detail: 'D',
+        suggestion: 'S',
+      },
+      { severity: 'high' }, // missing required fields
     ])
     const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })

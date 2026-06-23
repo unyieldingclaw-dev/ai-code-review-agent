@@ -7,7 +7,7 @@ import type { Finding } from '../../src/core/schema.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('OrchestratorAgent', () => {
@@ -36,7 +36,7 @@ describe('OrchestratorAgent', () => {
         recommendation: 'Use prepared statements',
         suggestion: 'Use prepared statements',
         blocking: false,
-        source: 'llm'
+        source: 'llm',
       },
       {
         id: 'correctness-0',
@@ -54,8 +54,8 @@ describe('OrchestratorAgent', () => {
         recommendation: 'Fix the logic',
         suggestion: 'Fix the logic',
         blocking: false,
-        source: 'llm'
-      }
+        source: 'llm',
+      },
     ]
     const result = agent.synthesize(findings)
     // Should keep only one (security has higher priority) with corroboratingAgents
@@ -82,8 +82,8 @@ describe('OrchestratorAgent', () => {
         recommendation: 'Add a test',
         suggestion: 'Add a test',
         blocking: false,
-        source: 'llm'
-      }
+        source: 'llm',
+      },
     ]
     const result = agent.synthesize(findings)
     expect(result).toEqual([])
@@ -108,7 +108,7 @@ describe('OrchestratorAgent', () => {
         recommendation: 'Review carefully',
         suggestion: 'Review carefully',
         blocking: true,
-        source: 'llm'
+        source: 'llm',
       },
       {
         id: 'performance-0',
@@ -126,12 +126,12 @@ describe('OrchestratorAgent', () => {
         recommendation: 'Optimize',
         suggestion: 'Optimize',
         blocking: false,
-        source: 'llm'
-      }
+        source: 'llm',
+      },
     ]
     const result = agent.synthesize(findings)
     // Multiple agents present, so hallucination check runs. Low-confidence solo critical → high
-    const critical = result.find(f => f.agent === 'security')
+    const critical = result.find((f) => f.agent === 'security')
     expect(critical).toBeDefined()
     expect(critical!.severity).toBe('high')
   })
@@ -155,8 +155,8 @@ describe('OrchestratorAgent', () => {
         recommendation: 'Use AES-256',
         suggestion: 'Use AES-256',
         blocking: true,
-        source: 'llm'
-      }
+        source: 'llm',
+      },
     ]
     const result = agent.synthesize(findings)
     // High-confidence solo critical stays critical

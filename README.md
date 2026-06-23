@@ -16,24 +16,24 @@ Each specialist agent receives only the (sanitized) diff and its own system prom
 
 ### Agents
 
-| Agent | Domain |
-|---|---|
-| SecurityAgent | Injection, auth flaws, secrets, unsafe deserialization |
-| PerformanceAgent | Hot paths, N+1 queries, memory pressure |
-| CorrectnessAgent | Logic bugs, null dereferences, off-by-one errors |
-| DesignAgent | SOLID violations, coupling, abstraction leaks |
-| DependenciesAgent | Outdated/vulnerable packages, supply chain risks |
-| BreakingChangeAgent | Removed exports, changed signatures, renamed public APIs |
-| LicenseComplianceAgent | GPL/AGPL/SSPL/Commons Clause/EUPL/CDDL-1.0 dependencies; LGPL (dynamic linking flagged at medium severity) |
-| AdversarialAgent | Adversarial inputs — null/empty/boundary values, concurrent access |
-| IntegrationScoutAgent | Integration boundaries lacking tests (new HTTP calls, DB writes, queues, WebSocket connections) |
-| CoverageAnalystAgent | Test coverage gaps, untested branches |
-| TestGenAgent | Generates test stubs for coverage gaps |
-| ErrorHandlingAgent | Swallowed exceptions, ignored Promise rejections, sentinel-value failure returns, error paths that should propagate |
-| ObservabilityAgent | New code paths (branches, state changes, API entry points) lacking log output |
-| MigrationSafetyAgent | NOT NULL without DEFAULT, DROP without IF EXISTS, missing FK indexes, missing down migrations (skipped when diff has no migration files) |
-| SecretsAgent | Hardcoded API keys, passwords, private keys, connection strings in source code |
-| ComplexityAgent | High cyclomatic complexity, deep nesting, functions exceeding threshold (uses `lizard` if installed, falls back to LLM) |
+| Agent                  | Domain                                                                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| SecurityAgent          | Injection, auth flaws, secrets, unsafe deserialization                                                                                   |
+| PerformanceAgent       | Hot paths, N+1 queries, memory pressure                                                                                                  |
+| CorrectnessAgent       | Logic bugs, null dereferences, off-by-one errors                                                                                         |
+| DesignAgent            | SOLID violations, coupling, abstraction leaks                                                                                            |
+| DependenciesAgent      | Outdated/vulnerable packages, supply chain risks                                                                                         |
+| BreakingChangeAgent    | Removed exports, changed signatures, renamed public APIs                                                                                 |
+| LicenseComplianceAgent | GPL/AGPL/SSPL/Commons Clause/EUPL/CDDL-1.0 dependencies; LGPL (dynamic linking flagged at medium severity)                               |
+| AdversarialAgent       | Adversarial inputs — null/empty/boundary values, concurrent access                                                                       |
+| IntegrationScoutAgent  | Integration boundaries lacking tests (new HTTP calls, DB writes, queues, WebSocket connections)                                          |
+| CoverageAnalystAgent   | Test coverage gaps, untested branches                                                                                                    |
+| TestGenAgent           | Generates test stubs for coverage gaps                                                                                                   |
+| ErrorHandlingAgent     | Swallowed exceptions, ignored Promise rejections, sentinel-value failure returns, error paths that should propagate                      |
+| ObservabilityAgent     | New code paths (branches, state changes, API entry points) lacking log output                                                            |
+| MigrationSafetyAgent   | NOT NULL without DEFAULT, DROP without IF EXISTS, missing FK indexes, missing down migrations (skipped when diff has no migration files) |
+| SecretsAgent           | Hardcoded API keys, passwords, private keys, connection strings in source code                                                           |
+| ComplexityAgent        | High cyclomatic complexity, deep nesting, functions exceeding threshold (uses `lizard` if installed, falls back to LLM)                  |
 
 > **Note:** `OrchestratorAgent` is internal infrastructure — it deduplicates findings, cross-references severity, applies confidence scoring, and caps the final set. It cannot be selected via `--agents` and does not appear in agent output.
 
@@ -76,18 +76,19 @@ npm install
 npm run build
 npm link
 ```
+
 </details>
 
 ## Setup Scripts
 
 Double-click to set up without opening a terminal:
 
-| Script | Platform | Who |
-|--------|----------|-----|
-| `setup.bat` | Windows | End-users |
-| `setup.command` | macOS | End-users |
-| `dev-setup.bat` | Windows | Contributors |
-| `dev-setup.command` | macOS | Contributors |
+| Script              | Platform | Who          |
+| ------------------- | -------- | ------------ |
+| `setup.bat`         | Windows  | End-users    |
+| `setup.command`     | macOS    | End-users    |
+| `dev-setup.bat`     | Windows  | Contributors |
+| `dev-setup.command` | macOS    | Contributors |
 
 **End-user scripts** (`setup.*`) check Node.js, verify Ollama is running, pull `devstral:latest`, install `ai-review-agent` globally, and run a smoke test.
 
@@ -167,21 +168,21 @@ ai-review-agent --help
 
 **Flag reference:**
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--diff <path>` | — | Review a saved .diff file |
-| `--dir <path>` | cwd | Diff the given directory against HEAD |
-| `--model <model>` | devstral:latest | Override Ollama model |
-| `--agents <list>` | all 15 agents (testgen opt-in) | Comma-separated agent list |
-| `--format <fmt>` | markdown | `markdown` or `json` |
-| `--out <path>` | stdout | Write report to file |
-| `--max-lines <n>` | 2000 | Truncate diff before review |
-| `--timeout <ms>` | 60000 | Per-agent timeout |
-| `--retry-attempts <n>` | 2 | Attempts per agent before skipping |
-| `--retry-delay <ms>` | 2000 | Backoff between retries |
-| `--fail-on <level>` | high | Exit 1 when severity ≥ level (`critical\|high\|medium\|any\|never`) |
-| `--ignore <glob>` | — | Exclude matching files (repeatable) |
-| `--no-sanitize` | — | Skip prompt injection sanitization |
+| Flag                   | Default                        | Description                                                         |
+| ---------------------- | ------------------------------ | ------------------------------------------------------------------- |
+| `--diff <path>`        | —                              | Review a saved .diff file                                           |
+| `--dir <path>`         | cwd                            | Diff the given directory against HEAD                               |
+| `--model <model>`      | devstral:latest                | Override Ollama model                                               |
+| `--agents <list>`      | all 15 agents (testgen opt-in) | Comma-separated agent list                                          |
+| `--format <fmt>`       | markdown                       | `markdown` or `json`                                                |
+| `--out <path>`         | stdout                         | Write report to file                                                |
+| `--max-lines <n>`      | 2000                           | Truncate diff before review                                         |
+| `--timeout <ms>`       | 60000                          | Per-agent timeout                                                   |
+| `--retry-attempts <n>` | 2                              | Attempts per agent before skipping                                  |
+| `--retry-delay <ms>`   | 2000                           | Backoff between retries                                             |
+| `--fail-on <level>`    | high                           | Exit 1 when severity ≥ level (`critical\|high\|medium\|any\|never`) |
+| `--ignore <glob>`      | —                              | Exclude matching files (repeatable)                                 |
+| `--no-sanitize`        | —                              | Skip prompt injection sanitization                                  |
 
 Exit code `1` when any finding meets the `--fail-on` threshold (default: `high`).
 
@@ -204,10 +205,24 @@ Create `ai-review.config.json` in your project root to override defaults:
   "model": "devstral:latest",
   "ollamaUrl": "http://localhost:11434",
   "maxFindings": 15,
-  "agents": ["security", "correctness", "performance", "design", "dependencies",
-             "adversarial", "integration", "breaking-change", "license",
-             "coverage", "testgen",
-             "error-handling", "observability", "migration-safety", "secrets", "complexity"],
+  "agents": [
+    "security",
+    "correctness",
+    "performance",
+    "design",
+    "dependencies",
+    "adversarial",
+    "integration",
+    "breaking-change",
+    "license",
+    "coverage",
+    "testgen",
+    "error-handling",
+    "observability",
+    "migration-safety",
+    "secrets",
+    "complexity"
+  ],
   "testOutputDir": "./ai-review-tests",
   "maxDiffLines": 2000,
   "agentTimeoutMs": 60000,
@@ -222,12 +237,14 @@ Create `ai-review.config.json` in your project root to override defaults:
 ```
 
 **Config field notes:**
+
 - `provider`: `"ollama"` (default) or `"anthropic"`. The Anthropic provider is defined in the schema but **not yet implemented** — all runs use Ollama regardless of this value. Planned for a future release.
 - `anthropicModel`: Model ID to use when `provider` is `"anthropic"` (e.g. `"claude-opus-4-8"`). Has no effect until the Anthropic provider is implemented.
 - `preferredSecretsScanner`: `"gitleaks"` (default when installed) or `"trufflehog"` or `"none"` — controls which external scanner SecretsAgent prefers. Falls back to LLM-only when the tool is not found.
 - `complexityThreshold`: Cyclomatic complexity threshold for ComplexityAgent (default: `10`). Functions exceeding this value are flagged. Used when `lizard` is installed; LLM estimates when not.
 
 **Optional dependencies (enhance specific agents):**
+
 - **[gitleaks](https://github.com/gitleaks/gitleaks)** or **[trufflehog](https://github.com/trufflesecurity/trufflehog)** — improves SecretsAgent accuracy. Falls back to LLM-only if neither is installed.
 - **[lizard](https://github.com/terryyin/lizard)** (`pip install lizard`) — provides precise cyclomatic complexity metrics to ComplexityAgent. Falls back to LLM estimation if not installed.
 
@@ -243,16 +260,16 @@ calibration/fixtures/
 
 ## Guardrails
 
-| Guardrail | CLI flag | Default |
-|-----------|----------|---------|
-| Diff size limit | `--max-lines` | 2000 lines |
-| Per-agent timeout | `--timeout` | 60 s |
-| Transient failure retry | `--retry-attempts` / `--retry-delay` | 2 attempts, 2 s backoff |
-| Severity gating | `--fail-on` | high |
-| Path exclusions | `--ignore` / `.aiignore` | — |
-| Prompt injection sanitization | `--no-sanitize` to disable | enabled |
-| Hallucination cross-check | always on | Critical/High require corroboration or ≥60% confidence |
-| Finding deduplication | always on | same file:line across agents merged with `corroboratingAgents` |
+| Guardrail                     | CLI flag                             | Default                                                        |
+| ----------------------------- | ------------------------------------ | -------------------------------------------------------------- |
+| Diff size limit               | `--max-lines`                        | 2000 lines                                                     |
+| Per-agent timeout             | `--timeout`                          | 60 s                                                           |
+| Transient failure retry       | `--retry-attempts` / `--retry-delay` | 2 attempts, 2 s backoff                                        |
+| Severity gating               | `--fail-on`                          | high                                                           |
+| Path exclusions               | `--ignore` / `.aiignore`             | —                                                              |
+| Prompt injection sanitization | `--no-sanitize` to disable           | enabled                                                        |
+| Hallucination cross-check     | always on                            | Critical/High require corroboration or ≥60% confidence         |
+| Finding deduplication         | always on                            | same file:line across agents merged with `corroboratingAgents` |
 
 ## Confidence Scoring
 

@@ -53,49 +53,46 @@ const TEST_CONFIG = {
   ollamaUrl: OLLAMA_URL,
   model: OLLAMA_MODEL,
   agents: ['security', 'correctness'] as typeof DEFAULT_CONFIG.agents,
-  maxFindings: 10
+  maxFindings: 10,
 }
 
-describe.skipIf(SKIP)(
-  'E2E — full pipeline against live Ollama',
-  () => {
-    let result: ReviewResult
+describe.skipIf(SKIP)('E2E — full pipeline against live Ollama', () => {
+  let result: ReviewResult
 
-    beforeAll(async () => {
-      const provider = new OllamaProvider(OLLAMA_URL, OLLAMA_MODEL)
-      const runner = new SwarmRunner(TEST_CONFIG, provider)
-      result = await runner.run({ diff: SAMPLE_DIFF })
-    }, 300_000) // 5-minute cap for the swarm run
+  beforeAll(async () => {
+    const provider = new OllamaProvider(OLLAMA_URL, OLLAMA_MODEL)
+    const runner = new SwarmRunner(TEST_CONFIG, provider)
+    result = await runner.run({ diff: SAMPLE_DIFF })
+  }, 300_000) // 5-minute cap for the swarm run
 
-    it('produces at least one finding', () => {
-      expect(result.findings).toBeInstanceOf(Array)
-      expect(result.findings.length).toBeGreaterThan(0)
-    })
+  it('produces at least one finding', () => {
+    expect(result.findings).toBeInstanceOf(Array)
+    expect(result.findings.length).toBeGreaterThan(0)
+  })
 
-    it('summary counters are consistent', () => {
-      expect(result.summary.totalFindings).toBe(result.findings.length)
-      expect(result.summary.durationMs).toBeGreaterThan(0)
-    })
+  it('summary counters are consistent', () => {
+    expect(result.summary.totalFindings).toBe(result.findings.length)
+    expect(result.summary.durationMs).toBeGreaterThan(0)
+  })
 
-    it('every finding conforms to the Finding schema', () => {
-      const SEVERITIES = ['critical', 'high', 'medium', 'low']
-      const BASES = ['VERIFIED', 'INFERRED', 'SPECULATIVE']
-      for (const f of result.findings) {
-        expect(SEVERITIES, `unexpected severity on finding ${f.id}`).toContain(f.severity)
-        expect(BASES, `unexpected basis on finding ${f.id}`).toContain(f.basis)
-        expect(typeof f.title).toBe('string')
-        expect(f.title.length).toBeGreaterThan(0)
-        expect(typeof f.detail).toBe('string')
-        expect(typeof f.suggestion).toBe('string')
-      }
-    })
+  it('every finding conforms to the Finding schema', () => {
+    const SEVERITIES = ['critical', 'high', 'medium', 'low']
+    const BASES = ['VERIFIED', 'INFERRED', 'SPECULATIVE']
+    for (const f of result.findings) {
+      expect(SEVERITIES, `unexpected severity on finding ${f.id}`).toContain(f.severity)
+      expect(BASES, `unexpected basis on finding ${f.id}`).toContain(f.basis)
+      expect(typeof f.title).toBe('string')
+      expect(f.title.length).toBeGreaterThan(0)
+      expect(typeof f.detail).toBe('string')
+      expect(typeof f.suggestion).toBe('string')
+    }
+  })
 
-    it('security agent flags at least one issue in the diff', () => {
-      const securityFindings = result.findings.filter(f => f.agent === 'security')
-      expect(
-        securityFindings.length,
-        'expected security agent to flag hardcoded secret, weak hash, or SQL injection'
-      ).toBeGreaterThan(0)
-    })
-  }
-)
+  it('security agent flags at least one issue in the diff', () => {
+    const securityFindings = result.findings.filter((f) => f.agent === 'security')
+    expect(
+      securityFindings.length,
+      'expected security agent to flag hardcoded secret, weak hash, or SQL injection'
+    ).toBeGreaterThan(0)
+  })
+})

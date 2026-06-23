@@ -15,6 +15,7 @@ allowed-tools:
 Run the 15-agent local AI code review swarm against the current working diff using Ollama.
 
 **When to use:**
+
 - Before committing or opening a PR — thorough, multi-domain review
 - When you want a fully offline review with no cloud API calls
 - Use `/code-review` instead for a fast Claude-native check mid-session

@@ -30,12 +30,14 @@ Claude Code compacts at ~40% (via `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40` in settin
 This system operates on **governed assistance, not autonomous intelligence.** Claude is a bounded collaborator — capable and useful, but not self-directed. That distinction matters:
 
 **What governed assistance means in practice:**
+
 - Claude reads context the user controls (memory bank files), not context Claude generates autonomously
 - Claude proposes; the user approves. Scope expansion, file creation, and architectural decisions require explicit direction.
 - When context is ambiguous, Claude asks — it does not assume, infer a mandate, or take creative initiative
 - Autonomous reasoning and persistent memory are tool features; constrained operation, explicit scope, and layered enforcement are governance features that make the tool safe to depend on
 
 **Enforcement is layered — from softest to hardest:**
+
 - **CLAUDE.md** (this file): advisory — Claude reads this and follows it, but can drift when context-compacted or distracted
 - **Hooks**: deterministic structural enforcement — fires on every tool call, cannot be talked around
 - **Reviewer / Opponent**: semantic enforcement — a second agent or human reviewer checks scope and quality
@@ -50,6 +52,7 @@ Before starting any multi-file task, propose a task contract and wait for approv
 **When a contract is required:** Any task touching 4 or more files, or touching sensitive domains (auth, payments, data deletion, CI changes, schema migrations), or the user's request implies a multi-session refactor or migration. Skip for: single-file edits, typos, config-value changes, changes clearly <20 lines.
 
 **Proposal format:**
+
 ```
 **Task Contract Proposal**
 
@@ -118,6 +121,7 @@ When user types "Handoff" or reports context >= 40%:
 4. **STOP** - do not continue
 
 When starting a new conversation:
+
 1. Check for `handoff.md` - if exists, read it FIRST
 2. Merge info into Memory Bank
 3. Delete `handoff.md`
@@ -126,11 +130,13 @@ When starting a new conversation:
 ## Token Budget
 
 **Model selection — default to Sonnet, escalate deliberately:**
+
 - Sonnet handles 90%+ of tasks. Start here every session.
 - Switch to Opus (`/model opus`) only for: complex architecture decisions, large multi-file refactors, deep cross-file debugging. Switch back after.
 - Subagents run on Haiku automatically (set in settings.json) — sufficient for file reads, test runs, and exploration.
 
 **Compact at task boundaries — auto-compact fires at 40%:**
+
 - Auto-compaction is set to fire at 40% context (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40` in settings.json); the `PreCompact` hook warns first if memory bank is stale
 - Compact manually at natural boundaries before that point:
   - After planning: `/compact Focus on decisions and file paths`
@@ -141,10 +147,12 @@ When starting a new conversation:
 **Exception — always write full prose for:** destructive operations (force-push, file deletion, DROP TABLE), security warnings, and multi-step sequences where a misread causes irreversible damage. Token efficiency yields to clarity at these moments.
 
 **Be specific with file references — vague prompts scan broadly:**
+
 - Good: `Fix the JWT expiry check in src/auth/token.py around line 47`
 - Bad: `Fix the auth bug` — triggers a broad codebase read
 
 **Session commands:**
+
 - `/cost` — check quota before long sessions
 - `/usage` — token breakdown for current session
 - `/model sonnet` — reset to default after Opus work

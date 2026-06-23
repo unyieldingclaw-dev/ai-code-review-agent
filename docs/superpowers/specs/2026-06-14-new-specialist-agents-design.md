@@ -11,6 +11,7 @@ Add 5 new specialist agents to the AI Code Review swarm to deepen code analysis 
 ## Architecture Overview
 
 All 5 new agents follow the existing agent contract:
+
 - Extend `BaseAgent` from `src/core/agents/base.ts`
 - Live in `src/core/agents/` with camelCase filenames (e.g., `secretsAgent.ts`)
 - Are registered in the `buildAgents()` Map in `src/core/runner.ts`
@@ -18,10 +19,12 @@ All 5 new agents follow the existing agent contract:
 - Run sequentially in the swarm orchestrator
 
 Two of the five agents are **hybrid** (LLM + external tools) with graceful fallback:
+
 - **SecretsAgent:** Shells out to gitleaks or trufflehog for static scanning, augments LLM analysis, merges & deduplicates
 - **ComplexityAgent:** Shells out to lizard for CCN metrics, augments diff with complexity block, flags high-complexity functions to LLM
 
 Three are **pure LLM:**
+
 - **ErrorHandlingAgent:** Analyzes exception handling patterns without external tooling
 - **ObservabilityAgent:** Analyzes logging coverage without external instrumentation
 - **MigrationSafetyAgent:** Analyzes schema migrations (conditionally executed)
@@ -37,14 +40,16 @@ Three are **pure LLM:**
 **Approach:** Hybrid — runs gitleaks or trufflehog via `shell.ts`, parses JSON output into Findings, then runs LLM on the same diff, merges & deduplicates by `file:line`.
 
 **Tool Chain:**
+
 1. Try `gitleaks detect --source string --json` (default) with diff as stdin
 2. Fallback: Try `trufflehog regex --json` with diff as stdin
 3. Fallback: Skip external tool, LLM-only
 
 **Configuration:**
+
 ```typescript
 interface ReviewConfig {
-  preferredSecretsScanner?: 'gitleaks' | 'trufflehog' | 'none'  // default: 'gitleaks'
+  preferredSecretsScanner?: 'gitleaks' | 'trufflehog' | 'none' // default: 'gitleaks'
   // ... existing fields
 }
 ```
@@ -52,6 +57,7 @@ interface ReviewConfig {
 **Output:** Merges external tool findings with LLM findings, deduplicates by `file:line:secret_type`, keeps the higher severity finding if both tools flag the same line.
 
 **Example Finding:**
+
 ```
 {
   id: "secrets-001",
@@ -73,6 +79,7 @@ interface ReviewConfig {
 **Purpose:** Flag error handling antipatterns: swallowed exceptions, ignored Promise rejections, silent failures.
 
 **Approach:** Pure LLM. Detects:
+
 - Empty catch blocks (no logging, rethrow, or recovery)
 - `.catch(() => {})` without side effects
 - `.then(...).catch(e => null)` — sentinel returns masking errors
@@ -82,6 +89,7 @@ interface ReviewConfig {
 **Prompt template:** Analyzes diff for error handling statements, flags patterns that hide failures from visibility.
 
 **Example Finding:**
+
 ```
 {
   id: "errors-001",
@@ -103,6 +111,7 @@ interface ReviewConfig {
 **Purpose:** Flag code paths (especially error branches and state transitions) that lack logging.
 
 **Approach:** Pure LLM. Detects:
+
 - New error branches with no log output
 - State transitions (e.g., `status = 'failed'`) without logging
 - Conditional returns without preceding log statements
@@ -111,6 +120,7 @@ interface ReviewConfig {
 **Prompt template:** Analyzes diff for control flow paths, identifies branches that lack instrumentation, suggests log calls appropriate to the inferred logging style.
 
 **Example Finding:**
+
 ```
 {
   id: "observability-001",
@@ -134,6 +144,7 @@ interface ReviewConfig {
 **Approach:** Pure LLM, conditionally executed. Only runs if diff contains migration files (detected by parsing diff headers like `+++ b/migrations/...` or `+++ b/db/migrations/...`).
 
 **Detects:**
+
 - NOT NULL columns added without DEFAULT — breaks existing inserts
 - DROP statements without IF EXISTS — fails if object doesn't exist
 - Missing foreign key indexes — degrades query performance
@@ -142,19 +153,22 @@ interface ReviewConfig {
 - Renaming columns without aliases (breaks queries mid-deploy)
 
 **Configuration:**
+
 ```typescript
 interface ReviewConfig {
-  migrationPaths?: string[]  // e.g., ['migrations/', 'db/migrations/', 'sqitch/']
+  migrationPaths?: string[] // e.g., ['migrations/', 'db/migrations/', 'sqitch/']
   // ... existing fields
 }
 ```
 
 **Detection Logic:**
+
 1. Parse diff headers for migration file paths
 2. If any migration files present, run agent
 3. If no migration files, skip agent (emit no findings, log skip reason)
 
 **Example Finding:**
+
 ```
 {
   id: "migration-001",
@@ -178,6 +192,7 @@ interface ReviewConfig {
 **Approach:** Hybrid — runs `lizard --csv` on changed files, parses CSV output, augments diff with `[COMPLEXITY METRICS]` block listing functions exceeding threshold, passes augmented diff to LLM.
 
 **Tool Chain:**
+
 1. Extract file paths from diff
 2. For each changed file (if it exists locally and is a known language: .ts, .js, .py, .java, .go, etc.), run `lizard --csv <file>`
 3. Parse CSV; extract functions with CCN >= threshold
@@ -185,20 +200,23 @@ interface ReviewConfig {
 5. LLM analyzes diff + metrics, flags high-complexity functions and suggests refactoring
 
 **Configuration:**
+
 ```typescript
 interface ReviewConfig {
-  complexityThreshold?: number  // default: 10 (CCN)
+  complexityThreshold?: number // default: 10 (CCN)
   // ... existing fields
 }
 ```
 
 **Lizard CSV Output:**
+
 ```
 NLOC,CCN,token_count,PARAM,length,location,file_name,function_name,long_name,start_line,end_line
 45,12,320,3,45,src/utils/parser.ts:5:parse,src/utils/parser.ts,parse,"parse(input: string)",5,49
 ```
 
 **Augmented Diff Block:**
+
 ```
 [COMPLEXITY METRICS]
 Function: parse (src/utils/parser.ts, lines 5–49)
@@ -209,6 +227,7 @@ Function: parse (src/utils/parser.ts, lines 5–49)
 ```
 
 **Example Finding:**
+
 ```
 {
   id: "complexity-001",
@@ -230,6 +249,7 @@ Function: parse (src/utils/parser.ts, lines 5–49)
 **Purpose:** Safely shell out to external tools, parsing their output, with graceful fallback.
 
 **Function Signature:**
+
 ```typescript
 export async function runTool(
   command: string,
@@ -239,6 +259,7 @@ export async function runTool(
 ```
 
 **Behavior:**
+
 - Spawns child process with `command` and `args`
 - If provided, writes `stdinData` to stdin
 - **Uses `close` event, not `exit`** — gitleaks and similar tools exit non-zero when they find secrets
@@ -247,11 +268,13 @@ export async function runTool(
 - Returns `null` on timeout (30s default) without throwing
 
 **Error Handling:**
+
 - No exceptions thrown; `null` is returned on missing tool or timeout
 - Agents check for `null` and fall back to LLM-only mode
 - Stderr is logged (not returned) for debugging
 
 **Usage Example:**
+
 ```typescript
 const output = await runTool('gitleaks', ['detect', '--source', 'string', '--json'], diff)
 if (output === null) {
@@ -266,7 +289,9 @@ const findings = JSON.parse(output)
 ## Integration: `src/core/schema.ts` & `src/core/config.ts`
 
 ### AgentName Union
+
 Add 5 entries:
+
 ```typescript
 export type AgentName =
   | 'SecurityAgent'
@@ -277,14 +302,15 @@ export type AgentName =
   | 'BreakingChangeAgent'
   | 'LicenseAgent'
   | 'CoverageAnalyst'
-  | 'SecretsAgent'           // new
-  | 'ErrorHandlingAgent'     // new
-  | 'ObservabilityAgent'     // new
-  | 'MigrationSafetyAgent'   // new
-  | 'ComplexityAgent'        // new
+  | 'SecretsAgent' // new
+  | 'ErrorHandlingAgent' // new
+  | 'ObservabilityAgent' // new
+  | 'MigrationSafetyAgent' // new
+  | 'ComplexityAgent' // new
 ```
 
 ### ReviewConfig Interface
+
 ```typescript
 export interface ReviewConfig {
   // ... existing fields
@@ -299,6 +325,7 @@ export interface ReviewConfig {
 ## Integration: `src/core/runner.ts`
 
 ### buildAgents() Registration
+
 Agents **must be registered before being added to DEFAULT_CONFIG.agents**. Failure to register causes the runner to emit no `onProgress` calls for the agent, breaking tests.
 
 ```typescript
@@ -322,7 +349,7 @@ function buildAgents(config: ReviewConfig, llmProvider: LLMProvider): Map<AgentN
 const DEFAULT_CONFIG: ReviewConfig = {
   agents: [
     // existing...
-    'SecretsAgent',            // add after registration
+    'SecretsAgent', // add after registration
     'ErrorHandlingAgent',
     'ObservabilityAgent',
     'MigrationSafetyAgent',

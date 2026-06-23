@@ -10,7 +10,10 @@ export class TestGenAgent {
     private readonly config: ReviewConfig
   ) {}
 
-  async runWithGaps(input: ReviewInput, gaps: CoverageGap[]): Promise<{ testFiles: GeneratedTestFile[] }> {
+  async runWithGaps(
+    input: ReviewInput,
+    gaps: CoverageGap[]
+  ): Promise<{ testFiles: GeneratedTestFile[] }> {
     if (gaps.length === 0) return { testFiles: [] }
 
     const framework = this.detectFramework(input.projectPath)
@@ -38,21 +41,24 @@ export class TestGenAgent {
     framework: TestFramework,
     input: ReviewInput
   ): Promise<GeneratedTestFile | null> {
-    const gapDescriptions = gaps.map(g =>
-      `- Function: ${g.functionName} (lines ${g.lineStart}-${g.lineEnd})\n  What it does: ${g.description}`
-    ).join('\n')
+    const gapDescriptions = gaps
+      .map(
+        (g) =>
+          `- Function: ${g.functionName} (lines ${g.lineStart}-${g.lineEnd})\n  What it does: ${g.description}`
+      )
+      .join('\n')
 
     const messages: Message[] = [
       {
         role: 'system',
         content: `You are a test generation agent. Write complete, runnable test code using ${framework}.
 Output ONLY valid ${framework} test code. No explanation, no markdown fences, no prose.
-Tests must: import the module under test, cover the happy path, cover the error/edge case, use descriptive test names.`
+Tests must: import the module under test, cover the happy path, cover the error/edge case, use descriptive test names.`,
       },
       {
         role: 'user',
-        content: `Generate tests for these uncovered functions in ${sourceFile}:\n\n${gapDescriptions}\n\nContext from diff:\n\`\`\`diff\n${input.diff.slice(0, 8000)}\n\`\`\``
-      }
+        content: `Generate tests for these uncovered functions in ${sourceFile}:\n\n${gapDescriptions}\n\nContext from diff:\n\`\`\`diff\n${input.diff.slice(0, 8000)}\n\`\`\``,
+      },
     ]
 
     const raw = await this.provider.chat(messages, { think: false })
@@ -69,11 +75,16 @@ Tests must: import the module under test, cover the happy path, cover the error/
     if (existsSync(pkgPath)) {
       try {
         const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>
-        const deps = { ...(pkg.dependencies as object ?? {}), ...(pkg.devDependencies as object ?? {}) }
+        const deps = {
+          ...((pkg.dependencies as object) ?? {}),
+          ...((pkg.devDependencies as object) ?? {}),
+        }
         if ('vitest' in deps) return 'vitest'
         if ('jest' in deps) return 'jest'
         if ('mocha' in deps) return 'mocha'
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
     }
     const reqPath = join(projectPath, 'requirements.txt')
     if (existsSync(reqPath)) return 'pytest'

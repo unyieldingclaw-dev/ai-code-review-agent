@@ -5,7 +5,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 describe('ObservabilityAgent', () => {
@@ -14,11 +14,24 @@ describe('ObservabilityAgent', () => {
   })
 
   it('returns empty array when provider returns empty JSON array', async () => {
-    expect(await new ObservabilityAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff content' })).toEqual([])
+    expect(
+      await new ObservabilityAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff content' })
+    ).toEqual([])
   })
 
   it('parses a valid finding and stamps agent name', async () => {
-    const raw = JSON.stringify([{ severity: 'medium', basis: 'VERIFIED', confidence: 75, file: 'src/service.ts', line: 20, title: 'Missing log on error path', detail: 'The catch block silently swallows the error', suggestion: 'Add a structured log statement at error level' }])
+    const raw = JSON.stringify([
+      {
+        severity: 'medium',
+        basis: 'VERIFIED',
+        confidence: 75,
+        file: 'src/service.ts',
+        line: 20,
+        title: 'Missing log on error path',
+        detail: 'The catch block silently swallows the error',
+        suggestion: 'Add a structured log statement at error level',
+      },
+    ])
     const agent = new ObservabilityAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
@@ -27,7 +40,9 @@ describe('ObservabilityAgent', () => {
   })
 
   it('returns empty array on parse failure', async () => {
-    expect(await new ObservabilityAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })).toEqual([])
+    expect(
+      await new ObservabilityAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).toEqual([])
   })
 
   it('system prompt mentions logging and code paths', () => {

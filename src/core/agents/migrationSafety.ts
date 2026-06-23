@@ -10,7 +10,9 @@ const MIGRATION_PATTERNS = [
 ]
 
 export class MigrationSafetyAgent extends BaseAgent {
-  get name(): AgentName { return 'migration-safety' }
+  get name(): AgentName {
+    return 'migration-safety'
+  }
 
   get systemPrompt(): string {
     return `You are a code reviewer specializing in database migration safety.
@@ -45,7 +47,7 @@ export function hasMigrationFiles(diff: string): boolean {
   for (const line of lines) {
     if (!line.startsWith('+++ b/')) continue
     const filePath = line.slice(6)
-    if (MIGRATION_PATTERNS.some(p => p.test(filePath))) return true
+    if (MIGRATION_PATTERNS.some((p) => p.test(filePath))) return true
   }
   return false
 }

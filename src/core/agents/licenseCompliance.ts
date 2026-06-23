@@ -2,7 +2,9 @@ import { BaseAgent } from './base.js'
 import type { AgentName } from '../schema.js'
 
 export class LicenseComplianceAgent extends BaseAgent {
-  get name(): AgentName { return 'license' }
+  get name(): AgentName {
+    return 'license'
+  }
 
   get systemPrompt(): string {
     return `You are a license compliance reviewer. Analyze the provided git diff for newly added dependencies with licenses incompatible with commercial use.

@@ -69,7 +69,9 @@ describe('runReview', () => {
 
   it('throws "nothing-staged" when git diff --cached returns empty string', async () => {
     vi.mocked(execSync).mockReturnValue('')
-    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow('nothing-staged')
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'nothing-staged'
+    )
   })
 
   it('throws "git not found" when execSync throws with spawn error', async () => {
@@ -78,7 +80,9 @@ describe('runReview', () => {
       err.code = 'ENOENT'
       throw err
     })
-    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow('git not found')
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'git not found'
+    )
   })
 
   it('writes staged diff to a temp file and deletes it after run', async () => {
@@ -106,17 +110,30 @@ describe('runReview', () => {
     const mockResult = {
       findings: [
         {
-          id: 'f1', agent: 'security', severity: 'high', basis: 'VERIFIED',
-          file: 'src/auth.ts', line: 42, title: 'SQL Injection',
-          detail: 'Unsanitized input', suggestion: 'Use parameterized queries',
+          id: 'f1',
+          agent: 'security',
+          severity: 'high',
+          basis: 'VERIFIED',
+          file: 'src/auth.ts',
+          line: 42,
+          title: 'SQL Injection',
+          detail: 'Unsanitized input',
+          suggestion: 'Use parameterized queries',
           confidence: 85,
         },
       ],
       testFiles: [],
-      summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: { security: 1 }, durationMs: 8000 },
+      summary: {
+        totalFindings: 1,
+        bySeverity: { high: 1 },
+        byAgent: { security: 1 },
+        durationMs: 8000,
+      },
     }
     // CLI stdout has progress noise before the JSON
-    const cliOutput = '\n🔍 Running ai-review-agent with 11 agents...\n\n  ✓ security\n\n' + JSON.stringify(mockResult)
+    const cliOutput =
+      '\n🔍 Running ai-review-agent with 11 agents...\n\n  ✓ security\n\n' +
+      JSON.stringify(mockResult)
 
     vi.mocked(execSync).mockReturnValue('some staged diff content')
     vi.mocked(spawn).mockReturnValue(makeChild(cliOutput) as any)
@@ -134,26 +151,27 @@ describe('runReview', () => {
       makeChild('', 1, 'Error: connect ECONNREFUSED 127.0.0.1:11434') as any
     )
 
-    await expect(runReview(mockConfig, '/workspace', mockToken as any))
-      .rejects.toThrow('ollama-unreachable:')
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'ollama-unreachable:'
+    )
   })
 
   it('throws "cli-error" for non-zero exit with unrecognised stderr', async () => {
     vi.mocked(execSync).mockReturnValue('some staged diff')
-    vi.mocked(spawn).mockReturnValue(
-      makeChild('', 1, 'Some unexpected crash') as any
-    )
+    vi.mocked(spawn).mockReturnValue(makeChild('', 1, 'Some unexpected crash') as any)
 
-    await expect(runReview(mockConfig, '/workspace', mockToken as any))
-      .rejects.toThrow('cli-error:')
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'cli-error:'
+    )
   })
 
   it('throws "parse-error" when stdout has no JSON object', async () => {
     vi.mocked(execSync).mockReturnValue('some staged diff')
     vi.mocked(spawn).mockReturnValue(makeChild('no json here', 0) as any)
 
-    await expect(runReview(mockConfig, '/workspace', mockToken as any))
-      .rejects.toThrow('parse-error:')
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'parse-error:'
+    )
   })
 
   it('kills child process and throws "cancelled" when cancellation token fires', async () => {
@@ -172,7 +190,7 @@ describe('runReview', () => {
       stdout: { on: vi.fn() },
       stderr: { on: vi.fn() },
       kill: vi.fn(),
-      on: vi.fn(),  // never calls 'close'
+      on: vi.fn(), // never calls 'close'
     }
 
     vi.mocked(execSync).mockReturnValue('some staged diff')

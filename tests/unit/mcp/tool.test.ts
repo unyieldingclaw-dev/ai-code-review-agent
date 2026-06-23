@@ -31,8 +31,18 @@ vi.mock('../../../src/core/config.js', () => ({
     ollamaUrl: 'http://localhost:11434',
     anthropicModel: '',
     maxFindings: 15,
-    agents: ['security', 'performance', 'correctness', 'design', 'dependencies',
-             'coverage', 'adversarial', 'integration', 'breaking-change', 'license'],
+    agents: [
+      'security',
+      'performance',
+      'correctness',
+      'design',
+      'dependencies',
+      'coverage',
+      'adversarial',
+      'integration',
+      'breaking-change',
+      'license',
+    ],
     contextLines: 10,
     testOutputDir: './ai-review-tests',
     maxDiffLines: 2000,
@@ -65,7 +75,7 @@ describe('runReviewTool', () => {
 
   it('falls back to git diff HEAD when no staged changes', async () => {
     mockSpawnSync
-      .mockReturnValueOnce({ status: 0, stdout: '' } as any)            // first call: git diff --cached → empty
+      .mockReturnValueOnce({ status: 0, stdout: '' } as any) // first call: git diff --cached → empty
       .mockReturnValueOnce({ status: 0, stdout: 'diff --git a/f.ts b/f.ts\n+line' } as any) // second call: git diff HEAD
     await runReviewTool({})
     const calls = mockSpawnSync.mock.calls
@@ -91,7 +101,9 @@ describe('runReviewTool', () => {
   })
 
   it('returns error message when git command throws (not a repo)', async () => {
-    mockSpawnSync.mockImplementation(() => { throw new Error('not a git repository') })
+    mockSpawnSync.mockImplementation(() => {
+      throw new Error('not a git repository')
+    })
     const result = await runReviewTool({})
     expect(result).toContain('Not a git repository')
   })
@@ -102,9 +114,12 @@ describe('runReviewTool', () => {
       stdout: 'diff --git a/f.ts b/f.ts\n+line',
     } as any)
     const { SwarmRunner } = await import('../../../src/core/runner.js')
-    vi.mocked(SwarmRunner).mockImplementationOnce(() => ({
-      run: vi.fn().mockRejectedValue(new Error('LLM provider not available')),
-    }) as any)
+    vi.mocked(SwarmRunner).mockImplementationOnce(
+      () =>
+        ({
+          run: vi.fn().mockRejectedValue(new Error('LLM provider not available')),
+        }) as any
+    )
     const result = await runReviewTool({})
     expect(result).toContain('Ollama is not reachable')
   })
@@ -121,7 +136,7 @@ describe('runReviewTool', () => {
       ollamaUrl: 'http://localhost:11434',
       anthropicModel: '',
       maxFindings: 15,
-      agents: ['security', 'testgen', 'coverage'],  // testgen present in config
+      agents: ['security', 'testgen', 'coverage'], // testgen present in config
       contextLines: 10,
       testOutputDir: './ai-review-tests',
       maxDiffLines: 2000,
@@ -131,8 +146,9 @@ describe('runReviewTool', () => {
     })
     const { SwarmRunner } = await import('../../../src/core/runner.js')
     const runMock = vi.fn().mockResolvedValue({
-      findings: [], testFiles: [],
-      summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 }
+      findings: [],
+      testFiles: [],
+      summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
     })
     vi.mocked(SwarmRunner).mockImplementationOnce((config: any) => {
       expect(config.agents).not.toContain('testgen')

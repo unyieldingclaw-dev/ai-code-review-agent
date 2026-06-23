@@ -4,9 +4,9 @@ import type { Finding, Severity } from './types'
 
 const SEVERITY_MAP: Record<Severity, vscode.DiagnosticSeverity> = {
   critical: vscode.DiagnosticSeverity.Error,
-  high:     vscode.DiagnosticSeverity.Error,
-  medium:   vscode.DiagnosticSeverity.Warning,
-  low:      vscode.DiagnosticSeverity.Information,
+  high: vscode.DiagnosticSeverity.Error,
+  medium: vscode.DiagnosticSeverity.Warning,
+  low: vscode.DiagnosticSeverity.Information,
 }
 
 /**
@@ -32,7 +32,7 @@ export function applyDiagnostics(
     const uri = vscode.Uri.file(path.join(workspaceDir, finding.file))
     const key = uri.fsPath.toLowerCase()
 
-    const line = Math.max(0, finding.line - 1)  // 1-based → 0-based
+    const line = Math.max(0, finding.line - 1) // 1-based → 0-based
     const range = new vscode.Range(line, 0, line, Number.MAX_SAFE_INTEGER)
     const severity = SEVERITY_MAP[finding.severity] ?? vscode.DiagnosticSeverity.Information
 

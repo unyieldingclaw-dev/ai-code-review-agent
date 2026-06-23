@@ -24,17 +24,20 @@ A local AI-powered code review agent (`/ai-review`) that runs 9 specialist sub-a
 ## Non-Negotiable Constraints
 
 ### Business Requirements
+
 - Ollama-only backend — no Anthropic/OpenAI API calls in the review pipeline
 - `/ai-review` coexists with PMB's `/code-review`; does not replace it (Option B)
 - All 9 specialist agents use `think: true` (reasoning depth matters for code review)
 
 ### Technical Constraints
+
 - Windows 11 development environment (PowerShell primary shell)
 - Ollama with `devstral:latest` (14 GB) at 32k context length
 - Sequential agent execution (Ollama is single-threaded)
 - Node.js / TypeScript project (`npm`, `vitest` for tests)
 
 ### User Experience
+
 - CLI entry point via Commander
 - Output in markdown or JSON (formatter flag)
 - GitHub Actions adapter for PR comment upsert + Step Summary
@@ -42,6 +45,7 @@ A local AI-powered code review agent (`/ai-review`) that runs 9 specialist sub-a
 ## Key Goals
 
 ### Phase 1 — Core Infrastructure (Complete: Tasks 1–5)
+
 - [x] Project scaffolding (package.json, tsconfig, vitest)
 - [x] Core types & Finding schema
 - [x] Config loading with defaults and project override
@@ -49,6 +53,7 @@ A local AI-powered code review agent (`/ai-review`) that runs 9 specialist sub-a
 - [x] BaseAgent abstract class with 3-stage JSON parse
 
 ### Phase 2 — Specialist Agents + Orchestrator (Tasks 6–10) ✅ COMPLETE
+
 - [x] Security, Performance, Correctness agents (Task 6)
 - [x] Design, Dependencies, Adversarial, IntegrationScout agents (Task 7)
 - [x] CoverageAnalyst + TestGen agents (Task 8)
@@ -56,6 +61,7 @@ A local AI-powered code review agent (`/ai-review`) that runs 9 specialist sub-a
 - [x] SwarmRunner — sequential orchestration + ping check (Task 10)
 
 ### Phase 3 — CLI, CI, Distribution (Tasks 11–16) ✅ COMPLETE
+
 - [x] CLI entry point + markdown/json formatters (Task 11)
 - [x] GitHub Actions adapter + workflow (Task 12)
 - [x] Claude Code slash command `.claude/commands/ai-review.md` (Task 13)
@@ -65,19 +71,19 @@ A local AI-powered code review agent (`/ai-review`) that runs 9 specialist sub-a
 
 ## Success Metrics
 
-| Metric | Target | Current |
-|--------|--------|---------|
-| Unit tests passing | 100% | 19/19 ✅ |
-| TypeScript errors | 0 | 0 ✅ |
-| Agent count | 9 specialists + 1 orchestrator | 10/10 ✅ |
-| Calibration suite | 9 fixture diffs | Complete ✅ |
+| Metric             | Target                         | Current     |
+| ------------------ | ------------------------------ | ----------- |
+| Unit tests passing | 100%                           | 19/19 ✅    |
+| TypeScript errors  | 0                              | 0 ✅        |
+| Agent count        | 9 specialists + 1 orchestrator | 10/10 ✅    |
+| Calibration suite  | 9 fixture diffs                | Complete ✅ |
 
 ## Stakeholders
 
-| Role | Person/Team | Responsibility |
-|------|-------------|----------------|
-| Primary User | Mizzo (solo) | Runs reviews on local diffs |
-| Development | Mizzo + Claude | Builds the tool |
+| Role         | Person/Team    | Responsibility              |
+| ------------ | -------------- | --------------------------- |
+| Primary User | Mizzo (solo)   | Runs reviews on local diffs |
+| Development  | Mizzo + Claude | Builds the tool             |
 
 ## Out of Scope
 

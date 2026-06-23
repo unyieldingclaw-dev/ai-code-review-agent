@@ -22,12 +22,12 @@ export class OllamaProvider implements LLMProvider {
         stream: false,
         ...(options.think && this.supportsThinking() ? { think: true } : {}),
         ...(options.format ? { format: options.format } : {}),
-        messages
+        messages,
       }),
-      signal: AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS)
+      signal: AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS),
     })
     if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`)
-    const data = await res.json() as { message?: { content?: string } }
+    const data = (await res.json()) as { message?: { content?: string } }
     const raw = data.message?.content ?? ''
     return this.stripThinkTags(raw)
   }
@@ -35,18 +35,21 @@ export class OllamaProvider implements LLMProvider {
   async ping(): Promise<{ ok: boolean; error?: string }> {
     try {
       const res = await fetch(`${this.baseUrl}/api/tags`, {
-        signal: AbortSignal.timeout(5_000)
+        signal: AbortSignal.timeout(5_000),
       })
       if (!res.ok) return { ok: false, error: `Ollama returned HTTP ${res.status}` }
-      const data = await res.json() as { models?: Array<{ name: string }> }
+      const data = (await res.json()) as { models?: Array<{ name: string }> }
       const modelBase = this.model.split(':')[0].toLowerCase()
-      const hasModel = (data.models ?? []).some(m => m.name.toLowerCase().includes(modelBase))
+      const hasModel = (data.models ?? []).some((m) => m.name.toLowerCase().includes(modelBase))
       if (!hasModel) {
         return { ok: false, error: `Model ${this.model} not found. Run: ollama pull ${this.model}` }
       }
       return { ok: true }
     } catch (err) {
-      return { ok: false, error: `Ollama not reachable at ${this.baseUrl}: ${(err as Error).message}` }
+      return {
+        ok: false,
+        error: `Ollama not reachable at ${this.baseUrl}: ${(err as Error).message}`,
+      }
     }
   }
 

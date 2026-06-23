@@ -4,7 +4,7 @@ const SEVERITY_EMOJI: Record<Severity, string> = {
   critical: '🔴',
   high: '🟠',
   medium: '🟡',
-  low: '🔵'
+  low: '🔵',
 }
 
 export function formatMarkdown(result: ReviewResult): string {
@@ -13,7 +13,9 @@ export function formatMarkdown(result: ReviewResult): string {
 
   lines.push('# AI Code Review Report')
   lines.push('')
-  lines.push(`**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`)
+  lines.push(
+    `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`
+  )
   lines.push('')
 
   if (findings.length === 0) {
@@ -21,7 +23,7 @@ export function formatMarkdown(result: ReviewResult): string {
     return lines.join('\n')
   }
 
-  const bySeverity = groupBy(findings, f => f.severity)
+  const bySeverity = groupBy(findings, (f) => f.severity)
   for (const severity of ['critical', 'high', 'medium', 'low'] as Severity[]) {
     const group = bySeverity.get(severity)
     if (!group?.length) continue
@@ -30,7 +32,9 @@ export function formatMarkdown(result: ReviewResult): string {
     for (const f of group) {
       lines.push(`### ${f.title}`)
       const conf = f.confidence ?? 70
-      lines.push(`**Agent:** ${f.agent} | **Basis:** ${f.basis} | **Confidence:** ${conf}% | **File:** \`${f.file}:${f.line}\``)
+      lines.push(
+        `**Agent:** ${f.agent} | **Basis:** ${f.basis} | **Confidence:** ${conf}% | **File:** \`${f.file}:${f.line}\``
+      )
       lines.push('')
       lines.push(f.detail)
       lines.push('')

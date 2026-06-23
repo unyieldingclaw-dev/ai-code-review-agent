@@ -22,28 +22,28 @@ No runtime enforcement. Trust level is informational context for security findin
 
 ## Trust Levels
 
-| Level | Definition |
-|-------|-----------|
-| TRUSTED | Content the operator explicitly controls and reviewed |
+| Level        | Definition                                                         |
+| ------------ | ------------------------------------------------------------------ |
+| TRUSTED      | Content the operator explicitly controls and reviewed              |
 | SEMI_TRUSTED | Content in the repository but potentially modified by contributors |
-| UNTRUSTED | External content not reviewed by the operator |
+| UNTRUSTED    | External content not reviewed by the operator                      |
 
 ## Source Classification
 
-| Source | Trust Level | Rationale |
-|--------|-------------|-----------|
-| Standards files (`standards/`) | TRUSTED | Operator-controlled, version-controlled |
-| Commands (`.claude/commands/`) | TRUSTED | Operator-controlled, version-controlled |
-| Agents (`.claude/agents/`) | TRUSTED | Operator-controlled, version-controlled |
-| CLAUDE.md | TRUSTED | Operator-controlled, version-controlled |
-| Memory bank files | SEMI_TRUSTED | Operator-controlled but partially AI-generated |
-| Project source code | SEMI_TRUSTED | In-repo but may include external contributions |
-| Config files | SEMI_TRUSTED | In-repo, usually operator-controlled |
-| PR descriptions | UNTRUSTED | User-supplied, not reviewed before processing |
-| Issue comments | UNTRUSTED | User-supplied, not reviewed before processing |
-| User prompts (runtime) | UNTRUSTED | Direct user input during session |
-| Fetched web content | UNTRUSTED | External, not operator-controlled |
-| MCP tool results | UNTRUSTED | External service responses |
+| Source                         | Trust Level  | Rationale                                      |
+| ------------------------------ | ------------ | ---------------------------------------------- |
+| Standards files (`standards/`) | TRUSTED      | Operator-controlled, version-controlled        |
+| Commands (`.claude/commands/`) | TRUSTED      | Operator-controlled, version-controlled        |
+| Agents (`.claude/agents/`)     | TRUSTED      | Operator-controlled, version-controlled        |
+| CLAUDE.md                      | TRUSTED      | Operator-controlled, version-controlled        |
+| Memory bank files              | SEMI_TRUSTED | Operator-controlled but partially AI-generated |
+| Project source code            | SEMI_TRUSTED | In-repo but may include external contributions |
+| Config files                   | SEMI_TRUSTED | In-repo, usually operator-controlled           |
+| PR descriptions                | UNTRUSTED    | User-supplied, not reviewed before processing  |
+| Issue comments                 | UNTRUSTED    | User-supplied, not reviewed before processing  |
+| User prompts (runtime)         | UNTRUSTED    | Direct user input during session               |
+| Fetched web content            | UNTRUSTED    | External, not operator-controlled              |
+| MCP tool results               | UNTRUSTED    | External service responses                     |
 
 ## Application in Security Findings
 

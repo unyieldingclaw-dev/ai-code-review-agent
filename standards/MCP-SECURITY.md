@@ -22,6 +22,7 @@ Review tool descriptions when adding a new server.
 ### Credential Exposure in mcp.json
 
 MCP config files often require API keys. Hardcoding them in `mcp.json` means:
+
 - The key appears in version control history if the file is ever committed
 - The key is readable by any process that can read the file
 
@@ -55,6 +56,7 @@ In `mcp.json` or `.mcp.json`:
 ```
 
 Never:
+
 ```json
 "API_KEY": "sk-live-abc123..."
 ```
@@ -62,6 +64,7 @@ Never:
 ### Allowlist MCP Servers
 
 Maintain an approved list of MCP servers at the team level. New servers require:
+
 1. Code review of the server's source or published manifest
 2. Security review of what data the server can access
 3. Least-privilege scope configuration
@@ -86,6 +89,7 @@ For task boundary setting and broader agentic safety guidance during live sessio
 ---
 
 **References:**
+
 - [Model Context Protocol Security — Red Hat](https://www.redhat.com/en/blog/model-context-protocol-mcp-understanding-security-risks-and-controls)
 - [11 Emerging AI Security Risks with MCP — Checkmarx](https://checkmarx.com/zero-post/11-emerging-ai-security-risks-with-mcp-model-context-protocol/)
 - [MCP Security Critical Vulnerabilities — eSentire](https://www.esentire.com/blog/model-context-protocol-security-critical-vulnerabilities-every-ciso-should-address-in-2025)

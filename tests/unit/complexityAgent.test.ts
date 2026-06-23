@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { runTool } from '../../src/utils/shell.js'
 
 vi.mock('../../src/utils/shell.js', () => ({
-  runTool: vi.fn()
+  runTool: vi.fn(),
 }))
 const mockRunTool = vi.mocked(runTool)
 
@@ -12,7 +12,7 @@ import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 const DIFF_WITH_FILE = `diff --git a/src/app.ts b/src/app.ts
@@ -55,22 +55,24 @@ describe('ComplexityAgent', () => {
     // The LLM prompt content should include the lizard metrics
     const chatArgs = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]
     const messages = chatArgs[0] as Array<{ role: string; content: string }>
-    const userMessage = messages.find(m => m.role === 'user')
+    const userMessage = messages.find((m) => m.role === 'user')
     expect(userMessage?.content).toContain(lizardOutput.trim())
   })
 
   it('parses a valid finding and stamps agent name', async () => {
     mockRunTool.mockResolvedValue(null)
-    const raw = JSON.stringify([{
-      severity: 'high',
-      basis: 'VERIFIED',
-      confidence: 80,
-      file: 'src/app.ts',
-      line: 10,
-      title: 'High cyclomatic complexity',
-      detail: 'Function has 16 decision paths',
-      suggestion: 'Break into smaller functions'
-    }])
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        confidence: 80,
+        file: 'src/app.ts',
+        line: 10,
+        title: 'High cyclomatic complexity',
+        detail: 'Function has 16 decision paths',
+        suggestion: 'Break into smaller functions',
+      },
+    ])
     const agent = new ComplexityAgent(makeProvider(raw), DEFAULT_CONFIG)
     const findings = await agent.run({ diff: DIFF_WITH_FILE })
     expect(findings).toHaveLength(1)

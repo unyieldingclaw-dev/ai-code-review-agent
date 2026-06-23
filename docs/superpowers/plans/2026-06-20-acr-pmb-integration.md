@@ -16,41 +16,42 @@
 
 **ACR (`ai-code-review-agent`):**
 
-| Operation | File |
-|---|---|
-| Create | `src/core/profiles.ts` |
-| Modify | `src/core/schema.ts` — extend Finding interface |
-| Modify | `src/cli/index.ts` — add `--profile` flag |
-| Modify | `src/core/agents/security.ts` |
-| Modify | `src/core/agents/performance.ts` |
-| Modify | `src/core/agents/correctness.ts` |
-| Modify | `src/core/agents/design.ts` |
-| Modify | `src/core/agents/dependencies.ts` |
-| Modify | `src/core/agents/coverageAnalyst.ts` |
-| Modify | `src/core/agents/adversarial.ts` |
-| Modify | `src/core/agents/integrationScout.ts` |
-| Modify | `src/core/agents/breakingChange.ts` |
-| Modify | `src/core/agents/licenseCompliance.ts` |
-| Modify | `src/core/agents/errorHandling.ts` |
-| Modify | `src/core/agents/observability.ts` |
-| Modify | `src/core/agents/migrationSafety.ts` |
-| Modify | `src/core/agents/secrets.ts` |
-| Modify | `src/core/agents/complexity.ts` |
-| Modify | `src/cli/formatter.ts` — print new fields |
-| Create | `tests/unit/profiles.test.ts` |
+| Operation | File                                            |
+| --------- | ----------------------------------------------- |
+| Create    | `src/core/profiles.ts`                          |
+| Modify    | `src/core/schema.ts` — extend Finding interface |
+| Modify    | `src/cli/index.ts` — add `--profile` flag       |
+| Modify    | `src/core/agents/security.ts`                   |
+| Modify    | `src/core/agents/performance.ts`                |
+| Modify    | `src/core/agents/correctness.ts`                |
+| Modify    | `src/core/agents/design.ts`                     |
+| Modify    | `src/core/agents/dependencies.ts`               |
+| Modify    | `src/core/agents/coverageAnalyst.ts`            |
+| Modify    | `src/core/agents/adversarial.ts`                |
+| Modify    | `src/core/agents/integrationScout.ts`           |
+| Modify    | `src/core/agents/breakingChange.ts`             |
+| Modify    | `src/core/agents/licenseCompliance.ts`          |
+| Modify    | `src/core/agents/errorHandling.ts`              |
+| Modify    | `src/core/agents/observability.ts`              |
+| Modify    | `src/core/agents/migrationSafety.ts`            |
+| Modify    | `src/core/agents/secrets.ts`                    |
+| Modify    | `src/core/agents/complexity.ts`                 |
+| Modify    | `src/cli/formatter.ts` — print new fields       |
+| Create    | `tests/unit/profiles.test.ts`                   |
 
 **PMB (`personal-memory-bank`):**
 
-| Operation | File |
-|---|---|
-| Create | `.claude/commands/change-review.md` |
-| Create | `templates/claude-commands/change-review.md` |
+| Operation | File                                         |
+| --------- | -------------------------------------------- |
+| Create    | `.claude/commands/change-review.md`          |
+| Create    | `templates/claude-commands/change-review.md` |
 
 ---
 
 ### Task 1: Create profiles.ts and add --profile to CLI
 
 **Files:**
+
 - Create: `src/core/profiles.ts`
 - Modify: `src/cli/index.ts`
 - Create: `tests/unit/profiles.test.ts`
@@ -123,17 +124,35 @@ import type { AgentName } from './schema.js'
 export const PROFILES: Record<string, AgentName[]> = {
   fast: ['security', 'correctness', 'secrets'],
   full: [
-    'security', 'performance', 'correctness', 'design', 'dependencies',
-    'coverage', 'adversarial', 'integration', 'breaking-change', 'license',
-    'error-handling', 'observability', 'migration-safety', 'secrets', 'complexity'
+    'security',
+    'performance',
+    'correctness',
+    'design',
+    'dependencies',
+    'coverage',
+    'adversarial',
+    'integration',
+    'breaking-change',
+    'license',
+    'error-handling',
+    'observability',
+    'migration-safety',
+    'secrets',
+    'complexity',
   ],
   'change-review': [
-    'security', 'correctness', 'design', 'coverage',
-    'integration', 'migration-safety', 'secrets', 'complexity'
+    'security',
+    'correctness',
+    'design',
+    'coverage',
+    'integration',
+    'migration-safety',
+    'secrets',
+    'complexity',
   ],
   ui: ['security', 'performance', 'correctness', 'coverage', 'integration'],
   migration: ['migration-safety', 'correctness', 'secrets', 'dependencies'],
-  security: ['security', 'secrets', 'dependencies', 'adversarial']
+  security: ['security', 'secrets', 'dependencies', 'adversarial'],
 }
 
 export function resolveProfile(name: string): AgentName[] {
@@ -209,6 +228,7 @@ git commit -m "feat: add --profile flag and PROFILES map (fast, full, change-rev
 ### Task 2: Extend Finding schema with MB/PMB fields
 
 **Files:**
+
 - Modify: `src/core/schema.ts`
 
 - [ ] **Step 1: Update src/core/schema.ts**
@@ -328,7 +348,7 @@ export const SEVERITY_RANK: Record<Severity, number> = {
   critical: 4,
   high: 3,
   medium: 2,
-  low: 1
+  low: 1,
 }
 
 export type FailOnLevel = 'critical' | 'high' | 'medium' | 'any' | 'never'
@@ -373,22 +393,22 @@ You will need to add an `agentDefaultDomain` helper that maps agent name to a se
 ```ts
 function agentDefaultDomain(name: AgentName): ReviewDomain {
   const map: Record<AgentName, ReviewDomain> = {
-    'security': 'Security',
-    'performance': 'Performance',
-    'correctness': 'Correctness',
-    'design': 'Architecture Drift',
-    'dependencies': 'Dependencies',
-    'coverage': 'Testing',
-    'testgen': 'Testing',
-    'adversarial': 'Adversarial',
-    'integration': 'Integration',
+    security: 'Security',
+    performance: 'Performance',
+    correctness: 'Correctness',
+    design: 'Architecture Drift',
+    dependencies: 'Dependencies',
+    coverage: 'Testing',
+    testgen: 'Testing',
+    adversarial: 'Adversarial',
+    integration: 'Integration',
     'breaking-change': 'Breaking Change',
-    'license': 'License',
-    'secrets': 'Secrets',
+    license: 'License',
+    secrets: 'Secrets',
     'error-handling': 'Error Handling',
-    'observability': 'Observability',
+    observability: 'Observability',
     'migration-safety': 'Migration Safety',
-    'complexity': 'Complexity'
+    complexity: 'Complexity',
   }
   return map[name] ?? 'Correctness'
 }
@@ -422,6 +442,7 @@ git commit -m "feat: extend Finding schema with domain, evidence, impact, recomm
 ### Task 3: Update agent system prompts to emit new fields
 
 **Files:**
+
 - Modify all 15 agent files in `src/core/agents/`
 
 Each agent's system prompt JSON format spec must request the new fields. The pattern is the same for every agent — update the `Required format:` example in the system prompt to include:
@@ -452,6 +473,7 @@ Do each agent as a separate step:
 In `src/core/agents/security.ts`, update the output format spec to include the new fields. The domain is `Security`. The `source` for security agent findings is `"llm"` by default (or `"semgrep"` if semgrep was used — for now use `"llm"`).
 
 Add to the format specification:
+
 ```
 "domain": "Security",
 "evidence": "<specific code line or value that proves the issue>",
@@ -545,6 +567,7 @@ git commit -m "feat: update all 15 agent system prompts to emit domain, evidence
 ### Task 4: Update formatters to print new fields
 
 **Files:**
+
 - Modify: `src/cli/formatter.ts`
 
 - [ ] **Step 1: Read current formatter**
@@ -593,6 +616,7 @@ git commit -m "feat: update formatters to print domain, evidence, impact, recomm
 ### Task 5: Create PMB /change-review command
 
 **Files:**
+
 - Create: `.claude/commands/change-review.md` (in PMB repo: `C:\Users\Mizzo\Claude\Personal-Memory-Bank`)
 - Create: `templates/claude-commands/change-review.md` (in PMB repo)
 
@@ -608,13 +632,14 @@ description: Review the current branch, PR, or diff as a complete change package
 Review the current branch, PR, MR, or diff as a complete change package.
 
 ## Usage
-
 ```
+
 /change-review
 /change-review --diff path/to/change.diff
 /change-review --base origin/main
 /change-review --pr <number>
-```
+
+````
 
 ## What it checks (Reviewer 9)
 
@@ -652,14 +677,16 @@ Run `mb preflight` if available. Note result in coverage footer.
 
 ```bash
 which ai-review-agent 2>/dev/null && echo "available" || echo "not found"
-```
+````
 
 If available, run for security and secrets:
+
 ```bash
 ai-review-agent --profile security --format json --out /tmp/acr-security.json
 ```
 
 Parse findings from JSON. Incorporate into Job 7 (Security). If ACR is unavailable:
+
 > ACR not found in PATH. Skipping local LLM swarm. Continuing with PMB-native review.
 
 ### Step 5 — Run all 9 review jobs
@@ -690,6 +717,7 @@ End the report with:
 
 ```markdown
 ## Coverage Footer
+
 - Review target: <local diff | branch | PR #N | MR !N>
 - Base ref: <ref or unavailable>
 - Files changed: <count>
@@ -703,14 +731,15 @@ End the report with:
 ### Step 8 — Stop
 
 Display findings and coverage footer. **Do not edit files.** Do not post PR comments. Do not run fixes. If the user wants to address findings, they will ask in a separate follow-up.
-```
+
+````
 
 - [ ] **Step 2: Copy to templates/claude-commands/**
 
 ```bash
 # In the PMB repo
 cp .claude/commands/change-review.md templates/claude-commands/change-review.md
-```
+````
 
 - [ ] **Step 3: Verify the file**
 

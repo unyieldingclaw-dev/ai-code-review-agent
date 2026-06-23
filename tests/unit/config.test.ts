@@ -36,7 +36,10 @@ describe('loadConfig', () => {
   })
 
   it('merges project config over defaults', () => {
-    writeFileSync('ai-review.config.json', JSON.stringify({ model: 'qwen3:latest', maxFindings: 5 }))
+    writeFileSync(
+      'ai-review.config.json',
+      JSON.stringify({ model: 'qwen3:latest', maxFindings: 5 })
+    )
     try {
       const config = loadConfig(process.cwd())
       expect(config.model).toBe('qwen3:latest')

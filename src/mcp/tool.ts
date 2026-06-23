@@ -18,7 +18,7 @@ export interface ReviewToolParams {
 function gitSync(cwd: string, args: string[]): string {
   const result = spawnSync('git', ['-C', cwd, ...args], {
     encoding: 'utf-8',
-    maxBuffer: 50 * 1024 * 1024
+    maxBuffer: 50 * 1024 * 1024,
   })
   if (result.error || result.status !== 0) return ''
   return result.stdout
@@ -45,9 +45,7 @@ export async function runReviewTool(params: ReviewToolParams): Promise<string> {
   // --- Config ---
   const config = loadConfig(repoPath)
   // Remove testgen regardless of what the config file says
-  config.agents = config.agents.filter(
-    (a): a is AgentName => !MCP_EXCLUDED_AGENTS.includes(a)
-  )
+  config.agents = config.agents.filter((a): a is AgentName => !MCP_EXCLUDED_AGENTS.includes(a))
 
   // --- Run swarm ---
   const provider = new OllamaProvider(config.ollamaUrl, config.model)
@@ -58,7 +56,11 @@ export async function runReviewTool(params: ReviewToolParams): Promise<string> {
     return formatMcpOutput(result)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('provider not available') || msg.includes('ECONNREFUSED') || msg.includes('fetch')) {
+    if (
+      msg.includes('provider not available') ||
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('fetch')
+    ) {
       return `## AI Code Review\n\nOllama is not reachable at \`${config.ollamaUrl}\`. Start Ollama and try again.`
     }
     return `## AI Code Review\n\nReview failed: ${msg}`

@@ -5,6 +5,7 @@ Generic code quality rules for AI-generated code, with an extension system for l
 ## Overview
 
 AI coding assistants can generate inconsistent code if not given clear guidelines. This standard ensures:
+
 - Verification before claiming completion
 - Consistent commenting practices
 - Proper error handling
@@ -18,12 +19,12 @@ These rules apply to **all languages**.
 
 **Never claim "done" without evidence.**
 
-| Rule | Implementation |
-|------|----------------|
-| Run tests after changes | Execute test suite, report results |
-| Check for lint errors | Run linter, fix issues |
-| Verify build succeeds | Run build command, confirm no errors |
-| Confirm functionality | Describe what was tested |
+| Rule                    | Implementation                       |
+| ----------------------- | ------------------------------------ |
+| Run tests after changes | Execute test suite, report results   |
+| Check for lint errors   | Run linter, fix issues               |
+| Verify build succeeds   | Run build command, confirm no errors |
+| Confirm functionality   | Describe what was tested             |
 
 ```
 ❌ "Done! I've implemented the feature."
@@ -39,15 +40,15 @@ These rules apply to **all languages**.
 
 **Comment the WHY, not the WHAT.**
 
-| Rule | Example |
-|------|---------|
-| No obvious comments | ❌ `// Import the module` |
-| WHY comments for non-obvious logic | ✅ `// Use UTC to avoid timezone bugs in scheduling` |
-| No commented-out code | ❌ `// oldFunction()` |
-| Document breaking changes | ✅ `// BREAKING: Changed from sync to async` |
-| Rationale must trace to observable behavior, documented constraint, or explicit project guidance | ❌ `// Using Set here for significant performance gains` ✅ `// Set prevents duplicate hook registration — settings loader may merge repeated entries on reload` |
-| No speculative performance or optimization claims | ❌ `// Parallelized for performance` ✅ `// Parallelized because the upstream API enforces a 5s per-call timeout; sequential execution exceeds dashboard SLA` |
-| Do not document rationale you cannot support with observable behavior, documented constraints, or explicit project guidance — this covers historical intent, optimization claims, and architectural explanations equally | ❌ `// Legacy compatibility` (unsupported — no linked ticket, no observable constraint) ✅ [omit the comment rather than invent a reason] |
+| Rule                                                                                                                                                                                                                     | Example                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No obvious comments                                                                                                                                                                                                      | ❌ `// Import the module`                                                                                                                                        |
+| WHY comments for non-obvious logic                                                                                                                                                                                       | ✅ `// Use UTC to avoid timezone bugs in scheduling`                                                                                                             |
+| No commented-out code                                                                                                                                                                                                    | ❌ `// oldFunction()`                                                                                                                                            |
+| Document breaking changes                                                                                                                                                                                                | ✅ `// BREAKING: Changed from sync to async`                                                                                                                     |
+| Rationale must trace to observable behavior, documented constraint, or explicit project guidance                                                                                                                         | ❌ `// Using Set here for significant performance gains` ✅ `// Set prevents duplicate hook registration — settings loader may merge repeated entries on reload` |
+| No speculative performance or optimization claims                                                                                                                                                                        | ❌ `// Parallelized for performance` ✅ `// Parallelized because the upstream API enforces a 5s per-call timeout; sequential execution exceeds dashboard SLA`    |
+| Do not document rationale you cannot support with observable behavior, documented constraints, or explicit project guidance — this covers historical intent, optimization claims, and architectural explanations equally | ❌ `// Legacy compatibility` (unsupported — no linked ticket, no observable constraint) ✅ [omit the comment rather than invent a reason]                        |
 
 ```python
 # ❌ BAD - Obvious comment
@@ -75,24 +76,24 @@ for user in users:
 
 **Keep code organized and maintainable.**
 
-| Rule | Rationale |
-|------|-----------|
-| Imports at top of file | Predictable location, easy to find |
-| No inline imports | Avoid hidden dependencies |
-| Prefer editing over creating files | Reduce code sprawl |
-| Small incremental changes | Easier to review and debug |
-| Single responsibility | Functions do one thing well |
+| Rule                               | Rationale                          |
+| ---------------------------------- | ---------------------------------- |
+| Imports at top of file             | Predictable location, easy to find |
+| No inline imports                  | Avoid hidden dependencies          |
+| Prefer editing over creating files | Reduce code sprawl                 |
+| Small incremental changes          | Easier to review and debug         |
+| Single responsibility              | Functions do one thing well        |
 
 ### 4. Error Handling
 
 **Handle all error cases explicitly.**
 
-| Rule | Implementation |
-|------|----------------|
-| Never swallow exceptions silently | Always log or re-raise |
-| Meaningful error messages | Include context, not just "Error" |
-| Handle edge cases | Empty inputs, null values, boundaries |
-| Graceful degradation | Partial results better than crash |
+| Rule                              | Implementation                        |
+| --------------------------------- | ------------------------------------- |
+| Never swallow exceptions silently | Always log or re-raise                |
+| Meaningful error messages         | Include context, not just "Error"     |
+| Handle edge cases                 | Empty inputs, null values, boundaries |
+| Graceful degradation              | Partial results better than crash     |
 
 ```python
 # ❌ BAD - Silent swallow
@@ -116,36 +117,37 @@ except ValueError as e:
 
 **Keep documentation in sync with code.**
 
-| Rule | When |
-|------|------|
-| Update docs with behavior changes | Any user-facing change |
-| Document breaking changes | Any API/interface change |
-| Clear function signatures | Parameters, return types, exceptions |
-| README for new features | Major additions |
+| Rule                              | When                                 |
+| --------------------------------- | ------------------------------------ |
+| Update docs with behavior changes | Any user-facing change               |
+| Document breaking changes         | Any API/interface change             |
+| Clear function signatures         | Parameters, return types, exceptions |
+| README for new features           | Major additions                      |
 
 ### 6. File Management
 
 **Be conservative with file creation.**
 
-| Rule | Rationale |
-|------|-----------|
-| Prefer editing existing files | Reduces complexity |
-| Don't create empty placeholder files | Creates noise |
-| Don't generate binary/hash content | Expensive and unhelpful |
-| Group related code | Avoid single-function files |
+| Rule                                 | Rationale                   |
+| ------------------------------------ | --------------------------- |
+| Prefer editing existing files        | Reduces complexity          |
+| Don't create empty placeholder files | Creates noise               |
+| Don't generate binary/hash content   | Expensive and unhelpful     |
+| Group related code                   | Avoid single-function files |
 
 ### 7. Dead Code & Cleanup Authority
 
 **Identifying dead code and removing it are separate authority levels.**
 
-| Authority | When allowed | Required evidence |
-|-----------|-------------|-------------------|
-| **Observe** | Always | State why it appears unused and what references were checked |
-| **Remove** | Only with deterministic proof or explicit human confirmation | Proof that no execution path reaches it (static analysis + runtime + all platform branches) |
+| Authority   | When allowed                                                 | Required evidence                                                                           |
+| ----------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| **Observe** | Always                                                       | State why it appears unused and what references were checked                                |
+| **Remove**  | Only with deterministic proof or explicit human confirmation | Proof that no execution path reaches it (static analysis + runtime + all platform branches) |
 
 **The key constraint:** Lack of observed execution is not deterministic proof of non-use.
 
 Code that appears unused during local analysis may be:
+
 - A shell fallback for an alternate platform or runtime
 - A CI-only branch activated by an env variable
 - A hook script referenced by external config
@@ -155,6 +157,7 @@ Code that appears unused during local analysis may be:
 **Default posture for infra, scripting, and governance code:** Observe-only. Shell scripts, platform branches, CI conditions, and hook scripts carry the highest risk of false dead-code detection. Do not remove without a human confirmation that the code path is truly unreachable.
 
 **Observation format:** When flagging suspected dead code, state:
+
 1. Why it appears unused (what signals suggest it's dead)
 2. What references were checked (grep, call-site analysis, CI config, hook config)
 3. Confidence level and the specific contexts that would need to be verified to be certain
@@ -168,7 +171,7 @@ Code that appears unused during local analysis may be:
 # Recommend: human confirms before deletion.
 ```
 
-**What this is not:** This section does not prohibit refactoring or cleanup. It constrains *autonomous deletion of code whose reachability cannot be proven*. Cleanup with human confirmation, cleanup of code the implementer just wrote, and cleanup where the full call graph is known — all fine.
+**What this is not:** This section does not prohibit refactoring or cleanup. It constrains _autonomous deletion of code whose reachability cannot be proven_. Cleanup with human confirmation, cleanup of code the implementer just wrote, and cleanup where the full call graph is known — all fine.
 
 ## Language Extensions
 
@@ -180,34 +183,39 @@ Add language-specific rules in `standards/extensions/<language>.md`.
 # [Language] Extension for Code Quality Standard
 
 ## Formatting
+
 - Tool: [formatter name]
 - Config: [config file if any]
 - Rules: [key formatting rules]
 
 ## Type Safety
+
 - Tool: [type checker name]
 - Rules: [type annotation requirements]
 
 ## Testing
+
 - Framework: [test framework]
 - Coverage: [coverage requirements]
 - Patterns: [test naming, structure]
 
 ## Anti-Patterns
+
 - [Language-specific things to avoid]
 - [Common AI mistakes in this language]
 
 ## IDE Integration
+
 - [How to enable in Cursor/Claude Code]
 ```
 
 ### Available Extensions
 
-| Language | File | Key Tools |
-|----------|------|-----------|
-| Python | [python.md](extensions/python.md) | black, isort, mypy, pytest |
-| TypeScript | [typescript.md](extensions/typescript.md) | prettier, eslint, tsc |
-| Template | [_template.md](extensions/_template.md) | For new languages |
+| Language   | File                                      | Key Tools                  |
+| ---------- | ----------------------------------------- | -------------------------- |
+| Python     | [python.md](extensions/python.md)         | black, isort, mypy, pytest |
+| TypeScript | [typescript.md](extensions/typescript.md) | prettier, eslint, tsc      |
+| Template   | [\_template.md](extensions/_template.md)  | For new languages          |
 
 ## Implementation
 
@@ -219,7 +227,6 @@ Create `.cursor/rules/code-quality.mdc`:
 ---
 alwaysApply: true
 ---
-
 # Code Quality Standards
 
 ## Verification (ALWAYS do these)
@@ -260,20 +267,24 @@ Add to `CLAUDE.md`:
 ## Code Quality
 
 ### Before Claiming Done
+
 - Run tests and report results
 - Check for lint errors
 - Verify build succeeds
 
 ### Comments
+
 - WHY comments only, not obvious WHAT comments
 - No commented-out code
 
 ### Structure
+
 - Imports at top
 - Prefer editing over creating files
 - Small incremental changes
 
 ### Errors
+
 - Handle all error cases
 - Meaningful error messages
 - Never swallow exceptions
@@ -287,23 +298,27 @@ Use this checklist before completing work:
 ## Code Quality Checklist
 
 ### Verification
+
 - [ ] Tests pass (run `pytest` / `npm test`)
 - [ ] No lint errors (run `flake8` / `eslint`)
 - [ ] Build succeeds (run `npm run build`)
 - [ ] Functionality verified manually
 
 ### Code Review
+
 - [ ] No obvious/redundant comments
 - [ ] WHY comments for complex logic
 - [ ] No commented-out code
 - [ ] Imports organized at top
 
 ### Error Handling
+
 - [ ] All error cases handled
 - [ ] Meaningful error messages
 - [ ] Edge cases covered
 
 ### Documentation
+
 - [ ] README updated if needed
 - [ ] Breaking changes documented
 - [ ] Function signatures clear
@@ -311,33 +326,35 @@ Use this checklist before completing work:
 
 ## Common AI Mistakes
 
-| Mistake | Prevention |
-|---------|------------|
-| Claiming done without testing | Require test output in response |
-| Creating duplicate files | Search before creating |
-| Obvious comments everywhere | Explicit "no obvious comments" rule |
-| Swallowing exceptions | Require error handling patterns |
-| Large monolithic changes | Prefer incremental approach |
-| Missing error handling | Require explicit handling |
+| Mistake                       | Prevention                          |
+| ----------------------------- | ----------------------------------- |
+| Claiming done without testing | Require test output in response     |
+| Creating duplicate files      | Search before creating              |
+| Obvious comments everywhere   | Explicit "no obvious comments" rule |
+| Swallowing exceptions         | Require error handling patterns     |
+| Large monolithic changes      | Prefer incremental approach         |
+| Missing error handling        | Require explicit handling           |
 
 ## Metrics
 
 Track code quality with:
 
-| Metric | Target | Tool |
-|--------|--------|------|
-| Test coverage | >80% new code | pytest-cov, nyc |
-| Lint errors | 0 | flake8, eslint |
-| Type coverage | >90% | mypy, tsc |
-| Complexity | <10 per function | radon, eslint |
+| Metric        | Target           | Tool            |
+| ------------- | ---------------- | --------------- |
+| Test coverage | >80% new code    | pytest-cov, nyc |
+| Lint errors   | 0                | flake8, eslint  |
+| Type coverage | >90%             | mypy, tsc       |
+| Complexity    | <10 per function | radon, eslint   |
 
 ## Enforcement
 
 ### Soft Enforcement (AI Rules)
+
 - AI follows these guidelines
 - Can be overridden by user
 
 ### Hard Enforcement (CI/CD)
+
 - Pre-commit hooks for linting
 - CI pipeline for tests
 - Code review requirements
@@ -365,6 +382,7 @@ repos:
 ## Success Indicators
 
 Code quality is improving when:
+
 - ✅ Tests consistently pass
 - ✅ No lint errors in PRs
 - ✅ Code reviews are faster

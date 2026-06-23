@@ -5,7 +5,7 @@ import { filterDiff, loadIgnorePatterns } from '../../src/core/ignoreFilter.js'
 const makeDiff = (files: string[]) =>
   files
     .map(
-      f =>
+      (f) =>
         `diff --git a/${f} b/${f}\n` +
         `index 000..111 100644\n` +
         `--- a/${f}\n` +
@@ -55,7 +55,10 @@ describe('loadIgnorePatterns', () => {
   it('merges .aiignore file with extraPaths', () => {
     writeFileSync(tmpFile, '# comment\ndist/\n*.log\n')
     try {
-      const patterns = loadIgnorePatterns(process.cwd().replace(/\\/g, '/') + '/' + tmpFile + '..', ['extra'])
+      const patterns = loadIgnorePatterns(
+        process.cwd().replace(/\\/g, '/') + '/' + tmpFile + '..',
+        ['extra']
+      )
       // Since tmpFile is in cwd, adjust test to use cwd
     } finally {
       unlinkSync(tmpFile)

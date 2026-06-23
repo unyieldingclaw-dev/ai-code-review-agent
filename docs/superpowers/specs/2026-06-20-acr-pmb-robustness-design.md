@@ -30,10 +30,10 @@ PMB /change-review  →  ai-review-agent --profile change-review
 
 **Models installed in Ollama:**
 
-| Model | Size | Role |
-|---|---|---|
-| `devstral:latest` | 14 GB | Primary code review model — ACR default |
-| `qwen3:latest` | 5.2 GB | Available for `--model` override; no tests require it live |
+| Model                     | Size   | Role                                                                                                                  |
+| ------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| `devstral:latest`         | 14 GB  | Primary code review model — ACR default                                                                               |
+| `qwen3:latest`            | 5.2 GB | Available for `--model` override; no tests require it live                                                            |
 | `nomic-embed-text:latest` | 274 MB | Embedding model — reserved for future semantic context selection when `--context memory-bank` is built; not wired yet |
 
 ---
@@ -45,6 +45,7 @@ PMB /change-review  →  ai-review-agent --profile change-review
 Remove `testgen` from `DEFAULT_CONFIG.agents` in `src/core/config.ts`.
 
 Add two new CLI flags:
+
 - `--suggest-tests` — enables testgen agent; output included in report only, no files written
 - `--write-tests` — enables testgen AND writes generated test files to `testOutputDir`
 
@@ -59,6 +60,7 @@ Replace all `execSync` string interpolation with `spawnSync` array arguments. Th
 - `src/mcp/tool.ts:26` — `execSync(\`git diff\`)`
 
 Replacement pattern:
+
 ```ts
 import { spawnSync } from 'child_process'
 spawnSync('git', ['-C', dir, 'diff', 'HEAD'], { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
@@ -69,6 +71,7 @@ Paths containing spaces and shell metacharacters become safe. All three sites up
 ### 1.3 Remove Anthropic provider
 
 ACR is Ollama-only. Complete removal:
+
 - `src/core/config.ts`: `provider: 'ollama' | 'anthropic'` → `provider: 'ollama'`; remove `anthropicModel` field from `ReviewConfig` and `DEFAULT_CONFIG`
 - Any README mention of Anthropic provider as "planned" removed
 
@@ -82,17 +85,18 @@ No guard needed — just deletion.
 
 Three files each claim a different agent count:
 
-| File | Claims | Correct |
-|---|---|---|
-| `.claude/commands/ai-review.md` | 11-agent | 15-agent (testgen now opt-in) |
-| `src/mcp/server.ts` tool description | 10 agents | 15 agents |
-| `.github/workflows/review.yml` comment | 15 agents | 15 agents ✓ |
+| File                                   | Claims    | Correct                       |
+| -------------------------------------- | --------- | ----------------------------- |
+| `.claude/commands/ai-review.md`        | 11-agent  | 15-agent (testgen now opt-in) |
+| `src/mcp/server.ts` tool description   | 10 agents | 15 agents                     |
+| `.github/workflows/review.yml` comment | 15 agents | 15 agents ✓                   |
 
 Single source of truth: `DEFAULT_CONFIG.agents.length` after testgen removal = 15.
 
 Update `.claude/commands/ai-review.md` description and `src/mcp/server.ts` tool description to match. Workflow comment is already correct.
 
 Canonical wording:
+
 > Local multi-agent AI code review powered by Ollama. Runs a configurable review swarm with 15 observe-only default agents; test generation is opt-in.
 
 ### 1.6 gitignore additions
@@ -121,6 +125,7 @@ New file: `src/tests/helpers/requireOllama.ts`
 Two distinct failure modes with distinct messages:
 
 **Ollama not reachable:**
+
 ```
 ╔════════════════════════════════════════════════════════════╗
 ║  INTEGRATION TESTS SKIPPED — Ollama not reachable         ║
@@ -132,6 +137,7 @@ Two distinct failure modes with distinct messages:
 ```
 
 **Ollama running but model not pulled:**
+
 ```
 ╔════════════════════════════════════════════════════════════╗
 ║  INTEGRATION TESTS SKIPPED — model not available          ║
@@ -150,6 +156,7 @@ The helper accepts `model: string` (defaults to `DEFAULT_CONFIG.model`). If `--m
 **Never silently skip.** Tests that cannot run must notify with the above formatted error and give a concrete solution. Silent `test.skip()` without a reason is forbidden in this codebase.
 
 Applied to:
+
 - `src/tests/e2e.test.ts` — requires Ollama + devstral
 - `src/tests/calibrate.ts` — requires Ollama + devstral
 
@@ -161,20 +168,21 @@ The oldest/core agents have no unit tests. Each gets a test file following the e
 
 **Agents needing tests:**
 
-| Agent | File |
-|---|---|
-| security | `src/tests/unit/securityAgent.test.ts` |
-| performance | `src/tests/unit/performanceAgent.test.ts` |
-| correctness | `src/tests/unit/correctnessAgent.test.ts` |
-| design | `src/tests/unit/designAgent.test.ts` |
-| dependencies | `src/tests/unit/dependenciesAgent.test.ts` |
-| coverage | `src/tests/unit/coverageAnalystAgent.test.ts` |
-| adversarial | `src/tests/unit/adversarialAgent.test.ts` |
-| integration | `src/tests/unit/integrationScoutAgent.test.ts` |
-| orchestrator | `src/tests/unit/orchestratorAgent.test.ts` |
-| testGen | `src/tests/unit/testGenAgent.test.ts` |
+| Agent        | File                                           |
+| ------------ | ---------------------------------------------- |
+| security     | `src/tests/unit/securityAgent.test.ts`         |
+| performance  | `src/tests/unit/performanceAgent.test.ts`      |
+| correctness  | `src/tests/unit/correctnessAgent.test.ts`      |
+| design       | `src/tests/unit/designAgent.test.ts`           |
+| dependencies | `src/tests/unit/dependenciesAgent.test.ts`     |
+| coverage     | `src/tests/unit/coverageAnalystAgent.test.ts`  |
+| adversarial  | `src/tests/unit/adversarialAgent.test.ts`      |
+| integration  | `src/tests/unit/integrationScoutAgent.test.ts` |
+| orchestrator | `src/tests/unit/orchestratorAgent.test.ts`     |
+| testGen      | `src/tests/unit/testGenAgent.test.ts`          |
 
 **Pattern per agent (5 tests each):**
+
 1. Returns `Finding[]` with correct shape for a relevant fixture diff
 2. `severity` is populated and valid
 3. `basis` is populated and valid
@@ -212,6 +220,7 @@ docs/
 ```
 
 `.gitignore` additions:
+
 ```gitignore
 .claude/plans/
 .memory-bank/state/
@@ -223,13 +232,13 @@ docs/
 
 ```yaml
 ---
-status: planned              # draft | planned | active | done | superseded | rejected
+status: planned # draft | planned | active | done | superseded | rejected
 created: YYYY-MM-DD
 approved: null
-related_spec: null           # docs/specs/YYYY-MM-DD-slug.md or null
-scope: local                 # local | repo | cross-repo
-risk: medium                 # low | medium | high
-source: ai-draft             # human | ai-draft | approved | imported
+related_spec: null # docs/specs/YYYY-MM-DD-slug.md or null
+scope: local # local | repo | cross-repo
+risk: medium # low | medium | high
+source: ai-draft # human | ai-draft | approved | imported
 ---
 ```
 
@@ -240,6 +249,7 @@ source: ai-draft             # human | ai-draft | approved | imported
 Four subcommands added to `scripts/mb.sh` and `scripts/mb.ps1`:
 
 **`mb plan status`**
+
 ```
 Plans: 1 active, 3 planned, 2 stale, 4 archived
 Drafts: 2 in .claude/plans
@@ -247,12 +257,14 @@ Problems: 0 tracked scratch plans, 1 missing frontmatter
 ```
 
 **`mb plan list`**
+
 - Reads frontmatter from `docs/plans/*.md`
 - Groups by status
 - Shows path, status, created date, related spec, stale flag (30+ days no activity)
 - Does not load full plan bodies
 
 **`mb plan promote <draft>`**
+
 - Accepts file under `.claude/plans/`
 - Validates or adds frontmatter (prompts for missing required fields)
 - Copies to `docs/plans/`
@@ -260,6 +272,7 @@ Problems: 0 tracked scratch plans, 1 missing frontmatter
 - Refuses to overwrite existing durable plan without `--force`
 
 **`mb plan archive <plan>`**
+
 - Moves from `docs/plans/` to `docs/archive/plans/`
 - Requires `status: done`, `status: superseded`, or `status: rejected` unless `--force`
 
@@ -295,17 +308,29 @@ New file: `src/core/profiles.ts`
 ```ts
 export const PROFILES: Record<string, AgentName[]> = {
   fast: ['security', 'correctness', 'secrets'],
-  full: [/* all 15 default agents */],
-  'change-review': ['security', 'correctness', 'design', 'coverage', 'integration', 'migration-safety', 'secrets', 'complexity'],
+  full: [
+    /* all 15 default agents */
+  ],
+  'change-review': [
+    'security',
+    'correctness',
+    'design',
+    'coverage',
+    'integration',
+    'migration-safety',
+    'secrets',
+    'complexity',
+  ],
   ui: ['security', 'performance', 'correctness', 'coverage', 'integration'],
   migration: ['migration-safety', 'correctness', 'secrets', 'dependencies'],
-  security: ['security', 'secrets', 'dependencies', 'adversarial']
+  security: ['security', 'secrets', 'dependencies', 'adversarial'],
 }
 ```
 
 CLI flag: `--profile <name>`
 
 Rules:
+
 - `--agents` overrides `--profile` when both are provided
 - `--profile full` never includes `testgen`
 - Invalid profile name fails with list of valid options printed to stderr
@@ -316,14 +341,34 @@ Rules:
 
 ```ts
 export type ReviewDomain =
-  | 'Security' | 'Correctness' | 'Performance' | 'Maintainability'
-  | 'Testing' | 'Architecture Drift' | 'Dependencies' | 'Secrets'
-  | 'Migration Safety' | 'License' | 'Observability' | 'Complexity'
-  | 'Integration' | 'Breaking Change' | 'Error Handling' | 'Adversarial'
+  | 'Security'
+  | 'Correctness'
+  | 'Performance'
+  | 'Maintainability'
+  | 'Testing'
+  | 'Architecture Drift'
+  | 'Dependencies'
+  | 'Secrets'
+  | 'Migration Safety'
+  | 'License'
+  | 'Observability'
+  | 'Complexity'
+  | 'Integration'
+  | 'Breaking Change'
+  | 'Error Handling'
+  | 'Adversarial'
 
 export type EvidenceSource =
-  | 'llm' | 'heuristic' | 'gitleaks' | 'trufflehog' | 'semgrep'
-  | 'npm-audit' | 'osv' | 'lizard' | 'git' | 'policy'
+  | 'llm'
+  | 'heuristic'
+  | 'gitleaks'
+  | 'trufflehog'
+  | 'semgrep'
+  | 'npm-audit'
+  | 'osv'
+  | 'lizard'
+  | 'git'
+  | 'policy'
 
 export interface Finding {
   // existing fields preserved
@@ -333,10 +378,10 @@ export interface Finding {
   basis: Basis
   file: string
   line: number
-  lineEnd?: number          // new — end line for multi-line findings
+  lineEnd?: number // new — end line for multi-line findings
   title: string
   detail: string
-  suggestion: string        // deprecated alias for recommendation
+  suggestion: string // deprecated alias for recommendation
   confidence?: number
   relatedFindings?: string[]
   corroboratingAgents?: AgentName[]
@@ -357,12 +402,14 @@ Each agent's system prompt updated to emit `domain`, `evidence`, `impact`, `reco
 ### 4.3 PMB `/change-review`
 
 New files:
+
 - `.claude/commands/change-review.md`
 - `templates/claude-commands/change-review.md`
 
 **Purpose:** Review the current branch, PR, MR, or diff as a complete change package.
 
 **Inputs:**
+
 ```
 /change-review
 /change-review --diff path/to/change.diff
@@ -372,21 +419,22 @@ New files:
 
 **Nine review jobs (Reviewer 9):**
 
-| # | Job | What it checks |
-|---|---|---|
-| 1 | Scope sanity | Diff size vs stated scope, generated junk, unrelated files |
-| 2 | Claim mapping | Every stated claim maps to files; every major touched file maps to a claim |
-| 3 | Seam integrity | Layer boundaries, dependency injection, API/service/data seams |
-| 4 | Runtime semantics | Defaults, env vars, startup behavior, async/concurrency, rollback |
-| 5 | Test assertion strength | Tests assert behavior, not just types/truthiness/snapshots |
-| 6 | Claim-to-test coverage | Every behavior claim has a test or explicit waiver |
-| 7 | Security | Delegates to `/security-review` or ACR security/secrets agents |
-| 8 | Accessibility | Conditional — delegates to `/accessibility-review` when UI files are touched |
-| 9 | Opposition | Challenges overstatements, gaps, false positives, cross-domain risk |
+| #   | Job                     | What it checks                                                               |
+| --- | ----------------------- | ---------------------------------------------------------------------------- |
+| 1   | Scope sanity            | Diff size vs stated scope, generated junk, unrelated files                   |
+| 2   | Claim mapping           | Every stated claim maps to files; every major touched file maps to a claim   |
+| 3   | Seam integrity          | Layer boundaries, dependency injection, API/service/data seams               |
+| 4   | Runtime semantics       | Defaults, env vars, startup behavior, async/concurrency, rollback            |
+| 5   | Test assertion strength | Tests assert behavior, not just types/truthiness/snapshots                   |
+| 6   | Claim-to-test coverage  | Every behavior claim has a test or explicit waiver                           |
+| 7   | Security                | Delegates to `/security-review` or ACR security/secrets agents               |
+| 8   | Accessibility           | Conditional — delegates to `/accessibility-review` when UI files are touched |
+| 9   | Opposition              | Challenges overstatements, gaps, false positives, cross-domain risk          |
 
 **Report schema:** Domain / Severity / Location / Evidence / Basis / Impact / Recommendation / Blocking / Confidence
 
 **Coverage footer:**
+
 ```
 ## Coverage Footer
 - Review target: local diff | branch | PR | MR
@@ -399,6 +447,7 @@ New files:
 ```
 
 **ACR integration is graceful degradation:**
+
 ```
 ACR not found in PATH. Skipping local LLM swarm. Continuing with PMB-native review.
 ```
@@ -408,6 +457,7 @@ No hard dependency on ACR. `/change-review` is fully functional without it.
 ### 4.4 `--context` placeholder
 
 `--context <mode>` flag reserved in CLI with `none` wired. `memory-bank` mode prints:
+
 ```
 --context memory-bank is not yet implemented. Use --context none.
 ```
@@ -419,6 +469,7 @@ No hard dependency on ACR. `/change-review` is fully functional without it.
 ## Implementation Order
 
 ### Phase 1 — ACR P0 (one session)
+
 1. Remove testgen from DEFAULT_CONFIG; add `--suggest-tests` / `--write-tests` flags
 2. Replace execSync with spawnSync in cli/index.ts and mcp/tool.ts
 3. Remove Anthropic provider entirely from config and types
@@ -427,11 +478,13 @@ No hard dependency on ACR. `/change-review` is fully functional without it.
 6. Add gitignore entries; remove dead `contextLines` field
 
 ### Phase 2 — Test Foundation (one to two sessions)
+
 1. Write `src/tests/helpers/requireOllama.ts`
 2. Apply to e2e.test.ts and calibrate.ts
 3. Write unit tests for 10 untested agents (~50 tests)
 
 ### Phase 3 — PMB Infrastructure (one session)
+
 1. Add docs/plans/ structure and gitignore entries
 2. Update plan template with frontmatter
 3. Add `mb plan` subcommands to mb.sh and mb.ps1
@@ -439,6 +492,7 @@ No hard dependency on ACR. `/change-review` is fully functional without it.
 5. Update /feature-dev and WORKFLOW.md
 
 ### Phase 4 — Integration (one to two sessions)
+
 1. Add src/core/profiles.ts and --profile flag
 2. Update Finding schema with MB/PMB fields
 3. Update agent system prompts to emit new fields
@@ -451,6 +505,7 @@ No hard dependency on ACR. `/change-review` is fully functional without it.
 ## Acceptance Criteria
 
 ### ACR
+
 - [ ] Default run never writes files
 - [ ] `--write-tests` is required to write generated test files
 - [ ] `--dir` and MCP `repoPath` are safe against shell metacharacters
@@ -468,6 +523,7 @@ No hard dependency on ACR. `/change-review` is fully functional without it.
 - [ ] JSON output includes all MB/PMB fields
 
 ### PMB
+
 - [ ] `.claude/plans/` is gitignored and flagged by `mb doctor` if tracked
 - [ ] `.memory-bank/state/` is gitignored
 - [ ] `docs/plans/README.md` exists

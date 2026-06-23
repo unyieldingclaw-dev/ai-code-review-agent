@@ -13,9 +13,7 @@ export function formatMcpOutput(result: ReviewResult): string {
     return '## AI Code Review — ✅ No findings\n'
   }
 
-  const actionable = findings.filter(
-    f => f.severity === 'critical' || f.severity === 'high'
-  )
+  const actionable = findings.filter((f) => f.severity === 'critical' || f.severity === 'high')
   // Intentionally trust summary.bySeverity rather than re-counting from findings —
   // summary is the canonical source of truth and keeps medium/low counts correct even
   // if the caller pre-filtered findings.

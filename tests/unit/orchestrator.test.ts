@@ -7,7 +7,7 @@ import { vi } from 'vitest'
 
 const makeProvider = () => ({
   chat: vi.fn(),
-  ping: vi.fn().mockResolvedValue({ ok: true })
+  ping: vi.fn().mockResolvedValue({ ok: true }),
 })
 
 const finding = (overrides: Partial<Finding> = {}): Finding => ({
@@ -26,7 +26,7 @@ const finding = (overrides: Partial<Finding> = {}): Finding => ({
   suggestion: 'Fix it',
   blocking: false,
   source: 'llm',
-  ...overrides
+  ...overrides,
 })
 
 function makeFinding(overrides: Partial<Finding>): Finding {
@@ -47,7 +47,7 @@ function makeFinding(overrides: Partial<Finding>): Finding {
     blocking: true,
     source: 'gitleaks',
     confidence: 50,
-    ...overrides
+    ...overrides,
   }
 }
 
@@ -56,8 +56,20 @@ describe('OrchestratorAgent', () => {
     it('merges duplicate findings from multiple agents into one with corroboratingAgents', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', file: 'src/auth.ts', line: 10, title: 'SQL injection' }),
-        finding({ id: 'correctness-0', agent: 'correctness', file: 'src/auth.ts', line: 10, title: 'Null pointer' })
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          file: 'src/auth.ts',
+          line: 10,
+          title: 'SQL injection',
+        }),
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          file: 'src/auth.ts',
+          line: 10,
+          title: 'Null pointer',
+        }),
       ]
       const result = orch.synthesize(findings)
       expect(result).toHaveLength(1)
@@ -68,8 +80,20 @@ describe('OrchestratorAgent', () => {
     it('removes duplicate findings at same file:line from different agents', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', file: 'src/auth.ts', line: 10, title: 'SQL injection' }),
-        finding({ id: 'correctness-0', agent: 'correctness', file: 'src/auth.ts', line: 10, title: 'Null pointer' })
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          file: 'src/auth.ts',
+          line: 10,
+          title: 'SQL injection',
+        }),
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          file: 'src/auth.ts',
+          line: 10,
+          title: 'Null pointer',
+        }),
       ]
       const result = orch.synthesize(findings)
       expect(result).toHaveLength(1)
@@ -82,11 +106,25 @@ describe('OrchestratorAgent', () => {
     it('escalates severity when correctness bug has no test coverage at same location', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'correctness-0', agent: 'correctness', severity: 'medium', file: 'src/foo.ts', line: 20, title: 'Logic bug' }),
-        finding({ id: 'coverage-0', agent: 'coverage', severity: 'medium', file: 'src/foo.ts', line: 20, title: 'No test coverage' })
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          severity: 'medium',
+          file: 'src/foo.ts',
+          line: 20,
+          title: 'Logic bug',
+        }),
+        finding({
+          id: 'coverage-0',
+          agent: 'coverage',
+          severity: 'medium',
+          file: 'src/foo.ts',
+          line: 20,
+          title: 'No test coverage',
+        }),
       ]
       const result = orch.synthesize(findings)
-      const corrFinding = result.find(f => f.agent === 'correctness')
+      const corrFinding = result.find((f) => f.agent === 'correctness')
       expect(corrFinding?.severity).toBe('high') // escalated from medium
     })
   })
@@ -96,11 +134,16 @@ describe('OrchestratorAgent', () => {
       const config = { ...DEFAULT_CONFIG, maxFindings: 3 }
       const orch = new OrchestratorAgent(makeProvider(), config)
       const findings = Array.from({ length: 10 }, (_, i) =>
-        finding({ id: `security-${i}`, line: i + 1, title: `Finding ${i}`, severity: i < 3 ? 'critical' : 'medium' })
+        finding({
+          id: `security-${i}`,
+          line: i + 1,
+          title: `Finding ${i}`,
+          severity: i < 3 ? 'critical' : 'medium',
+        })
       )
       const result = orch.synthesize(findings)
       expect(result).toHaveLength(3)
-      expect(result.every(f => f.severity === 'critical')).toBe(true)
+      expect(result.every((f) => f.severity === 'critical')).toBe(true)
     })
   })
 
@@ -108,11 +151,24 @@ describe('OrchestratorAgent', () => {
     it('downgrades solo Critical to High (not Medium) when confidence < 60', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', severity: 'critical', confidence: 45, file: 'src/foo.ts', line: 5 }),
-        finding({ id: 'correctness-0', agent: 'correctness', severity: 'low', file: 'src/bar.ts', line: 99 })
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          severity: 'critical',
+          confidence: 45,
+          file: 'src/foo.ts',
+          line: 5,
+        }),
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          severity: 'low',
+          file: 'src/bar.ts',
+          line: 99,
+        }),
       ]
       const result = orch.synthesize(findings)
-      const f = result.find(r => r.id === 'security-0')
+      const f = result.find((r) => r.id === 'security-0')
       // confidence < 60 → downgraded to high, not medium
       expect(f?.severity).toBe('high')
     })
@@ -120,21 +176,39 @@ describe('OrchestratorAgent', () => {
     it('keeps critical finding when a second agent flags the same file+line region', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', severity: 'critical', file: 'src/foo.ts', line: 10 }),
-        finding({ id: 'correctness-0', agent: 'correctness', severity: 'high', file: 'src/foo.ts', line: 12 })
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          severity: 'critical',
+          file: 'src/foo.ts',
+          line: 10,
+        }),
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          severity: 'high',
+          file: 'src/foo.ts',
+          line: 12,
+        }),
       ]
       const result = orch.synthesize(findings)
-      const secFinding = result.find(f => f.agent === 'security')
+      const secFinding = result.find((f) => f.agent === 'security')
       expect(secFinding?.severity).toBe('critical')
     })
 
     it('skips cross-check when only one agent ran', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
-        finding({ id: 'security-0', agent: 'security', severity: 'critical', file: 'src/foo.ts', line: 5 })
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          severity: 'critical',
+          file: 'src/foo.ts',
+          line: 5,
+        }),
       ]
       const result = orch.synthesize(findings)
-      const f = result.find(r => r.id === 'security-0')
+      const f = result.find((r) => r.id === 'security-0')
       expect(f?.severity).toBe('critical')
     })
   })
@@ -145,12 +219,12 @@ describe('OrchestratorAgent', () => {
       const findings = [
         finding({ id: 'security-0', severity: 'medium', basis: 'SPECULATIVE' }),
         finding({ id: 'security-1', severity: 'high', basis: 'SPECULATIVE' }),
-        finding({ id: 'security-2', severity: 'medium', basis: 'VERIFIED' })
+        finding({ id: 'security-2', severity: 'medium', basis: 'VERIFIED' }),
       ]
       const result = orch.synthesize(findings)
-      expect(result.find(f => f.id === 'security-0')).toBeUndefined()
-      expect(result.find(f => f.id === 'security-1')).toBeDefined()
-      expect(result.find(f => f.id === 'security-2')).toBeDefined()
+      expect(result.find((f) => f.id === 'security-0')).toBeUndefined()
+      expect(result.find((f) => f.id === 'security-1')).toBeDefined()
+      expect(result.find((f) => f.id === 'security-2')).toBeDefined()
     })
   })
 })
@@ -161,40 +235,82 @@ describe('OrchestratorAgent.synthesize — hallucinationCrossCheck', () => {
   it('does NOT downgrade a solo Critical finding from a deterministic source (gitleaks)', () => {
     const findings: Finding[] = [
       makeFinding({ source: 'gitleaks', severity: 'critical', confidence: 50, agent: 'secrets' }),
-      makeFinding({ id: 'f2', agent: 'security', file: 'src/other.ts', line: 99, source: 'llm', severity: 'low' })
+      makeFinding({
+        id: 'f2',
+        agent: 'security',
+        file: 'src/other.ts',
+        line: 99,
+        source: 'llm',
+        severity: 'low',
+      }),
     ]
     const result = orchestrator.synthesize(findings)
-    const secretFinding = result.find(f => f.id === 'f1')
+    const secretFinding = result.find((f) => f.id === 'f1')
     expect(secretFinding?.severity).toBe('critical')
   })
 
   it('does NOT downgrade a solo High finding from semgrep', () => {
     const findings: Finding[] = [
-      makeFinding({ id: 'f1', source: 'semgrep', severity: 'high', confidence: 40, agent: 'security' }),
-      makeFinding({ id: 'f2', agent: 'correctness', file: 'src/other.ts', line: 99, source: 'llm', severity: 'low' })
+      makeFinding({
+        id: 'f1',
+        source: 'semgrep',
+        severity: 'high',
+        confidence: 40,
+        agent: 'security',
+      }),
+      makeFinding({
+        id: 'f2',
+        agent: 'correctness',
+        file: 'src/other.ts',
+        line: 99,
+        source: 'llm',
+        severity: 'low',
+      }),
     ]
     const result = orchestrator.synthesize(findings)
-    const secFinding = result.find(f => f.id === 'f1')
+    const secFinding = result.find((f) => f.id === 'f1')
     expect(secFinding?.severity).toBe('high')
   })
 
   it('DOES downgrade a solo High finding from llm source with low confidence', () => {
     const findings: Finding[] = [
       makeFinding({ id: 'f1', source: 'llm', severity: 'high', confidence: 40, agent: 'security' }),
-      makeFinding({ id: 'f2', agent: 'correctness', file: 'src/other.ts', line: 99, source: 'llm', severity: 'low' })
+      makeFinding({
+        id: 'f2',
+        agent: 'correctness',
+        file: 'src/other.ts',
+        line: 99,
+        source: 'llm',
+        severity: 'low',
+      }),
     ]
     const result = orchestrator.synthesize(findings)
-    const secFinding = result.find(f => f.id === 'f1')
+    const secFinding = result.find((f) => f.id === 'f1')
     expect(secFinding?.severity).toBe('medium')
   })
 
   it('does NOT downgrade when a corroborating agent exists regardless of source', () => {
     const findings: Finding[] = [
-      makeFinding({ id: 'f1', source: 'llm', severity: 'critical', confidence: 40, agent: 'security', file: 'src/api.ts', line: 10 }),
-      makeFinding({ id: 'f2', source: 'llm', severity: 'high', agent: 'adversarial', file: 'src/api.ts', line: 10 })
+      makeFinding({
+        id: 'f1',
+        source: 'llm',
+        severity: 'critical',
+        confidence: 40,
+        agent: 'security',
+        file: 'src/api.ts',
+        line: 10,
+      }),
+      makeFinding({
+        id: 'f2',
+        source: 'llm',
+        severity: 'high',
+        agent: 'adversarial',
+        file: 'src/api.ts',
+        line: 10,
+      }),
     ]
     const result = orchestrator.synthesize(findings)
-    const criticalFinding = result.find(f => f.id === 'f1')
+    const criticalFinding = result.find((f) => f.id === 'f1')
     expect(criticalFinding?.severity).toBe('critical')
   })
 })
