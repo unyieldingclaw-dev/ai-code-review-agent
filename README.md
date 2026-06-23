@@ -1,6 +1,6 @@
 # AI Code Review Agent
 
-A local, 16-agent AI code review tool powered by [Ollama](https://ollama.com). Runs against any git diff and produces structured findings across security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, test coverage, test generation, error handling, observability, database migration safety, secrets detection, and code complexity — no cloud API calls required.
+A local, 15-agent AI code review tool powered by [Ollama](https://ollama.com). Runs against any git diff and produces structured findings across security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, test coverage, test generation, error handling, observability, database migration safety, secrets detection, and code complexity — no cloud API calls required.
 
 ## Overview
 
@@ -61,7 +61,7 @@ ollama pull devstral:latest
 ```bash
 cd your-project
 git add -p                            # stage the changes you want reviewed
-ai-review-agent                       # run the full 16-agent swarm
+ai-review-agent                       # run the full 15-agent swarm
 ai-review-agent --agents security     # single-agent fast pass
 ai-review-agent --format json         # machine-readable output
 ```
@@ -172,7 +172,7 @@ ai-review-agent --help
 | `--diff <path>` | — | Review a saved .diff file |
 | `--dir <path>` | cwd | Diff the given directory against HEAD |
 | `--model <model>` | devstral:latest | Override Ollama model |
-| `--agents <list>` | all 16 agents | Comma-separated agent list |
+| `--agents <list>` | all 15 agents (testgen opt-in) | Comma-separated agent list |
 | `--format <fmt>` | markdown | `markdown` or `json` |
 | `--out <path>` | stdout | Write report to file |
 | `--max-lines <n>` | 2000 | Truncate diff before review |
@@ -187,7 +187,7 @@ Exit code `1` when any finding meets the `--fail-on` threshold (default: `high`)
 
 ### Claude Code slash command
 
-After installing, use `/ai-review` inside any Claude Code session to run the 16-agent swarm against your current diff and stream findings into the conversation.
+After installing, use `/ai-review` inside any Claude Code session to run the 15-agent swarm against your current diff and stream findings into the conversation.
 
 ### GitHub Actions
 
