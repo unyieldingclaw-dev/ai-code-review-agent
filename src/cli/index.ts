@@ -71,6 +71,13 @@ program
     const projectPath = resolve(options.dir ?? process.cwd())
     const config = loadConfig(projectPath)
 
+    if (config.provider !== 'ollama') {
+      console.error(
+        `Provider "${config.provider}" is configured but not implemented. Use provider "ollama".`
+      )
+      process.exit(1)
+    }
+
     if (options.model) config.model = options.model
     if (options.ollamaUrl) config.ollamaUrl = options.ollamaUrl
     if (options.agents) config.agents = options.agents.split(',').map(a => a.trim()) as AgentName[]
