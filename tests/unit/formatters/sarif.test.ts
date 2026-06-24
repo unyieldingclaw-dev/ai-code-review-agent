@@ -88,10 +88,7 @@ describe('formatSarif', () => {
 
   it('includes multiple findings with distinct rule IDs', () => {
     const result = makeResult({
-      findings: [
-        makeFinding({ id: 'sec-1' }),
-        makeFinding({ id: 'sec-2' }),
-      ],
+      findings: [makeFinding({ id: 'sec-1' }), makeFinding({ id: 'sec-2' })],
     })
     const output = JSON.parse(formatSarif(result))
     expect(output.runs[0].results).toHaveLength(2)

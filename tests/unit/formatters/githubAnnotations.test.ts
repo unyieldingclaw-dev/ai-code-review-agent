@@ -39,22 +39,30 @@ describe('formatGithubAnnotations', () => {
   })
 
   it('maps critical severity to ::error', () => {
-    const output = formatGithubAnnotations(makeResult({ findings: [makeFinding({ severity: 'critical' })] }))
+    const output = formatGithubAnnotations(
+      makeResult({ findings: [makeFinding({ severity: 'critical' })] })
+    )
     expect(output).toMatch(/^::error /)
   })
 
   it('maps high severity to ::error', () => {
-    const output = formatGithubAnnotations(makeResult({ findings: [makeFinding({ severity: 'high' })] }))
+    const output = formatGithubAnnotations(
+      makeResult({ findings: [makeFinding({ severity: 'high' })] })
+    )
     expect(output).toMatch(/^::error /)
   })
 
   it('maps medium severity to ::warning', () => {
-    const output = formatGithubAnnotations(makeResult({ findings: [makeFinding({ severity: 'medium' })] }))
+    const output = formatGithubAnnotations(
+      makeResult({ findings: [makeFinding({ severity: 'medium' })] })
+    )
     expect(output).toMatch(/^::warning /)
   })
 
   it('maps low severity to ::notice', () => {
-    const output = formatGithubAnnotations(makeResult({ findings: [makeFinding({ severity: 'low' })] }))
+    const output = formatGithubAnnotations(
+      makeResult({ findings: [makeFinding({ severity: 'low' })] })
+    )
     expect(output).toMatch(/^::notice /)
   })
 

@@ -6,9 +6,9 @@ import { dirname, join } from 'path'
 import type { ReviewResult, Finding, Severity } from '../../core/schema.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const { version } = JSON.parse(
-  readFileSync(join(__dirname, '../../../package.json'), 'utf-8')
-) as { version: string }
+const { version } = JSON.parse(readFileSync(join(__dirname, '../../../package.json'), 'utf-8')) as {
+  version: string
+}
 
 function severityToLevel(severity: Severity): 'error' | 'warning' | 'note' {
   if (severity === 'critical' || severity === 'high') return 'error'

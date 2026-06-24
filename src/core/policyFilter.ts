@@ -24,11 +24,11 @@ function matchPattern(filePath: string, pattern: string): boolean {
 }
 
 function matchesAny(files: string[], patterns: string[]): boolean {
-  return files.some(f => patterns.some(p => matchPattern(f, p)))
+  return files.some((f) => patterns.some((p) => matchPattern(f, p)))
 }
 
 function matchesAll(files: string[], patterns: string[]): boolean {
-  return files.every(f => patterns.some(p => matchPattern(f, p)))
+  return files.every((f) => patterns.some((p) => matchPattern(f, p)))
 }
 
 export function evaluatePolicy(
@@ -54,7 +54,8 @@ export function evaluatePolicy(
     if (rule.include && rule.include.length > 0) {
       if (!matchesAny(changedFiles, rule.include)) {
         policy.agentsSkipped.push(agent)
-        policy.reason[agent] = `no changed files matched include patterns: ${rule.include.join(', ')}`
+        policy.reason[agent] =
+          `no changed files matched include patterns: ${rule.include.join(', ')}`
         continue
       }
     }
@@ -63,7 +64,8 @@ export function evaluatePolicy(
     if (rule.exclude && rule.exclude.length > 0) {
       if (matchesAll(changedFiles, rule.exclude)) {
         policy.agentsSkipped.push(agent)
-        policy.reason[agent] = `all changed files matched exclude patterns: ${rule.exclude.join(', ')}`
+        policy.reason[agent] =
+          `all changed files matched exclude patterns: ${rule.exclude.join(', ')}`
         continue
       }
     }

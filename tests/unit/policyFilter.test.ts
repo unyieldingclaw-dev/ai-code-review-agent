@@ -30,7 +30,7 @@ describe('evaluatePolicy', () => {
   it('skips agent when no changed files match include patterns', () => {
     const config = {
       ...DEFAULT_CONFIG,
-      agentPolicy: { license: { include: ['package.json', 'package-lock.json'] } }
+      agentPolicy: { license: { include: ['package.json', 'package-lock.json'] } },
     }
     const { allowed, policy } = evaluatePolicy([...agents], ['src/api.ts'], config)
     expect(allowed).not.toContain('license')
@@ -41,7 +41,7 @@ describe('evaluatePolicy', () => {
   it('keeps agent when at least one changed file matches include', () => {
     const config = {
       ...DEFAULT_CONFIG,
-      agentPolicy: { license: { include: ['package.json'] } }
+      agentPolicy: { license: { include: ['package.json'] } },
     }
     const { allowed } = evaluatePolicy([...agents], ['package.json', 'src/api.ts'], config)
     expect(allowed).toContain('license')
@@ -50,9 +50,13 @@ describe('evaluatePolicy', () => {
   it('skips agent when ALL changed files match exclude patterns', () => {
     const config = {
       ...DEFAULT_CONFIG,
-      agentPolicy: { security: { exclude: ['docs/**'] } }
+      agentPolicy: { security: { exclude: ['docs/**'] } },
     }
-    const { allowed, policy } = evaluatePolicy([...agents], ['docs/README.md', 'docs/guide.md'], config)
+    const { allowed, policy } = evaluatePolicy(
+      [...agents],
+      ['docs/README.md', 'docs/guide.md'],
+      config
+    )
     expect(allowed).not.toContain('security')
     expect(policy.agentsSkipped).toContain('security')
   })
@@ -60,7 +64,7 @@ describe('evaluatePolicy', () => {
   it('keeps agent when only SOME changed files match exclude', () => {
     const config = {
       ...DEFAULT_CONFIG,
-      agentPolicy: { security: { exclude: ['docs/**'] } }
+      agentPolicy: { security: { exclude: ['docs/**'] } },
     }
     const { allowed } = evaluatePolicy([...agents], ['docs/README.md', 'src/api.ts'], config)
     expect(allowed).toContain('security')
@@ -69,7 +73,7 @@ describe('evaluatePolicy', () => {
   it('allows all agents when changedFiles is empty (no diff to filter on)', () => {
     const config = {
       ...DEFAULT_CONFIG,
-      agentPolicy: { license: { include: ['package.json'] } }
+      agentPolicy: { license: { include: ['package.json'] } },
     }
     const { allowed } = evaluatePolicy([...agents], [], config)
     expect(allowed).toContain('license')

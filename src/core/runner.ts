@@ -207,9 +207,10 @@ export class SwarmRunner {
       changedFiles,
       this.config
     )
-    const policyConfig = allowedAgents.length !== activeConfig.agents.length
-      ? { ...activeConfig, agents: allowedAgents }
-      : activeConfig
+    const policyConfig =
+      allowedAgents.length !== activeConfig.agents.length
+        ? { ...activeConfig, agents: allowedAgents }
+        : activeConfig
 
     const agents = buildAgents(policyConfig, this.provider)
     const hasCoverage = allowedAgents.includes('coverage')

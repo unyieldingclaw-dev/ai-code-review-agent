@@ -33,7 +33,11 @@ program
     '--profile <name>',
     'Run a named agent subset: fast, full, change-review, ui, migration, security'
   )
-  .option('--format <format>', 'Output format: markdown, json, sarif, or github-annotations', 'markdown')
+  .option(
+    '--format <format>',
+    'Output format: markdown, json, sarif, or github-annotations',
+    'markdown'
+  )
   .option('--out <path>', 'Write output to file instead of stdout')
   .option('--max-lines <n>', 'Truncate diff to this many lines (default: 2000)', parseInt)
   .option('--timeout <ms>', 'Per-agent timeout in milliseconds (default: 60000)', parseInt)
@@ -188,15 +192,21 @@ program
         )
       }
 
-      let output = options.format === 'json'
-        ? formatJson(result)
-        : options.format === 'sarif'
-          ? formatSarif(result)
-          : options.format === 'github-annotations'
-            ? formatGithubAnnotations(result)
-            : formatMarkdown(result)
+      let output =
+        options.format === 'json'
+          ? formatJson(result)
+          : options.format === 'sarif'
+            ? formatSarif(result)
+            : options.format === 'github-annotations'
+              ? formatGithubAnnotations(result)
+              : formatMarkdown(result)
 
-      if (result.earlyExit && options.format !== 'json' && options.format !== 'sarif' && options.format !== 'github-annotations') {
+      if (
+        result.earlyExit &&
+        options.format !== 'json' &&
+        options.format !== 'sarif' &&
+        options.format !== 'github-annotations'
+      ) {
         output += `\n\n> ⚡ **Fail-fast**: swarm stopped after \`${result.earlyExit.stoppedAt}\` (severity threshold met). Remaining agents were not run.\n`
       }
 
