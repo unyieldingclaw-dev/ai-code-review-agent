@@ -180,7 +180,7 @@ ai-review-agent --help
 | `--profile <name>`     | —               | Run a named agent subset: `fast`, `full`, `change-review`, `ui`, `migration`, `security` |
 | `--agents <list>`      | all 15 agents   | Comma-separated agent list (overrides `--profile`)                                       |
 | `--context <mode>`     | none            | `memory-bank` loads per-agent project context from `memory-bank/`                        |
-| `--format <fmt>`       | markdown        | `markdown` or `json`                                                                     |
+| `--format <fmt>`       | markdown        | `markdown`, `json`, `sarif`, or `github-annotations`                                     |
 | `--out <path>`         | stdout          | Write report to file                                                                     |
 | `--max-lines <n>`      | 2000            | Truncate diff before review                                                              |
 | `--timeout <ms>`       | 60000           | Per-agent timeout                                                                        |
