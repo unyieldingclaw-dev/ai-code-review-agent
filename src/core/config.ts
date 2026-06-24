@@ -20,6 +20,10 @@ export interface ReviewConfig {
   failFast: boolean
   failOn: FailOnLevel
   parallel: boolean
+  agentPolicy?: Partial<Record<AgentName, {
+    include?: string[]   // agent only runs if a changed file matches at least one pattern
+    exclude?: string[]   // agent is skipped if ALL changed files match exclude patterns
+  }>>
 }
 
 export const DEFAULT_CONFIG: ReviewConfig = {

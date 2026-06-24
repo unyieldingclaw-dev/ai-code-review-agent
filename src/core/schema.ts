@@ -107,6 +107,11 @@ export interface SanitizerMetadata {
   warnings: string[]
 }
 
+export interface PolicyResult {
+  agentsSkipped: AgentName[]
+  reason: Partial<Record<AgentName, string>>
+}
+
 export interface ReviewResult {
   findings: Finding[]
   testFiles: GeneratedTestFile[]
@@ -119,6 +124,7 @@ export interface ReviewResult {
     estimatedTokens: number
   }
   sanitizer?: SanitizerMetadata
+  policy?: PolicyResult
 }
 
 export const SEVERITY_RANK: Record<Severity, number> = {

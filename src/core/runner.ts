@@ -10,11 +10,13 @@ import type {
   GeneratedTestFile,
   AgentProgressEvent,
   SanitizerMetadata,
+  PolicyResult,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
 import { loadAgentContext } from './contextLoader.js'
 import type { ContextResult } from './contextLoader.js'
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
+import { evaluatePolicy, extractChangedFiles } from './policyFilter.js'
 import { sanitizeDiff } from './sanitizer.js'
 import { BreakingChangeAgent } from './agents/breakingChange.js'
 import { LicenseComplianceAgent } from './agents/licenseCompliance.js'
@@ -198,9 +200,20 @@ export class SwarmRunner {
         ? { ...this.config, agents: this.config.agents.filter((a) => a !== 'migration-safety') }
         : this.config
 
-    const agents = buildAgents(activeConfig, this.provider)
-    const hasCoverage = activeConfig.agents.includes('coverage')
-    const hasTestgen = activeConfig.agents.includes('testgen')
+    // Policy filtering — per-agent include/exclude path rules
+    const changedFiles = extractChangedFiles(input.diff)
+    const { allowed: allowedAgents, policy: policyResult } = evaluatePolicy(
+      activeConfig.agents,
+      changedFiles,
+      this.config
+    )
+    const policyConfig = allowedAgents.length !== activeConfig.agents.length
+      ? { ...activeConfig, agents: allowedAgents }
+      : activeConfig
+
+    const agents = buildAgents(policyConfig, this.provider)
+    const hasCoverage = allowedAgents.includes('coverage')
+    const hasTestgen = allowedAgents.includes('testgen')
     const total = agents.length + (hasCoverage ? 1 : 0) + (hasTestgen ? 1 : 0)
 
     let index = 0
@@ -403,6 +416,7 @@ export class SwarmRunner {
           }
         : {}),
       sanitizer: sanitizerMeta,
+      ...(policyResult.agentsSkipped.length > 0 ? { policy: policyResult } : {}),
     }
   }
 }

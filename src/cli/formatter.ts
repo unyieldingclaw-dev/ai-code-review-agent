@@ -73,6 +73,11 @@ export function formatMarkdown(result: ReviewResult): string {
     lines.push(`*Context: ${mode} — loaded ${fileList || 'no files'} (~${estimatedTokens} tokens)*`)
   }
 
+  if (result.policy && result.policy.agentsSkipped.length > 0) {
+    lines.push('---')
+    lines.push(`*Policy: ${result.policy.agentsSkipped.join(', ')} skipped by agentPolicy rules.*`)
+  }
+
   return lines.join('\n')
 }
 
