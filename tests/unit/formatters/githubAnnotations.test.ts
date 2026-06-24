@@ -1,0 +1,210 @@
+import { describe, it, expect } from 'vitest'
+import { formatGithubAnnotations } from '../../../src/cli/formatters/githubAnnotations.js'
+import type { ReviewResult, Finding } from '../../../src/core/schema.js'
+
+function makeResult(overrides: Partial<ReviewResult> = {}): ReviewResult {
+  return {
+    findings: [],
+    testFiles: [],
+    summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 100 },
+    ...overrides,
+  }
+}
+
+function makeFinding(overrides: Partial<Finding> = {}): Finding {
+  return {
+    id: 'security-0',
+    agent: 'security',
+    domain: 'Security',
+    severity: 'high',
+    basis: 'VERIFIED',
+    file: 'src/auth.ts',
+    line: 42,
+    title: 'Hardcoded secret',
+    detail: 'API key is hardcoded',
+    evidence: 'const API_KEY = "abc123"',
+    impact: 'Credential exposure',
+    recommendation: 'Use environment variable',
+    suggestion: 'Use environment variable',
+    blocking: true,
+    source: 'llm',
+    confidence: 85,
+    ...overrides,
+  }
+}
+
+describe('formatGithubAnnotations', () => {
+  it('returns empty string when there are no findings', () => {
+    expect(formatGithubAnnotations(makeResult())).toBe('')
+  })
+
+  it('maps critical severity to ::error', () => {
+    const output = formatGithubAnnotations(makeResult({ findings: [makeFinding({ severity: 'critical' })] }))
+    expect(output).toMatch(/^::error /)
+  })
+
+  it('maps high severity to ::error', () => {
+    const output = formatGithubAnnotations(makeResult({ findings: [makeFinding({ severity: 'high' })] }))
+    expect(output).toMatch(/^::error /)
+  })
+
+  it('maps medium severity to ::warning', () => {
+    const output = formatGithubAnnotations(makeResult({ findings: [makeFinding({ severity: 'medium' })] }))
+    expect(output).toMatch(/^::warning /)
+  })
+
+  it('maps low severity to ::notice', () => {
+    const output = formatGithubAnnotations(makeResult({ findings: [makeFinding({ severity: 'low' })] }))
+    expect(output).toMatch(/^::notice /)
+  })
+
+  it('includes file and line in annotation', () => {
+    const output = formatGithubAnnotations(
+      makeResult({ findings: [makeFinding({ file: 'src/api.ts', line: 42 })] })
+    )
+    expect(output).toContain('file=src/api.ts')
+    expect(output).toContain('line=42')
+  })
+
+  it('includes title in annotation properties', () => {
+    const output = formatGithubAnnotations(
+      makeResult({ findings: [makeFinding({ title: 'SQL injection risk' })] })
+    )
+    expect(output).toContain('SQL injection risk')
+  })
+
+  it('uses recommendation as message text', () => {
+    const output = formatGithubAnnotations(
+      makeResult({ findings: [makeFinding({ recommendation: 'Use parameterized queries' })] })
+    )
+    expect(output).toContain('Use parameterized queries')
+  })
+
+  it('falls back to detail when recommendation is empty', () => {
+    const output = formatGithubAnnotations(
+      makeResult({
+        findings: [
+          makeFinding({
+            recommendation: '',
+            detail: 'This is the detail text',
+          }),
+        ],
+      })
+    )
+    expect(output).toContain('This is the detail text')
+  })
+
+  it('produces one line per finding', () => {
+    const result = makeResult({
+      findings: [makeFinding({ file: 'src/a.ts' }), makeFinding({ file: 'src/b.ts' })],
+    })
+    const output = formatGithubAnnotations(result)
+    expect(output.split('\n')).toHaveLength(2)
+  })
+
+  it('escapes newlines in title and message', () => {
+    const output = formatGithubAnnotations(
+      makeResult({
+        findings: [
+          makeFinding({
+            title: 'line1\nline2',
+            recommendation: 'fix\nthis',
+          }),
+        ],
+      })
+    )
+    expect(output).not.toContain('\n\n')
+    expect(output.split('\n')).toHaveLength(1)
+  })
+
+  it('escapes percent signs to prevent injection', () => {
+    const output = formatGithubAnnotations(
+      makeResult({
+        findings: [makeFinding({ title: '100% safe', recommendation: 'apply 50% fix' })],
+      })
+    )
+    expect(output).toContain('%25')
+  })
+
+  it('escapes colons in title and message', () => {
+    const output = formatGithubAnnotations(
+      makeResult({
+        findings: [makeFinding({ title: 'Error: failed', recommendation: 'Fix: do this' })],
+      })
+    )
+    // Colons should be escaped as %3A in the properties
+    expect(output).toContain('title=Error%3A')
+  })
+
+  it('includes endLine when present', () => {
+    const output = formatGithubAnnotations(
+      makeResult({
+        findings: [makeFinding({ line: 10, lineEnd: 15 })],
+      })
+    )
+    expect(output).toContain('line=10')
+    expect(output).toContain('endLine=15')
+  })
+
+  it('omits endLine when not specified', () => {
+    const output = formatGithubAnnotations(
+      makeResult({
+        findings: [makeFinding({ line: 42, lineEnd: undefined })],
+      })
+    )
+    expect(output).toContain('line=42')
+    expect(output).not.toContain('endLine')
+  })
+
+  it('formats annotation with correct structure', () => {
+    const output = formatGithubAnnotations(
+      makeResult({
+        findings: [
+          makeFinding({
+            severity: 'high',
+            file: 'src/api.ts',
+            line: 25,
+            title: 'Test finding',
+            recommendation: 'Fix it',
+          }),
+        ],
+      })
+    )
+    expect(output).toMatch(/^::error file=src\/api\.ts,line=25,title=Test finding::/)
+  })
+
+  it('handles multiple findings with different severities', () => {
+    const result = makeResult({
+      findings: [
+        makeFinding({ severity: 'critical', file: 'src/a.ts', line: 1 }),
+        makeFinding({ severity: 'high', file: 'src/b.ts', line: 2 }),
+        makeFinding({ severity: 'medium', file: 'src/c.ts', line: 3 }),
+        makeFinding({ severity: 'low', file: 'src/d.ts', line: 4 }),
+      ],
+    })
+    const lines = formatGithubAnnotations(result).split('\n')
+    expect(lines).toHaveLength(4)
+    expect(lines[0]).toMatch(/^::error /)
+    expect(lines[1]).toMatch(/^::error /)
+    expect(lines[2]).toMatch(/^::warning /)
+    expect(lines[3]).toMatch(/^::notice /)
+  })
+
+  it('escapes newlines as %0A', () => {
+    const output = formatGithubAnnotations(
+      makeResult({
+        findings: [makeFinding({ title: 'Line 1\nLine 2' })],
+      })
+    )
+    expect(output).toContain('Line 1%0ALine 2')
+  })
+
+  it('escapes carriage returns as %0D', () => {
+    const output = formatGithubAnnotations(
+      makeResult({
+        findings: [makeFinding({ title: 'Text\rWith\rCR' })],
+      })
+    )
+    expect(output).toContain('Text%0DWith%0DCR')
+  })
+})

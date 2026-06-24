@@ -1,5 +1,6 @@
 import type { ReviewResult, Finding, Severity } from '../core/schema.js'
 export { formatSarif } from './formatters/sarif.js'
+export { formatGithubAnnotations } from './formatters/githubAnnotations.js'
 
 const SEVERITY_EMOJI: Record<Severity, string> = {
   critical: '🔴',
