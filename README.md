@@ -6,11 +6,11 @@ A local, 15-agent AI code review tool powered by [Ollama](https://ollama.com). R
 
 ```
 git diff → sanitizer
-  → [Phase 1] CoverageAnalystAgent
-  → [Phase 2] 9 specialists in parallel
-  → [Phase 3] TestGenAgent (only if coverage gaps found)
+  → CoverageAnalystAgent + 14 specialist agents
   → OrchestratorAgent → findings
 ```
+
+> **testgen is opt-in.** Pass `--suggest-tests` to include generated test suggestions in the report, or `--write-tests` to write them to disk. Default runs never write files.
 
 Each specialist agent receives only the (sanitized) diff and its own system prompt, so agents don't bias each other. The orchestrator deduplicates, cross-references, applies confidence-aware severity gating, and caps the final finding set.
 
@@ -28,7 +28,7 @@ Each specialist agent receives only the (sanitized) diff and its own system prom
 | AdversarialAgent       | Adversarial inputs — null/empty/boundary values, concurrent access                                                                       |
 | IntegrationScoutAgent  | Integration boundaries lacking tests (new HTTP calls, DB writes, queues, WebSocket connections)                                          |
 | CoverageAnalystAgent   | Test coverage gaps, untested branches                                                                                                    |
-| TestGenAgent           | Generates test stubs for coverage gaps                                                                                                   |
+| TestGenAgent           | Generates test stubs for coverage gaps (**opt-in** — use `--suggest-tests` or `--write-tests`)                                           |
 | ErrorHandlingAgent     | Swallowed exceptions, ignored Promise rejections, sentinel-value failure returns, error paths that should propagate                      |
 | ObservabilityAgent     | New code paths (branches, state changes, API entry points) lacking log output                                                            |
 | MigrationSafetyAgent   | NOT NULL without DEFAULT, DROP without IF EXISTS, missing FK indexes, missing down migrations (skipped when diff has no migration files) |
@@ -60,10 +60,14 @@ ollama pull devstral:latest
 
 ```bash
 cd your-project
-git add -p                            # stage the changes you want reviewed
-ai-review-agent                       # run the full 15-agent swarm
-ai-review-agent --agents security     # single-agent fast pass
-ai-review-agent --format json         # machine-readable output
+git add -p                                       # stage the changes you want reviewed
+ai-review-agent                                  # run the full 15-agent swarm
+ai-review-agent --profile fast                   # security + correctness + secrets only (~3 min)
+ai-review-agent --profile change-review          # 8-agent change package review
+ai-review-agent --profile security               # security-focused subset
+ai-review-agent --agents security                # single-agent fast pass
+ai-review-agent --format json                    # machine-readable output
+ai-review-agent --context memory-bank            # load per-agent project context from memory-bank/
 ```
 
 <details>
@@ -168,21 +172,27 @@ ai-review-agent --help
 
 **Flag reference:**
 
-| Flag                   | Default                        | Description                                                         |
-| ---------------------- | ------------------------------ | ------------------------------------------------------------------- |
-| `--diff <path>`        | —                              | Review a saved .diff file                                           |
-| `--dir <path>`         | cwd                            | Diff the given directory against HEAD                               |
-| `--model <model>`      | devstral:latest                | Override Ollama model                                               |
-| `--agents <list>`      | all 15 agents (testgen opt-in) | Comma-separated agent list                                          |
-| `--format <fmt>`       | markdown                       | `markdown` or `json`                                                |
-| `--out <path>`         | stdout                         | Write report to file                                                |
-| `--max-lines <n>`      | 2000                           | Truncate diff before review                                         |
-| `--timeout <ms>`       | 60000                          | Per-agent timeout                                                   |
-| `--retry-attempts <n>` | 2                              | Attempts per agent before skipping                                  |
-| `--retry-delay <ms>`   | 2000                           | Backoff between retries                                             |
-| `--fail-on <level>`    | high                           | Exit 1 when severity ≥ level (`critical\|high\|medium\|any\|never`) |
-| `--ignore <glob>`      | —                              | Exclude matching files (repeatable)                                 |
-| `--no-sanitize`        | —                              | Skip prompt injection sanitization                                  |
+| Flag                   | Default         | Description                                                                              |
+| ---------------------- | --------------- | ---------------------------------------------------------------------------------------- |
+| `--diff <path>`        | —               | Review a saved .diff file                                                                |
+| `--dir <path>`         | cwd             | Diff the given directory against HEAD                                                    |
+| `--model <model>`      | devstral:latest | Override Ollama model                                                                    |
+| `--profile <name>`     | —               | Run a named agent subset: `fast`, `full`, `change-review`, `ui`, `migration`, `security` |
+| `--agents <list>`      | all 15 agents   | Comma-separated agent list (overrides `--profile`)                                       |
+| `--context <mode>`     | none            | `memory-bank` loads per-agent project context from `memory-bank/`                        |
+| `--format <fmt>`       | markdown        | `markdown` or `json`                                                                     |
+| `--out <path>`         | stdout          | Write report to file                                                                     |
+| `--max-lines <n>`      | 2000            | Truncate diff before review                                                              |
+| `--timeout <ms>`       | 60000           | Per-agent timeout                                                                        |
+| `--retry-attempts <n>` | 2               | Attempts per agent before skipping                                                       |
+| `--retry-delay <ms>`   | 2000            | Backoff between retries                                                                  |
+| `--fail-on <level>`    | high            | Exit 1 when severity ≥ level (`critical\|high\|medium\|any\|never`)                      |
+| `--fail-fast`          | off             | Stop swarm on first finding at or above `--fail-on` threshold                            |
+| `--parallel`           | off             | Run specialist agents in parallel (faster; disables fail-fast)                           |
+| `--ignore <glob>`      | —               | Exclude matching files (repeatable)                                                      |
+| `--no-sanitize`        | —               | Skip prompt injection sanitization                                                       |
+| `--suggest-tests`      | —               | Enable testgen; include suggestions in report (no files written)                         |
+| `--write-tests`        | —               | Enable testgen and write generated test files to `testOutputDir`                         |
 
 Exit code `1` when any finding meets the `--fail-on` threshold (default: `high`).
 
@@ -207,16 +217,15 @@ Create `ai-review.config.json` in your project root to override defaults:
   "maxFindings": 15,
   "agents": [
     "security",
-    "correctness",
     "performance",
+    "correctness",
     "design",
     "dependencies",
+    "coverage",
     "adversarial",
     "integration",
     "breaking-change",
     "license",
-    "coverage",
-    "testgen",
     "error-handling",
     "observability",
     "migration-safety",
@@ -229,17 +238,15 @@ Create `ai-review.config.json` in your project root to override defaults:
   "retryAttempts": 2,
   "retryDelayMs": 2000,
   "sanitize": true,
-  "provider": "ollama",
-  "anthropicModel": "claude-opus-4-8",
   "preferredSecretsScanner": "gitleaks",
   "complexityThreshold": 10
 }
 ```
 
+> **Note:** `testgen` is not in the default agent list. Add it explicitly to `agents` if you want suggestions, or use `--suggest-tests` / `--write-tests` at the CLI.
+
 **Config field notes:**
 
-- `provider`: `"ollama"` (default) or `"anthropic"`. The Anthropic provider is defined in the schema but **not yet implemented** — all runs use Ollama regardless of this value. Planned for a future release.
-- `anthropicModel`: Model ID to use when `provider` is `"anthropic"` (e.g. `"claude-opus-4-8"`). Has no effect until the Anthropic provider is implemented.
 - `preferredSecretsScanner`: `"gitleaks"` (default when installed) or `"trufflehog"` or `"none"` — controls which external scanner SecretsAgent prefers. Falls back to LLM-only when the tool is not found.
 - `complexityThreshold`: Cyclomatic complexity threshold for ComplexityAgent (default: `10`). Functions exceeding this value are flagged. Used when `lizard` is installed; LLM estimates when not.
 
@@ -285,9 +292,11 @@ Confidence is shown in the markdown report next to each finding.
 ## Development
 
 ```bash
-npm test                     # unit tests — no Ollama needed (112 passing)
-npm run typecheck            # 0 TypeScript errors
-npm run build                # compile to dist/
-INTEGRATION=1 npm run test:integration  # e2e — requires Ollama
-npm run calibrate            # calibration suite — requires Ollama
+npm run check                           # full local gate: tests + typecheck + build + format
+npm test                                # unit tests only — no Ollama needed (196 passing)
+npm run test:extension                  # VS Code extension tests (25 passing)
+npm run typecheck                       # 0 TypeScript errors
+npm run build                           # compile to dist/
+INTEGRATION=1 npm run test:integration  # e2e pipeline — requires Ollama + devstral
+npm run calibrate                       # calibration suite — requires Ollama + devstral (~30-45 min)
 ```
