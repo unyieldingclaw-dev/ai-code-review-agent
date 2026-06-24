@@ -79,14 +79,15 @@
   },
   "permissions": {
     "allow": [
-      "Bash(git *)",
-      "Bash(npm run lint)",
-      "Bash(npm run test)",
-      "Bash(npm test)",
-      "Bash(npx *)",
-      "Bash(python -m pytest *)",
-      "Bash(python -m mypy *)",
-      "Bash(python -m ruff *)"
-    ]
+    "Bash(git *)",
+    "Bash(npm run *)",
+    "Bash(npm test)",
+    "Bash(npm ci)",
+    "Bash(npx *)",
+    "Bash(bash tests/*.sh)",
+    "Bash(node dist/*)",
+    "Bash(python -m pytest *)",
+    "Bash(python -m mypy *)",
+    "Bash(python -m ruff *)"    ]
   }
 }

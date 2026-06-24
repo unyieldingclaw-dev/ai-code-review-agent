@@ -45,7 +45,8 @@
     "lint": "tsc --noEmit",
     "test:extension": "npm --prefix vscode-extension test",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "check": "npm test && npm run typecheck && npm run build && npm run format:check"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
