@@ -7,7 +7,7 @@ import { join, resolve, dirname } from 'path'
 import { SwarmRunner } from '../core/runner.js'
 import { loadConfig } from '../core/config.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
-import { formatMarkdown, formatJson } from './formatter.js'
+import { formatMarkdown, formatJson, formatSarif } from './formatter.js'
 import type { AgentName, AgentProgressEvent } from '../core/schema.js'
 import { shouldFail, FAIL_ON_OPTIONS } from './exitCode.js'
 import type { FailOnLevel } from './exitCode.js'
@@ -33,7 +33,7 @@ program
     '--profile <name>',
     'Run a named agent subset: fast, full, change-review, ui, migration, security'
   )
-  .option('--format <format>', 'Output format: markdown or json', 'markdown')
+  .option('--format <format>', 'Output format: markdown, json, or sarif', 'markdown')
   .option('--out <path>', 'Write output to file instead of stdout')
   .option('--max-lines <n>', 'Truncate diff to this many lines (default: 2000)', parseInt)
   .option('--timeout <ms>', 'Per-agent timeout in milliseconds (default: 60000)', parseInt)
@@ -75,7 +75,7 @@ program
       ollamaUrl?: string
       agents?: string
       profile?: string
-      format: 'markdown' | 'json'
+      format: 'markdown' | 'json' | 'sarif'
       out?: string
       maxLines?: number
       timeout?: number
@@ -188,9 +188,13 @@ program
         )
       }
 
-      let output = options.format === 'json' ? formatJson(result) : formatMarkdown(result)
+      let output = options.format === 'json'
+        ? formatJson(result)
+        : options.format === 'sarif'
+          ? formatSarif(result)
+          : formatMarkdown(result)
 
-      if (result.earlyExit && options.format !== 'json') {
+      if (result.earlyExit && options.format !== 'json' && options.format !== 'sarif') {
         output += `\n\n> ⚡ **Fail-fast**: swarm stopped after \`${result.earlyExit.stoppedAt}\` (severity threshold met). Remaining agents were not run.\n`
       }
 
