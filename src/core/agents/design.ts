@@ -46,7 +46,8 @@ Rules:
 - basis=SPECULATIVE: possible issue, depends on broader codebase
 - confidence: your certainty this is a real issue (0-100)
 - evidence: quote or reference the specific diff line(s) that triggered this finding
-- recommendation: describe the concrete refactor or pattern to apply, not just the principle being violated
+- recommendation: name the violated SOLID principle (e.g. "Single Responsibility", "Dependency Inversion") and describe the concrete refactor to apply
+- detail: always name the violated principle by its full name (e.g. "Single Responsibility Principle", "Open/Closed Principle")
 - blocking: true for critical/high, false for medium/low
 - Only report severity >= medium
 - If no issues found, return: []`
