@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { writeFileSync, unlinkSync } from 'fs'
-import { filterDiff, loadIgnorePatterns } from '../../src/core/ignoreFilter.js'
+import { filterDiff, loadIgnorePatterns, IgnorePatterns } from '../../src/core/ignoreFilter.js'
 
 const makeDiff = (files: string[]) =>
   files
@@ -49,7 +49,8 @@ describe('loadIgnorePatterns', () => {
 
   it('returns only extraPaths when no .aiignore exists', () => {
     const patterns = loadIgnorePatterns('/nonexistent/path', ['*.log'])
-    expect(patterns).toEqual(['*.log'])
+    expect(patterns.excludes).toEqual(['*.log'])
+    expect(patterns.includes).toEqual([])
   })
 
   it('merges .aiignore file with extraPaths', () => {
@@ -69,11 +70,41 @@ describe('loadIgnorePatterns', () => {
     writeFileSync('.aiignore', '# this is a comment\n\ndist/\n*.log\n')
     try {
       const patterns = loadIgnorePatterns(process.cwd())
-      expect(patterns).not.toContain('# this is a comment')
-      expect(patterns).toContain('dist/')
-      expect(patterns).toContain('*.log')
+      expect(patterns.excludes).not.toContain('# this is a comment')
+      expect(patterns.excludes).toContain('dist/')
+      expect(patterns.excludes).toContain('*.log')
     } finally {
       unlinkSync('.aiignore')
     }
+  })
+
+  it('loadIgnorePatterns separates negation lines into includes array', () => {
+    const fs = require('fs')
+    const os = require('os')
+    const path = require('path')
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aiignore-'))
+    try {
+      fs.writeFileSync(path.join(tmp, '.aiignore'), '*.log\n!important.log\ndist/\n')
+      const patterns = loadIgnorePatterns(tmp)
+      expect(patterns.excludes).toContain('*.log')
+      expect(patterns.excludes).toContain('dist/')
+      expect(patterns.includes).toContain('important.log')
+      expect(patterns.includes).not.toContain('!important.log')
+    } finally {
+      fs.rmSync(tmp, { recursive: true })
+    }
+  })
+})
+
+describe('filterDiff negation patterns', () => {
+  it('keeps files that match a negation pattern even when also matching an exclude', () => {
+    const diff = makeDiff(['src/logs/important.log', 'src/logs/debug.log'])
+    const patterns: IgnorePatterns = {
+      excludes: ['*.log'],
+      includes: ['important.log'],
+    }
+    const result = filterDiff(diff, patterns)
+    expect(result).toContain('important.log')
+    expect(result).not.toContain('debug.log')
   })
 })

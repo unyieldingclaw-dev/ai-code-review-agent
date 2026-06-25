@@ -130,7 +130,7 @@ export class SwarmRunner {
     // Path exclusions — filter files matching .aiignore or config.ignorePaths
     if (input.projectPath || this.config.ignorePaths.length > 0) {
       const patterns = loadIgnorePatterns(input.projectPath ?? '', this.config.ignorePaths)
-      if (patterns.length > 0) {
+      if (patterns.excludes.length > 0) {
         input = { ...input, diff: filterDiff(input.diff, patterns) }
       }
     }

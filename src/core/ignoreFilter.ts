@@ -1,29 +1,44 @@
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
+export interface IgnorePatterns {
+  excludes: string[]  // patterns — file is removed from diff if it matches
+  includes: string[]  // negation patterns (! prefix stripped) — overrides excludes
+}
+
 /** Load patterns from a .aiignore file and any extra paths passed by the caller. */
-export function loadIgnorePatterns(projectPath: string, extraPaths: string[] = []): string[] {
-  const patterns: string[] = [...extraPaths]
+export function loadIgnorePatterns(projectPath: string, extraPaths: string[] = []): IgnorePatterns {
+  const excludes: string[] = [...extraPaths]
+  const includes: string[] = []
+
   const ignorePath = join(projectPath, '.aiignore')
   if (existsSync(ignorePath)) {
     const lines = readFileSync(ignorePath, 'utf-8').split('\n')
     for (const line of lines) {
       const trimmed = line.trim()
-      // Skip blank lines, comments, and negation patterns (unsupported)
-      if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('!')) {
-        patterns.push(trimmed)
+      if (!trimmed || trimmed.startsWith('#')) continue
+      if (trimmed.startsWith('!')) {
+        includes.push(trimmed.slice(1)) // strip the ! prefix
+      } else {
+        excludes.push(trimmed)
       }
     }
   }
-  return patterns
+  return { excludes, includes }
 }
 
 /**
  * Filter a git diff string, removing sections for files that match any
- * of the provided gitignore-style patterns. Returns the filtered diff.
+ * exclude pattern, unless they also match a negation (include) pattern.
+ * Returns the filtered diff.
  */
-export function filterDiff(diff: string, patterns: string[]): string {
-  if (patterns.length === 0) return diff
+export function filterDiff(diff: string, patterns: IgnorePatterns | string[]): string {
+  // Backward compat: accept raw string[] (treated as excludes only)
+  const { excludes, includes } = Array.isArray(patterns)
+    ? { excludes: patterns, includes: [] }
+    : patterns
+
+  if (excludes.length === 0) return diff
 
   // Split on diff --git boundaries, preserving the marker in each chunk
   const sections = diff.split(/(?=^diff --git )/m)
@@ -32,7 +47,10 @@ export function filterDiff(diff: string, patterns: string[]): string {
       if (!section.startsWith('diff --git ')) return true
       const filePath = extractFilePath(section)
       if (!filePath) return true
-      return !matchesAnyPattern(filePath, patterns)
+      // Keep if explicitly included (negation wins)
+      if (includes.some(p => matchPattern(filePath, p))) return true
+      // Remove if excluded
+      return !excludes.some(p => matchPattern(filePath, p))
     })
     .join('')
 }
@@ -51,10 +69,6 @@ function extractFilePath(section: string): string | null {
   if (minusMatch && minusMatch[1] !== '/dev/null') return minusMatch[1]
 
   return null
-}
-
-function matchesAnyPattern(filePath: string, patterns: string[]): boolean {
-  return patterns.some((p) => matchPattern(filePath, p))
 }
 
 function matchPattern(filePath: string, pattern: string): boolean {
