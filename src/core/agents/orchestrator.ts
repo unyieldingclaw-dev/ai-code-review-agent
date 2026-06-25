@@ -14,7 +14,16 @@ const DETERMINISTIC_SOURCES: EvidenceSource[] = [
   'policy',
 ]
 
-// Agent priority for deduplication — higher index = higher priority kept
+// Dedup tie-breaker: when multiple agents flag the same file:line, the agent
+// with the highest index is kept; others are recorded in corroboratingAgents.
+//
+// Rationale (highest index = most likely to be kept):
+//   secrets / error-handling — high-signal, specific, rarely false-positive
+//   security / complexity / migration-safety — precise, domain-specific findings
+//   correctness / performance — common but important
+//   design / dependencies / license — broader, more interpretive
+//   integration / breaking-change — widest scope, most overlap with other agents
+//   coverage / testgen / adversarial — supportive signals, escalate others
 const AGENT_PRIORITY: AgentName[] = [
   'integration',
   'breaking-change',
