@@ -9,6 +9,7 @@ export async function upsertPRComment(
   prNumber: number,
   body: string
 ): Promise<void> {
+  if (!token) throw new Error('GitHub token is required for PR comment upsert')
   const headers = {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
