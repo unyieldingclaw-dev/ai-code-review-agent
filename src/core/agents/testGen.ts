@@ -62,7 +62,7 @@ Tests must: import the module under test, cover the happy path, cover the error/
     ]
 
     const raw = await this.provider.chat(messages, { think: false })
-    const content = raw.replace(/```(?:typescript|javascript|python)?\s*|```\s*/g, '').trim()
+    const content = raw.replace(/```[a-z]*\s*/gi, '').trim()
     if (!content || content.length < 50) return null
 
     const testPath = this.deriveTestPath(sourceFile, framework)
