@@ -143,6 +143,7 @@ export abstract class BaseAgent {
           suggestion,
           blocking: f.blocking ?? f.severity === 'critical',
           source: f.source ?? 'llm',
+          ...(f.lineEnd !== undefined ? { lineEnd: Math.max(f.line, f.lineEnd) } : {}),
         }
       })
   }

@@ -188,4 +188,25 @@ describe('BaseAgent', () => {
     expect(findings[0].source).toBe('llm')
     expect(findings[0].source).not.toBeUndefined()
   })
+
+  it('clamps lineEnd to line when lineEnd < line', async () => {
+    const raw = JSON.stringify([{
+      severity: 'high', basis: 'VERIFIED', confidence: 80,
+      file: 'src/a.ts', line: 42, lineEnd: 5,
+      title: 'Test', detail: 'Detail', suggestion: 'Fix it'
+    }])
+    const findings = await new TestAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
+    expect(findings[0].lineEnd).toBeGreaterThanOrEqual(findings[0].line)
+    expect(findings[0].lineEnd).toBe(42)
+  })
+
+  it('preserves valid lineEnd when lineEnd >= line', async () => {
+    const raw = JSON.stringify([{
+      severity: 'high', basis: 'VERIFIED', confidence: 80,
+      file: 'src/a.ts', line: 10, lineEnd: 20,
+      title: 'Test', detail: 'Detail', suggestion: 'Fix it'
+    }])
+    const findings = await new TestAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
+    expect(findings[0].lineEnd).toBe(20)
+  })
 })

@@ -27,7 +27,7 @@ function findingToSarifResult(f: Finding) {
           artifactLocation: { uri: f.file, uriBaseId: '%SRCROOT%' },
           region: {
             startLine: f.line,
-            endLine: f.lineEnd ?? f.line,
+            endLine: f.lineEnd !== undefined && f.lineEnd >= f.line ? f.lineEnd : f.line,
           },
         },
       },
