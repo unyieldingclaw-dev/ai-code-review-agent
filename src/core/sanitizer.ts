@@ -41,14 +41,21 @@ export function sanitizeDiff(diff: string): SanitizeResult {
     // Only scan added lines; skip diff header lines (+++ b/...)
     if (!line.startsWith('+') || line.startsWith('+++')) return line
 
+    let redactedLine = line
+    let wasRedacted = false
+
     for (const { pattern, label } of INJECTION_PATTERNS) {
-      if (pattern.test(line)) {
+      if (pattern.test(redactedLine)) {
         warnings.push(`Prompt injection pattern detected (${label}): ${line.slice(0, 100)}`)
-        redactedLines++
-        return line.replace(pattern, '[REDACTED]')
+        // Replace all occurrences of this pattern using a global version of the regex
+        const globalPat = new RegExp(pattern.source, 'gi')
+        redactedLine = redactedLine.replace(globalPat, '[REDACTED]')
+        wasRedacted = true
       }
     }
-    return line
+
+    if (wasRedacted) redactedLines++
+    return redactedLine
   })
 
   return {
