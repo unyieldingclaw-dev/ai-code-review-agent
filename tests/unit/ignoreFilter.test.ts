@@ -79,8 +79,11 @@ describe('loadIgnorePatterns', () => {
   })
 
   it('loadIgnorePatterns separates negation lines into includes array', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = require('fs')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const os = require('os')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const path = require('path')
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aiignore-'))
     try {

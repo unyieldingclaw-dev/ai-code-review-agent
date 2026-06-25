@@ -46,6 +46,7 @@
     "test:extension": "npm --prefix vscode-extension test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "lint:eslint": "eslint src/ tests/",
     "check": "npm test && npm run typecheck && npm run build && npm run format:check"
   },
   "dependencies": {
@@ -53,11 +54,14 @@
     "commander": "^12.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.0.0",
     "@vitest/coverage-v8": "^2.0.0",
+    "eslint": "^10.5.0",
     "prettier": "^3.8.4",
     "tsx": "^4.0.0",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.62.0",
     "vitest": "^2.0.0"
   }
 }
