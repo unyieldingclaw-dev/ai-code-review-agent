@@ -166,6 +166,12 @@ ai-review-agent --ignore "dist/**" --ignore "**/*.snap"
 # Skip prompt-injection sanitization (use if sanitizer causes false positives)
 ai-review-agent --no-sanitize
 
+# Use semantic context selection (requires nomic-embed-text in Ollama)
+ai-review-agent --context memory-bank --context-mode semantic
+
+# Disable emoji for CI/CD pipelines
+ai-review-agent --no-emoji --format markdown
+
 # Full help
 ai-review-agent --help
 ```
@@ -193,6 +199,9 @@ ai-review-agent --help
 | `--no-sanitize`        | —               | Skip prompt injection sanitization                                                       |
 | `--suggest-tests`      | —               | Enable testgen; include suggestions in report (no files written)                         |
 | `--write-tests`        | —               | Enable testgen and write generated test files to `testOutputDir`                         |
+| `--context-budget <n>` | 4000           | Max chars of memory-bank context per agent                           |
+| `--context-mode <mode>`| static         | `static` (hardcoded routing) or `semantic` (nomic-embed-text ranking) |
+| `--no-emoji`           | off            | Use text labels instead of emoji (for CI without UTF-8 support)      |
 
 Exit code `1` when any finding meets the `--fail-on` threshold (default: `high`).
 
@@ -263,6 +272,13 @@ build/
 *.min.js
 **/__snapshots__/
 calibration/fixtures/
+```
+
+Negation patterns (`!`) are supported — a file matching `!important.log` is kept even if it also matches a preceding exclude pattern:
+
+```
+*.log
+!important.log
 ```
 
 ## Guardrails
