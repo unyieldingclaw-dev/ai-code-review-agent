@@ -9,3 +9,49 @@ index 000000..111111 100644
 +
 +-- FALSE POSITIVE BAIT: safe index creation
 +CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+diff --git a/db/migrations/20240620_add_status_knex.js b/db/migrations/20240620_add_status_knex.js
+new file mode 100644
+--- /dev/null
++++ b/db/migrations/20240620_add_status_knex.js
+@@ -0,0 +1,18 @@
++/**
++ * REAL ISSUE: Knex migration adds NOT NULL column without DEFAULT
++ * Will fail on tables with existing rows because no default value is provided
++ */
++exports.up = function(knex) {
++  return knex.schema.table('users', function(table) {
++    // UNSAFE: notNullable() without defaultTo() or initial backfill
++    table.string('status').notNullable()
++    table.timestamps(true, true)
++  })
++}
++
++exports.down = function(knex) {
++  return knex.schema.table('users', function(table) {
++    table.dropColumn('status')
++    table.dropTimestamps()
++  })
++}
+diff --git a/alembic/versions/a1b2c3d4_add_email_verified.py b/alembic/versions/a1b2c3d4_add_email_verified.py
+new file mode 100644
+--- /dev/null
++++ b/alembic/versions/a1b2c3d4_add_email_verified.py
+@@ -0,0 +1,18 @@
++"""Add email_verified column to users table.
++
++REAL ISSUE: Alembic migration adds NOT NULL constraint without server_default
++When applied to a non-empty table, this will fail because there is no value
++for existing rows.
++"""
++from alembic import op
++import sqlalchemy as sa
++
++
++def upgrade():
++    # UNSAFE: nullable=False without server_default
++    op.add_column('users',
++        sa.Column('email_verified', sa.Boolean(), nullable=False)
++    )
++
++def downgrade():
++    op.drop_column('users', 'email_verified')
