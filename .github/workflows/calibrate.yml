@@ -9,7 +9,7 @@ on:
 
 jobs:
   calibrate:
-    runs-on: self-hosted # Requires Ollama on the runner (same machine as review workflow)
+    runs-on: ubuntu-latest # Ollama check skips calibration gracefully when not available
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
     steps:
