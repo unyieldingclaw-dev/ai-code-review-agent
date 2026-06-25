@@ -42,15 +42,15 @@ Run a **15-agent** local AI code review swarm on your staged git changes, direct
 
 All settings are under **Preferences → Settings → AI Review**:
 
-| Setting                 | Default                  | Description                                                   |
-| ----------------------- | ------------------------ | ------------------------------------------------------------- |
-| `aiReview.ollamaUrl`    | `http://localhost:11434` | Ollama base URL                                               |
-| `aiReview.model`        | `devstral:latest`        | Model name                                                    |
-| `aiReview.profile`      | `` (none)                | Named agent subset: `fast`, `full`, `change-review`, `ui`, `migration`, `security` |
-| `aiReview.agents`       | `[]` (all 15 defaults)   | Explicit agent list (overrides profile). testgen always excluded. |
-| `aiReview.contextMode`  | `none`                   | `none`, `memory-bank` (static), or `memory-bank-semantic` (nomic-embed-text) |
-| `aiReview.maxLines`     | `2000`                   | Max diff lines sent for review                                |
-| `aiReview.timeout`      | `120`                    | Per-agent timeout (seconds)                                   |
+| Setting                | Default                  | Description                                                                        |
+| ---------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
+| `aiReview.ollamaUrl`   | `http://localhost:11434` | Ollama base URL                                                                    |
+| `aiReview.model`       | `devstral:latest`        | Model name                                                                         |
+| `aiReview.profile`     | `` (none)                | Named agent subset: `fast`, `full`, `change-review`, `ui`, `migration`, `security` |
+| `aiReview.agents`      | `[]` (all 15 defaults)   | Explicit agent list (overrides profile). testgen always excluded.                  |
+| `aiReview.contextMode` | `none`                   | `none`, `memory-bank` (static), or `memory-bank-semantic` (nomic-embed-text)       |
+| `aiReview.maxLines`    | `2000`                   | Max diff lines sent for review                                                     |
+| `aiReview.timeout`     | `120`                    | Per-agent timeout (seconds)                                                        |
 
 ### Profiles
 
@@ -84,21 +84,21 @@ Set `aiReview.contextMode` to `memory-bank` to load relevant `memory-bank/` file
 
 ## Agents (15 default, testgen opt-in)
 
-| Agent           | Domain           | What it checks                                    |
-| --------------- | ---------------- | ------------------------------------------------- |
-| SecurityAgent          | Security          | Injection, auth flaws, unsafe deserialization     |
-| PerformanceAgent       | Performance       | Hot paths, N+1 queries, memory pressure           |
-| CorrectnessAgent       | Correctness       | Logic bugs, off-by-one, null dereferences         |
-| DesignAgent            | Architecture Drift| SOLID violations, coupling, abstraction leaks     |
-| DependenciesAgent      | Dependencies      | Outdated/vulnerable packages, supply chain risks  |
-| BreakingChangeAgent    | Breaking Change   | Removed exports, changed signatures               |
-| LicenseComplianceAgent | License           | GPL/AGPL/SSPL/Commons Clause dependencies         |
-| AdversarialAgent       | Adversarial       | Adversarial inputs, boundary/concurrency issues   |
-| IntegrationScoutAgent  | Integration       | Contract mismatches, missing integration tests    |
-| CoverageAnalystAgent   | Testing           | Untested paths, missing assertions                |
-| ErrorHandlingAgent     | Error Handling    | Swallowed exceptions, ignored Promise rejections  |
-| ObservabilityAgent     | Observability     | New code paths lacking log output                 |
-| MigrationSafetyAgent   | Migration Safety  | NOT NULL without DEFAULT, missing down migrations |
-| SecretsAgent           | Secrets           | Hardcoded API keys, passwords, connection strings |
-| ComplexityAgent        | Complexity        | High cyclomatic complexity, deep nesting          |
-| TestGenAgent           | Testing           | Generates test stubs (**opt-in** — use CLI only)  |
+| Agent                  | Domain             | What it checks                                    |
+| ---------------------- | ------------------ | ------------------------------------------------- |
+| SecurityAgent          | Security           | Injection, auth flaws, unsafe deserialization     |
+| PerformanceAgent       | Performance        | Hot paths, N+1 queries, memory pressure           |
+| CorrectnessAgent       | Correctness        | Logic bugs, off-by-one, null dereferences         |
+| DesignAgent            | Architecture Drift | SOLID violations, coupling, abstraction leaks     |
+| DependenciesAgent      | Dependencies       | Outdated/vulnerable packages, supply chain risks  |
+| BreakingChangeAgent    | Breaking Change    | Removed exports, changed signatures               |
+| LicenseComplianceAgent | License            | GPL/AGPL/SSPL/Commons Clause dependencies         |
+| AdversarialAgent       | Adversarial        | Adversarial inputs, boundary/concurrency issues   |
+| IntegrationScoutAgent  | Integration        | Contract mismatches, missing integration tests    |
+| CoverageAnalystAgent   | Testing            | Untested paths, missing assertions                |
+| ErrorHandlingAgent     | Error Handling     | Swallowed exceptions, ignored Promise rejections  |
+| ObservabilityAgent     | Observability      | New code paths lacking log output                 |
+| MigrationSafetyAgent   | Migration Safety   | NOT NULL without DEFAULT, missing down migrations |
+| SecretsAgent           | Secrets            | Hardcoded API keys, passwords, connection strings |
+| ComplexityAgent        | Complexity         | High cyclomatic complexity, deep nesting          |
+| TestGenAgent           | Testing            | Generates test stubs (**opt-in** — use CLI only)  |
