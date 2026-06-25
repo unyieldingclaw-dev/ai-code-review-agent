@@ -42,6 +42,7 @@ Seven agents. Six domain agents run in parallel; one consolidation agent runs af
 **Repositories:** Both.
 
 **Empirical tasks:**
+
 - Grep for credential patterns; check `.gitleaks.toml` for allow-list abuse
 - Read `.claude/settings.json` permissions in both repos — check for over-permissive blocks
 - Verify secret scanning exists in CI workflows
@@ -62,6 +63,7 @@ Seven agents. Six domain agents run in parallel; one consolidation agent runs af
 **Repositories:** Both.
 
 **Empirical tasks:**
+
 - Trace Ollama-down failure path: does ACR hang, timeout, or fail gracefully?
 - Read `src/core/runner.ts` — retry logic, timeout propagation, partial-failure handling
 - Check `.aiignore` malformed input handling
@@ -84,6 +86,7 @@ Seven agents. Six domain agents run in parallel; one consolidation agent runs af
 **Repositories:** Both.
 
 **Empirical tasks:**
+
 - Map the full ACR call graph: `CLI → SwarmRunner → agents → OllamaProvider`
 - Count abstraction layers; flag unnecessary indirection
 - Evaluate `BaseAgent` scope — does it do too much (parse + validate + prompt + retry)?
@@ -106,6 +109,7 @@ Seven agents. Six domain agents run in parallel; one consolidation agent runs af
 **Repositories:** Both.
 
 **Empirical tasks:**
+
 - Follow `install.sh` / `init-memory-bank.sh` from scratch — does it work exactly as documented?
 - Follow ACR README install steps exactly — note every gap or assumption
 - Verify every CLI flag in `--help` matches documentation
@@ -127,6 +131,7 @@ Seven agents. Six domain agents run in parallel; one consolidation agent runs af
 **Repository:** ACR (PMB has no CI pipeline).
 
 **Empirical tasks:**
+
 - Read all three workflows: `release.yml`, `review.yml`, `calibrate.yml` — check logic, missing steps, secret exposure
 - Run `npm run check` — verify full check suite passes
 - Run `npm run test:coverage` — identify untested files and uncovered code paths
@@ -149,6 +154,7 @@ Seven agents. Six domain agents run in parallel; one consolidation agent runs af
 **Repositories:** Both together.
 
 **Empirical tasks:**
+
 - Map all duplicated commands between ACR and PMB (`/code-review`, `/security-review`, etc.)
 - Read PMB's `/change-review` — does the ACR bridge section actually work? What's the exact integration point?
 - Identify conflicting terminology (PMB `authority`/`confidence: high/medium/low` vs ACR `confidence` 0–100)
@@ -168,6 +174,7 @@ Seven agents. Six domain agents run in parallel; one consolidation agent runs af
 ### Agent 7 — Consolidation
 
 Receives all findings from Agents 1–6. Performs:
+
 - Deduplication: merge findings that refer to the same root cause
 - Cross-referencing: link related findings across domains
 - Severity ranking: Critical → High → Medium → Low → Advisory
@@ -206,29 +213,29 @@ Receives all findings from Agents 1–6. Performs:
 
 Every finding includes:
 
-| Field | Content |
-|---|---|
-| Title | Short imperative phrase |
-| Severity | Critical / High / Medium / Low / Advisory |
-| Confidence | Verified / Strong Evidence / Likely / Speculative |
-| Repository | PMB / ACR / Both |
-| Evidence | What was observed (file path, line, output) |
-| Reproduction Steps | Exact steps to trigger |
-| Root Cause | Why it happens |
-| Recommended Fix | Specific, actionable |
-| Expected Impact | What improves when fixed |
-| Estimated Effort | XS / S / M / L / XL |
+| Field              | Content                                           |
+| ------------------ | ------------------------------------------------- |
+| Title              | Short imperative phrase                           |
+| Severity           | Critical / High / Medium / Low / Advisory         |
+| Confidence         | Verified / Strong Evidence / Likely / Speculative |
+| Repository         | PMB / ACR / Both                                  |
+| Evidence           | What was observed (file path, line, output)       |
+| Reproduction Steps | Exact steps to trigger                            |
+| Root Cause         | Why it happens                                    |
+| Recommended Fix    | Specific, actionable                              |
+| Expected Impact    | What improves when fixed                          |
+| Estimated Effort   | XS / S / M / L / XL                               |
 
 ---
 
 ## Confidence Definitions
 
-| Label | Meaning |
-|---|---|
-| Verified | Command executed, output observed, defect confirmed |
-| Strong Evidence | Code read; behavior clearly implied by implementation |
-| Likely | Pattern matches known failure mode; not directly tested |
-| Speculative | Reasonable inference; unverified |
+| Label           | Meaning                                                 |
+| --------------- | ------------------------------------------------------- |
+| Verified        | Command executed, output observed, defect confirmed     |
+| Strong Evidence | Code read; behavior clearly implied by implementation   |
+| Likely          | Pattern matches known failure mode; not directly tested |
+| Speculative     | Reasonable inference; unverified                        |
 
 ---
 
