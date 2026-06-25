@@ -9,7 +9,17 @@ const SEVERITY_EMOJI: Record<Severity, string> = {
   low: '🔵',
 }
 
-export function formatMarkdown(result: ReviewResult): string {
+const SEVERITY_TEXT: Record<Severity, string> = {
+  critical: '[CRITICAL]',
+  high: '[HIGH]',
+  medium: '[MEDIUM]',
+  low: '[LOW]',
+}
+
+export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boolean }): string {
+  const useEmoji = !options?.noEmoji
+  const sevLabel = (s: Severity) => (useEmoji ? SEVERITY_EMOJI[s] : SEVERITY_TEXT[s])
+
   const { findings, testFiles, summary } = result
   const lines: string[] = []
 
@@ -21,7 +31,7 @@ export function formatMarkdown(result: ReviewResult): string {
   lines.push('')
 
   if (findings.length === 0) {
-    lines.push('✅ No issues found.')
+    lines.push(useEmoji ? '✅ No issues found.' : 'No issues found.')
     return lines.join('\n')
   }
 
@@ -29,7 +39,7 @@ export function formatMarkdown(result: ReviewResult): string {
   for (const severity of ['critical', 'high', 'medium', 'low'] as Severity[]) {
     const group = bySeverity.get(severity)
     if (!group?.length) continue
-    lines.push(`## ${SEVERITY_EMOJI[severity]} ${capitalize(severity)} (${group.length})`)
+    lines.push(`## ${sevLabel(severity)} ${capitalize(severity)} (${group.length})`)
     lines.push('')
     for (const f of group) {
       lines.push(`### ${f.title}`)
@@ -52,7 +62,7 @@ export function formatMarkdown(result: ReviewResult): string {
   }
 
   if (testFiles.length > 0) {
-    lines.push(`## 🧪 Generated Test Files (${testFiles.length})`)
+    lines.push(`## ${useEmoji ? '🧪 ' : ''}Generated Test Files (${testFiles.length})`)
     lines.push('')
     for (const tf of testFiles) {
       lines.push(`- \`${tf.path}\` (${tf.framework})`)

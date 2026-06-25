@@ -81,6 +81,7 @@ program
     'Context selection mode: static (default) or semantic (uses nomic-embed-text)',
     'static'
   )
+  .option('--no-emoji', 'Disable emoji in output (for CI terminals without UTF-8 support)')
   .action(
     async (options: {
       diff?: string
@@ -105,6 +106,7 @@ program
       context: string
       contextBudget?: number
       contextMode?: string
+      emoji: boolean
     }) => {
       const contextMode = options.context === 'memory-bank' ? 'memory-bank' : 'none'
 
@@ -156,8 +158,9 @@ program
       const provider = new OllamaProvider(config.ollamaUrl, config.model)
       const runner = new SwarmRunner(config, provider)
 
+      const reviewingLabel = options.emoji !== false ? '🔍' : 'Reviewing'
       process.stderr.write(
-        `\n🔍 Running ai-review-agent with ${config.agents.length} agents...\n\n`
+        `\n${reviewingLabel} Running ai-review-agent with ${config.agents.length} agents...\n\n`
       )
 
       const result = await runner.run(
@@ -181,8 +184,9 @@ program
               `[${event.index}/${event.total}] ${event.name}   ${elapsed} — ${summary}\n`
             )
             if (event.earlyExit) {
+              const bolt = options.emoji !== false ? '⚡ ' : ''
               process.stderr.write(
-                `⚡ Fail-fast: stopping swarm after ${event.name} (threshold met)\n`
+                `${bolt}Fail-fast: stopping swarm after ${event.name} (threshold met)\n`
               )
             }
           }
@@ -197,12 +201,14 @@ program
           mkdirSync(join(outPath, '..'), { recursive: true })
           writeFileSync(outPath, tf.content, 'utf-8')
         }
+        const paperclip = options.emoji !== false ? '📝' : 'Generated'
         process.stdout.write(
-          `\n📝 Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`
+          `\n${paperclip} Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`
         )
       } else if (options.suggestTests && result.testFiles.length > 0) {
+        const lightbulb = options.emoji !== false ? '💡' : 'Note:'
         process.stdout.write(
-          `\n💡 ${result.testFiles.length} test suggestion(s) included in report (use --write-tests to write files)\n`
+          `\n${lightbulb} ${result.testFiles.length} test suggestion(s) included in report (use --write-tests to write files)\n`
         )
       }
 
@@ -213,7 +219,7 @@ program
             ? formatSarif(result)
             : options.format === 'github-annotations'
               ? formatGithubAnnotations(result)
-              : formatMarkdown(result)
+              : formatMarkdown(result, { noEmoji: options.emoji === false })
 
       if (
         result.earlyExit &&
@@ -221,12 +227,14 @@ program
         options.format !== 'sarif' &&
         options.format !== 'github-annotations'
       ) {
-        output += `\n\n> ⚡ **Fail-fast**: swarm stopped after \`${result.earlyExit.stoppedAt}\` (severity threshold met). Remaining agents were not run.\n`
+        const bolt = options.emoji !== false ? '⚡ ' : ''
+        output += `\n\n> ${bolt}**Fail-fast**: swarm stopped after \`${result.earlyExit.stoppedAt}\` (severity threshold met). Remaining agents were not run.\n`
       }
 
       if (options.out) {
         writeFileSync(options.out, output, 'utf-8')
-        process.stdout.write(`\n✅ Report written to ${options.out}\n`)
+        const check = options.emoji !== false ? '✅ ' : ''
+        process.stdout.write(`\n${check}Report written to ${options.out}\n`)
       } else {
         process.stdout.write('\n' + output + '\n')
       }
