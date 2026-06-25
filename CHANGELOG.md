@@ -3,6 +3,37 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] — 2026-06-25
+
+### Added
+
+- **`--no-emoji` flag**: disables emoji in markdown output for CI terminals without UTF-8 support. Severity labels become `[CRITICAL]`/`[HIGH]`/`[MEDIUM]`/`[LOW]`.
+- **`--context-mode <mode>`**: `static` (default, hardcoded per-agent file routing) or `semantic` (ranks memory-bank files by cosine similarity to diff using `nomic-embed-text:latest`).
+- **`--context-budget <n>`**: override the per-agent memory-bank context budget (default: 4000 chars).
+- **`.aiignore` negation patterns**: lines starting with `!` now override exclude patterns (gitignore-style negation). Previously silently ignored.
+- **ESLint** (`@eslint/js` + `typescript-eslint`): `npm run lint:eslint` — 0 warnings; included in `npm run check`.
+- **`src/core/embedder.ts`**: cosine similarity + Ollama `/api/embeddings` for semantic context selection.
+- **SARIF run-level properties**: context and policy metadata included in SARIF output when present.
+- **GitHub token validation**: `upsertPRComment` throws early if token is empty.
+- **Coverage agent parser**: balanced-brace extraction replaces greedy regex (prevents malformed JSON on complex outputs).
+- **Orchestrator escalation**: breaking-change findings co-located with correctness or design findings are escalated one severity level.
+- Migration-safety calibration fixture extended with Knex.js and Alembic patterns.
+- vscode-extension v0.6.0: `aiReview.profile` dropdown, `aiReview.contextMode` dropdown, 15-agent description.
+
+### Changed
+
+- `npm run check` now includes `npm run lint:eslint` as a final step.
+- TestGen fence regex expanded to match any language identifier (`ts`, `jsx`, `tsx`, etc.), not just `typescript`/`javascript`/`python`.
+- `contextBudgetChars` added to `ReviewConfig` and `DEFAULT_CONFIG` (4000); hardcoded constant removed.
+
+### Tests
+
+- 276 unit tests across 35 test files (up from 264 at v1.0.1).
+- 7 new markdown formatter tests (emoji/no-emoji mode).
+- 5 new cosine similarity tests (`src/core/embedder.ts`).
+
+---
+
 ## [1.0.0] — 2026-06-24
 
 ### Added
