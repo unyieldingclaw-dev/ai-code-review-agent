@@ -1,6 +1,4 @@
 import { BaseAgent } from './base.js'
-import type { LLMProvider } from '../llm/provider.js'
-import type { ReviewConfig } from '../config.js'
 import type { AgentName } from '../schema.js'
 
 export class SecretsAgent extends BaseAgent {

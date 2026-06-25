@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { loadConfig, DEFAULT_CONFIG } from '../../src/core/config.js'
 import { writeFileSync, unlinkSync } from 'fs'
 

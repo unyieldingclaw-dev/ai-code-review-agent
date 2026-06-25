@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { writeFileSync, unlinkSync } from 'fs'
 import { filterDiff, loadIgnorePatterns, IgnorePatterns } from '../../src/core/ignoreFilter.js'
 
@@ -56,7 +56,7 @@ describe('loadIgnorePatterns', () => {
   it('merges .aiignore file with extraPaths', () => {
     writeFileSync(tmpFile, '# comment\ndist/\n*.log\n')
     try {
-      const patterns = loadIgnorePatterns(
+      const _patterns = loadIgnorePatterns(
         process.cwd().replace(/\\/g, '/') + '/' + tmpFile + '..',
         ['extra']
       )

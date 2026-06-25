@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { BaseAgent } from '../../src/core/agents/base.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
-import type { ReviewInput } from '../../src/core/schema.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 
 // Concrete subclass for testing

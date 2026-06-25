@@ -10,7 +10,6 @@ import type {
   GeneratedTestFile,
   AgentProgressEvent,
   SanitizerMetadata,
-  PolicyResult,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
 import { loadAgentContext } from './contextLoader.js'

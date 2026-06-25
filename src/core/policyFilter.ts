@@ -12,7 +12,6 @@ function matchPattern(filePath: string, pattern: string): boolean {
   const hasSlash = normalised.includes('/')
   const regexStr = normalised
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    // eslint-disable-next-line no-control-regex
     .replace(/\*\*/g, '\x00')
     .replace(/\*/g, '[^/]*')
     .replace(/\?/g, '[^/]')

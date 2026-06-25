@@ -47,7 +47,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:eslint": "eslint src/ tests/",
-    "check": "npm test && npm run typecheck && npm run build && npm run format:check"
+    "check": "npm test && npm run typecheck && npm run build && npm run format:check && npm run lint:eslint"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

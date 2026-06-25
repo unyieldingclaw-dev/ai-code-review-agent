@@ -79,7 +79,6 @@ function matchPattern(filePath: string, pattern: string): boolean {
   // Convert gitignore glob to regex
   const regexStr = normalised
     .replace(/[.+^${}()|[\]\\]/g, '\\$&') // escape regex special chars
-    // eslint-disable-next-line no-control-regex
     .replace(/\*\*/g, '\x00') // placeholder for **
     .replace(/\*/g, '[^/]*') // * = non-slash run
     .replace(/\?/g, '[^/]') // ? = one non-slash char

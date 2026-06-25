@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { OrchestratorAgent } from '../../src/core/agents/orchestrator.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import type { Finding } from '../../src/core/schema.js'
+import type { LLMProvider } from '../../src/core/llm/provider.js'
 import { vi } from 'vitest'
 
 const makeProvider = () => ({
@@ -230,7 +231,10 @@ describe('OrchestratorAgent', () => {
 })
 
 describe('OrchestratorAgent.synthesize — hallucinationCrossCheck', () => {
-  const orchestrator = new OrchestratorAgent(null as any, { ...DEFAULT_CONFIG, maxFindings: 50 })
+  const orchestrator = new OrchestratorAgent(null as unknown as LLMProvider, {
+    ...DEFAULT_CONFIG,
+    maxFindings: 50,
+  })
 
   it('does NOT downgrade a solo Critical finding from a deterministic source (gitleaks)', () => {
     const findings: Finding[] = [

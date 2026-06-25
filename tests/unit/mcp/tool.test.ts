@@ -1,6 +1,7 @@
 // tests/unit/mcp/tool.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { runReviewTool } from '../../../src/mcp/tool.js'
+import type { SpawnSyncReturns } from 'child_process'
 
 // Mock child_process so tests never shell out
 vi.mock('child_process', () => ({
@@ -64,7 +65,7 @@ describe('runReviewTool', () => {
     mockSpawnSync.mockReturnValue({
       status: 0,
       stdout: 'diff --git a/f.ts b/f.ts\n+line',
-    } as any)
+    } as unknown as SpawnSyncReturns<string>)
     await runReviewTool({})
     expect(mockSpawnSync).toHaveBeenCalledWith(
       'git',
@@ -75,8 +76,11 @@ describe('runReviewTool', () => {
 
   it('falls back to git diff HEAD when no staged changes', async () => {
     mockSpawnSync
-      .mockReturnValueOnce({ status: 0, stdout: '' } as any) // first call: git diff --cached → empty
-      .mockReturnValueOnce({ status: 0, stdout: 'diff --git a/f.ts b/f.ts\n+line' } as any) // second call: git diff HEAD
+      .mockReturnValueOnce({ status: 0, stdout: '' } as unknown as SpawnSyncReturns<string>) // first call: git diff --cached → empty
+      .mockReturnValueOnce({
+        status: 0,
+        stdout: 'diff --git a/f.ts b/f.ts\n+line',
+      } as unknown as SpawnSyncReturns<string>) // second call: git diff HEAD
     await runReviewTool({})
     const calls = mockSpawnSync.mock.calls
     expect(calls[0][1]).toContain('--cached')
@@ -84,7 +88,7 @@ describe('runReviewTool', () => {
   })
 
   it('returns empty-diff message when no changes found', async () => {
-    mockSpawnSync.mockReturnValue({ status: 0, stdout: '' } as any)
+    mockSpawnSync.mockReturnValue({ status: 0, stdout: '' } as unknown as SpawnSyncReturns<string>)
     const result = await runReviewTool({})
     expect(result).toContain('No staged changes found')
   })
@@ -93,9 +97,9 @@ describe('runReviewTool', () => {
     mockSpawnSync.mockReturnValue({
       status: 0,
       stdout: 'diff --git a/f.ts b/f.ts\n+line',
-    } as any)
+    } as unknown as SpawnSyncReturns<string>)
     await runReviewTool({ repo_path: '/tmp/myrepo' })
-    const call = mockSpawnSync.mock.calls[0][1] as string[]
+    const _call = mockSpawnSync.mock.calls[0][1] as string[]
     expect(mockSpawnSync.mock.calls[0][0]).toBe('git')
     expect(mockSpawnSync.mock.calls[0][2]).toHaveProperty('encoding', 'utf-8')
   })
@@ -112,13 +116,13 @@ describe('runReviewTool', () => {
     mockSpawnSync.mockReturnValue({
       status: 0,
       stdout: 'diff --git a/f.ts b/f.ts\n+line',
-    } as any)
+    } as unknown as SpawnSyncReturns<string>)
     const { SwarmRunner } = await import('../../../src/core/runner.js')
     vi.mocked(SwarmRunner).mockImplementationOnce(
       () =>
         ({
           run: vi.fn().mockRejectedValue(new Error('LLM provider not available')),
-        }) as any
+        }) as unknown as InstanceType<typeof SwarmRunner>
     )
     const result = await runReviewTool({})
     expect(result).toContain('Ollama is not reachable')
@@ -128,7 +132,7 @@ describe('runReviewTool', () => {
     mockSpawnSync.mockReturnValue({
       status: 0,
       stdout: 'diff --git a/f.ts b/f.ts\n+line',
-    } as any)
+    } as unknown as SpawnSyncReturns<string>)
     const { loadConfig } = await import('../../../src/core/config.js')
     vi.mocked(loadConfig).mockReturnValueOnce({
       model: 'devstral:latest',
@@ -150,9 +154,9 @@ describe('runReviewTool', () => {
       testFiles: [],
       summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
     })
-    vi.mocked(SwarmRunner).mockImplementationOnce((config: any) => {
+    vi.mocked(SwarmRunner).mockImplementationOnce((config: Parameters<typeof SwarmRunner>[0]) => {
       expect(config.agents).not.toContain('testgen')
-      return { run: runMock } as any
+      return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
     })
     await runReviewTool({})
   })
