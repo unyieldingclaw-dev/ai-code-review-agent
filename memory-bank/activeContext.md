@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-06-19
+last-reviewed: 2026-06-25
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,23 +16,26 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-06-19
+**Last Updated**: 2026-06-25
 
 ## Current Focus
 
-**ACR P0 Fixes — Task 2 COMPLETE.** Replaced `src/cli/index.ts`: spawnSync for git calls, `--suggest-tests`/`--write-tests` flags for testgen opt-in, version read from package.json at runtime, context flag validation. 127 unit tests passing. Committed `378f33f`. Next: Task 3 (mcp/tool.ts spawnSync replacement).
+**ACR v1.1.0 shipped.** All planned work complete. 276 unit tests passing, 16/16 calibration, 0 ESLint warnings. Published to npm. GitHub Actions runner (mizzo-local) active via Task Scheduler.
 
 ## What's Working
 
-- Full 16-agent swarm: 11 original + ErrorHandlingAgent + ObservabilityAgent + MigrationSafetyAgent + SecretsAgent + ComplexityAgent + OrchestratorAgent
-- `SwarmRunner` with sanitizer, sequential execution, coverage-first ordering
-- CLI: top-level flags (no subcommand), `--dir`, `--max-lines`, `--ignore`, `--no-sanitize`
-- Confidence scoring: `confidence` (0–100) on Finding, shown in markdown output
-- Confidence-aware hallucination check: solo Critical ≥60% confidence stays Critical; <60% → High
-- Prompt injection sanitizer: strips SYSTEM:, instruction overrides, role-play directives, long base64
-- Calibration CI: `.github/workflows/calibrate.yml` — weekly + release, skips gracefully without Ollama
-- **120 unit tests passing** across 18 test files (includes 15 new MCP tests, 3 new retry tests, 5 new agent tests × 5 agents, 5 new fail-fast/progress tests, 2 new parallel tests)
+- Full 16-agent swarm (15 default + testgen opt-in): all specialists + OrchestratorAgent
+- `SwarmRunner` with policy filtering, context injection, sanitizer, sequential/parallel execution
+- CLI: `--profile`, `--context`, `--context-mode`, `--context-budget`, `--format` (markdown/json/sarif/github-annotations), `--no-emoji`, `--agents`, `--dir`, `--ignore`, `--no-sanitize`, `--suggest-tests`, `--write-tests`
+- Finding schema: domain, evidence, impact, recommendation, blocking, source, lineEnd (MB/PMB-aligned)
+- Semantic context: `--context-mode semantic` uses nomic-embed-text to rank memory-bank files by diff similarity
+- Policy layer: `agentPolicy` per-agent include/exclude glob path filtering
+- `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
+- ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
+- Calibration CI: self-hosted runner, continue-on-error, 10min timeout
+- **276 unit tests** across 35 test files
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
+- **npm**: `ai-review-agent@1.1.0`
 
 ## Guardrails (All Complete)
 
