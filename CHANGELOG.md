@@ -3,6 +3,74 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0] — 2026-06-24
+
+### Added
+
+- **`--profile` flag**: named agent subsets — `fast` (3 agents), `full` (15 agents), `change-review` (8 agents), `ui`, `migration`, `security`. `--agents` overrides `--profile`.
+- **`--context memory-bank`**: loads per-agent project context from `memory-bank/` files before each agent runs. Budget-bounded at 4000 chars per agent by default.
+- **`--format sarif`**: SARIF 2.1.0 output for upload to GitHub Code Scanning.
+- **`--format github-annotations`**: GitHub Actions workflow annotation output (`::error`/`::warning`/`::notice` per finding).
+- **Policy layer** (`agentPolicy` config): per-agent include/exclude glob path filtering. Policy footer added to JSON and markdown output.
+- **Extended Finding schema**: `domain`, `evidence`, `impact`, `recommendation`, `blocking`, `source`, `lineEnd` fields. `suggestion` kept as deprecated alias.
+- All 15 specialist agent system prompts updated to emit new schema fields.
+- `tests/helpers/requireOllama.ts`: visible error box with solution steps when Ollama or model is unavailable.
+- Unit tests for all 16 specialist agents (10 previously untested core agents now covered).
+- `src/core/contextLoader.ts`: per-agent memory-bank file routing with budget enforcement.
+- `src/core/policyFilter.ts`: glob-based agent path filtering (no external dependency).
+- `src/core/profiles.ts`: PROFILES map + `resolveProfile()`.
+- `npm run check` script: single command runs tests + typecheck + build + format:check.
+
+### Changed
+
+- **testgen is now opt-in**: removed from `DEFAULT_CONFIG.agents`. Enable with `--suggest-tests` (report only) or `--write-tests` (writes files).
+- Anthropic provider removed — ACR is Ollama-only. `provider` type narrowed to `'ollama'`.
+- Removed dead config fields: `anthropicModel`, `contextLines`.
+- MCP server version now reads from `package.json` at runtime (was hardcoded `'0.6.0'`).
+- Shell injection fix: `execSync` with string interpolation replaced by `spawnSync` with array args.
+- Calibration CI: `continue-on-error: true` + `timeout-minutes: 10` — releases not blocked when runner is offline.
+
+### Removed
+
+- `@anthropic-ai/sdk` from `optionalDependencies` — Anthropic provider was never implemented.
+
+### Tests
+
+- 255 unit tests across 34 test files (up from 112 at v0.8.0).
+- 16/16 calibration PASS.
+
+---
+
+## [0.9.4] — 2026-06-19
+
+### Added
+
+- `--parallel` flag: runs specialist agents via `Promise.allSettled` for faster review.
+- Two-phase `AgentProgressEvent`: `start` and `end` events with findings and elapsed time.
+
+### Tests
+
+- 120 unit tests (up from 117).
+
+---
+
+## [0.9.0–0.9.3] — 2026-06-18 to 2026-06-19
+
+### Added
+
+- `--fail-fast` flag: stops swarm on first finding at or above `--fail-on` threshold.
+- `earlyExit` field on `ReviewResult`.
+- stderr progress renderer with per-agent start/end events.
+
+### Fixed
+
+- Calibration prompt tuning: design (SOLID principle naming), complexity (concise recommendations).
+- Balanced-bracket JSON parser fix in `base.ts`.
+
+### Tests
+
+- 117 unit tests.
+
 ## [0.8.0] — 2026-06-15
 
 ### Added
