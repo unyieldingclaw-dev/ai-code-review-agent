@@ -258,6 +258,27 @@ Create `ai-review.config.json` in your project root to override defaults:
 
 - `preferredSecretsScanner`: `"gitleaks"` (default when installed) or `"trufflehog"` or `"none"` — controls which external scanner SecretsAgent prefers. Falls back to LLM-only when the tool is not found.
 - `complexityThreshold`: Cyclomatic complexity threshold for ComplexityAgent (default: `10`). Functions exceeding this value are flagged. Used when `lizard` is installed; LLM estimates when not.
+- `agentPolicy`: Per-agent include/exclude path rules. An agent runs only when at least one changed file matches its `include` patterns; it is skipped when **all** changed files match its `exclude` patterns. Uses gitignore-style globs. Omitting a rule means the agent always runs.
+
+**`agentPolicy` example** — skip `license` on non-lockfile changes, restrict `migration-safety` to migration paths:
+
+```json
+{
+  "agentPolicy": {
+    "license": {
+      "include": ["package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "LICENSE*"]
+    },
+    "migration-safety": {
+      "include": ["**/migrations/**", "**/schema/**", "**/*.sql"]
+    },
+    "security": {
+      "exclude": ["docs/**", "*.md"]
+    }
+  }
+}
+```
+
+Policy decisions appear in `--format json` output under `result.policy`. They are also summarized in `--format markdown` output when any agents are skipped.
 
 **Optional dependencies (enhance specific agents):**
 
