@@ -12,23 +12,24 @@
 
 ## File Map
 
-| Operation | File |
-|---|---|
-| Modify | `src/core/config.ts` — add `contextBudgetChars?: number` |
-| Modify | `src/core/contextLoader.ts` — accept budget param, remove hardcoded constant |
-| Modify | `src/core/runner.ts` — pass `config.contextBudgetChars` to `loadAgentContext` |
-| Modify | `src/cli/index.ts` — add `--context-budget <n>` CLI flag |
-| Modify | `src/core/agents/base.ts` — clamp `lineEnd` in map step |
-| Modify | `src/cli/formatters/sarif.ts` — defensive lineEnd check |
-| Modify | `src/core/agents/orchestrator.ts` — add AGENT_PRIORITY comment |
-| Modify | `tests/unit/contextLoader.test.ts` — verify custom budget respected |
-| Modify | `tests/unit/baseAgent.test.ts` — verify lineEnd clamping |
+| Operation | File                                                                          |
+| --------- | ----------------------------------------------------------------------------- |
+| Modify    | `src/core/config.ts` — add `contextBudgetChars?: number`                      |
+| Modify    | `src/core/contextLoader.ts` — accept budget param, remove hardcoded constant  |
+| Modify    | `src/core/runner.ts` — pass `config.contextBudgetChars` to `loadAgentContext` |
+| Modify    | `src/cli/index.ts` — add `--context-budget <n>` CLI flag                      |
+| Modify    | `src/core/agents/base.ts` — clamp `lineEnd` in map step                       |
+| Modify    | `src/cli/formatters/sarif.ts` — defensive lineEnd check                       |
+| Modify    | `src/core/agents/orchestrator.ts` — add AGENT_PRIORITY comment                |
+| Modify    | `tests/unit/contextLoader.test.ts` — verify custom budget respected           |
+| Modify    | `tests/unit/baseAgent.test.ts` — verify lineEnd clamping                      |
 
 ---
 
 ### Task 1: Make contextBudgetChars configurable
 
 **Files:**
+
 - Modify: `src/core/config.ts`
 - Modify: `src/core/contextLoader.ts`
 - Modify: `src/core/runner.ts`
@@ -42,7 +43,7 @@ Open `tests/unit/contextLoader.test.ts`. Add this test inside the existing descr
 ```ts
 it('respects a custom budget smaller than default', () => {
   setup({ 'techContext.md': 'x'.repeat(500) })
-  const result = loadAgentContext(TMP, 'security', 200)  // 200-char budget
+  const result = loadAgentContext(TMP, 'security', 200) // 200-char budget
   expect(result.truncated).toBe(true)
   expect(result.content.length).toBeLessThan(300) // content + header overhead
   expect(result.estimatedTokens).toBeLessThanOrEqual(55) // ~200 chars / 4
@@ -70,11 +71,13 @@ Expected: FAIL — `loadAgentContext` currently doesn't accept a budget paramete
 Read the file first. Then make two surgical changes:
 
 **3a.** Add one line to `ReviewConfig` interface (after the `sanitize` field):
+
 ```ts
-  contextBudgetChars: number
+contextBudgetChars: number
 ```
 
 **3b.** Add one line to `DEFAULT_CONFIG` (after `sanitize: true`):
+
 ```ts
   contextBudgetChars: 4000,
 ```
@@ -104,7 +107,7 @@ Replace all references to `CONTEXT_BUDGET_CHARS` with `budgetChars`:
 and:
 
 ```ts
-  const chunk = raw.length <= remaining ? raw : raw.slice(0, remaining)
+const chunk = raw.length <= remaining ? raw : raw.slice(0, remaining)
 ```
 
 (There are 2 references to `CONTEXT_BUDGET_CHARS` — replace both with `budgetChars`.)
@@ -114,9 +117,10 @@ and:
 Find the `loadAgentContext` call (in the `withContext` helper or wherever it's called). Pass the budget from config:
 
 ```ts
-const ctx = contextMode === 'memory-bank' && projectPath
-  ? loadAgentContext(projectPath, agent.name, config.contextBudgetChars)
-  : { content: '', filesLoaded: [], truncated: false, estimatedTokens: 0 }
+const ctx =
+  contextMode === 'memory-bank' && projectPath
+    ? loadAgentContext(projectPath, agent.name, config.contextBudgetChars)
+    : { content: '', filesLoaded: [], truncated: false, estimatedTokens: 0 }
 ```
 
 - [ ] **Step 6: Update src/cli/index.ts — add --context-budget flag**
@@ -130,6 +134,7 @@ Add this option to the Commander chain (after `--context`):
 Add `contextBudget?: number` to the options type.
 
 In the action handler, after loading config and setting other options:
+
 ```ts
 if (options.contextBudget !== undefined) config.contextBudgetChars = options.contextBudget
 ```
@@ -165,6 +170,7 @@ git commit -m "feat: make contextBudgetChars configurable (default 4000); add --
 ### Task 2: Clamp lineEnd in BaseAgent and SARIF formatter
 
 **Files:**
+
 - Modify: `src/core/agents/base.ts`
 - Modify: `src/cli/formatters/sarif.ts`
 - Modify: `tests/unit/baseAgent.test.ts`
@@ -175,22 +181,38 @@ Add to `tests/unit/baseAgent.test.ts`:
 
 ```ts
 it('clamps lineEnd to line when lineEnd < line', async () => {
-  const raw = JSON.stringify([{
-    severity: 'high', basis: 'VERIFIED', confidence: 80,
-    file: 'src/a.ts', line: 42, lineEnd: 5,  // lineEnd < line — invalid
-    title: 'Test', detail: 'Detail', suggestion: 'Fix it'
-  }])
+  const raw = JSON.stringify([
+    {
+      severity: 'high',
+      basis: 'VERIFIED',
+      confidence: 80,
+      file: 'src/a.ts',
+      line: 42,
+      lineEnd: 5, // lineEnd < line — invalid
+      title: 'Test',
+      detail: 'Detail',
+      suggestion: 'Fix it',
+    },
+  ])
   const findings = await new SecurityAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
   expect(findings[0].lineEnd).toBeGreaterThanOrEqual(findings[0].line)
   expect(findings[0].lineEnd).toBe(42) // clamped to line value
 })
 
 it('preserves valid lineEnd when lineEnd >= line', async () => {
-  const raw = JSON.stringify([{
-    severity: 'high', basis: 'VERIFIED', confidence: 80,
-    file: 'src/a.ts', line: 10, lineEnd: 20,  // valid
-    title: 'Test', detail: 'Detail', suggestion: 'Fix it'
-  }])
+  const raw = JSON.stringify([
+    {
+      severity: 'high',
+      basis: 'VERIFIED',
+      confidence: 80,
+      file: 'src/a.ts',
+      line: 10,
+      lineEnd: 20, // valid
+      title: 'Test',
+      detail: 'Detail',
+      suggestion: 'Fix it',
+    },
+  ])
   const findings = await new SecurityAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
   expect(findings[0].lineEnd).toBe(20)
 })
@@ -269,6 +291,7 @@ git commit -m "fix: clamp lineEnd >= line in BaseAgent and SARIF formatter"
 ### Task 3: Document AGENT_PRIORITY in orchestrator
 
 **Files:**
+
 - Modify: `src/core/agents/orchestrator.ts`
 
 - [ ] **Step 1: Add comment above AGENT_PRIORITY**

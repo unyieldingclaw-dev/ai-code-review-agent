@@ -12,16 +12,17 @@
 
 ## File Map
 
-| Operation | File |
-|---|---|
-| Create | `tests/unit/adapters/github.test.ts` |
-| Modify | `vitest.config.ts:12-14` — remove coverage exclusions |
+| Operation | File                                                  |
+| --------- | ----------------------------------------------------- |
+| Create    | `tests/unit/adapters/github.test.ts`                  |
+| Modify    | `vitest.config.ts:12-14` — remove coverage exclusions |
 
 ---
 
 ### Task 1: Create GitHub adapter tests — buildStepSummary
 
 **Files:**
+
 - Create: `tests/unit/adapters/github.test.ts`
 
 `buildStepSummary` is a pure function — no mocking needed.
@@ -77,9 +78,18 @@ describe('buildStepSummary', () => {
   })
 
   it('renders one row per finding with correct columns', () => {
-    const result = buildStepSummary(makeResult([
-      { severity: 'critical', agent: 'security', file: 'src/a.ts', line: 42, title: 'SQL injection', basis: 'VERIFIED' },
-    ]))
+    const result = buildStepSummary(
+      makeResult([
+        {
+          severity: 'critical',
+          agent: 'security',
+          file: 'src/a.ts',
+          line: 42,
+          title: 'SQL injection',
+          basis: 'VERIFIED',
+        },
+      ])
+    )
     expect(result).toContain('critical')
     expect(result).toContain('security')
     expect(result).toContain('src/a.ts:42')
@@ -88,10 +98,12 @@ describe('buildStepSummary', () => {
   })
 
   it('renders all findings when multiple are present', () => {
-    const result = buildStepSummary(makeResult([
-      { title: 'Finding A', severity: 'high' },
-      { title: 'Finding B', severity: 'medium' },
-    ]))
+    const result = buildStepSummary(
+      makeResult([
+        { title: 'Finding A', severity: 'high' },
+        { title: 'Finding B', severity: 'medium' },
+      ])
+    )
     expect(result).toContain('Finding A')
     expect(result).toContain('Finding B')
     expect(result).toContain('2 findings')
@@ -135,6 +147,7 @@ git commit -m "test: add buildStepSummary tests for GitHub adapter"
 ### Task 2: Add upsertPRComment tests with mocked fetch
 
 **Files:**
+
 - Modify: `tests/unit/adapters/github.test.ts`
 
 - [ ] **Step 1: Add upsertPRComment tests to the existing test file**
@@ -145,11 +158,13 @@ Append these describes after the `buildStepSummary` describe block:
 describe('upsertPRComment', () => {
   const TOKEN = 'ghp_test123'
   const OWNER = 'testowner'
-  const REPO  = 'testrepo'
-  const PR    = 42
+  const REPO = 'testrepo'
+  const PR = 42
 
   // Helper: build a mock fetch that returns different responses for each call
-  function mockFetch(...responses: Array<{ ok: boolean; status?: number; json?: () => Promise<unknown> }>) {
+  function mockFetch(
+    ...responses: Array<{ ok: boolean; status?: number; json?: () => Promise<unknown> }>
+  ) {
     let call = 0
     return vi.fn().mockImplementation(() => {
       const r = responses[call++] ?? { ok: true, status: 200, json: async () => [] }
@@ -194,7 +209,11 @@ describe('upsertPRComment', () => {
     // Call 1: list comments → one existing bot comment
     // Call 2: PATCH existing comment → 200 ok
     const fetchMock = mockFetch(
-      { ok: true, status: 200, json: async () => [{ id: 99, body: `${COMMENT_MARKER}\nOld content` }] },
+      {
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 99, body: `${COMMENT_MARKER}\nOld content` }],
+      },
       { ok: true, status: 200 }
     )
     vi.stubGlobal('fetch', fetchMock)
@@ -228,8 +247,9 @@ describe('upsertPRComment', () => {
     const fetchMock = mockFetch({ ok: false, status: 403 })
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(upsertPRComment(TOKEN, OWNER, REPO, PR, 'body'))
-      .rejects.toThrow('list comments failed: 403')
+    await expect(upsertPRComment(TOKEN, OWNER, REPO, PR, 'body')).rejects.toThrow(
+      'list comments failed: 403'
+    )
   })
 
   it('throws when create comment call fails', async () => {
@@ -239,8 +259,9 @@ describe('upsertPRComment', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(upsertPRComment(TOKEN, OWNER, REPO, PR, 'body'))
-      .rejects.toThrow('create comment failed: 422')
+    await expect(upsertPRComment(TOKEN, OWNER, REPO, PR, 'body')).rejects.toThrow(
+      'create comment failed: 422'
+    )
   })
 
   it('throws when update comment call fails', async () => {
@@ -250,8 +271,9 @@ describe('upsertPRComment', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(upsertPRComment(TOKEN, OWNER, REPO, PR, 'body'))
-      .rejects.toThrow('update comment failed: 500')
+    await expect(upsertPRComment(TOKEN, OWNER, REPO, PR, 'body')).rejects.toThrow(
+      'update comment failed: 500'
+    )
   })
 
   it('sends correct Authorization header', async () => {
@@ -291,6 +313,7 @@ git commit -m "test: add upsertPRComment tests with mocked fetch for GitHub adap
 ### Task 3: Remove coverage exclusions from vitest.config.ts
 
 **Files:**
+
 - Modify: `vitest.config.ts`
 
 - [ ] **Step 1: Update vitest.config.ts**
@@ -309,9 +332,9 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json'],
       include: ['src/**/*.ts'],
-      exclude: ['src/cli/**', 'src/adapters/**']  // ← REMOVE these two entries
-    }
-  }
+      exclude: ['src/cli/**', 'src/adapters/**'], // ← REMOVE these two entries
+    },
+  },
 })
 ```
 
@@ -329,8 +352,8 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json'],
       include: ['src/**/*.ts'],
-    }
-  }
+    },
+  },
 })
 ```
 

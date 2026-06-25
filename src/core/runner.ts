@@ -181,7 +181,11 @@ export class SwarmRunner {
     // Helper: build per-agent ReviewInput with optional context prepended
     const withContext = (agentName: AgentName): ReviewInput => {
       if (contextMode !== 'memory-bank' || !input.projectPath) return input
-      const ctx: ContextResult = loadAgentContext(input.projectPath, agentName, this.config.contextBudgetChars)
+      const ctx: ContextResult = loadAgentContext(
+        input.projectPath,
+        agentName,
+        this.config.contextBudgetChars
+      )
       if (ctx.filesLoaded.length > 0) {
         allFilesLoaded.push(...ctx.filesLoaded)
         if (ctx.truncated) anyTruncated = true

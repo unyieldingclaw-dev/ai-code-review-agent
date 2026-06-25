@@ -10,7 +10,7 @@ on:
 jobs:
   calibrate:
     runs-on: self-hosted
-    timeout-minutes: 10     # fail fast if no runner available (not 24h)
+    timeout-minutes: 10 # fail fast if no runner available (not 24h)
     continue-on-error: true # non-blocking — release publishes even if runner is offline
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'

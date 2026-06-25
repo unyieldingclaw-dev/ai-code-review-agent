@@ -31,6 +31,7 @@ A comprehensive audit of ACR v1.0.0 surfaced 30 findings across correctness, tes
 **Fix:** Expand the filter predicate to check all required Finding fields. For fields that have safe defaults (domain, evidence, impact, blocking, source), fill them in the map step rather than rejecting the finding — rejection causes false negatives; defaulting is more robust.
 
 Specifically:
+
 - Validate presence of `domain` — if missing, fill from `agentDefaultDomain(this.name)` (already exists)
 - Validate `evidence` — if missing, default to `f.detail`
 - Validate `impact` — if missing, default to `''`
@@ -68,12 +69,14 @@ These defaults already exist in the map step but are applied even when the field
 **Fix:** Create tests using `vi.stubGlobal('fetch', ...)` to mock the GitHub API. Cover:
 
 For `buildStepSummary()` (pure function — no mocking needed):
+
 - Empty findings → table with "No findings" row
 - Single finding → correct row format (severity, agent, file:line, title, basis)
 - Multiple findings across severities → all rows present
 - Duration formatted correctly
 
 For `upsertPRComment()` (mock fetch):
+
 - Creates new comment when no existing comment matches `COMMENT_MARKER`
 - Patches existing comment when COMMENT_MARKER found in comment body
 - Prepends COMMENT_MARKER to body in both create and update
@@ -163,6 +166,7 @@ For `upsertPRComment()` (mock fetch):
 **Problem:** `CONTEXT_BUDGET_CHARS = 4000` is a hardcoded magic number.
 
 **Fix:**
+
 - Add `contextBudgetChars?: number` to `ReviewConfig` (default 4000)
 - Pass it from runner through to `loadAgentContext(projectPath, agentName, budget)`
 - Add `--context-budget <n>` CLI flag
@@ -176,6 +180,7 @@ For `upsertPRComment()` (mock fetch):
 **Problem:** `Finding.lineEnd` has no constraint that `lineEnd >= line`. Inverted values produce invalid SARIF.
 
 **Fix:**
+
 - In `BaseAgent.validateFindings()` map step: clamp `lineEnd` to `Math.max(f.line, f.lineEnd ?? f.line)`
 - In SARIF formatter: use `endLine: f.lineEnd && f.lineEnd >= f.line ? f.lineEnd : f.line` (defensive, even after the BaseAgent fix)
 
@@ -207,12 +212,12 @@ For `upsertPRComment()` (mock fetch):
 
 Execute tracks sequentially within each session. Each track is independent — Track 2 can start after Track 1 commits land.
 
-| Track | Files touched | Tests added | Estimated commits |
-|---|---|---|---|
-| 1 — Correctness | base.ts, sanitizer.ts | 3-4 | 2 |
-| 2 — Test coverage | github.test.ts, vitest.config.ts | 10-12 | 2 |
-| 3 — Documentation | CHANGELOG.md, package.json, profiles.ts | 0 | 2 |
-| 4 — Cleanup | config.ts, contextLoader.ts, index.ts, base.ts, sarif.ts, orchestrator.ts | 2 | 3 |
+| Track             | Files touched                                                             | Tests added | Estimated commits |
+| ----------------- | ------------------------------------------------------------------------- | ----------- | ----------------- |
+| 1 — Correctness   | base.ts, sanitizer.ts                                                     | 3-4         | 2                 |
+| 2 — Test coverage | github.test.ts, vitest.config.ts                                          | 10-12       | 2                 |
+| 3 — Documentation | CHANGELOG.md, package.json, profiles.ts                                   | 0           | 2                 |
+| 4 — Cleanup       | config.ts, contextLoader.ts, index.ts, base.ts, sarif.ts, orchestrator.ts | 2           | 3                 |
 
 ## Acceptance Criteria
 

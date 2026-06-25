@@ -12,17 +12,18 @@
 
 ## File Map
 
-| Operation | File |
-|---|---|
-| Modify | `src/core/sanitizer.ts` — apply all matching patterns, not just first |
-| Modify | `tests/unit/sanitizer.test.ts` — add multi-pattern test |
-| Modify | `tests/unit/baseAgent.test.ts` — add default-field tests |
+| Operation | File                                                                  |
+| --------- | --------------------------------------------------------------------- |
+| Modify    | `src/core/sanitizer.ts` — apply all matching patterns, not just first |
+| Modify    | `tests/unit/sanitizer.test.ts` — add multi-pattern test               |
+| Modify    | `tests/unit/baseAgent.test.ts` — add default-field tests              |
 
 ---
 
 ### Task 1: Fix sanitizer — redact all matching patterns on a line
 
 **Files:**
+
 - Modify: `src/core/sanitizer.ts:40-52`
 - Modify: `tests/unit/sanitizer.test.ts`
 
@@ -64,6 +65,7 @@ Expected: 2 new tests FAIL — current code returns on first pattern match and d
 - [ ] **Step 3: Fix src/core/sanitizer.ts**
 
 Replace the inner loop body (lines 44-49) so it:
+
 1. Checks ALL patterns per line (no early return)
 2. Applies each matching pattern globally (handles multiple occurrences)
 
@@ -124,6 +126,7 @@ git commit -m "fix: sanitizer — redact all matching patterns per line, not jus
 ### Task 2: Add BaseAgent validation default-field tests
 
 **Files:**
+
 - Modify: `tests/unit/baseAgent.test.ts`
 
 The `validateFindings()` in `base.ts` already fills defaults correctly (domain, evidence, impact, blocking, source). This task adds tests that confirm the behavior — catching any future regression if the defaults are removed.
@@ -134,60 +137,109 @@ Open `tests/unit/baseAgent.test.ts`. Read the existing tests to find the right d
 
 ```ts
 it('fills domain from agentDefaultDomain when LLM omits it', async () => {
-  const raw = JSON.stringify([{
-    severity: 'high', basis: 'VERIFIED', confidence: 80,
-    file: 'src/a.ts', line: 1,
-    title: 'Test', detail: 'Detail', suggestion: 'Fix it'
-    // domain intentionally omitted
-  }])
+  const raw = JSON.stringify([
+    {
+      severity: 'high',
+      basis: 'VERIFIED',
+      confidence: 80,
+      file: 'src/a.ts',
+      line: 1,
+      title: 'Test',
+      detail: 'Detail',
+      suggestion: 'Fix it',
+      // domain intentionally omitted
+    },
+  ])
   const findings = await new SecurityAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
   expect(findings[0].domain).toBe('Security')
   expect(findings[0].domain).not.toBeUndefined()
 })
 
 it('fills evidence from detail when LLM omits evidence', async () => {
-  const raw = JSON.stringify([{
-    severity: 'high', basis: 'VERIFIED', confidence: 80,
-    file: 'src/a.ts', line: 1,
-    title: 'Test', detail: 'The detail text', suggestion: 'Fix it'
-    // evidence intentionally omitted
-  }])
+  const raw = JSON.stringify([
+    {
+      severity: 'high',
+      basis: 'VERIFIED',
+      confidence: 80,
+      file: 'src/a.ts',
+      line: 1,
+      title: 'Test',
+      detail: 'The detail text',
+      suggestion: 'Fix it',
+      // evidence intentionally omitted
+    },
+  ])
   const findings = await new SecurityAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
   expect(findings[0].evidence).toBe('The detail text')
 })
 
 it('fills impact as empty string when LLM omits it', async () => {
-  const raw = JSON.stringify([{
-    severity: 'high', basis: 'VERIFIED', confidence: 80,
-    file: 'src/a.ts', line: 1,
-    title: 'Test', detail: 'Detail', suggestion: 'Fix it'
-    // impact intentionally omitted
-  }])
+  const raw = JSON.stringify([
+    {
+      severity: 'high',
+      basis: 'VERIFIED',
+      confidence: 80,
+      file: 'src/a.ts',
+      line: 1,
+      title: 'Test',
+      detail: 'Detail',
+      suggestion: 'Fix it',
+      // impact intentionally omitted
+    },
+  ])
   const findings = await new SecurityAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
   expect(findings[0].impact).toBe('')
   expect(findings[0].impact).not.toBeUndefined()
 })
 
 it('fills blocking based on severity when LLM omits it', async () => {
-  const critRaw = JSON.stringify([{
-    severity: 'critical', basis: 'VERIFIED', confidence: 90,
-    file: 'src/a.ts', line: 1, title: 'T', detail: 'D', suggestion: 'S'
-  }])
-  const highRaw = JSON.stringify([{
-    severity: 'high', basis: 'VERIFIED', confidence: 80,
-    file: 'src/a.ts', line: 1, title: 'T', detail: 'D', suggestion: 'S'
-  }])
-  const critFindings = await new SecurityAgent(makeProvider(critRaw), DEFAULT_CONFIG).run({ diff: 'diff' })
-  const highFindings = await new SecurityAgent(makeProvider(highRaw), DEFAULT_CONFIG).run({ diff: 'diff' })
-  expect(critFindings[0].blocking).toBe(true)   // critical → blocking
-  expect(highFindings[0].blocking).toBe(false)  // high → not blocking (only critical defaults to true)
+  const critRaw = JSON.stringify([
+    {
+      severity: 'critical',
+      basis: 'VERIFIED',
+      confidence: 90,
+      file: 'src/a.ts',
+      line: 1,
+      title: 'T',
+      detail: 'D',
+      suggestion: 'S',
+    },
+  ])
+  const highRaw = JSON.stringify([
+    {
+      severity: 'high',
+      basis: 'VERIFIED',
+      confidence: 80,
+      file: 'src/a.ts',
+      line: 1,
+      title: 'T',
+      detail: 'D',
+      suggestion: 'S',
+    },
+  ])
+  const critFindings = await new SecurityAgent(makeProvider(critRaw), DEFAULT_CONFIG).run({
+    diff: 'diff',
+  })
+  const highFindings = await new SecurityAgent(makeProvider(highRaw), DEFAULT_CONFIG).run({
+    diff: 'diff',
+  })
+  expect(critFindings[0].blocking).toBe(true) // critical → blocking
+  expect(highFindings[0].blocking).toBe(false) // high → not blocking (only critical defaults to true)
 })
 
 it('fills source as llm when LLM omits it', async () => {
-  const raw = JSON.stringify([{
-    severity: 'high', basis: 'VERIFIED', confidence: 80,
-    file: 'src/a.ts', line: 1, title: 'T', detail: 'D', suggestion: 'S'
-  }])
+  const raw = JSON.stringify([
+    {
+      severity: 'high',
+      basis: 'VERIFIED',
+      confidence: 80,
+      file: 'src/a.ts',
+      line: 1,
+      title: 'T',
+      detail: 'D',
+      suggestion: 'S',
+    },
+  ])
   const findings = await new SecurityAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
   expect(findings[0].source).toBe('llm')
   expect(findings[0].source).not.toBeUndefined()

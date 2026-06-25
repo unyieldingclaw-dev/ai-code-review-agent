@@ -12,17 +12,18 @@
 
 ## File Map
 
-| Operation | File |
-|---|---|
-| Modify | `CHANGELOG.md` — add v0.9.x and v1.0.0 entries |
-| Modify | `package.json` — remove `@anthropic-ai/sdk` from optionalDependencies |
-| Modify | `src/core/profiles.ts` — add JSDoc to PROFILES |
+| Operation | File                                                                  |
+| --------- | --------------------------------------------------------------------- |
+| Modify    | `CHANGELOG.md` — add v0.9.x and v1.0.0 entries                        |
+| Modify    | `package.json` — remove `@anthropic-ai/sdk` from optionalDependencies |
+| Modify    | `src/core/profiles.ts` — add JSDoc to PROFILES                        |
 
 ---
 
 ### Task 1: Add CHANGELOG entries
 
 **Files:**
+
 - Modify: `CHANGELOG.md`
 
 - [ ] **Step 1: Insert v1.0.0 and v0.9.x entries at the top of CHANGELOG.md**
@@ -129,7 +130,6 @@ The current CHANGELOG starts at `## [0.8.0]`. Insert the following block immedia
 ### Tests
 
 - 117 unit tests (up from 112): added 5 fail-fast/progress tests.
-
 ```
 
 - [ ] **Step 2: Verify the file looks correct**
@@ -154,6 +154,7 @@ git commit -m "docs: add CHANGELOG entries for v0.9.x and v1.0.0"
 ### Task 2: Remove @anthropic-ai/sdk from package.json
 
 **Files:**
+
 - Modify: `package.json`
 
 - [ ] **Step 1: Remove the optionalDependencies block**
@@ -199,11 +200,13 @@ git commit -m "chore: remove @anthropic-ai/sdk from optionalDependencies (provid
 ### Task 3: Add JSDoc to PROFILES
 
 **Files:**
+
 - Modify: `src/core/profiles.ts`
 
 - [ ] **Step 1: Add JSDoc block above the PROFILES export**
 
 Current `src/core/profiles.ts` line 3:
+
 ```ts
 export const PROFILES: Record<string, AgentName[]> = {
 ```
