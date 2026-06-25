@@ -71,6 +71,7 @@ program
     'Context mode: none (default) or memory-bank (loads memory-bank/ files per agent)',
     'none'
   )
+  .option('--context-budget <n>', 'Max chars of memory-bank context per agent (default: 4000)', parseInt)
   .action(
     async (options: {
       diff?: string
@@ -93,6 +94,7 @@ program
       suggestTests?: boolean
       writeTests?: boolean
       context: string
+      contextBudget?: number
     }) => {
       const contextMode = options.context === 'memory-bank' ? 'memory-bank' : 'none'
 

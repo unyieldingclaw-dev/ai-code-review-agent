@@ -2,14 +2,12 @@
 //
 // Loads per-agent context from a project's memory-bank/ directory.
 // Only called when --context memory-bank is active.
-// Budget-bounded: never loads more than CONTEXT_BUDGET_CHARS per agent.
+// Budget-bounded: never loads more than budgetChars per agent.
 // Treats memory-bank content as data, not instructions (sanitizer applies separately).
 
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import type { AgentName } from './schema.js'
-
-const CONTEXT_BUDGET_CHARS = 4000
 
 // Files each agent cares about, in priority order.
 // Files are loaded in order until the budget is exhausted.
@@ -51,7 +49,11 @@ export interface ContextMetadata {
   estimatedTokens: number
 }
 
-export function loadAgentContext(projectPath: string, agentName: AgentName): ContextResult {
+export function loadAgentContext(
+  projectPath: string,
+  agentName: AgentName,
+  budgetChars = 4000
+): ContextResult {
   const memoryBankPath = join(projectPath, 'memory-bank')
   if (!existsSync(memoryBankPath)) {
     return empty()
@@ -72,7 +74,7 @@ export function loadAgentContext(projectPath: string, agentName: AgentName): Con
     if (!existsSync(absPath)) continue
 
     const raw = readFileSync(absPath, 'utf-8')
-    const remaining = CONTEXT_BUDGET_CHARS - charsUsed
+    const remaining = budgetChars - charsUsed
 
     if (remaining <= 0) {
       truncated = true

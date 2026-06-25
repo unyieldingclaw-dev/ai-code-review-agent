@@ -72,4 +72,18 @@ describe('loadAgentContext', () => {
     expect(result.filesLoaded).not.toContain('memory-bank/projectbrief.md')
     expect(result.truncated).toBe(false)
   })
+
+  it('respects a custom budget smaller than default', () => {
+    setup({ 'techContext.md': 'x'.repeat(500) })
+    const result = loadAgentContext(TMP, 'security', 200)
+    expect(result.truncated).toBe(true)
+    expect(result.estimatedTokens).toBeLessThanOrEqual(55)
+  })
+
+  it('loads full file when budget is large enough', () => {
+    setup({ 'techContext.md': 'x'.repeat(100) })
+    const result = loadAgentContext(TMP, 'security', 4000)
+    expect(result.truncated).toBe(false)
+    expect(result.filesLoaded).toHaveLength(1)
+  })
 })
