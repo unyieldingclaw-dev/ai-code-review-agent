@@ -314,3 +314,80 @@ describe('OrchestratorAgent.synthesize — hallucinationCrossCheck', () => {
     expect(criticalFinding?.severity).toBe('critical')
   })
 })
+
+describe('OrchestratorAgent.synthesize — crossReference breaking-change escalation', () => {
+  it('escalates breaking-change severity when correctness finding is at same location', () => {
+    const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+    const findings = [
+      makeFinding({
+        id: 'bc-0',
+        agent: 'breaking-change',
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'src/api.ts',
+        line: 10,
+      }),
+      makeFinding({
+        id: 'c-0',
+        agent: 'correctness',
+        severity: 'medium',
+        basis: 'VERIFIED',
+        file: 'src/api.ts',
+        line: 13, // within 5-line window but different location
+      }),
+    ]
+    const result = orch.synthesize(findings)
+    const bc = result.find((f) => f.agent === 'breaking-change')
+    expect(bc?.severity).toBe('critical') // high → critical (escalated due to nearby correctness)
+  })
+
+  it('escalates breaking-change when design finding is nearby', () => {
+    const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+    const findings = [
+      makeFinding({
+        id: 'bc-0',
+        agent: 'breaking-change',
+        severity: 'medium',
+        basis: 'VERIFIED',
+        file: 'src/api.ts',
+        line: 10,
+      }),
+      makeFinding({
+        id: 'd-0',
+        agent: 'design',
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'src/api.ts',
+        line: 12,
+      }),
+    ]
+    const result = orch.synthesize(findings)
+    const bc = result.find((f) => f.agent === 'breaking-change')
+    expect(bc?.severity).toBe('high') // medium → high (escalated due to nearby design)
+  })
+
+  it('does not escalate breaking-change when correctness is beyond 5-line window', () => {
+    const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+    const findings = [
+      makeFinding({
+        id: 'bc-0',
+        agent: 'breaking-change',
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'src/api.ts',
+        line: 10,
+      }),
+      makeFinding({
+        id: 'c-0',
+        agent: 'correctness',
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'src/api.ts',
+        line: 20, // > 5 lines away
+      }),
+    ]
+    const result = orch.synthesize(findings)
+    const bc = result.find((f) => f.agent === 'breaking-change')
+    expect(bc?.severity).toBe('high') // unchanged
+  })
+})

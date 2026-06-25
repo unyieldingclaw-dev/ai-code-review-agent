@@ -170,6 +170,18 @@ export class OrchestratorAgent {
           return { ...f, severity: this.escalate(f.severity) }
         }
       }
+      // Breaking change at same location as correctness or design issue → escalate
+      if (f.agent === 'breaking-change') {
+        const hasCorrectnessOrDesign = findings.some(
+          (other) =>
+            (other.agent === 'correctness' || other.agent === 'design') &&
+            other.file === f.file &&
+            Math.abs(other.line - f.line) <= 5
+        )
+        if (hasCorrectnessOrDesign) {
+          return { ...f, severity: this.escalate(f.severity) }
+        }
+      }
       return f
     })
   }
