@@ -67,28 +67,55 @@ Rules:
 
   private parseCoverageResult(raw: string, _input: ReviewInput): CoverageAnalystResult {
     const cleaned = raw.replace(/```json\s*|```\s*/g, '').trim()
+
+    // Stage 1: direct parse
     try {
       const parsed = JSON.parse(cleaned) as { findings?: unknown[]; gaps?: unknown[] }
-      const findings = this.parseFindings(JSON.stringify(parsed.findings ?? []))
-      const gaps = this.validateGaps(parsed.gaps ?? [])
-      return { findings, gaps }
-    } catch {
-      // Try regex extraction
-      try {
-        const objMatch = cleaned.match(/\{[\s\S]*\}/)
-        if (objMatch) {
-          const parsed = JSON.parse(objMatch[0]) as { findings?: unknown[]; gaps?: unknown[] }
-          return {
-            findings: this.parseFindings(JSON.stringify(parsed.findings ?? [])),
-            gaps: this.validateGaps(parsed.gaps ?? []),
-          }
-        }
-      } catch {
-        /* fall through */
+      return {
+        findings: this.parseFindings(JSON.stringify(parsed.findings ?? [])),
+        gaps: this.validateGaps(parsed.gaps ?? []),
       }
-      console.error(`[coverage] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
-      return { findings: [], gaps: [] }
+    } catch {
+      /* fall through */
     }
+
+    // Stage 2: balanced-brace extraction
+    try {
+      const extracted = this.extractJsonObject(cleaned)
+      if (extracted) {
+        const parsed = JSON.parse(extracted) as { findings?: unknown[]; gaps?: unknown[] }
+        return {
+          findings: this.parseFindings(JSON.stringify(parsed.findings ?? [])),
+          gaps: this.validateGaps(parsed.gaps ?? []),
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+
+    console.error(`[coverage] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
+    return { findings: [], gaps: [] }
+  }
+
+  private extractJsonObject(text: string): string | null {
+    const start = text.indexOf('{')
+    if (start === -1) return null
+    let depth = 0
+    let inString = false
+    let esc = false
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i]
+      if (esc) { esc = false; continue }
+      if (ch === '\\' && inString) { esc = true; continue }
+      if (ch === '"') { inString = !inString; continue }
+      if (inString) continue
+      if (ch === '{') depth++
+      else if (ch === '}') {
+        depth--
+        if (depth === 0) return text.slice(start, i + 1)
+      }
+    }
+    return null
   }
 
   private validateGaps(items: unknown[]): CoverageGap[] {
