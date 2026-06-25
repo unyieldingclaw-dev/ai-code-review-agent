@@ -1,6 +1,6 @@
 # AI Review Agent — VS Code / Cursor Extension
 
-Run an 11-agent local AI code review swarm on your staged git changes, directly from the command palette. Findings appear as inline editor squiggles (Problems panel) and a full markdown report in the Output panel.
+Run a **15-agent** local AI code review swarm on your staged git changes, directly from the command palette. Findings appear as inline editor squiggles (Problems panel) and a full markdown report in the Output panel.
 
 **Requires [Ollama](https://ollama.ai) running locally.** No API keys, no cloud, no cost.
 
@@ -10,7 +10,7 @@ Run an 11-agent local AI code review swarm on your staged git changes, directly 
 
 ### From .vsix (manual install)
 
-1. Download `ai-review-agent-0.5.0.vsix` from the [GitHub Releases](https://github.com/unyieldingclaw-dev/ai-code-review-agent/releases) page.
+1. Download `ai-review-agent-0.6.0.vsix` from the [GitHub Releases](https://github.com/unyieldingclaw-dev/ai-code-review-agent/releases) page.
 2. In Cursor or VS Code: open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) → **Extensions: Install from VSIX…** → select the downloaded file.
 
 ### Prerequisites
@@ -18,7 +18,7 @@ Run an 11-agent local AI code review swarm on your staged git changes, directly 
 1. [Install Ollama](https://ollama.ai)
 2. Pull the default model:
    ```bash
-   ollama serve          # start Ollama (keep this running)
+   ollama serve                    # start Ollama (keep this running)
    ollama pull devstral:latest
    ```
 
@@ -42,21 +42,32 @@ Run an 11-agent local AI code review swarm on your staged git changes, directly 
 
 All settings are under **Preferences → Settings → AI Review**:
 
-| Setting              | Default                  | Description                    |
-| -------------------- | ------------------------ | ------------------------------ |
-| `aiReview.ollamaUrl` | `http://localhost:11434` | Ollama base URL                |
-| `aiReview.model`     | `devstral:latest`        | Model name                     |
-| `aiReview.agents`    | `[]` (all 11)            | Subset of agents to run        |
-| `aiReview.maxLines`  | `2000`                   | Max diff lines sent for review |
-| `aiReview.timeout`   | `120`                    | Per-agent timeout (seconds)    |
+| Setting                 | Default                  | Description                                                   |
+| ----------------------- | ------------------------ | ------------------------------------------------------------- |
+| `aiReview.ollamaUrl`    | `http://localhost:11434` | Ollama base URL                                               |
+| `aiReview.model`        | `devstral:latest`        | Model name                                                    |
+| `aiReview.profile`      | `` (none)                | Named agent subset: `fast`, `full`, `change-review`, `ui`, `migration`, `security` |
+| `aiReview.agents`       | `[]` (all 15 defaults)   | Explicit agent list (overrides profile). testgen always excluded. |
+| `aiReview.contextMode`  | `none`                   | `none`, `memory-bank` (static), or `memory-bank-semantic` (nomic-embed-text) |
+| `aiReview.maxLines`     | `2000`                   | Max diff lines sent for review                                |
+| `aiReview.timeout`      | `120`                    | Per-agent timeout (seconds)                                   |
 
-**Available agents:** `security`, `performance`, `correctness`, `design`, `dependencies`, `coverage`, `testgen`, `adversarial`, `integration`, `breaking-change`, `license`
+### Profiles
 
-To run only security and performance checks:
+Use `aiReview.profile` to run a named subset of agents:
 
-```json
-"aiReview.agents": ["security", "performance"]
-```
+| Profile         | Agents | Time    |
+| --------------- | ------ | ------- |
+| `fast`          | 3      | ~3 min  |
+| `change-review` | 8      | ~10 min |
+| `full`          | 15     | ~30 min |
+| `security`      | 4      | ~5 min  |
+| `migration`     | 4      | ~5 min  |
+| `ui`            | 5      | ~8 min  |
+
+### Memory-bank context
+
+Set `aiReview.contextMode` to `memory-bank` to load relevant `memory-bank/` files into each agent's prompt before reviewing. Requires a `memory-bank/` directory in the project root (compatible with [PMB](https://github.com/unyieldingclaw-dev/personal-memory-bank)).
 
 ---
 
@@ -71,18 +82,23 @@ To run only security and performance checks:
 
 ---
 
-## Agents
+## Agents (15 default, testgen opt-in)
 
-| Agent           | What it checks                             |
-| --------------- | ------------------------------------------ |
-| Security        | Injection, auth, secrets, input validation |
-| Performance     | N+1 queries, blocking I/O, O(n²) loops     |
-| Correctness     | Off-by-one, null dereference, edge cases   |
-| Design          | SOLID violations, coupling, naming         |
-| Dependencies    | Outdated packages, CVEs, license conflicts |
-| Coverage        | Untested paths, missing assertions         |
-| TestGen         | Generates test stubs for new code          |
-| Adversarial     | Prompt injection, misuse scenarios         |
-| Integration     | Contract mismatches, API breakage          |
-| Breaking Change | Removed exports, signature changes         |
-| License         | GPL/AGPL/SSPL incompatible dependencies    |
+| Agent           | Domain           | What it checks                                    |
+| --------------- | ---------------- | ------------------------------------------------- |
+| SecurityAgent          | Security          | Injection, auth flaws, unsafe deserialization     |
+| PerformanceAgent       | Performance       | Hot paths, N+1 queries, memory pressure           |
+| CorrectnessAgent       | Correctness       | Logic bugs, off-by-one, null dereferences         |
+| DesignAgent            | Architecture Drift| SOLID violations, coupling, abstraction leaks     |
+| DependenciesAgent      | Dependencies      | Outdated/vulnerable packages, supply chain risks  |
+| BreakingChangeAgent    | Breaking Change   | Removed exports, changed signatures               |
+| LicenseComplianceAgent | License           | GPL/AGPL/SSPL/Commons Clause dependencies         |
+| AdversarialAgent       | Adversarial       | Adversarial inputs, boundary/concurrency issues   |
+| IntegrationScoutAgent  | Integration       | Contract mismatches, missing integration tests    |
+| CoverageAnalystAgent   | Testing           | Untested paths, missing assertions                |
+| ErrorHandlingAgent     | Error Handling    | Swallowed exceptions, ignored Promise rejections  |
+| ObservabilityAgent     | Observability     | New code paths lacking log output                 |
+| MigrationSafetyAgent   | Migration Safety  | NOT NULL without DEFAULT, missing down migrations |
+| SecretsAgent           | Secrets           | Hardcoded API keys, passwords, connection strings |
+| ComplexityAgent        | Complexity        | High cyclomatic complexity, deep nesting          |
+| TestGenAgent           | Testing           | Generates test stubs (**opt-in** — use CLI only)  |
