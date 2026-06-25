@@ -194,6 +194,11 @@ program
         contextMode
       )
 
+      // Stamp integration metadata so callers can parse the contract version
+      result.schemaVersion = 'ai-review-agent/v1'
+      result.toolVersion = version
+      result.profile = options.profile ?? null
+
       // Only write test files when --write-tests is explicitly passed
       if (options.writeTests && result.testFiles.length > 0) {
         for (const tf of result.testFiles) {

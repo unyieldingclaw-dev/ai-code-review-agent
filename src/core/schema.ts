@@ -113,6 +113,9 @@ export interface PolicyResult {
 }
 
 export interface ReviewResult {
+  schemaVersion?: 'ai-review-agent/v1'
+  toolVersion?: string
+  profile?: string | null
   findings: Finding[]
   testFiles: GeneratedTestFile[]
   summary: ReviewSummary

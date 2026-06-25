@@ -326,6 +326,42 @@ Each agent self-reports a `confidence` value (0–100) alongside each finding. T
 
 Confidence is shown in the markdown report next to each finding.
 
+## Integration Contract (PMB / MB / CI)
+
+When calling ACR from another tool (PMB's `/change-review`, a CI script, or any JSON consumer), use these stable invocation patterns:
+
+```bash
+# Full change review with memory-bank context — write to state file
+ai-review-agent --profile change-review --context memory-bank --format json \
+  --out .memory-bank/state/reviews/latest.json
+
+# Fast gate (no Ollama context overhead)
+ai-review-agent --profile fast --context none --format markdown
+
+# Security audit with SARIF upload
+ai-review-agent --profile security --format sarif --out ai-review.sarif
+```
+
+Every `--format json` response includes a stable envelope:
+
+```json
+{
+  "schemaVersion": "ai-review-agent/v1",
+  "toolVersion": "1.1.0",
+  "profile": "change-review",
+  "findings": [],
+  "summary": { "totalFindings": 0, "bySeverity": {}, "byAgent": {}, "durationMs": 0 },
+  "sanitizer": { "enabled": true, "applied": false, "redactedLines": 0, "warnings": [] },
+  "policy": { "agentsSkipped": [], "reason": {} },
+  "context": { "mode": "memory-bank", "filesLoaded": [], "truncated": false, "estimatedTokens": 0 }
+}
+```
+
+- `schemaVersion` is bumped on breaking schema changes — parse this to detect incompatible versions.
+- `profile` is `null` when `--agents` was used instead of `--profile`.
+- `policy` only appears when at least one agent was skipped by policy rules.
+- `context` only appears when `--context memory-bank` is active.
+
 ## Development
 
 ```bash
