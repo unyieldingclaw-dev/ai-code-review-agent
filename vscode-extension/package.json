@@ -1,8 +1,8 @@
 {
   "name": "ai-review-agent",
   "displayName": "AI Review Agent",
-  "description": "Local AI code review — run an 11-agent Ollama swarm on your staged changes",
-  "version": "0.5.0",
+  "description": "Local AI code review — run a 15-agent Ollama swarm on your staged changes. testgen is opt-in.",
+  "version": "0.6.0",
   "publisher": "unyieldingclaw",
   "engines": {
     "vscode": "^1.85.0"
@@ -43,7 +43,33 @@
             "type": "string"
           },
           "default": [],
-          "description": "Agents to run. Empty array runs all 11 agents. Valid values: security, performance, correctness, design, dependencies, coverage, testgen, adversarial, integration, breaking-change, license"
+          "description": "Agents to run. Empty array runs all 15 default agents. testgen is always excluded (opt-in via CLI only). Valid: security, performance, correctness, design, dependencies, coverage, adversarial, integration, breaking-change, license, error-handling, observability, migration-safety, secrets, complexity"
+        },
+        "aiReview.profile": {
+          "type": "string",
+          "default": "",
+          "enum": ["", "fast", "full", "change-review", "ui", "migration", "security"],
+          "enumDescriptions": [
+            "No profile — use agents list or all 15 defaults",
+            "fast: security + correctness + secrets (~3 min)",
+            "full: all 15 default agents (~30-45 min)",
+            "change-review: 8 agents for PR review (~10-15 min)",
+            "ui: 5 frontend-focused agents (~8 min)",
+            "migration: 4 database-focused agents (~5 min)",
+            "security: 4 security-focused agents (~5 min)"
+          ],
+          "description": "Named agent subset to run. Overrides aiReview.agents if set."
+        },
+        "aiReview.contextMode": {
+          "type": "string",
+          "default": "none",
+          "enum": ["none", "memory-bank", "memory-bank-semantic"],
+          "enumDescriptions": [
+            "No project context loaded",
+            "Load relevant memory-bank files per agent (static routing)",
+            "Load memory-bank files ranked by semantic similarity (requires nomic-embed-text)"
+          ],
+          "description": "Context mode for --context flag. Requires memory-bank/ in project root."
         },
         "aiReview.maxLines": {
           "type": "number",

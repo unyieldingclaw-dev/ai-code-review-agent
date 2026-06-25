@@ -13,6 +13,8 @@ export function getConfig(extensionPath: string): ExtensionConfig {
     ollamaUrl: cfg.get('ollamaUrl', 'http://localhost:11434'),
     model: cfg.get('model', 'devstral:latest'),
     agents: cfg.get<string[]>('agents', []),
+    profile: cfg.get('profile', ''),
+    contextMode: cfg.get('contextMode', 'none'),
     maxLines: cfg.get('maxLines', 2000),
     timeoutSecs: cfg.get('timeout', 120),
     cliPath: path.join(extensionPath, 'node_modules', 'ai-review-agent', 'dist', 'cli', 'index.js'),
@@ -51,6 +53,17 @@ export function buildCliArgs(
 
   if (config.agents.length > 0) {
     args.push('--agents', config.agents.join(','))
+  }
+
+  if (config.profile) {
+    args.push('--profile', config.profile)
+  }
+
+  if (config.contextMode !== 'none') {
+    args.push('--context', 'memory-bank')
+    if (config.contextMode === 'memory-bank-semantic') {
+      args.push('--context-mode', 'semantic')
+    }
   }
 
   return args

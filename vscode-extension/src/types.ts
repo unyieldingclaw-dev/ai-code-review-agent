@@ -41,6 +41,8 @@ export interface ExtensionConfig {
   ollamaUrl: string
   model: string
   agents: string[] // empty = all agents
+  profile: string // named agent subset; overrides agents when set
+  contextMode: string // 'none' | 'memory-bank' | 'memory-bank-semantic'
   maxLines: number
   timeoutSecs: number // seconds; converted to ms before passing to CLI
   cliPath: string // absolute path to bundled CLI index.js

@@ -27,6 +27,13 @@ describe('getConfig', () => {
     )
   })
 
+  it('returns defaults including profile and contextMode', async () => {
+    const { getConfig } = await import('../src/config')
+    const config = getConfig('/ext/path')
+    expect(config.profile).toBe('')
+    expect(config.contextMode).toBe('none')
+  })
+
   it('reads aiReview.ollamaUrl from VS Code settings', async () => {
     vi.mocked(vscodeModule.workspace.getConfiguration).mockReturnValue({
       get: vi.fn((key: string, defaultVal: unknown) => {
@@ -59,6 +66,8 @@ describe('buildCliArgs', () => {
     ollamaUrl: 'http://localhost:11434',
     model: 'devstral:latest',
     agents: [] as string[],
+    profile: '',
+    contextMode: 'none',
     maxLines: 2000,
     timeoutSecs: 120,
     cliPath: '/ext/node_modules/ai-review-agent/dist/cli/index.js',
@@ -107,5 +116,42 @@ describe('buildCliArgs', () => {
     const agentsIdx = args.indexOf('--agents')
     expect(agentsIdx).not.toBe(-1)
     expect(args[agentsIdx + 1]).toBe('security,performance')
+  })
+
+  it('includes --profile flag when profile is set', async () => {
+    const { buildCliArgs } = await import('../src/config')
+    const args = buildCliArgs({ ...baseConfig, profile: 'fast', contextMode: 'none' }, '/workspace', '/tmp/diff')
+    expect(args).toContain('--profile')
+    expect(args).toContain('fast')
+  })
+
+  it('omits --profile when profile is empty string', async () => {
+    const { buildCliArgs } = await import('../src/config')
+    const args = buildCliArgs({ ...baseConfig, profile: '', contextMode: 'none' }, '/workspace', '/tmp/diff')
+    expect(args).not.toContain('--profile')
+  })
+
+  it('includes --context memory-bank when contextMode is memory-bank', async () => {
+    const { buildCliArgs } = await import('../src/config')
+    const args = buildCliArgs({ ...baseConfig, contextMode: 'memory-bank' }, '/workspace', '/tmp/diff')
+    expect(args).toContain('--context')
+    expect(args).toContain('memory-bank')
+    expect(args).not.toContain('--context-mode')
+  })
+
+  it('includes --context-mode semantic when contextMode is memory-bank-semantic', async () => {
+    const { buildCliArgs } = await import('../src/config')
+    const args = buildCliArgs({ ...baseConfig, contextMode: 'memory-bank-semantic' }, '/workspace', '/tmp/diff')
+    expect(args).toContain('--context')
+    expect(args).toContain('memory-bank')
+    expect(args).toContain('--context-mode')
+    expect(args).toContain('semantic')
+  })
+
+  it('omits --context flags when contextMode is none', async () => {
+    const { buildCliArgs } = await import('../src/config')
+    const args = buildCliArgs({ ...baseConfig, contextMode: 'none' }, '/workspace', '/tmp/diff')
+    expect(args).not.toContain('--context')
+    expect(args).not.toContain('--context-mode')
   })
 })
