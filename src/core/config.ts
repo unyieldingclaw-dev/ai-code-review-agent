@@ -16,6 +16,7 @@ export interface ReviewConfig {
   ignorePaths: string[]
   sanitize: boolean
   contextBudgetChars: number
+  contextMode?: 'static' | 'semantic'
   preferredSecretsScanner?: 'gitleaks' | 'trufflehog' | 'none'
   complexityThreshold?: number
   failFast: boolean
@@ -62,6 +63,7 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   ignorePaths: [],
   sanitize: true,
   contextBudgetChars: 4000,
+  contextMode: 'static',
   failFast: false,
   failOn: 'high',
   parallel: false,

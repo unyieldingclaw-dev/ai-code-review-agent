@@ -76,6 +76,11 @@ program
     'Max chars of memory-bank context per agent (default: 4000)',
     parseInt
   )
+  .option(
+    '--context-mode <mode>',
+    'Context selection mode: static (default) or semantic (uses nomic-embed-text)',
+    'static'
+  )
   .action(
     async (options: {
       diff?: string
@@ -99,6 +104,7 @@ program
       writeTests?: boolean
       context: string
       contextBudget?: number
+      contextMode?: string
     }) => {
       const contextMode = options.context === 'memory-bank' ? 'memory-bank' : 'none'
 
@@ -133,6 +139,8 @@ program
       config.failOn = options.failOn
       config.failFast = !!options.failFast
       config.parallel = !!options.parallel
+      if (options.contextBudget !== undefined) config.contextBudgetChars = options.contextBudget
+      if (options.contextMode === 'semantic') config.contextMode = 'semantic'
 
       // testgen opt-in: only add to agents if --suggest-tests or --write-tests is passed
       if ((options.suggestTests || options.writeTests) && !config.agents.includes('testgen')) {
