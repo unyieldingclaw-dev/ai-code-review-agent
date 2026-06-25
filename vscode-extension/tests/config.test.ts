@@ -120,20 +120,32 @@ describe('buildCliArgs', () => {
 
   it('includes --profile flag when profile is set', async () => {
     const { buildCliArgs } = await import('../src/config')
-    const args = buildCliArgs({ ...baseConfig, profile: 'fast', contextMode: 'none' }, '/workspace', '/tmp/diff')
+    const args = buildCliArgs(
+      { ...baseConfig, profile: 'fast', contextMode: 'none' },
+      '/workspace',
+      '/tmp/diff'
+    )
     expect(args).toContain('--profile')
     expect(args).toContain('fast')
   })
 
   it('omits --profile when profile is empty string', async () => {
     const { buildCliArgs } = await import('../src/config')
-    const args = buildCliArgs({ ...baseConfig, profile: '', contextMode: 'none' }, '/workspace', '/tmp/diff')
+    const args = buildCliArgs(
+      { ...baseConfig, profile: '', contextMode: 'none' },
+      '/workspace',
+      '/tmp/diff'
+    )
     expect(args).not.toContain('--profile')
   })
 
   it('includes --context memory-bank when contextMode is memory-bank', async () => {
     const { buildCliArgs } = await import('../src/config')
-    const args = buildCliArgs({ ...baseConfig, contextMode: 'memory-bank' }, '/workspace', '/tmp/diff')
+    const args = buildCliArgs(
+      { ...baseConfig, contextMode: 'memory-bank' },
+      '/workspace',
+      '/tmp/diff'
+    )
     expect(args).toContain('--context')
     expect(args).toContain('memory-bank')
     expect(args).not.toContain('--context-mode')
@@ -141,7 +153,11 @@ describe('buildCliArgs', () => {
 
   it('includes --context-mode semantic when contextMode is memory-bank-semantic', async () => {
     const { buildCliArgs } = await import('../src/config')
-    const args = buildCliArgs({ ...baseConfig, contextMode: 'memory-bank-semantic' }, '/workspace', '/tmp/diff')
+    const args = buildCliArgs(
+      { ...baseConfig, contextMode: 'memory-bank-semantic' },
+      '/workspace',
+      '/tmp/diff'
+    )
     expect(args).toContain('--context')
     expect(args).toContain('memory-bank')
     expect(args).toContain('--context-mode')

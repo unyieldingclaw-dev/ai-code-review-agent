@@ -48,7 +48,15 @@
         "aiReview.profile": {
           "type": "string",
           "default": "",
-          "enum": ["", "fast", "full", "change-review", "ui", "migration", "security"],
+          "enum": [
+            "",
+            "fast",
+            "full",
+            "change-review",
+            "ui",
+            "migration",
+            "security"
+          ],
           "enumDescriptions": [
             "No profile — use agents list or all 15 defaults",
             "fast: security + correctness + secrets (~3 min)",
@@ -63,7 +71,11 @@
         "aiReview.contextMode": {
           "type": "string",
           "default": "none",
-          "enum": ["none", "memory-bank", "memory-bank-semantic"],
+          "enum": [
+            "none",
+            "memory-bank",
+            "memory-bank-semantic"
+          ],
           "enumDescriptions": [
             "No project context loaded",
             "Load relevant memory-bank files per agent (static routing)",
