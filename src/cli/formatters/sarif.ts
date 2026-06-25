@@ -58,6 +58,13 @@ export function formatSarif(result: ReviewResult): string {
           },
         },
         results: result.findings.map(findingToSarifResult),
+        // Add run-level properties for context and policy metadata
+        properties: {
+          ...(result.context ? { context: result.context } : {}),
+          ...(result.policy && result.policy.agentsSkipped.length > 0
+            ? { policy: result.policy }
+            : {}),
+        },
       },
     ],
   }
