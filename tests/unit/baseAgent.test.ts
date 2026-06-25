@@ -90,4 +90,102 @@ describe('BaseAgent', () => {
     const findings = await agent.run({ diff: 'diff' })
     expect(findings).toHaveLength(1)
   })
+
+  it('fills domain from agentDefaultDomain when LLM omits it', async () => {
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        confidence: 80,
+        file: 'src/a.ts',
+        line: 1,
+        title: 'Test',
+        detail: 'Detail',
+        suggestion: 'Fix it',
+        // domain intentionally omitted
+      },
+    ])
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
+    const findings = await agent.run({ diff: 'diff' })
+    expect(findings[0].domain).toBe('Security')
+    expect(findings[0].domain).not.toBeUndefined()
+  })
+
+  it('fills evidence from detail when LLM omits evidence', async () => {
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        confidence: 80,
+        file: 'src/a.ts',
+        line: 1,
+        title: 'Test',
+        detail: 'The detail text',
+        suggestion: 'Fix it',
+        // evidence intentionally omitted
+      },
+    ])
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
+    const findings = await agent.run({ diff: 'diff' })
+    expect(findings[0].evidence).toBe('The detail text')
+  })
+
+  it('fills impact as empty string when LLM omits it', async () => {
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        confidence: 80,
+        file: 'src/a.ts',
+        line: 1,
+        title: 'Test',
+        detail: 'Detail',
+        suggestion: 'Fix it',
+        // impact intentionally omitted
+      },
+    ])
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
+    const findings = await agent.run({ diff: 'diff' })
+    expect(findings[0].impact).toBe('')
+    expect(findings[0].impact).not.toBeUndefined()
+  })
+
+  it('fills blocking=true for critical severity when LLM omits blocking', async () => {
+    const raw = JSON.stringify([
+      {
+        severity: 'critical',
+        basis: 'VERIFIED',
+        confidence: 90,
+        file: 'src/a.ts',
+        line: 1,
+        title: 'T',
+        detail: 'D',
+        suggestion: 'S',
+        // blocking intentionally omitted
+      },
+    ])
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
+    const findings = await agent.run({ diff: 'diff' })
+    expect(findings[0].blocking).toBe(true)
+  })
+
+  it('fills source as llm when LLM omits source', async () => {
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        confidence: 80,
+        file: 'src/a.ts',
+        line: 1,
+        title: 'T',
+        detail: 'D',
+        suggestion: 'S',
+        // source intentionally omitted
+      },
+    ])
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
+    const findings = await agent.run({ diff: 'diff' })
+    expect(findings[0].source).toBe('llm')
+    expect(findings[0].source).not.toBeUndefined()
+  })
 })
