@@ -19,7 +19,10 @@ export default tseslint.config(
     rules: {
       // Downgrade to warn — these are quality signals, not hard errors
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       // Keep as errors — these are real problems
       'no-console': 'off', // ACR legitimately uses console.error/warn for stderr progress
       '@typescript-eslint/no-floating-promises': 'off', // vitest handles these

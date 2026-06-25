@@ -2,8 +2,8 @@ import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 
 export interface IgnorePatterns {
-  excludes: string[]  // patterns — file is removed from diff if it matches
-  includes: string[]  // negation patterns (! prefix stripped) — overrides excludes
+  excludes: string[] // patterns — file is removed from diff if it matches
+  includes: string[] // negation patterns (! prefix stripped) — overrides excludes
 }
 
 /** Load patterns from a .aiignore file and any extra paths passed by the caller. */
@@ -48,9 +48,9 @@ export function filterDiff(diff: string, patterns: IgnorePatterns | string[]): s
       const filePath = extractFilePath(section)
       if (!filePath) return true
       // Keep if explicitly included (negation wins)
-      if (includes.some(p => matchPattern(filePath, p))) return true
+      if (includes.some((p) => matchPattern(filePath, p))) return true
       // Remove if excluded
-      return !excludes.some(p => matchPattern(filePath, p))
+      return !excludes.some((p) => matchPattern(filePath, p))
     })
     .join('')
 }
