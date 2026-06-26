@@ -18,7 +18,7 @@ const { version } = JSON.parse(readFileSync(join(__dirname, '../../package.json'
   version: string
 }
 
-const program = new Command()
+export const program = new Command()
 
 program
   .name('ai-review-agent')
@@ -248,6 +248,8 @@ program
       const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
       process.exit(hasBlocker ? 1 : 0)
     } catch (err) {
+      // Re-throw synthetic exits (e.g. process.exit mocks in tests) so they propagate correctly
+      if (err instanceof Error && err.message.startsWith('process.exit(')) throw err
       const msg = err instanceof Error ? err.message : String(err)
       process.stderr.write(`\nError: ${msg}\n`)
       if (msg.includes('not reachable') || msg.includes('ECONNREFUSED') || msg.includes('ENOENT')) {
@@ -286,4 +288,6 @@ function getDiff(diffFile?: string, dir?: string): string {
   return gitSync(['diff'])
 }
 
-program.parse()
+if (process.env.NODE_ENV !== 'test') {
+  program.parse()
+}
