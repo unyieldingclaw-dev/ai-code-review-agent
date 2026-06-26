@@ -118,14 +118,11 @@ export class SwarmRunner {
     this.testGen = new TestGenAgent(provider, config)
   }
 
-  async run(
-    input: ReviewInput,
-    onProgress?: (event: AgentProgressEvent) => void,
-    contextMode: 'none' | 'memory-bank' = 'none'
-  ): Promise<ReviewResult> {
-    const ping = await this.provider.ping()
-    if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')
-
+  // Handles ignore filtering, sanitization, and diff truncation.
+  // Returns the (possibly modified) input and sanitizer metadata.
+  private async preprocessDiff(
+    input: ReviewInput
+  ): Promise<{ input: ReviewInput; sanitizerMeta: SanitizerMetadata }> {
     // Path exclusions — filter files matching .aiignore or config.ignorePaths
     if (input.projectPath || this.config.ignorePaths.length > 0) {
       const patterns = loadIgnorePatterns(input.projectPath ?? '', this.config.ignorePaths)
@@ -167,6 +164,216 @@ export class SwarmRunner {
       }
     }
 
+    return { input, sanitizerMeta }
+  }
+
+  // Runs the coverage agent with progress reporting and error handling.
+  // Returns findings, coverage gaps, and whether an early exit was triggered.
+  private async runCoverageAgent(
+    agent: CoverageAnalystAgent,
+    input: ReviewInput,
+    ctx: (name: AgentName) => Promise<ReviewInput>,
+    total: number,
+    index: number,
+    onProgress?: (e: AgentProgressEvent) => void
+  ): Promise<{ findings: Finding[]; gaps: CoverageGap[]; earlyExit: boolean }> {
+    const timeout = this.config.agentTimeoutMs
+    const retryAttempts = this.config.retryAttempts
+    const retryDelayMs = this.config.retryDelayMs
+
+    onProgress?.({ phase: 'start', name: 'coverage', index, total })
+    const startMs = Date.now()
+    try {
+      const coverageResult = await withRetryTimeout(
+        async () => agent.runForCoverage(await ctx('coverage')),
+        timeout,
+        'coverage',
+        retryAttempts,
+        retryDelayMs
+      )
+      const findings = coverageResult.findings
+      const gaps = coverageResult.gaps
+      const earlyExit = shouldEarlyExit(this.config, findings)
+      onProgress?.({
+        phase: 'end',
+        name: 'coverage',
+        index,
+        total,
+        findings,
+        elapsedMs: Date.now() - startMs,
+        earlyExit,
+      })
+      return { findings, gaps, earlyExit }
+    } catch (err) {
+      console.warn(`[ai-review] Agent coverage timed out or failed: ${(err as Error).message}`)
+      onProgress?.({
+        phase: 'end',
+        name: 'coverage',
+        index,
+        total,
+        findings: [],
+        elapsedMs: Date.now() - startMs,
+      })
+      return { findings: [], gaps: [], earlyExit: false }
+    }
+  }
+
+  // Sequential execution loop — runs agents one at a time, stopping on early exit.
+  private async runAgentsSequential(
+    agents: BaseAgent[],
+    ctx: (name: AgentName) => Promise<ReviewInput>,
+    baseIndex: number,
+    total: number,
+    onProgress?: (e: AgentProgressEvent) => void
+  ): Promise<{ findings: Finding[]; earlyExitAgent?: AgentName }> {
+    const timeout = this.config.agentTimeoutMs
+    const retryAttempts = this.config.retryAttempts
+    const retryDelayMs = this.config.retryDelayMs
+
+    const findings: Finding[] = []
+    let earlyExitAgent: AgentName | undefined
+    let index = baseIndex
+
+    for (const agent of agents) {
+      index++
+      onProgress?.({ phase: 'start', name: agent.name, index, total })
+      const startMs = Date.now()
+      try {
+        const agentFindings = await withRetryTimeout(
+          async () => agent.run(await ctx(agent.name)),
+          timeout,
+          agent.name,
+          retryAttempts,
+          retryDelayMs
+        )
+        findings.push(...agentFindings)
+        const shouldStop = shouldEarlyExit(this.config, findings)
+        onProgress?.({
+          phase: 'end',
+          name: agent.name,
+          index,
+          total,
+          findings: agentFindings,
+          elapsedMs: Date.now() - startMs,
+          earlyExit: shouldStop,
+        })
+        if (shouldStop) {
+          earlyExitAgent = agent.name
+          break
+        }
+      } catch (err) {
+        console.warn(
+          `[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`
+        )
+        onProgress?.({
+          phase: 'end',
+          name: agent.name,
+          index,
+          total,
+          findings: [],
+          elapsedMs: Date.now() - startMs,
+        })
+      }
+    }
+
+    return { findings, earlyExitAgent }
+  }
+
+  // Parallel execution block — runs all agents concurrently, collects findings.
+  private async runAgentsParallel(
+    agents: BaseAgent[],
+    ctx: (name: AgentName) => Promise<ReviewInput>,
+    baseIndex: number,
+    total: number,
+    onProgress?: (e: AgentProgressEvent) => void
+  ): Promise<Finding[]> {
+    const timeout = this.config.agentTimeoutMs
+    const retryAttempts = this.config.retryAttempts
+    const retryDelayMs = this.config.retryDelayMs
+
+    const findings: Finding[] = []
+
+    agents.forEach((agent, i) => {
+      onProgress?.({ phase: 'start', name: agent.name, index: baseIndex + i + 1, total })
+    })
+
+    await Promise.allSettled(
+      agents.map(async (agent, i) => {
+        const agentIndex = baseIndex + i + 1
+        const startMs = Date.now()
+        try {
+          const agentFindings = await withRetryTimeout(
+            async () => agent.run(await ctx(agent.name)),
+            timeout,
+            agent.name,
+            retryAttempts,
+            retryDelayMs
+          )
+          findings.push(...agentFindings)
+          onProgress?.({
+            phase: 'end',
+            name: agent.name,
+            index: agentIndex,
+            total,
+            findings: agentFindings,
+            elapsedMs: Date.now() - startMs,
+          })
+        } catch (err) {
+          console.warn(
+            `[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`
+          )
+          onProgress?.({
+            phase: 'end',
+            name: agent.name,
+            index: agentIndex,
+            total,
+            findings: [],
+            elapsedMs: Date.now() - startMs,
+          })
+        }
+      })
+    )
+
+    return findings
+  }
+
+  // Aggregates findings into bySeverity and byAgent counts for the result summary.
+  private buildSummary(
+    findings: Finding[],
+    durationMs: number
+  ): ReviewResult['summary'] {
+    const bySeverity = findings.reduce(
+      (acc, f) => {
+        acc[f.severity] = (acc[f.severity] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
+
+    const byAgent = findings.reduce(
+      (acc, f) => {
+        acc[f.agent] = (acc[f.agent] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
+
+    return { totalFindings: findings.length, bySeverity, byAgent, durationMs }
+  }
+
+  async run(
+    input: ReviewInput,
+    onProgress?: (event: AgentProgressEvent) => void,
+    contextMode: 'none' | 'memory-bank' = 'none'
+  ): Promise<ReviewResult> {
+    const ping = await this.provider.ping()
+    if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')
+
+    // Preprocess: ignore filtering, sanitization, truncation
+    const preprocessed = await this.preprocessDiff(input)
+    input = preprocessed.input
+    const sanitizerMeta = preprocessed.sanitizerMeta
+
     const start = Date.now()
     const allFindings: Finding[] = []
     let coverageGaps: CoverageGap[] = []
@@ -196,10 +403,6 @@ export class SwarmRunner {
       }
       return ctx.content ? { ...input, context: ctx.content } : input
     }
-
-    const timeout = this.config.agentTimeoutMs
-    const retryAttempts = this.config.retryAttempts
-    const retryDelayMs = this.config.retryDelayMs
 
     // Determine which agents will run — hoist before coverage so total is known upfront
     const activeConfig =
@@ -231,128 +434,43 @@ export class SwarmRunner {
     if (hasCoverage) {
       index++
       const coverageAgent = new CoverageAnalystAgent(this.provider, this.config)
-      onProgress?.({ phase: 'start', name: 'coverage', index, total })
-      const startMs = Date.now()
-      try {
-        const coverageResult = await withRetryTimeout(
-          async () => coverageAgent.runForCoverage(await withContext('coverage')),
-          timeout,
-          'coverage',
-          retryAttempts,
-          retryDelayMs
-        )
-        allFindings.push(...coverageResult.findings)
-        coverageGaps = coverageResult.gaps
-        const shouldStop = shouldEarlyExit(this.config, allFindings)
-        onProgress?.({
-          phase: 'end',
-          name: 'coverage',
-          index,
-          total,
-          findings: coverageResult.findings,
-          elapsedMs: Date.now() - startMs,
-          earlyExit: shouldStop,
-        })
-        if (shouldStop) earlyExitAgent = 'coverage'
-      } catch (err) {
-        console.warn(`[ai-review] Agent coverage timed out or failed: ${(err as Error).message}`)
-        onProgress?.({
-          phase: 'end',
-          name: 'coverage',
-          index,
-          total,
-          findings: [],
-          elapsedMs: Date.now() - startMs,
-        })
-      }
+      const coverageResult = await this.runCoverageAgent(
+        coverageAgent,
+        input,
+        withContext,
+        total,
+        index,
+        onProgress
+      )
+      allFindings.push(...coverageResult.findings)
+      coverageGaps = coverageResult.gaps
+      if (coverageResult.earlyExit) earlyExitAgent = 'coverage'
     }
 
     // Run specialist agents — parallel or sequential
     if (!earlyExitAgent) {
+      const baseIndex = hasCoverage ? 1 : 0
       if (this.config.parallel) {
-        const baseIndex = hasCoverage ? 1 : 0
-        agents.forEach((agent, i) => {
-          onProgress?.({ phase: 'start', name: agent.name, index: baseIndex + i + 1, total })
-        })
-        await Promise.allSettled(
-          agents.map(async (agent, i) => {
-            const agentIndex = baseIndex + i + 1
-            const startMs = Date.now()
-            try {
-              const findings = await withRetryTimeout(
-                async () => agent.run(await withContext(agent.name)),
-                timeout,
-                agent.name,
-                retryAttempts,
-                retryDelayMs
-              )
-              allFindings.push(...findings)
-              onProgress?.({
-                phase: 'end',
-                name: agent.name,
-                index: agentIndex,
-                total,
-                findings,
-                elapsedMs: Date.now() - startMs,
-              })
-            } catch (err) {
-              console.warn(
-                `[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`
-              )
-              onProgress?.({
-                phase: 'end',
-                name: agent.name,
-                index: agentIndex,
-                total,
-                findings: [],
-                elapsedMs: Date.now() - startMs,
-              })
-            }
-          })
+        const parallelFindings = await this.runAgentsParallel(
+          agents,
+          withContext,
+          baseIndex,
+          total,
+          onProgress
         )
+        allFindings.push(...parallelFindings)
         index += agents.length
       } else {
-        for (const agent of agents) {
-          index++
-          onProgress?.({ phase: 'start', name: agent.name, index, total })
-          const startMs = Date.now()
-          try {
-            const findings = await withRetryTimeout(
-              async () => agent.run(await withContext(agent.name)),
-              timeout,
-              agent.name,
-              retryAttempts,
-              retryDelayMs
-            )
-            allFindings.push(...findings)
-            const shouldStop = shouldEarlyExit(this.config, allFindings)
-            onProgress?.({
-              phase: 'end',
-              name: agent.name,
-              index,
-              total,
-              findings,
-              elapsedMs: Date.now() - startMs,
-              earlyExit: shouldStop,
-            })
-            if (shouldStop) {
-              earlyExitAgent = agent.name
-              break
-            }
-          } catch (err) {
-            console.warn(
-              `[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`
-            )
-            onProgress?.({
-              phase: 'end',
-              name: agent.name,
-              index,
-              total,
-              findings: [],
-              elapsedMs: Date.now() - startMs,
-            })
-          }
-        }
+        const seqResult = await this.runAgentsSequential(
+          agents,
+          withContext,
+          baseIndex,
+          total,
+          onProgress
+        )
+        allFindings.push(...seqResult.findings)
+        index = baseIndex + agents.length
+        earlyExitAgent = seqResult.earlyExitAgent
       }
     }
 
@@ -365,10 +483,10 @@ export class SwarmRunner {
         try {
           const testResult = await withRetryTimeout(
             async () => this.testGen.runWithGaps(await withContext('testgen'), coverageGaps),
-            timeout,
+            this.config.agentTimeoutMs,
             'testgen',
-            retryAttempts,
-            retryDelayMs
+            this.config.retryAttempts,
+            this.config.retryDelayMs
           )
           testFiles = testResult.testFiles
         } catch (err) {
@@ -387,31 +505,10 @@ export class SwarmRunner {
 
     const findings = this.orchestrator.synthesize(allFindings)
 
-    const bySeverity = findings.reduce(
-      (acc, f) => {
-        acc[f.severity] = (acc[f.severity] ?? 0) + 1
-        return acc
-      },
-      {} as Record<string, number>
-    )
-
-    const byAgent = findings.reduce(
-      (acc, f) => {
-        acc[f.agent] = (acc[f.agent] ?? 0) + 1
-        return acc
-      },
-      {} as Record<string, number>
-    )
-
     return {
       findings,
       testFiles,
-      summary: {
-        totalFindings: findings.length,
-        bySeverity,
-        byAgent,
-        durationMs: Date.now() - start,
-      },
+      summary: this.buildSummary(findings, Date.now() - start),
       ...(earlyExitAgent ? { earlyExit: { stoppedAt: earlyExitAgent } } : {}),
       ...(contextMode === 'memory-bank'
         ? {
