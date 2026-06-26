@@ -71,7 +71,7 @@ function extractFilePath(section: string): string | null {
   return null
 }
 
-function matchPattern(filePath: string, pattern: string): boolean {
+export function matchPattern(filePath: string, pattern: string): boolean {
   const isDir = pattern.endsWith('/')
   const normalised = isDir ? pattern.slice(0, -1) : pattern
   const hasSlash = normalised.includes('/')

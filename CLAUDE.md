@@ -85,7 +85,7 @@ Full enumerated lists in `standards/SECURITY-GUARDRAILS.md`.
 
 ## Code Quality
 
-Follow patterns in `standards/CODE-QUALITY.md`. Language-specific extensions in `standards/extensions/`.
+Follow patterns in `standards/CODE-QUALITY.md`. Language-specific extension standards are in PMB (`standards/extensions/`) — not copied into this repo; consult the PMB repo if needed.
 Comment the WHY, not the WHAT.
 Do not invent rationale, optimization claims, or historical intent not supported by observable behavior, documentation, or explicit project guidance.
 Treat dead-code identification as advisory unless non-use can be proven deterministically.

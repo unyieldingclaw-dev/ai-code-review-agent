@@ -84,4 +84,11 @@ describe('ComplexityAgent', () => {
     const agent = new ComplexityAgent(makeProvider('[]'), DEFAULT_CONFIG)
     expect(agent.systemPrompt).toMatch(/cyclomatic/i)
   })
+
+  it('returns empty array on parse failure', async () => {
+    mockRunTool.mockResolvedValue(null)
+    const agent = new ComplexityAgent(makeProvider('not json'), DEFAULT_CONFIG)
+    const findings = await agent.run({ diff: DIFF_WITH_FILE })
+    expect(findings).toEqual([])
+  })
 })

@@ -1,28 +1,9 @@
 // src/core/policyFilter.ts
 // Evaluates per-agent include/exclude glob policies against changed file paths.
-// Reuses matchPattern from ignoreFilter.ts — no external dependencies.
 
 import type { AgentName, PolicyResult } from './schema.js'
 import type { ReviewConfig } from './config.js'
-
-// Copied from ignoreFilter.ts — same gitignore-style glob logic
-function matchPattern(filePath: string, pattern: string): boolean {
-  const isDir = pattern.endsWith('/')
-  const normalised = isDir ? pattern.slice(0, -1) : pattern
-  const hasSlash = normalised.includes('/')
-  const regexStr = normalised
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*\*/g, '\x00')
-    .replace(/\*/g, '[^/]*')
-    .replace(/\?/g, '[^/]')
-    // eslint-disable-next-line no-control-regex
-    .replace(/\x00/g, '.*')
-  const suffix = isDir ? '(/.*)?$' : '$'
-  if (hasSlash) {
-    return new RegExp(`^/?${regexStr}${suffix}`).test(filePath)
-  }
-  return new RegExp(`(^|/)${regexStr}(/|$)`).test(filePath)
-}
+import { matchPattern } from './ignoreFilter.js'
 
 function matchesAny(files: string[], patterns: string[]): boolean {
   return files.some((f) => patterns.some((p) => matchPattern(f, p)))

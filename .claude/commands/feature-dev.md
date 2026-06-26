@@ -11,7 +11,15 @@ Invoke superpowers:brainstorming. Explore the codebase, ask clarifying questions
 Write the validated design to `docs/specs/YYYY-MM-DD-<topic>.md`. Self-review for TBDs, contradictions, and ambiguity. Get user approval.
 
 **Phase 3 — Plan**
-Invoke superpowers:writing-plans. Create a bite-sized plan with exact file paths, complete code in every step, and exact verification commands. No placeholders.
+
+Draft the implementation plan in `.claude/plans/YYYY-MM-DD-<feature-slug>.md`. This file is gitignored — it is a scratch draft, not a durable artifact.
+
+After presenting the plan and receiving user approval, promote it:
+```
+mb plan promote .claude/plans/YYYY-MM-DD-<feature-slug>.md
+```
+
+Do not commit `.claude/plans/` files. Do not load all plans at session start.
 
 **Phase 4 — Implement**
 Execute the plan using superpowers:subagent-driven-development (preferred) or superpowers:executing-plans. TDD: write failing test → implement → verify passing → commit after each unit.
