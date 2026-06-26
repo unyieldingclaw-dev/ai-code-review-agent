@@ -108,6 +108,7 @@ program
       contextMode?: string
       emoji: boolean
     }) => {
+      try {
       const contextMode = options.context === 'memory-bank' ? 'memory-bank' : 'none'
 
       const projectPath = resolve(options.dir ?? process.cwd())
@@ -246,8 +247,16 @@ program
 
       const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
       process.exit(hasBlocker ? 1 : 0)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      process.stderr.write(`\nError: ${msg}\n`)
+      if (msg.includes('not reachable') || msg.includes('ECONNREFUSED') || msg.includes('ENOENT')) {
+        process.stderr.write(`Make sure Ollama is running: ollama serve\n`)
+      }
+      process.exit(1)
     }
-  )
+  }
+)
 
 function collect(value: string, previous: string[]): string[] {
   return [...previous, value]

@@ -6,7 +6,16 @@ export class OllamaProvider implements LLMProvider {
   constructor(
     private readonly baseUrl: string,
     private readonly model: string
-  ) {}
+  ) {
+    const { hostname } = new URL(baseUrl)
+    if (!['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(hostname)) {
+      throw new Error(
+        `Ollama URL must point to localhost. Got: ${hostname}. ` +
+          `Use http://localhost:11434 (or http://127.0.0.1:11434) instead. ` +
+          `Remote Ollama instances are not supported (SSRF risk).`
+      )
+    }
+  }
 
   private supportsThinking(): boolean {
     const m = this.model.toLowerCase()

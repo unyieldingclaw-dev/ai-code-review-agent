@@ -1,10 +1,11 @@
 ---
-description: Deep code review covering security, correctness, maintainability, testing, and architecture drift. Spawns separate subagents per domain so findings don't bias each other. Works on git diff or a specific file/folder.
+description: "Deep code review covering security, correctness, maintainability, testing, and architecture drift. Uses Claude (cloud API) — sends diff content to Anthropic. For offline/local review, use /ai-review instead. Spawns separate subagents per domain so findings don't bias each other."
 allowed-tools:
   - Bash(git diff *)
   - Bash(git log *)
   - Bash(git status *)
   - Read
+  - Agent
 ---
 
 # Code Review

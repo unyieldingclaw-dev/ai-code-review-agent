@@ -123,7 +123,15 @@ Cross-reference job 2 claims against the test changes:
 
 ### Job 7 — Security
 
-**If ACR is available:** Run `ai-review-agent --profile security` on the diff and incorporate its findings here. Attribute findings as `basis: acr`.
+**If ACR is available:**
+1. Write the diff from Step 1 to a temp file:
+   - Bash: `git diff origin/main...HEAD > /tmp/cr-diff.patch` (or replay the Step 1 command that produced the diff)
+   - If Step 1 used `--diff <path>`, copy that file to `/tmp/cr-diff.patch`
+   - If Step 1 used `gh pr diff <number>`, re-run: `gh pr diff <number> > /tmp/cr-diff.patch`
+2. Run `ai-review-agent --profile security --diff /tmp/cr-diff.patch` and incorporate its findings here.
+3. Attribute findings as `basis: acr`.
+
+> **Why:** Without `--diff`, ACR defaults to `git diff --cached` (staged changes), which is a different surface than the PR or branch diff computed in Step 1.
 
 **If ACR is not available:** Run the PMB `/security-review` logic inline:
 

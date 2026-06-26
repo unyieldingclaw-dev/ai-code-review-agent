@@ -14,9 +14,17 @@ Review the output of `git diff HEAD` for security vulnerabilities. Check every c
 2. Command injection — unsanitized user input passed to shell commands (subprocess, os.system, exec)
 3. SQL injection — user input concatenated directly into SQL strings
 
-**[HIGH]** 4. Unvalidated external input — data from HTTP requests, files, or env vars used in logic without validation 5. Missing auth checks — endpoints or operations that should require authentication but don't 6. Insecure deserialization — pickle.loads(), yaml.load() without Loader=, eval() on untrusted data
+**[HIGH]**
 
-**[MEDIUM]** 7. XSS — unescaped user input rendered into HTML output 8. Exposed error details — stack traces, internal paths, or system info returned to the user 9. Unsafe dynamic execution — eval(), exec(), or os.system() with any variable input
+4. Unvalidated external input — data from HTTP requests, files, or env vars used in logic without validation
+5. Missing auth checks — endpoints or operations that should require authentication but don't
+6. Insecure deserialization — pickle.loads(), yaml.load() without Loader=, eval() on untrusted data
+
+**[MEDIUM]**
+
+7. XSS — unescaped user input rendered into HTML output
+8. Exposed error details — stack traces, internal paths, or system info returned to the user
+9. Unsafe dynamic execution — eval(), exec(), or os.system() with any variable input
 
 **[LOW]**
 

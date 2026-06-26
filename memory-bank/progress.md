@@ -65,9 +65,9 @@ lineage: []
 
 ### Test Coverage
 
-- **Unit Tests**: 112 passing (config: 2, ollamaProvider: 5, baseAgent: 5, orchestrator: 8, runner: 8, exitCode: 5, ignoreFilter: 7, sanitizer: 9, breakingChangeAgent: 5, licenseComplianceAgent: 5, confidence: 6, mcp/formatter: 8, mcp/tool: 7, errorHandlingAgent: 5, observabilityAgent: 5, migrationSafetyAgent: 5, secretsAgent: 5, complexityAgent: 5)
+- **Unit Tests**: 276 passing across 34 test files (run `npm test` for current count)
 - **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
-- **Total**: 112
+- **Total**: 276
 
 ### Implementation Progress
 

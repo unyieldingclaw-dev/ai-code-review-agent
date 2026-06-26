@@ -26,6 +26,7 @@ Every finding MUST use this exact markdown format:
 
 ```markdown
 ### Finding: [Short title — imperative phrase]
+
 - **Severity:** Critical | High | Medium | Low | Advisory
 - **Confidence:** Verified | Strong Evidence | Likely | Speculative
 - **Repository:** PMB | ACR | Both
@@ -42,6 +43,7 @@ Every finding MUST use this exact markdown format:
 ## Task 0: Pre-Audit Setup
 
 **Files:**
+
 - Create: `docs/audit/staging/` (directory)
 - Create: `docs/audit/staging/agent-1-security.md`
 - Create: `docs/audit/staging/agent-2-reliability.md`
@@ -84,6 +86,7 @@ git commit -m "chore: scaffold audit staging directory"
 > **Dispatch as subagent. Scope: both repos.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\.gitleaks.toml`
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\.claude\settings.json`
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\standards\SECRETS.md`
@@ -155,6 +158,7 @@ Write findings using the standard format to `C:\Users\Mizzo\Claude\AI-Code-Revie
 
 ```markdown
 # Agent 1 — Security & Secrets Findings
+
 **Date:** 2026-06-24
 **Status:** Complete
 **Finding count:** [N]
@@ -171,6 +175,7 @@ Then append each finding in the standard format. If a check produced no finding,
 > **Dispatch as subagent. Scope: both repos.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\runner.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\agents\base.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\llm\ollamaProvider.ts`
@@ -238,6 +243,7 @@ Write findings to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging
 > **Dispatch as subagent. Scope: both repos.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\agents\base.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\agents\orchestrator.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\runner.ts`
@@ -252,6 +258,7 @@ Write findings to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\.claude\settings.json`
 
 **Commands to run:**
+
 ```bash
 # Count TypeScript `any` usages, @ts-ignore, eslint-disable
 grep -rn "any\b\|@ts-ignore\|eslint-disable" \
@@ -284,21 +291,25 @@ Read `src\core\agents\base.ts` in full. List every distinct responsibility it ha
 - [ ] **Step 3: Check for Anthropic/dead code residue**
 
 Run:
+
 ```bash
 grep -rn "anthropic\|AnthropicProvider\|@anthropic-ai" \
   "C:/Users/Mizzo/Claude/AI-Code-Review-Agent/src" \
   --include="*.ts"
 ```
+
 Any hit = Medium/Verified finding. Document exact file and line.
 
 - [ ] **Step 4: Count `any` types and lint suppressions**
 
 Run:
+
 ```bash
 grep -n ": any\b\|as any\b\|@ts-ignore\|eslint-disable" \
   "C:/Users/Mizzo/Claude/AI-Code-Review-Agent/src"/*.ts \
   "C:/Users/Mizzo/Claude/AI-Code-Review-Agent/src"/**/*.ts 2>/dev/null
 ```
+
 More than 10 uses of `any` without justification = Medium finding. Every `@ts-ignore` = advisory.
 
 - [ ] **Step 5: Read contextLoader.ts — is semantic embedding real or aspirational?**
@@ -336,6 +347,7 @@ Write findings to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging
 > **Dispatch as subagent. Scope: both repos.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\README.md`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\CHANGELOG.md`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\CLAUDE.md`
@@ -350,6 +362,7 @@ Write findings to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\docs\CONTRACTS-GUIDE.md`
 
 **Commands to run:**
+
 ```bash
 # ACR: get actual CLI help output
 cd "C:/Users/Mizzo/Claude/AI-Code-Review-Agent" && node dist/cli/index.js --help 2>&1
@@ -372,6 +385,7 @@ ls -la "C:/Users/Mizzo/Claude/Personal-Memory-Bank/install.sh"
 Run `npm test | grep "Tests "` and record actual test count. Read `memory-bank\activeContext.md` and note what it claims. The discrepancy between claimed and actual test count is a **Verified** finding. Also check `memory-bank\progress.md` — does it reflect 264 tests and v1.0.1?
 
 Format as:
+
 ```
 ### Finding: ACR memory bank actively misreports test count
 - Severity: Medium
@@ -427,6 +441,7 @@ Write findings to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging
 > **Dispatch as subagent. Scope: ACR (PMB has no CI).**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\.github\workflows\release.yml`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\.github\workflows\review.yml`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\.github\workflows\calibrate.yml`
@@ -436,6 +451,7 @@ Write findings to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging
 - All 34 unit test files in `tests\unit\`
 
 **Commands to run:**
+
 ```bash
 cd "C:/Users/Mizzo/Claude/AI-Code-Review-Agent"
 
@@ -520,6 +536,7 @@ Write findings to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging
 > **Dispatch as subagent. Scope: both repos together.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\.claude\commands\` (all .md files)
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\.claude\commands\` (all .md files)
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\CLAUDE.md`
@@ -532,6 +549,7 @@ Write findings to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\memory-bank\systemPatterns.md`
 
 **Commands to run:**
+
 ```bash
 # List all commands in both repos
 ls "C:/Users/Mizzo/Claude/AI-Code-Review-Agent/.claude/commands/"
@@ -603,6 +621,7 @@ Write findings to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging
 > **Prerequisite:** All 6 staging files exist and contain `Status: Complete`.
 
 **Files to read:**
+
 - All 6 staging files in `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\superpowers\specs\2026-06-24-pre-production-audit-design.md`
 
@@ -645,6 +664,7 @@ Write to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\2026-06-24-pre-p
 
 ```markdown
 # Pre-Production Readiness Audit Report
+
 **Date:** 2026-06-24
 **Auditor:** Claude Sonnet 4.6 (6-agent parallel audit)
 **Repositories:** Personal-Memory-Bank v1.2.0 | AI-Code-Review-Agent v1.0.1
@@ -653,9 +673,11 @@ Write to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\2026-06-24-pre-p
 ---
 
 ## 1. Executive Summary
+
 [400 words max. Key findings, overall posture, top 3 risks.]
 
 ## 2. Overall Readiness Assessment
+
 [Table: domain → rating → rationale]
 | Domain | Rating | Key Risk |
 |---|---|---|
@@ -667,57 +689,75 @@ Write to `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\2026-06-24-pre-p
 | Integration | ... | ... |
 
 ## 3. Critical Issues (Must Fix)
+
 [Each finding in full format]
 
 ## 4. High Priority Issues
+
 ...
 
 ## 5. Medium Priority Issues
+
 ...
 
 ## 6. Low Priority Issues
+
 ...
 
 ## 7. Missing Features
+
 ...
 
 ## 8. Missing Guardrails
+
 ...
 
 ## 9. Incorrect Guardrails
+
 ...
 
 ## 10. Security Concerns
+
 ...
 
 ## 11. Reliability Concerns
+
 ...
 
 ## 12. Performance Concerns
+
 ...
 
 ## 13. Documentation Issues
+
 ...
 
 ## 14. Developer Experience Issues
+
 ...
 
 ## 15. Integration Problems
+
 ...
 
 ## 16. Architecture Critique
+
 ...
 
 ## 17. Technical Debt
+
 ...
 
 ## 18. Quick Wins
+
 [XS/S effort, Medium+ severity — prioritized list]
 
 ## 19. Long-Term Recommendations
+
 ...
 
 ## 20. Production Readiness Verdict
+
 [One paragraph. Blunt. Is it ready? For what definition of "production"? What must change first?]
 ```
 

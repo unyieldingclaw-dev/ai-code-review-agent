@@ -99,7 +99,7 @@ lineage: []
 ## Key Commands
 
 ```bash
-npm test                    # all unit tests (120 passing)
+npm test                    # all unit tests (276 passing)
 npm run typecheck           # 0 errors
 npm run build               # compile to dist/
 node dist/cli/index.js --help   # smoke test CLI

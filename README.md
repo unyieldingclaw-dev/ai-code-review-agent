@@ -53,6 +53,7 @@ npm install -g ai-review-agent
 Pull the model if you haven't already:
 
 ```bash
+# devstral:latest is approximately 14 GB — ensure at least 15 GB free disk space before proceeding
 ollama pull devstral:latest
 ```
 
@@ -366,7 +367,7 @@ Every `--format json` response includes a stable envelope:
 
 ```bash
 npm run check                           # full local gate: tests + typecheck + build + format
-npm test                                # unit tests only — no Ollama needed (196 passing)
+npm test                                # unit tests only — no Ollama needed (276 passing)
 npm run test:extension                  # VS Code extension tests (25 passing)
 npm run typecheck                       # 0 TypeScript errors
 npm run build                           # compile to dist/

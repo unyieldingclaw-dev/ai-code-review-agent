@@ -19,6 +19,11 @@ handoff.md
 *.vsix
 *.tgz
 
+# Secret file types
+*.pem
+*.key
+*.p12
+
 # AI-generated scratch planning/session state
 .claude/plans/
 .claude/worktrees/

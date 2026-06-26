@@ -31,8 +31,19 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: VS Code extension tests
+        run: npm run test:extension
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build
         run: npm run build
+
+      - name: NPM_TOKEN expiry reminder
+        run: echo "::warning::NPM_TOKEN (github-actions-publish) expires 2026-09-08. Renew at npmjs.com before this date and update the NPM_TOKEN secret."
 
       - name: Publish to npm
         run: npm publish --provenance --access public
