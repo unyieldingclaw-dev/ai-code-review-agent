@@ -148,6 +148,9 @@ export class SwarmRunner {
         warnings: sanitizeResult.warnings,
       }
     } else {
+      process.stderr.write(
+        '[ai-review] WARNING: --no-sanitize is active. Prompt injection from diff content is not prevented.\n'
+      )
       sanitizerMeta = { enabled: false, applied: false, redactedLines: 0, warnings: [] }
     }
 
