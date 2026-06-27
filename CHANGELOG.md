@@ -37,6 +37,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.0.1] — 2026-06-26
 
 ### Fixed
+
 - OllamaProvider: removed `0.0.0.0` from localhost allowlist (routes to external interfaces on Linux)
 - OllamaProvider: added HTTP/HTTPS scheme validation; `ollama://` protocol now throws with helpful error
 - OllamaProvider: wrapped `new URL()` in try/catch for helpful error on malformed URL input
@@ -55,6 +56,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - MCP server: added SIGTERM/SIGINT/stdin.close shutdown handlers
 
 ### Added
+
 - `docs/CONTRACTS-GUIDE.md`: canonical task contract schema documentation
 - `docs/HOOKS-GUIDE.md`: hook types, enforcement layers, and per-hook behavior
 - `.github/dependabot.yml`: weekly GitHub Actions version tracking
