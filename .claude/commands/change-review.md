@@ -124,6 +124,7 @@ Cross-reference job 2 claims against the test changes:
 ### Job 7 — Security
 
 **If ACR is available:**
+
 1. Write the diff from Step 1 to a temp file:
    - Bash: `git diff origin/main...HEAD > /tmp/cr-diff.patch` (or replay the Step 1 command that produced the diff)
    - If Step 1 used `--diff <path>`, copy that file to `/tmp/cr-diff.patch`

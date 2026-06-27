@@ -26,6 +26,7 @@ Every finding MUST use this exact format:
 
 ```markdown
 ### Finding: [Short imperative title]
+
 - **Tag:** [REGRESSION] | [NEW]
 - **Severity:** Critical | High | Medium | Low | Advisory
 - **Confidence:** Verified | Strong Evidence | Likely | Speculative
@@ -45,6 +46,7 @@ Null result: `> [CHECK NAME]: No finding — [what was observed].`
 ## Task 0: Pre-Audit Setup
 
 **Files:**
+
 - Create: `docs/audit/staging/r2-agent-1-regression.md`
 - Create: `docs/audit/staging/r2-agent-2-pmb-tests.md`
 - Create: `docs/audit/staging/r2-agent-3-mcp-extension.md`
@@ -86,6 +88,7 @@ git commit -m "chore: scaffold Round 2 audit staging files"
 > **Dispatch as subagent. Scope: both repos. Verifies every Round 1 fix held after 20+ subsequent commits.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\llm\ollamaProvider.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\cli\index.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\policyFilter.ts`
@@ -127,6 +130,7 @@ Record the allowlist exactly and assess each case. Any bypass = High/[NEW] findi
 - [ ] **Step 3: Verify CLI re-throw guard**
 
 Read `src/cli/index.ts`. Find the catch block. Verify:
+
 - Does it contain `err.message.startsWith('process.exit(')` or equivalent?
 - If a real dependency throws `new Error('process.exit(something) was called in test harness')` would that be accidentally re-thrown (masking the real error)?
 
@@ -143,6 +147,7 @@ Expected: 0 errors. Also read `src/core/policyFilter.ts` — verify it imports `
 - [ ] **Step 5: Verify check-contract scope schema handling**
 
 Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\scripts\check-contract.sh`. Find the Python block. Verify it handles:
+
 - `scope` = `[{file: "x", op: "edit"}]` (ACR format) → extracts `["x"]`
 - `scope` = `{files: ["x"]}` (PMB template) → extracts `["x"]`
 - `scope` = `[]` → extracts `[]` (empty, no scope check fires)
@@ -153,6 +158,7 @@ Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\scripts\check-contract.ps1`. Fi
 - [ ] **Step 6: Verify CONTRACTS-GUIDE.md accuracy**
 
 Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\CONTRACTS-GUIDE.md`. Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\.claude\contracts\active-task.json`. Compare:
+
 - Does guide's schema match the actual JSON fields?
 - Does guide document both scope formats or only one?
 - Does guide mention `approved_by` field? Is that field in the actual contract?
@@ -162,6 +168,7 @@ Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\CONTRACTS-GUIDE.md`. Read 
 Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\HOOKS-GUIDE.md`. Find the PreCompact section. Note the claim about exit codes.
 
 Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\scripts\pre-compact-check.sh`. Find the actual exit codes:
+
 - On check pass: exits 0 ✓
 - On check fail: exits 2 (blocks) or exits 0 (warns)?
 
@@ -178,6 +185,7 @@ Also check: can `--diff` and `--dir` both be specified? Is there a validation er
 - [ ] **Step 9: Verify --no-sanitize warning fires correctly**
 
 Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\runner.ts`. Find `preprocessDiff` method. Check:
+
 - Is the warning written via `process.stderr.write` (correct) or `console.warn` (may be swallowed by stdout redirect in CI)?
 - Is sanitization skipped when `config.sanitize === false` or when `config.sanitize !== true`? (edge: what is the default value?)
 
@@ -186,12 +194,14 @@ Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\config.ts` to find the
 - [ ] **Step 10: Verify gitleaks action is pinned**
 
 Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\.github\workflows\release.yml`. Find the gitleaks step. Check:
+
 - Is it `gitleaks/gitleaks-action@v2` (mutable, supply-chain risk) or `gitleaks/gitleaks-action@SHA` (pinned)?
 - A floating `@v2` tag means any push to that tag repo changes what runs with `GITHUB_TOKEN` in scope.
 
 - [ ] **Step 11: Verify vscode-extension CI test can run headlessly**
 
 Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\.github\workflows\release.yml`. Find the `npm run test:extension` step. Check:
+
 - Is there a `xvfb-run` prefix or `DISPLAY` environment variable set?
 - Is there a `uses: actions/setup-node` + headless display setup step before it?
 
@@ -208,6 +218,7 @@ Expected: ≥284 tests passing. Any reduction = [REGRESSION].
 - [ ] **Step 13: Verify /code-review cloud disclosure is in frontmatter**
 
 Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\.claude\commands\code-review.md`. Check:
+
 - Is "Uses Claude (cloud API)" in the `description:` frontmatter field (visible to Claude when listing commands)?
 - Or is it only in the body text (only visible when Claude reads the full file)?
 
@@ -219,6 +230,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-1-
 
 ```markdown
 # Agent 1 — Round 1 Fix Verification (Regression Inspector)
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** [N] ([R] regressions, [N] new)
@@ -235,6 +247,7 @@ Then append each finding in the standard format. For null results: `> [CHECK NAM
 > **Dispatch as subagent. Scope: PMB only. Areas barely touched in Round 1.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\tests\run.sh`
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\tests\test-mb-doctor.sh`
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\tests\test-mb-plan.sh`
@@ -257,6 +270,7 @@ Record: did it complete? How many tests passed/failed? Any permission errors on 
 - [ ] **Step 2: Check test isolation**
 
 Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\tests\run.sh` and any helper files in `tests/helpers/`. Check:
+
 - Do tests create temp directories and clean up after themselves?
 - Do any tests mutate the real PMB repo (e.g. write to `memory-bank/` directly)?
 - Is there a shared state file that one test writes and another reads?
@@ -266,6 +280,7 @@ Any test that mutates real repo state without cleanup = High/[NEW] finding.
 - [ ] **Step 3: Verify test-mb-doctor.sh covers all 24 checks**
 
 Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\tests\test-mb-doctor.sh`. Count the distinct doctor checks being tested. Cross-reference with the 24 checks in `mb doctor` output:
+
 - Does the test file test all 24 checks, or does it skip some?
 - Does it test the "clean baseline" path (all OK)?
 - Does it test failure modes for each check?
@@ -275,6 +290,7 @@ Any doctor check with no test = Medium/[NEW] finding.
 - [ ] **Step 4: Verify test-mb-plan.sh — mb plan promote actually moves files**
 
 Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\tests\test-mb-plan.sh`. Check:
+
 - Does the test create a file in `.claude/plans/`, call `mb plan promote`, and verify the file moved to `docs/plans/`?
 - Or does it just check the exit code of `mb plan promote`?
 
@@ -283,6 +299,7 @@ A test that only checks exit code without verifying file movement = Medium/[NEW]
 - [ ] **Step 5: Audit new commands test coverage**
 
 Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\tests\test-mb-preflight.sh` and `test-mb-change-check.sh`. Check:
+
 - Do they test actual behavior (output content, file changes) or just exit codes?
 - Do they test failure/error paths?
 
@@ -291,6 +308,7 @@ Also list all `mb` subcommands in `scripts/mb.sh` by scanning for the `case` sta
 - [ ] **Step 6: Read pmb-health.yml — does it actually run mb as a CLI?**
 
 Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\.github\workflows\pmb-health.yml`. Find the `mb-doctor-self-check` job. Check:
+
 - Does it run `mb doctor` as a CLI command, or does it `source scripts/mb.sh && doctor`?
 - If it runs `mb` as a CLI, how is `mb` installed? Via `PATH`? Via `npm install -g`?
 - If `mb` is not installed as a CLI on the CI runner, does the job fail with a useful error or silently pass?
@@ -300,6 +318,7 @@ A CI job that tests `mb` but doesn't actually install `mb` = High/[NEW] finding.
 - [ ] **Step 7: Read powershell-lint job**
 
 Read the powershell-lint job in `pmb-health.yml`. Check:
+
 - What PSScriptAnalyzer severity level is enforced (`-Severity Error` only, or also `Warning`)?
 - Does it run on all `.ps1` files or only some?
 - Run mentally: would the known CRLF warnings on `check-contract.ps1` and `check-contract.sh` (from our Round 1 commits) trigger PSScriptAnalyzer findings?
@@ -307,6 +326,7 @@ Read the powershell-lint job in `pmb-health.yml`. Check:
 - [ ] **Step 8: Verify doctor O(n) optimization**
 
 Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\scripts\mb.sh`. Find the doctor check section (checks 22–23, the semantic drift checks). Check:
+
 - Is there a pre-computation step that runs BEFORE the check loop (O(1) setup)?
 - Or is the expensive computation still inside the loop?
 
@@ -318,6 +338,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-2-
 
 ```markdown
 # Agent 2 — PMB Test Suite & CI Audit
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** [N]
@@ -332,6 +353,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-2-
 > **Dispatch as subagent. Scope: ACR src/mcp/ and vscode-extension/. Barely touched in Round 1.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\mcp\server.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\mcp\tool.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\mcp\formatter.ts`
@@ -343,6 +365,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-2-
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\tests\unit\mcp\tool.test.ts`
 
 **Commands to run:**
+
 ```bash
 cd "C:/Users/Mizzo/Claude/AI-Code-Review-Agent" && npm pack --dry-run 2>&1 | grep -i "mcp\|server"
 cd "C:/Users/Mizzo/Claude/AI-Code-Review-Agent" && npm run test:extension 2>&1 | tail -20
@@ -353,6 +376,7 @@ cd "C:/Users/Mizzo/Claude/AI-Code-Review-Agent" && npm run test:extension 2>&1 |
 - [ ] **Step 1: Check MCP server shutdown handling**
 
 Read `src/mcp/server.ts`. Check:
+
 - Is there a `process.on('SIGTERM', ...)` or `process.on('SIGINT', ...)` handler?
 - Is there a `stdin.on('close', ...)` handler to detect client disconnect?
 - What happens if the MCP client disconnects mid-review — does the server hang, crash, or clean up?
@@ -362,6 +386,7 @@ No shutdown handler = Medium/[NEW] finding (server leaks on client disconnect).
 - [ ] **Step 2: Test MCP tool empty/null diff handling**
 
 Read `src/mcp/tool.ts`. Find the `review_diff` tool handler. Check:
+
 - What happens when `diff` argument is `""` (empty string)? Does it return an error response or call SwarmRunner with empty diff?
 - What happens when `diff` is not provided (undefined)? Is there input validation?
 - Is the response always a valid `CallToolResult` with a `content` array?
@@ -371,6 +396,7 @@ Compare to how the CLI handles empty diff (exits with error message).
 - [ ] **Step 3: Verify MCP formatter response schema**
 
 Read `src/mcp/formatter.ts`. Check that the returned object matches MCP `CallToolResult` schema:
+
 - `content` must be an array
 - Each content item must have `type: "text"` and `text: string`
 - No extra fields that MCP clients reject
@@ -386,6 +412,7 @@ Expected: `dist/mcp/server.js` appears in pack output. If not: High/[NEW] findin
 - [ ] **Step 5: Check vscode-extension runner timeout**
 
 Read `vscode-extension/src/runner.ts`. Check:
+
 - Is there a timeout set on the `ai-review-agent` subprocess spawn?
 - If ACR hangs for 10 minutes, does the extension timeout and surface an error, or does VS Code become unresponsive?
 
@@ -394,6 +421,7 @@ No subprocess timeout = High/[NEW] finding.
 - [ ] **Step 6: Check vscode-extension diagnostics clearing**
 
 Read `vscode-extension/src/diagnostics.ts`. Find where `diagnosticCollection.set()` is called. Check:
+
 - Is `diagnosticCollection.clear()` or `diagnosticCollection.delete(uri)` called before setting new diagnostics?
 - If not, running the extension twice on files where the first run had findings but the second run does not — do stale squiggles persist?
 
@@ -410,6 +438,7 @@ Record: did it pass, fail, or hang? If it hangs (requires display server), kill 
 - [ ] **Step 8: Check vscode-extension CI headless compatibility**
 
 Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\.github\workflows\release.yml`. Find the `VS Code extension tests` step. Check:
+
 - Is there `xvfb-run` wrapping the command?
 - Is there `DISPLAY: :99` in the environment?
 - Is there `uses: coactions/setup-xvfb@v1` or equivalent before it?
@@ -422,6 +451,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-3-
 
 ```markdown
 # Agent 3 — MCP Server & vscode-extension Deep Dive
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** [N]
@@ -436,6 +466,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-3-
 > **Dispatch as subagent. Scope: ACR src/core/agents/base.ts and src/core/contextLoader.ts. Both deferred in Round 1.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\agents\base.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\contextLoader.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\tests\unit\baseAgent.test.ts`
@@ -446,6 +477,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-3-
 - [ ] **Step 1: Count BaseAgent responsibilities**
 
 Read `src/core/agents/base.ts` in full. List every distinct responsibility:
+
 1. System prompt construction
 2. HTTP call to LLM
 3. Think-tag stripping
@@ -463,6 +495,7 @@ Count the actual responsibilities in the current code. More than 5 distinct conc
 - [ ] **Step 2: Test 3-stage parse interaction**
 
 Read the 3 parse stages. Answer:
+
 - If stage-1 fails and stage-2 succeeds, are stage-2 findings still validated by `validateFindings()`?
 - Is there a guarantee that if stage-2 returns results, stage-3 is NOT attempted (avoiding double findings)?
 - What happens if stage-2 produces partial findings (some valid, some missing required fields)?
@@ -470,6 +503,7 @@ Read the 3 parse stages. Answer:
 - [ ] **Step 3: Audit validateFindings silently dropping findings**
 
 Read `validateFindings()` in `base.ts`. Check:
+
 - What fields are required? Does it check `title`? `severity`? `file`?
 - If the LLM returns a finding with all 10 required fields plus one extra unknown field, is the finding kept or dropped?
 - Is there any logging when a finding is dropped by validation?
@@ -479,6 +513,7 @@ Silent finding drops with no log = Medium/[NEW] finding (makes debugging agent o
 - [ ] **Step 4: Test field aliasing priority**
 
 Read the aliasing block. Answer:
+
 - If a finding has BOTH `basis: "x"` AND `evidence: "y"`, which wins?
 - If a finding has BOTH `detail: "x"` AND `description: "y"`, which wins?
 - Is the aliasing order documented?
@@ -488,6 +523,7 @@ Conflicting field resolution without documentation = Low/[NEW] finding.
 - [ ] **Step 5: Test confidence clamping edge cases**
 
 Read the confidence handling. Evaluate:
+
 - `confidence: -1` → what happens?
 - `confidence: 200` → what happens?
 - `confidence: "high"` (string) → does TypeScript catch this, or does runtime coerce it?
@@ -498,6 +534,7 @@ Any unhandled edge case that produces `NaN` or `undefined` confidence = Medium/[
 - [ ] **Step 6: Verify contextLoader semantic embedding is real**
 
 Read `src/core/contextLoader.ts` in full. Find `loadAgentContextSemantic()` and `embed()`. Check:
+
 - Does `embed()` actually make an HTTP call to `http://localhost:11434/api/embeddings` with model `nomic-embed-text`?
 - Or does it return a fallback/mock embedding?
 - What happens when `nomic-embed-text` is not installed in Ollama? Does `embed()` throw, return zeros, or fall back to keyword selection?
@@ -507,6 +544,7 @@ If semantic embedding is aspired but not implemented = High/[NEW] finding (featu
 - [ ] **Step 7: Verify cosineSimilarity mathematical correctness**
 
 Read the `cosineSimilarity()` function. Evaluate:
+
 - Is the numerator the dot product of the two vectors?
 - Is the denominator the product of the L2 norms?
 - What happens when one vector is all zeros? (division by zero → `NaN` or `Infinity`)
@@ -517,6 +555,7 @@ Division by zero risk = Medium/[NEW] finding.
 - [ ] **Step 8: Check contextLoader test coverage of semantic path**
 
 Read `tests/unit/contextLoader.test.ts`. Check:
+
 - Does any test call `loadAgentContextSemantic()`?
 - Does any test exercise `embed()` or `cosineSimilarity()`?
 - Are all semantic-path functions at 0% coverage?
@@ -529,6 +568,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-4-
 
 ```markdown
 # Agent 4 — BaseAgent Architecture & contextLoader Semantic Path
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** [N]
@@ -543,6 +583,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-4-
 > **Dispatch as subagent. Scope: both repos. Focuses on security/reliability of Round 1 changes themselves.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\llm\ollamaProvider.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\cli\index.ts`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src\core\runner.ts`
@@ -556,6 +597,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-4-
 - [ ] **Step 1: Test URL parser hostname bypass vectors**
 
 Evaluate these URL parsing behaviors (no execution needed — use `new URL()` semantics):
+
 - `new URL('http://localhost@evil.com:11434').hostname` → returns `evil.com` (the `@` makes `localhost` a username). OllamaProvider's allowlist checks `hostname`, so `evil.com` fails → safe. But if anyone ever changes to checking `host`, the `localhost` username bypasses.
 - `new URL('http://127.0.0.1.evil.com:11434').hostname` → returns `127.0.0.1.evil.com` → fails allowlist → safe.
 - `new URL('ollama://localhost:11434')` → unknown protocol causes `TypeError: Invalid URL` → does OllamaProvider constructor catch this and produce a helpful error, or does it propagate as an uncaught type error?
@@ -565,6 +607,7 @@ Record each case with confidence. The `localhost@evil.com` case is NOT a bypass 
 - [ ] **Step 2: Verify sanitization order in preprocessDiff**
 
 Read `src/core/runner.ts`, find `preprocessDiff`. Verify the order:
+
 1. Ignore filtering (remove files matching .aiignore)
 2. Sanitization (strip injection patterns)
 3. Truncation (cut at maxDiffLines)
@@ -574,6 +617,7 @@ If truncation happens BEFORE sanitization: an attacker can embed injection at li
 - [ ] **Step 3: Test --no-sanitize warning channel**
 
 Read `src/core/runner.ts` `preprocessDiff`. Find the warning for `config.sanitize === false`. Check:
+
 - Is it `process.stderr.write(...)` (reaches CI stderr stream)?
 - Is it `console.warn(...)` (routed through Node.js console, typically also to stderr but potentially suppressed)?
 
@@ -582,6 +626,7 @@ Then consider: in a CI pipeline that does `ai-review-agent --no-sanitize --forma
 - [ ] **Step 4: Assess gitleaks supply-chain risk**
 
 Read `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\.github\workflows\release.yml`. Find:
+
 ```yaml
 uses: gitleaks/gitleaks-action@v2
 ```
@@ -597,6 +642,7 @@ Read the `VS Code extension tests` step in `release.yml`. Does it have a `timeou
 - [ ] **Step 6: Check check-contract.ps1 null scope edge case**
 
 Read `check-contract.ps1`. Find the scope extraction block. Evaluate:
+
 - If `$contract.scope` is `$null` (contract JSON has no `scope` field), what does `$rawScope -is [System.Array]` return? In PowerShell, `$null -is [System.Array]` returns `$false`. So `$rawScope` falls to `else` branch and `$scopeFiles = $rawScope` = `$null`.
 - Then in the scope loop: `foreach ($pattern in $null)` — does PowerShell iterate zero times (safe) or throw?
 - If it iterates zero times, every file appears out-of-scope and a spurious warning fires.
@@ -613,6 +659,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-5-
 
 ```markdown
 # Agent 5 — New Security & Reliability Surface
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** [N]
@@ -627,6 +674,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-5-
 > **Dispatch as subagent. Scope: both repos. Verifies documentation accuracy after the Round 1 remediation sprint.**
 
 **Files to read:**
+
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\memory-bank\activeContext.md`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\memory-bank\progress.md`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\CHANGELOG.md`
@@ -638,6 +686,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-5-
 - `C:\Users\Mizzo\Claude\Personal-Memory-Bank\.github\workflows\pmb-health.yml`
 
 **Commands to run:**
+
 ```bash
 cd "C:/Users/Mizzo/Claude/AI-Code-Review-Agent" && npm test 2>&1 | grep "Tests "
 cd "C:/Users/Mizzo/Claude/AI-Code-Review-Agent" && git log --oneline -5
@@ -648,17 +697,20 @@ cd "C:/Users/Mizzo/Claude/AI-Code-Review-Agent" && git log --oneline -5
 - [ ] **Step 1: Audit ACR memory bank staleness**
 
 Read `memory-bank/activeContext.md`. Check:
+
 - What is the `last-reviewed` date?
 - Today is 2026-06-26; staleness threshold is 14d. Is it stale?
 - Does "Current Focus" reflect the Round 1 remediation sprint, or is it still describing v0.5.0 extension work?
 
 Read `memory-bank/progress.md`. Check:
+
 - Does the Metrics section say 284 tests (correct) or an older count?
 - Does the Version History table include entries for v1.1.0 and the post-audit remediation commits?
 
 - [ ] **Step 2: Verify ACR CHANGELOG covers Round 1 fixes**
 
 Read `CHANGELOG.md`. Check:
+
 - Is there a section for v1.1.0 or the remediation commits (after 2026-06-24)?
 - Does it mention: OllamaProvider URL validation, CLI try/catch, runner decomposition, gitleaks in CI, vscode-extension tests in CI, /change-review Job 7 fix, CONTRACTS-GUIDE.md, HOOKS-GUIDE.md?
 
@@ -667,9 +719,11 @@ Missing CHANGELOG entries for shipped fixes = Medium/[NEW] finding.
 - [ ] **Step 3: Verify ACR CLAUDE.md references resolve**
 
 Read `CLAUDE.md`. Find every reference to a local file (paths starting with `docs/`, `standards/`, `scripts/`). For each:
+
 - Does the file actually exist in the ACR repo?
 
 Specifically check:
+
 - `docs/CONTRACTS-GUIDE.md` → should now exist (created in Round 1)
 - `docs/HOOKS-GUIDE.md` → should now exist (copied in Round 1)
 - `standards/SECURITY-GUARDRAILS.md` → does this exist in ACR?
@@ -682,6 +736,7 @@ Any broken reference = High/[NEW] finding (CLAUDE.md is the primary governance d
 - [ ] **Step 4: Verify CONTRACTS-GUIDE.md documents dual-format scope**
 
 Read `docs/CONTRACTS-GUIDE.md`. After the Round 1 fix to `check-contract.sh`, the script now handles both `[{file,op}]` AND `{files:[]}` scope schemas. Does the guide:
+
 - Document only one canonical schema (leaving users confused about which to use)?
 - Or document both and explain the compatibility layer?
 
@@ -704,6 +759,7 @@ Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\memory-bank\activeContext.md`. 
 - [ ] **Step 7: Check PMB README for new commands and CI**
 
 Read `C:\Users\Mizzo\Claude\Personal-Memory-Bank\README.md`. Check:
+
 - Does the command table include `mb preflight` and `mb change-check` (new since last audit)?
 - Does the README mention that PMB has CI (pmb-health.yml with 9 jobs)?
 - Does the doctor diagnostic count say 24?
@@ -720,6 +776,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-6-
 
 ```markdown
 # Agent 6 — Ecosystem Drift & Documentation Accuracy Post-Fixes
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** [N]
@@ -734,6 +791,7 @@ Write `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-6-
 > **Run AFTER Tasks 1–6 are complete. All 6 staging files must contain `Status: Complete`.**
 
 **Files to read:**
+
 - All 6 staging files in `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\staging\r2-agent-*.md`
 - `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\docs\audit\2026-06-24-pre-production-audit-report.md` (Round 1 report for cross-reference)
 
@@ -750,21 +808,21 @@ For every `[REGRESSION]` finding, create a row in this table:
 ```markdown
 ## 3.1 Round 1 Regression Summary
 
-| Round 1 Fix | Status | Finding |
-|---|---|---|
-| npm run check fix | ❌ Regressed | 14 new Prettier violations from subsequent commits |
-| OllamaProvider URL validation | ✅ Held | [or] ⚠️ Partial — [specific gap] |
-| CLI try/catch | ... | ... |
-| matchPattern export | ... | ... |
-| check-contract scope fix | ... | ... |
-| CONTRACTS-GUIDE.md | ... | ... |
-| HOOKS-GUIDE.md | ... | ... |
-| /change-review --diff fix | ... | ... |
-| --no-sanitize warning | ... | ... |
-| gitleaks in release.yml | ... | ... |
-| vscode-extension CI | ... | ... |
-| runner decomposition | ... | ... |
-| /code-review cloud disclosure | ... | ... |
+| Round 1 Fix                   | Status       | Finding                                            |
+| ----------------------------- | ------------ | -------------------------------------------------- |
+| npm run check fix             | ❌ Regressed | 14 new Prettier violations from subsequent commits |
+| OllamaProvider URL validation | ✅ Held      | [or] ⚠️ Partial — [specific gap]                   |
+| CLI try/catch                 | ...          | ...                                                |
+| matchPattern export           | ...          | ...                                                |
+| check-contract scope fix      | ...          | ...                                                |
+| CONTRACTS-GUIDE.md            | ...          | ...                                                |
+| HOOKS-GUIDE.md                | ...          | ...                                                |
+| /change-review --diff fix     | ...          | ...                                                |
+| --no-sanitize warning         | ...          | ...                                                |
+| gitleaks in release.yml       | ...          | ...                                                |
+| vscode-extension CI           | ...          | ...                                                |
+| runner decomposition          | ...          | ...                                                |
+| /code-review cloud disclosure | ...          | ...                                                |
 ```
 
 Status: ✅ Held / ❌ Regressed / ⚠️ Partial
@@ -779,6 +837,7 @@ Write to `docs/audit/2026-06-26-round2-audit-report.md` using this structure:
 
 ```markdown
 # Round 2 Pre-Production Readiness Audit Report
+
 **Date:** 2026-06-26
 **Auditor:** Claude Sonnet 4.6 — 6-agent parallel audit (Round 2)
 **Repositories:** Personal-Memory-Bank | AI-Code-Review-Agent v1.1.0
@@ -789,38 +848,61 @@ Write to `docs/audit/2026-06-26-round2-audit-report.md` using this structure:
 ---
 
 ## 1. Executive Summary
+
 [300–400 words. Lead with regression count. What held? What broke? What's net-new?]
 
 ## 2. Overall Readiness Assessment
-| Domain | Round 1 Rating | Round 2 Rating | Delta |
-|---|---|---|---|
-| Security | ... | ... | ↑/↓/= |
+
+| Domain   | Round 1 Rating | Round 2 Rating | Delta |
+| -------- | -------------- | -------------- | ----- |
+| Security | ...            | ...            | ↑/↓/= |
+
 ...
 
 ## 3. Critical Issues
+
 ### 3.1 Round 1 Regression Summary
+
 [Table from Step 2]
 
 ### 3.2 Critical Findings
+
 [Full finding format for Critical severity]
 
 ## 4. High Priority Issues
+
 ## 5. Medium Priority Issues
+
 ## 6. Low Priority Issues
+
 ## 7. Missing Features
+
 ## 8. Missing Guardrails
+
 ## 9. Incorrect Guardrails
+
 ## 10. Security Concerns
+
 ## 11. Reliability Concerns
+
 ## 12. Performance Concerns
+
 ## 13. Documentation Issues
+
 ## 14. Developer Experience Issues
+
 ## 15. Integration Problems
+
 ## 16. Architecture Critique
+
 ## 17. Technical Debt
+
 ## 18. Quick Wins
+
 ## 19. Long-Term Recommendations
+
 ## 20. Production Readiness Verdict
+
 [One blunt paragraph. What changed since Round 1? Is it closer to ready?]
 ```
 

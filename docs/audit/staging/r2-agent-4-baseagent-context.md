@@ -1,4 +1,5 @@
 # Agent 4 — BaseAgent Architecture & contextLoader Semantic Path
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** 8
@@ -10,31 +11,15 @@
 Distinct concerns identified in `src/core/agents/base.ts`:
 
 **In `run()`:**
+
 1. LLM/HTTP call dispatch (`provider.chat`)
 2. Message array construction (system + user messages)
 
-**In `buildUserPrompt()`:**
-3. User prompt construction (context concatenation + diff wrapping)
+**In `buildUserPrompt()`:** 3. User prompt construction (context concatenation + diff wrapping)
 
-**In `parseFindings()`:**
-4. Code-fence stripping (`raw.replace(...)`)
-5. Stage-1 JSON parse: bare array path
-6. Stage-1 JSON parse: wrapped-object path (`{findings:[]}`)
-7. Stage-2 balanced-bracket extraction (`extractJsonArray`)
-8. Stage-2 JSON re-parse of extracted substring
-9. Error logging on total parse failure
+**In `parseFindings()`:** 4. Code-fence stripping (`raw.replace(...)`) 5. Stage-1 JSON parse: bare array path 6. Stage-1 JSON parse: wrapped-object path (`{findings:[]}`) 7. Stage-2 balanced-bracket extraction (`extractJsonArray`) 8. Stage-2 JSON re-parse of extracted substring 9. Error logging on total parse failure
 
-**In `validateFindings()`:**
-10. Structural field validation / filter (7-field type check)
-11. Field aliasing: `detail → evidence` (via `f.evidence ?? f.detail`)
-12. Field aliasing: `suggestion ↔ recommendation` (bidirectional)
-13. Confidence clamping (`Math.max(0, Math.min(100, ...))`)
-14. Confidence defaulting (string/null/undefined → 70)
-15. ID stamping (`${this.name}-${i}`)
-16. Domain defaulting (`agentDefaultDomain`)
-17. `blocking` defaulting (`severity === 'critical'`)
-18. `source` defaulting (`'llm'`)
-19. `lineEnd` clamping (`Math.max(f.line, f.lineEnd)`)
+**In `validateFindings()`:** 10. Structural field validation / filter (7-field type check) 11. Field aliasing: `detail → evidence` (via `f.evidence ?? f.detail`) 12. Field aliasing: `suggestion ↔ recommendation` (bidirectional) 13. Confidence clamping (`Math.max(0, Math.min(100, ...))`) 14. Confidence defaulting (string/null/undefined → 70) 15. ID stamping (`${this.name}-${i}`) 16. Domain defaulting (`agentDefaultDomain`) 17. `blocking` defaulting (`severity === 'critical'`) 18. `source` defaulting (`'llm'`) 19. `lineEnd` clamping (`Math.max(f.line, f.lineEnd)`)
 
 **Total: 19 distinct concerns in one 150-line class.**
 
@@ -68,9 +53,11 @@ Yes — any return inside the try block exits `parseFindings()` entirely. The ex
 **Q3: What if stage-1 parsed a non-empty array but validateFindings returned 0 valid findings?**
 
 The condition on line 60 is:
+
 ```typescript
 if (valid.length > 0 || parsed.length === 0) return valid
 ```
+
 When `parsed.length > 0` AND `valid.length === 0` (all items failed validation), this condition is **false**. Execution falls through to check `parsed.findings`. If `parsed` is a plain array (not an object with `.findings`), both checks fail and the try block exits normally — **the catch is not triggered**. Execution falls through to the extraction stage. This means the balanced-bracket extractor re-processes the same already-successfully-parsed JSON string, looking for a `[…]` in text that is valid JSON. It will find the same array, re-parse it, and `validateFindings()` will drop all items again, returning `[]`. No data corruption, but it's wasted work and the error log at line 81 is **never reached** in this scenario — the caller gets a silent empty array with no diagnostic output.
 
 ---
@@ -91,7 +78,9 @@ When `parsed.length > 0` AND `valid.length === 0` (all items failed validation),
   ```typescript
   if (valid.length > 0 || parsed.length === 0) return valid
   if (parsed.length > 0) {
-    console.error(`[${this.name}] ${parsed.length} item(s) parsed but 0 passed validation. First item: ${JSON.stringify(parsed[0]).slice(0, 200)}`)
+    console.error(
+      `[${this.name}] ${parsed.length} item(s) parsed but 0 passed validation. First item: ${JSON.stringify(parsed[0]).slice(0, 200)}`
+    )
   }
   ```
   Return `[]` after this log rather than falling through to the extraction stage (which will always produce the same result for valid JSON).
@@ -103,6 +92,7 @@ When `parsed.length > 0` AND `valid.length === 0` (all items failed validation),
 ## Check 3: validateFindings Silent Drops
 
 **Required fields (all must pass type check):**
+
 1. `severity` — `string`
 2. `basis` — `string`
 3. `file` — `string`
@@ -131,7 +121,9 @@ When `parsed.length > 0` AND `valid.length === 0` (all items failed validation),
 - **Root Cause:** The filter was written for correctness, not debuggability. Logging was not added alongside it.
 - **Fix:** After the `.filter()`, compare input and output lengths. If `items.length > valid.length`:
   ```typescript
-  console.warn(`[${this.name}] validateFindings: ${items.length - valid.length} of ${items.length} findings dropped (missing required fields)`)
+  console.warn(
+    `[${this.name}] validateFindings: ${items.length - valid.length} of ${items.length} findings dropped (missing required fields)`
+  )
   ```
   For debug-level verbosity, log the first dropped item's missing fields.
 - **Impact:** Makes it possible to diagnose prompt regressions (LLM stops emitting `basis` field) without adding manual tracing. Currently impossible to distinguish "agent found nothing" from "agent found things but the schema broke."
@@ -146,10 +138,13 @@ When `parsed.length > 0` AND `valid.length === 0` (all items failed validation),
 In the `.filter()`, `basis` is checked (`typeof f.basis === 'string'`), so the finding passes.
 
 In the `.map()`:
+
 ```typescript
 evidence: f.evidence ?? f.detail ?? '',
 ```
+
 `f.evidence` is `"src/foo.ts:42"` (truthy), so `??` short-circuits — `f.evidence` wins. The `basis` field is also present in the output via `...f` spread. So the final Finding object has:
+
 - `evidence: "src/foo.ts:42"` (the explicit evidence value)
 - `basis: "VERIFIED"` (carried as extra field via spread)
 
@@ -177,6 +172,7 @@ The `basis` field on the output is not a documented schema field — it is a leg
 ## Check 5: Confidence Clamping Edge Cases
 
 Tested inputs:
+
 - `confidence: -1` → `rawConf = -1`, `Math.max(0, Math.min(100, -1))` = `0`. **Correct.**
 - `confidence: 200` → `rawConf = 200`, `Math.max(0, Math.min(100, 200))` = `100`. **Correct.**
 - `confidence: "high"` → `typeof "high" === 'number'` is false → `rawConf = 70`. **Safe.**
@@ -222,6 +218,7 @@ Tested inputs:
 ## Check 7: cosineSimilarity Mathematical Correctness
 
 From `src/core/embedder.ts:23–35`:
+
 - Numerator: `dot += a[i] * b[i]` — correct dot product.
 - Denominator: `Math.sqrt(normA) * Math.sqrt(normB)` where `normA = sum(a[i]²)` and `normB = sum(b[i]²)` — correct L2 norm product.
 - Zero vector guard: `return denom === 0 ? 0 : dot / denom` — explicit, correct.
@@ -235,6 +232,7 @@ From `src/core/embedder.ts:23–35`:
 ## Check 8: contextLoader Test Coverage of Semantic Path
 
 Coverage from `npm run test:coverage`:
+
 ```
 contextLoader.ts |  57.85  |   89.47  |  66.66  |  57.85  | 90-92,113-174
 embedder.ts      |  48.27  |   87.5   |  50     |  48.27  | 7-21
@@ -269,16 +267,16 @@ embedder.ts      |  48.27  |   87.5   |  50     |  48.27  | 7-21
 
 ## Summary Table
 
-| # | Finding | Severity | Tag | Effort |
-|---|---------|----------|-----|--------|
-| 1 | BaseAgent has 19 distinct concerns — SRP violated at High threshold | High | NEW | M |
-| 2 | Silent zero-finding return when all stage-1 items fail validation | Medium | NEW | XS |
-| 3 | validateFindings drops findings silently with no diagnostic log | Medium | NEW | XS |
-| 4 | `basis→evidence` aliasing undocumented; filter rejects `evidence`-only findings | Low | NEW | S |
-| 5 | Confidence clamping is correct for all edge cases | — | null | — |
-| 6 | `--context-mode semantic` silently degrades to no-context on embed failure | High | NEW | S |
-| 7 | cosineSimilarity is mathematically correct; zero vector handled | — | null | — |
-| 8 | `loadAgentContextSemantic` and `embed()` have zero test coverage | High | NEW | M |
+| #   | Finding                                                                         | Severity | Tag  | Effort |
+| --- | ------------------------------------------------------------------------------- | -------- | ---- | ------ |
+| 1   | BaseAgent has 19 distinct concerns — SRP violated at High threshold             | High     | NEW  | M      |
+| 2   | Silent zero-finding return when all stage-1 items fail validation               | Medium   | NEW  | XS     |
+| 3   | validateFindings drops findings silently with no diagnostic log                 | Medium   | NEW  | XS     |
+| 4   | `basis→evidence` aliasing undocumented; filter rejects `evidence`-only findings | Low      | NEW  | S      |
+| 5   | Confidence clamping is correct for all edge cases                               | —        | null | —      |
+| 6   | `--context-mode semantic` silently degrades to no-context on embed failure      | High     | NEW  | S      |
+| 7   | cosineSimilarity is mathematically correct; zero vector handled                 | —        | null | —      |
+| 8   | `loadAgentContextSemantic` and `embed()` have zero test coverage                | High     | NEW  | M      |
 
 **Net-new findings: 6 (items 1–4, 6, 8)**
 **Null results (clean): 2 (items 5, 7)**

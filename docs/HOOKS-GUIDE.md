@@ -4,23 +4,23 @@ Hooks run deterministically at Claude Code lifecycle points. Unlike `CLAUDE.md` 
 
 ## Hook Types
 
-| Hook | When it fires | Primary use |
-|------|--------------|-------------|
-| `PreToolUse` | Before Claude runs a tool | Block dangerous operations, validate inputs |
-| `PostToolUse` | After Claude runs a tool | Auto-format, run lint, log actions |
-| `Stop` | When Claude pauses for input | Desktop notification |
-| `PreCompact` | Before context compaction | Save state summary |
+| Hook          | When it fires                | Primary use                                 |
+| ------------- | ---------------------------- | ------------------------------------------- |
+| `PreToolUse`  | Before Claude runs a tool    | Block dangerous operations, validate inputs |
+| `PostToolUse` | After Claude runs a tool     | Auto-format, run lint, log actions          |
+| `Stop`        | When Claude pauses for input | Desktop notification                        |
+| `PreCompact`  | Before context compaction    | Save state summary                          |
 
 ## Enforcement Layer Architecture
 
 Hooks are one layer in a four-layer enforcement stack. Understanding which layer owns which concern prevents duplication and drift:
 
-| Layer | Kind | Owns | Does NOT own |
-|-------|------|------|-------------|
-| **CLAUDE.md** | Advisory | Behavioral norms, workflow philosophy, code style | Anything requiring guaranteed execution |
-| **Hooks** | Deterministic structural | Per-tool-call pattern enforcement: dangerous commands, credential access | Semantic correctness, business logic review |
-| **Reviewer / Opponent** | Semantic | Spec compliance, scope drift, code quality | Mechanical pattern matching |
-| **CI** | Deterministic gate | Codebase invariants: file size, forbidden imports, secret scanning | Real-time per-command interception |
+| Layer                   | Kind                     | Owns                                                                     | Does NOT own                                |
+| ----------------------- | ------------------------ | ------------------------------------------------------------------------ | ------------------------------------------- |
+| **CLAUDE.md**           | Advisory                 | Behavioral norms, workflow philosophy, code style                        | Anything requiring guaranteed execution     |
+| **Hooks**               | Deterministic structural | Per-tool-call pattern enforcement: dangerous commands, credential access | Semantic correctness, business logic review |
+| **Reviewer / Opponent** | Semantic                 | Spec compliance, scope drift, code quality                               | Mechanical pattern matching                 |
+| **CI**                  | Deterministic gate       | Codebase invariants: file size, forbidden imports, secret scanning       | Real-time per-command interception          |
 
 **Design rule:** Don't duplicate concerns across layers. If a check belongs in CI, adding it to hooks creates two places to update when patterns change. If a check is semantic, adding it to hooks creates false confidence (simple pattern matching misses context). Each layer does its job; the stack as a whole provides defense in depth.
 
@@ -33,8 +33,8 @@ Configured in `.claude/settings.json`:
 Intercepts both Bash and PowerShell tool calls before they run using `scripts/dangerous-commands.ps1`. Enforces 3-tier safety:
 
 **BLOCK** (19 patterns — command exits non-zero, Claude stops):\
-*Shell:* `rm -rf` · `mkfs` · `dd if=` · `git push --force` · `git push -f` · `DROP TABLE` · `DROP DATABASE` · `| bash` · `| sh` · `|bash` · `|sh`\
-*PowerShell-native:* `Remove-Item -Recurse -Force` · `Remove-Item -Force -Recurse` · `Format-Volume` · `| Invoke-Expression` · `|Invoke-Expression` · `| iex` · `|iex`
+_Shell:_ `rm -rf` · `mkfs` · `dd if=` · `git push --force` · `git push -f` · `DROP TABLE` · `DROP DATABASE` · `| bash` · `| sh` · `|bash` · `|sh`\
+_PowerShell-native:_ `Remove-Item -Recurse -Force` · `Remove-Item -Force -Recurse` · `Format-Volume` · `| Invoke-Expression` · `|Invoke-Expression` · `| iex` · `|iex`
 
 **CONFIRM** (7 patterns — surfaces confirmation dialog):
 `git filter-branch` · `git update-ref` · `sudo rm` · `chmod -R 777` · `--no-verify` · `TRUNCATE TABLE` · `DELETE FROM`
@@ -82,12 +82,14 @@ Fires after every `Write` or `Edit` tool call. Reads the edited file path from t
 Fires before Claude Code compacts context. Runs two content-based quality checks on the memory bank **or** bypasses via `handoff.md`.
 
 **Exit codes:**
+
 - **Exits 0** — both checks pass (or `handoff.md` bypass is present). Compaction proceeds normally.
 - **Exits 2** — one or more checks fail. **Compaction is blocked.** Claude Code treats a non-zero exit from a PreCompact hook as a block signal. The hook prints an actionable message explaining what to do.
 
 **To unblock:** address the failing check (see below), then retry. Alternatively, create `handoff.md` to bypass the gate (the handoff file signals that session state has been captured via the Handoff Protocol).
 
 **Detection logic (content-based, not mtime):**
+
 - **Check 1 — `activeContext.md` substantive content:** counts non-frontmatter, non-heading, non-empty lines with ≥20 characters. Requires ≥3 such lines. A file that was only touched (e.g. `last-reviewed` timestamp updated) fails this check.
 - **Check 2 — `progress.md` dated entry:** looks for at least one line starting with today's date (or a markdown heading/list prefix followed by today's date). The date must appear at the start of a line — embedded dates in prose do not count.
 - **Bypass:** `handoff.md` present in the project root skips both checks.
@@ -125,13 +127,14 @@ PMB distributes two git hooks through the `.githooks/` directory, which is versi
 
 ### How it works
 
-`core.hooksPath = .githooks` is a per-project git local config (stored in `.git/config`, not committed). When set, git resolves all hooks from `.githooks/` instead of `.git/hooks/`. The hook *files* are committed and versioned; the *activation* is a local git config that each `mb init`/`mb upgrade` run sets automatically.
+`core.hooksPath = .githooks` is a per-project git local config (stored in `.git/config`, not committed). When set, git resolves all hooks from `.githooks/` instead of `.git/hooks/`. The hook _files_ are committed and versioned; the _activation_ is a local git config that each `mb init`/`mb upgrade` run sets automatically.
 
 `mb upgrade` treats `.githooks/pre-push` and `.githooks/pre-commit` as `TEMPLATE_OWNED` — it overwrites them unconditionally if they differ from the template, so hook logic stays current across PMB version bumps.
 
 ### The two hooks
 
 **`.githooks/pre-push`** — delegates to the 7-check push gate:
+
 - Unresolved merge conflicts or conflict markers
 - Uncommitted working tree changes
 - Missing `.gitattributes`
@@ -143,12 +146,14 @@ PMB distributes two git hooks through the `.githooks/` directory, which is versi
 Dispatches to `scripts/pre-push-check.ps1` (Windows/pwsh) or `scripts/pre-push-check.sh` (POSIX/bash). Fails open — if the script errors unexpectedly, the push is allowed through.
 
 **`.githooks/pre-commit`** — lightweight two-check gate before every commit:
+
 - **Blocks** if `handoff.md` is staged (`handoff.md` is ephemeral and must not be committed)
 - **Warns** if `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` is missing from `.claude/settings.json` (token budget auto-compaction may not be configured)
 
 ### Migration from `.git/hooks/`
 
 Projects initialized before PMB 1.1.0 have the old PMB shim at `.git/hooks/pre-push`. Running `mb upgrade` on those projects:
+
 1. Installs `.githooks/pre-push` and `.githooks/pre-commit` (TEMPLATE_OWNED)
 2. Sets `core.hooksPath = .githooks` (git local config)
 3. Removes `.git/hooks/pre-push` if it matches the PMB shim (detected by grepping for `pre-push-check`)
@@ -172,37 +177,46 @@ Copy `.claude/settings.json` into your project, then add hooks as needed.
 Add to the `PostToolUse` array in `settings.json`:
 
 **Prettier (JavaScript/TypeScript):**
+
 ```json
 {
   "matcher": "Write|Edit",
-  "hooks": [{
-    "type": "command",
-    "command": "npx prettier --write \"$CLAUDE_TOOL_OUTPUT_PATH\" 2>/dev/null || true"
-  }]
+  "hooks": [
+    {
+      "type": "command",
+      "command": "npx prettier --write \"$CLAUDE_TOOL_OUTPUT_PATH\" 2>/dev/null || true"
+    }
+  ]
 }
 ```
 
 **Black (Python):**
+
 ```json
 {
   "matcher": "Write|Edit",
-  "hooks": [{
-    "type": "command",
-    "command": "python -m black \"$CLAUDE_TOOL_OUTPUT_PATH\" 2>/dev/null || true"
-  }]
+  "hooks": [
+    {
+      "type": "command",
+      "command": "python -m black \"$CLAUDE_TOOL_OUTPUT_PATH\" 2>/dev/null || true"
+    }
+  ]
 }
 ```
 
 ### Lint Before Commit (PreToolUse on Bash)
 
 Add to the `PreToolUse` array (alongside the dangerous-command hook):
+
 ```json
 {
   "matcher": "Bash",
-  "hooks": [{
-    "type": "command",
-    "command": "HOOK_INPUT=$(cat 2>/dev/null); echo \"$HOOK_INPUT\" | grep -q 'git commit' && npm run lint 2>&1 || true"
-  }]
+  "hooks": [
+    {
+      "type": "command",
+      "command": "HOOK_INPUT=$(cat 2>/dev/null); echo \"$HOOK_INPUT\" | grep -q 'git commit' && npm run lint 2>&1 || true"
+    }
+  ]
 }
 ```
 

@@ -1,4 +1,5 @@
 # Agent 3 — Architecture & Technical Debt Findings
+
 **Date:** 2026-06-25
 **Status:** Complete
 **Finding count:** 8
@@ -69,6 +70,7 @@ Grep for `: any\b|as any\b`: **zero matches** in `src/`.
 Grep for `@ts-ignore`: **zero matches** in `src/`.
 
 Grep for `eslint-disable` (broad, file-level): **zero matches**. Two `eslint-disable-next-line` comments exist:
+
 - `src/core/ignoreFilter.ts:85` — suppresses `no-control-regex` for a regex that necessarily uses a control character (U+0000) as a glob-to-regex sentinel
 - `src/core/policyFilter.ts:18` — identical justification (copied pattern)
 
@@ -142,6 +144,7 @@ The semantic implementation is real — it calls a live embeddings endpoint and 
 Reading `src/core/agents/orchestrator.ts` (215 lines):
 
 **Deduplication algorithm (`deduplicate`, lines 97–141):**
+
 - Groups findings by `${file}:${line}` string key using a `Map`.
 - For multi-agent groups, selects the winning agent by `AGENT_PRIORITY.indexOf()` (highest index wins).
 - Non-winning agents' finding IDs are merged into `relatedFindings`; their agent names into `corroboratingAgents`.
@@ -150,6 +153,7 @@ Reading `src/core/agents/orchestrator.ts` (215 lines):
 
 **Cross-reference escalation logic (`crossReference`, lines 143–187):**
 Three hard-coded escalation rules, each expressed as: if agent X has a finding and agent Y has a finding within ±5 lines of the same file, escalate X's severity.
+
 - `correctness` + `coverage` gap within 5 lines → escalate correctness
 - `security` + `adversarial` within 5 lines → escalate security
 - `breaking-change` + (`correctness` | `design`) within 5 lines → escalate breaking-change
@@ -189,18 +193,18 @@ Three hard-coded escalation rules, each expressed as: if agent X has a finding a
 
 **Script inventory:**
 
-| Script | `.sh` lines | `.ps1` lines |
-|---|---|---|
-| mb.sh / mb.ps1 | 2147 | 2227 |
-| check-contract | 131 | 111 |
-| dangerous-commands | 87 | 93 |
-| delegation-depth-check | 36 | 44 |
-| init-memory-bank | 248 | 247 |
-| pre-compact-check | 66 | 71 |
-| pre-push-check | 147 | 158 |
-| update-reviewed | 44 | 49 |
-| pick-folder.ps1 | — | 8 |
-| **Total** | **2906** | **3008** |
+| Script                 | `.sh` lines | `.ps1` lines |
+| ---------------------- | ----------- | ------------ |
+| mb.sh / mb.ps1         | 2147        | 2227         |
+| check-contract         | 131         | 111          |
+| dangerous-commands     | 87          | 93           |
+| delegation-depth-check | 36          | 44           |
+| init-memory-bank       | 248         | 247          |
+| pre-compact-check      | 66          | 71           |
+| pre-push-check         | 147         | 158          |
+| update-reviewed        | 44          | 49           |
+| pick-folder.ps1        | —           | 8            |
+| **Total**              | **2906**    | **3008**     |
 
 **Combined governance shell code: ~5914 lines** (sh + ps1 combined, before counting template duplicates).
 
@@ -253,16 +257,16 @@ Hook count in `.claude/settings.json`: **5 distinct hook entries** across 4 hook
 
 ## Check 10: File Size — SRP Violations by Line Count
 
-| File | Lines | Note |
-|---|---|---|
-| `src/core/runner.ts` | 430 | Flagged — see finding below |
-| `src/cli/index.ts` | 280 | Acceptable; ~80 lines are the CLI option declarations |
-| `src/core/agents/orchestrator.ts` | 215 | Acceptable; 5 private methods with clear boundaries |
-| `src/core/contextLoader.ts` | 178 | Acceptable; two exported functions + helpers |
-| `src/core/schema.ts` | 151 | Acceptable; type definitions |
-| `src/core/agents/base.ts` | 150 | See Check 2 finding |
-| `src/core/agents/coverageAnalyst.ts` | 142 | Acceptable |
-| `src/cli/formatter.ts` | 113 | Acceptable |
+| File                                 | Lines | Note                                                  |
+| ------------------------------------ | ----- | ----------------------------------------------------- |
+| `src/core/runner.ts`                 | 430   | Flagged — see finding below                           |
+| `src/cli/index.ts`                   | 280   | Acceptable; ~80 lines are the CLI option declarations |
+| `src/core/agents/orchestrator.ts`    | 215   | Acceptable; 5 private methods with clear boundaries   |
+| `src/core/contextLoader.ts`          | 178   | Acceptable; two exported functions + helpers          |
+| `src/core/schema.ts`                 | 151   | Acceptable; type definitions                          |
+| `src/core/agents/base.ts`            | 150   | See Check 2 finding                                   |
+| `src/core/agents/coverageAnalyst.ts` | 142   | Acceptable                                            |
+| `src/cli/formatter.ts`               | 113   | Acceptable                                            |
 
 No file exceeds 500 lines. One file exceeds 300 lines.
 
@@ -306,17 +310,17 @@ error-handling, observability, migration-safety, secrets, complexity
 
 ## Summary Table
 
-| # | Check | Finding | Severity | Effort |
-|---|---|---|---|---|
-| 2 | BaseAgent SRP | 6–8 responsibilities in one class | Medium | M |
-| 4a | Copied glob logic | `matchPattern` duplicated across two files | Advisory | XS |
-| 5a | Semantic context untested | No tests for contextLoader or embedder | Medium | S |
-| 5b | Embedding quality | Only 500 chars embedded, frontmatter wastes budget | Advisory | XS |
-| 7a | Undocumented escalation | Magic ±5-line window, no rule rationale comments | Low | XS |
-| 7b | Misleading method name | `hallucinationCrossCheck` vs corroboration gate | Advisory | XS |
-| 8 | PMB script overhead | ~5914 lines of governance for solo tooling; 3 heuristic checks removable | Medium | M |
-| 9 | /health-check stale | Calls deprecated `mb validate`/`mb audit` aliases | Medium | XS |
-| 10 | runner.ts bloat | 430-line file, 305-line `run()` method with 8 sub-concerns | Medium | M |
+| #   | Check                     | Finding                                                                  | Severity | Effort |
+| --- | ------------------------- | ------------------------------------------------------------------------ | -------- | ------ |
+| 2   | BaseAgent SRP             | 6–8 responsibilities in one class                                        | Medium   | M      |
+| 4a  | Copied glob logic         | `matchPattern` duplicated across two files                               | Advisory | XS     |
+| 5a  | Semantic context untested | No tests for contextLoader or embedder                                   | Medium   | S      |
+| 5b  | Embedding quality         | Only 500 chars embedded, frontmatter wastes budget                       | Advisory | XS     |
+| 7a  | Undocumented escalation   | Magic ±5-line window, no rule rationale comments                         | Low      | XS     |
+| 7b  | Misleading method name    | `hallucinationCrossCheck` vs corroboration gate                          | Advisory | XS     |
+| 8   | PMB script overhead       | ~5914 lines of governance for solo tooling; 3 heuristic checks removable | Medium   | M      |
+| 9   | /health-check stale       | Calls deprecated `mb validate`/`mb audit` aliases                        | Medium   | XS     |
+| 10  | runner.ts bloat           | 430-line file, 305-line `run()` method with 8 sub-concerns               | Medium   | M      |
 
 **No Critical or High findings.** The ACR codebase is notably clean: zero `any` types, zero Anthropic residue, zero broad lint suppressions, consistent agent count, and a well-structured call graph. The debt is structural accretion (base.ts, runner.ts) and missing test coverage on the semantic embedding path.
 

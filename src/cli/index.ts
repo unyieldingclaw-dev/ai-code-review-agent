@@ -109,156 +109,161 @@ program
       emoji: boolean
     }) => {
       try {
-      const contextMode = options.context === 'memory-bank' ? 'memory-bank' : 'none'
+        const contextMode = options.context === 'memory-bank' ? 'memory-bank' : 'none'
 
-      const projectPath = resolve(options.dir ?? process.cwd())
-      const config = loadConfig(projectPath)
+        const projectPath = resolve(options.dir ?? process.cwd())
+        const config = loadConfig(projectPath)
 
-      if (config.provider !== 'ollama') {
-        console.error(
-          `Provider "${config.provider}" is configured but not implemented. Use provider "ollama".`
-        )
-        process.exit(1)
-      }
-
-      if (options.model) config.model = options.model
-      if (options.ollamaUrl) config.ollamaUrl = options.ollamaUrl
-      if (options.agents)
-        config.agents = options.agents.split(',').map((a) => a.trim()) as AgentName[]
-      if (options.profile && !options.agents) {
-        try {
-          config.agents = resolveProfile(options.profile)
-        } catch (err) {
-          console.error(err instanceof Error ? err.message : String(err))
+        if (config.provider !== 'ollama') {
+          console.error(
+            `Provider "${config.provider}" is configured but not implemented. Use provider "ollama".`
+          )
           process.exit(1)
         }
-      }
-      if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
-      if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
-      if (options.retryAttempts !== undefined) config.retryAttempts = options.retryAttempts
-      if (options.retryDelay !== undefined) config.retryDelayMs = options.retryDelay
-      if (options.ignore.length > 0) config.ignorePaths = [...config.ignorePaths, ...options.ignore]
-      if (!options.sanitize) config.sanitize = false
-      config.failOn = options.failOn
-      config.failFast = !!options.failFast
-      config.parallel = !!options.parallel
-      if (options.contextBudget !== undefined) config.contextBudgetChars = options.contextBudget
-      if (options.contextMode === 'semantic') config.contextMode = 'semantic'
 
-      // testgen opt-in: only add to agents if --suggest-tests or --write-tests is passed
-      if ((options.suggestTests || options.writeTests) && !config.agents.includes('testgen')) {
-        config.agents = [...config.agents, 'testgen']
-      }
+        if (options.model) config.model = options.model
+        if (options.ollamaUrl) config.ollamaUrl = options.ollamaUrl
+        if (options.agents)
+          config.agents = options.agents.split(',').map((a) => a.trim()) as AgentName[]
+        if (options.profile && !options.agents) {
+          try {
+            config.agents = resolveProfile(options.profile)
+          } catch (err) {
+            console.error(err instanceof Error ? err.message : String(err))
+            process.exit(1)
+          }
+        }
+        if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
+        if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
+        if (options.retryAttempts !== undefined) config.retryAttempts = options.retryAttempts
+        if (options.retryDelay !== undefined) config.retryDelayMs = options.retryDelay
+        if (options.ignore.length > 0)
+          config.ignorePaths = [...config.ignorePaths, ...options.ignore]
+        if (!options.sanitize) config.sanitize = false
+        config.failOn = options.failOn
+        config.failFast = !!options.failFast
+        config.parallel = !!options.parallel
+        if (options.contextBudget !== undefined) config.contextBudgetChars = options.contextBudget
+        if (options.contextMode === 'semantic') config.contextMode = 'semantic'
 
-      const diff = getDiff(options.diff, options.dir)
-      if (!diff.trim()) {
-        console.error('No diff to review. Stage changes or provide --diff.')
+        // testgen opt-in: only add to agents if --suggest-tests or --write-tests is passed
+        if ((options.suggestTests || options.writeTests) && !config.agents.includes('testgen')) {
+          config.agents = [...config.agents, 'testgen']
+        }
+
+        const diff = getDiff(options.diff, options.dir)
+        if (!diff.trim()) {
+          console.error('No diff to review. Stage changes or provide --diff.')
+          process.exit(1)
+        }
+
+        const provider = new OllamaProvider(config.ollamaUrl, config.model)
+        const runner = new SwarmRunner(config, provider)
+
+        const reviewingLabel = options.emoji !== false ? '🔍' : 'Reviewing'
+        process.stderr.write(
+          `\n${reviewingLabel} Running ai-review-agent with ${config.agents.length} agents...\n\n`
+        )
+
+        const result = await runner.run(
+          { diff, projectPath },
+          (event: AgentProgressEvent) => {
+            if (event.phase === 'start') {
+              process.stderr.write(`[${event.index}/${event.total}] ${event.name}  starting…\n`)
+            } else {
+              const elapsed = `${Math.round((event.elapsedMs ?? 0) / 1000)}s`
+              const count = event.findings?.length ?? 0
+              let summary = `${count} finding${count !== 1 ? 's' : ''}`
+              if (count > 0 && event.findings) {
+                const bySev: Record<string, number> = {}
+                for (const f of event.findings) bySev[f.severity] = (bySev[f.severity] ?? 0) + 1
+                const parts = (['critical', 'high', 'medium', 'low'] as const)
+                  .filter((s) => bySev[s])
+                  .map((s) => `${bySev[s]} ${s}`)
+                summary += ` (${parts.join(', ')})`
+              }
+              process.stderr.write(
+                `[${event.index}/${event.total}] ${event.name}   ${elapsed} — ${summary}\n`
+              )
+              if (event.earlyExit) {
+                const bolt = options.emoji !== false ? '⚡ ' : ''
+                process.stderr.write(
+                  `${bolt}Fail-fast: stopping swarm after ${event.name} (threshold met)\n`
+                )
+              }
+            }
+          },
+          contextMode
+        )
+
+        // Stamp integration metadata so callers can parse the contract version
+        result.schemaVersion = 'ai-review-agent/v1'
+        result.toolVersion = version
+        result.profile = options.profile ?? null
+
+        // Only write test files when --write-tests is explicitly passed
+        if (options.writeTests && result.testFiles.length > 0) {
+          for (const tf of result.testFiles) {
+            const outPath = join(projectPath, tf.path)
+            mkdirSync(join(outPath, '..'), { recursive: true })
+            writeFileSync(outPath, tf.content, 'utf-8')
+          }
+          const paperclip = options.emoji !== false ? '📝' : 'Generated'
+          process.stdout.write(
+            `\n${paperclip} Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`
+          )
+        } else if (options.suggestTests && result.testFiles.length > 0) {
+          const lightbulb = options.emoji !== false ? '💡' : 'Note:'
+          process.stdout.write(
+            `\n${lightbulb} ${result.testFiles.length} test suggestion(s) included in report (use --write-tests to write files)\n`
+          )
+        }
+
+        let output =
+          options.format === 'json'
+            ? formatJson(result)
+            : options.format === 'sarif'
+              ? formatSarif(result)
+              : options.format === 'github-annotations'
+                ? formatGithubAnnotations(result)
+                : formatMarkdown(result, { noEmoji: options.emoji === false })
+
+        if (
+          result.earlyExit &&
+          options.format !== 'json' &&
+          options.format !== 'sarif' &&
+          options.format !== 'github-annotations'
+        ) {
+          const bolt = options.emoji !== false ? '⚡ ' : ''
+          output += `\n\n> ${bolt}**Fail-fast**: swarm stopped after \`${result.earlyExit.stoppedAt}\` (severity threshold met). Remaining agents were not run.\n`
+        }
+
+        if (options.out) {
+          writeFileSync(options.out, output, 'utf-8')
+          const check = options.emoji !== false ? '✅ ' : ''
+          process.stdout.write(`\n${check}Report written to ${options.out}\n`)
+        } else {
+          process.stdout.write('\n' + output + '\n')
+        }
+
+        const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
+        process.exit(hasBlocker ? 1 : 0)
+      } catch (err) {
+        // Re-throw synthetic exits (e.g. process.exit mocks in tests) so they propagate correctly
+        if (err instanceof Error && err.message.startsWith('process.exit(')) throw err
+        const msg = err instanceof Error ? err.message : String(err)
+        process.stderr.write(`\nError: ${msg}\n`)
+        if (
+          msg.includes('not reachable') ||
+          msg.includes('ECONNREFUSED') ||
+          msg.includes('ENOENT')
+        ) {
+          process.stderr.write(`Make sure Ollama is running: ollama serve\n`)
+        }
         process.exit(1)
       }
-
-      const provider = new OllamaProvider(config.ollamaUrl, config.model)
-      const runner = new SwarmRunner(config, provider)
-
-      const reviewingLabel = options.emoji !== false ? '🔍' : 'Reviewing'
-      process.stderr.write(
-        `\n${reviewingLabel} Running ai-review-agent with ${config.agents.length} agents...\n\n`
-      )
-
-      const result = await runner.run(
-        { diff, projectPath },
-        (event: AgentProgressEvent) => {
-          if (event.phase === 'start') {
-            process.stderr.write(`[${event.index}/${event.total}] ${event.name}  starting…\n`)
-          } else {
-            const elapsed = `${Math.round((event.elapsedMs ?? 0) / 1000)}s`
-            const count = event.findings?.length ?? 0
-            let summary = `${count} finding${count !== 1 ? 's' : ''}`
-            if (count > 0 && event.findings) {
-              const bySev: Record<string, number> = {}
-              for (const f of event.findings) bySev[f.severity] = (bySev[f.severity] ?? 0) + 1
-              const parts = (['critical', 'high', 'medium', 'low'] as const)
-                .filter((s) => bySev[s])
-                .map((s) => `${bySev[s]} ${s}`)
-              summary += ` (${parts.join(', ')})`
-            }
-            process.stderr.write(
-              `[${event.index}/${event.total}] ${event.name}   ${elapsed} — ${summary}\n`
-            )
-            if (event.earlyExit) {
-              const bolt = options.emoji !== false ? '⚡ ' : ''
-              process.stderr.write(
-                `${bolt}Fail-fast: stopping swarm after ${event.name} (threshold met)\n`
-              )
-            }
-          }
-        },
-        contextMode
-      )
-
-      // Stamp integration metadata so callers can parse the contract version
-      result.schemaVersion = 'ai-review-agent/v1'
-      result.toolVersion = version
-      result.profile = options.profile ?? null
-
-      // Only write test files when --write-tests is explicitly passed
-      if (options.writeTests && result.testFiles.length > 0) {
-        for (const tf of result.testFiles) {
-          const outPath = join(projectPath, tf.path)
-          mkdirSync(join(outPath, '..'), { recursive: true })
-          writeFileSync(outPath, tf.content, 'utf-8')
-        }
-        const paperclip = options.emoji !== false ? '📝' : 'Generated'
-        process.stdout.write(
-          `\n${paperclip} Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`
-        )
-      } else if (options.suggestTests && result.testFiles.length > 0) {
-        const lightbulb = options.emoji !== false ? '💡' : 'Note:'
-        process.stdout.write(
-          `\n${lightbulb} ${result.testFiles.length} test suggestion(s) included in report (use --write-tests to write files)\n`
-        )
-      }
-
-      let output =
-        options.format === 'json'
-          ? formatJson(result)
-          : options.format === 'sarif'
-            ? formatSarif(result)
-            : options.format === 'github-annotations'
-              ? formatGithubAnnotations(result)
-              : formatMarkdown(result, { noEmoji: options.emoji === false })
-
-      if (
-        result.earlyExit &&
-        options.format !== 'json' &&
-        options.format !== 'sarif' &&
-        options.format !== 'github-annotations'
-      ) {
-        const bolt = options.emoji !== false ? '⚡ ' : ''
-        output += `\n\n> ${bolt}**Fail-fast**: swarm stopped after \`${result.earlyExit.stoppedAt}\` (severity threshold met). Remaining agents were not run.\n`
-      }
-
-      if (options.out) {
-        writeFileSync(options.out, output, 'utf-8')
-        const check = options.emoji !== false ? '✅ ' : ''
-        process.stdout.write(`\n${check}Report written to ${options.out}\n`)
-      } else {
-        process.stdout.write('\n' + output + '\n')
-      }
-
-      const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
-      process.exit(hasBlocker ? 1 : 0)
-    } catch (err) {
-      // Re-throw synthetic exits (e.g. process.exit mocks in tests) so they propagate correctly
-      if (err instanceof Error && err.message.startsWith('process.exit(')) throw err
-      const msg = err instanceof Error ? err.message : String(err)
-      process.stderr.write(`\nError: ${msg}\n`)
-      if (msg.includes('not reachable') || msg.includes('ECONNREFUSED') || msg.includes('ENOENT')) {
-        process.stderr.write(`Make sure Ollama is running: ollama serve\n`)
-      }
-      process.exit(1)
     }
-  }
-)
+  )
 
 function collect(value: string, previous: string[]): string[] {
   return [...previous, value]

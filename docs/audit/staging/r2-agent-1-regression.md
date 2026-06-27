@@ -138,7 +138,7 @@
 - **Severity:** Medium
 - **Confidence:** Verified
 - **Repository:** ACR
-- **Evidence:** `docs/CONTRACTS-GUIDE.md` line 101: `- \`expires_at\` is informational; the hook does not check clock time`. In reality, `scripts/check-contract.sh` lines 77-93 perform a live UTC clock check via Python `datetime.now(timezone.utc)`. `scripts/check-contract.ps1` lines 53-65 perform the same check via `[datetime]::UtcNow`. When expired, the hook emits "⚠️ CONTRACT EXPIRED" and exits 0, which stops scope enforcement silently.
+- **Evidence:** `docs/CONTRACTS-GUIDE.md` line 101: `- \`expires_at\` is informational; the hook does not check clock time`. In reality, `scripts/check-contract.sh`lines 77-93 perform a live UTC clock check via Python`datetime.now(timezone.utc)`. `scripts/check-contract.ps1`lines 53-65 perform the same check via`[datetime]::UtcNow`. When expired, the hook emits "⚠️ CONTRACT EXPIRED" and exits 0, which stops scope enforcement silently.
 - **Reproduction:** Set `expires_at` to any past ISO 8601 datetime. Trigger a Write outside declared scope. Expect the scope warning — instead get the expiry warning and no scope enforcement.
 - **Root Cause:** Guide was written before expiry enforcement was implemented in the hook scripts. Not updated when enforcement was added.
 - **Fix:** Replace `docs/CONTRACTS-GUIDE.md` line 101 with: "`expires_at` is actively enforced. When the current UTC time exceeds this value, the hook emits a CONTRACT EXPIRED warning and scope enforcement is suspended for that session."
@@ -238,20 +238,20 @@
 
 ## Summary Table
 
-| # | Check | Tag | Severity | Status |
-|---|-------|-----|----------|--------|
-| 1 | 16 files fail format:check including core source files | REGRESSION | Critical | FAIL |
-| 2 | `ollama://` scheme passes hostname allowlist, fails at runtime fetch | NEW | Medium | FAIL |
-| 3 | CLI re-throw guard has false-positive risk on real error messages | NEW | Low | FAIL |
-| 4 | matchPattern import/export and typecheck | — | — | PASS |
-| 5 | check-contract.sh empty scope triggers spurious out-of-scope warning | NEW | Low | FAIL |
-| 6 | check-contract.ps1 same empty-scope false-positive | — | Low | FAIL (same as 5) |
-| 7a | CONTRACTS-GUIDE documents expires_at as informational; hook enforces it | NEW | Medium | FAIL |
-| 7b | CONTRACTS-GUIDE omits PMB scope format | NEW | Low | FAIL |
-| 8 | CLAUDE.md says PreCompact "warns"; it exits 2 (blocks) | REGRESSION | Medium | FAIL |
-| 9 | --diff wiring and getDiff priority correct | — | — | PASS |
-| 10 | --no-sanitize uses stderr.write; sanitize !== false logic correct | — | — | PASS |
-| 11 | gitleaks-action@v2 floating tag not pinned to SHA | REGRESSION | High | FAIL |
-| 12 | VS Code extension tests pass headlessly (vitest, no xvfb) | — | — | PASS |
-| 13 | Test count 284 — meets ≥284 threshold | — | — | PASS |
-| 14 | /code-review cloud disclosure in description frontmatter | — | — | PASS |
+| #   | Check                                                                   | Tag        | Severity | Status           |
+| --- | ----------------------------------------------------------------------- | ---------- | -------- | ---------------- |
+| 1   | 16 files fail format:check including core source files                  | REGRESSION | Critical | FAIL             |
+| 2   | `ollama://` scheme passes hostname allowlist, fails at runtime fetch    | NEW        | Medium   | FAIL             |
+| 3   | CLI re-throw guard has false-positive risk on real error messages       | NEW        | Low      | FAIL             |
+| 4   | matchPattern import/export and typecheck                                | —          | —        | PASS             |
+| 5   | check-contract.sh empty scope triggers spurious out-of-scope warning    | NEW        | Low      | FAIL             |
+| 6   | check-contract.ps1 same empty-scope false-positive                      | —          | Low      | FAIL (same as 5) |
+| 7a  | CONTRACTS-GUIDE documents expires_at as informational; hook enforces it | NEW        | Medium   | FAIL             |
+| 7b  | CONTRACTS-GUIDE omits PMB scope format                                  | NEW        | Low      | FAIL             |
+| 8   | CLAUDE.md says PreCompact "warns"; it exits 2 (blocks)                  | REGRESSION | Medium   | FAIL             |
+| 9   | --diff wiring and getDiff priority correct                              | —          | —        | PASS             |
+| 10  | --no-sanitize uses stderr.write; sanitize !== false logic correct       | —          | —        | PASS             |
+| 11  | gitleaks-action@v2 floating tag not pinned to SHA                       | REGRESSION | High     | FAIL             |
+| 12  | VS Code extension tests pass headlessly (vitest, no xvfb)               | —          | —        | PASS             |
+| 13  | Test count 284 — meets ≥284 threshold                                   | —          | —        | PASS             |
+| 14  | /code-review cloud disclosure in description frontmatter                | —          | —        | PASS             |

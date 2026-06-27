@@ -15,6 +15,7 @@ Write the validated design to `docs/specs/YYYY-MM-DD-<topic>.md`. Self-review fo
 Draft the implementation plan in `.claude/plans/YYYY-MM-DD-<feature-slug>.md`. This file is gitignored — it is a scratch draft, not a durable artifact.
 
 After presenting the plan and receiving user approval, promote it:
+
 ```
 mb plan promote .claude/plans/YYYY-MM-DD-<feature-slug>.md
 ```

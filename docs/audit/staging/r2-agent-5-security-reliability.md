@@ -1,4 +1,5 @@
 # Agent 5 — New Security & Reliability Surface
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** 7 (6 actionable findings + 1 advisory + 1 null result)
@@ -6,6 +7,7 @@
 ---
 
 ### Finding: OllamaProvider constructor throws unhandled TypeError on malformed URLs
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -32,6 +34,7 @@
 ---
 
 ### Finding: 0.0.0.0 in Ollama allowlist permits externally-bound Ollama instances
+
 - **Tag:** [NEW]
 - **Severity:** High
 - **Confidence:** Strong Evidence
@@ -56,6 +59,7 @@
 ---
 
 ### Finding: --no-sanitize warning is silently discarded when stderr is redirected
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -80,6 +84,7 @@
 ---
 
 ### Finding: gitleaks-action pinned to floating @v2 tag with contents:write and id-token:write
+
 - **Tag:** [REGRESSION]
 - **Severity:** High
 - **Confidence:** Verified
@@ -100,7 +105,7 @@
      ```
      Then update the workflow:
      ```yaml
-     uses: gitleaks/gitleaks-action@c8e9898f4698c1e8b7a2e87b5ad3c68e00b5af59  # v2.3.8 (verify current)
+     uses: gitleaks/gitleaks-action@c8e9898f4698c1e8b7a2e87b5ad3c68e00b5af59 # v2.3.8 (verify current)
      ```
   2. Add Dependabot to receive automated SHA-pinning PRs when gitleaks releases updates:
      ```yaml
@@ -118,6 +123,7 @@
 ---
 
 ### Finding: VS Code extension test step has no timeout — release can hang for 6 hours
+
 - **Tag:** [REGRESSION]
 - **Severity:** High
 - **Confidence:** Verified
@@ -143,6 +149,7 @@
 ---
 
 ### Finding: Null scope field in contract produces spurious out-of-scope warning on every file write
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -151,7 +158,7 @@
 - **Reproduction:**
   1. Create `.claude/contracts/active-task.json`:
      ```json
-     {"status": "active", "task": "Fix typo in docs", "expires_at": "2099-01-01T00:00:00Z"}
+     { "status": "active", "task": "Fix typo in docs", "expires_at": "2099-01-01T00:00:00Z" }
      ```
      (Note: no `scope` field — a valid pattern for tasks that don't involve file writes, or an incomplete contract draft)
   2. Trigger any Write or Edit tool call via Claude Code
@@ -183,13 +190,13 @@
 
 ## Summary Table
 
-| # | Title | Severity | Tag | Repo | Effort |
-|---|-------|----------|-----|------|--------|
-| 1 | OllamaProvider throws unhandled TypeError on malformed URL | Medium | NEW | ACR | XS |
-| 2 | `0.0.0.0` in Ollama allowlist permits externally-bound instances | High | NEW | ACR | XS |
-| 3 | `--no-sanitize` warning silently discarded via `2>/dev/null` | Low | NEW | ACR | XS |
-| 4 | gitleaks-action floating `@v2` with `contents:write` + `id-token:write` | High | REGRESSION | ACR | XS |
-| 5 | VS Code extension test step has no timeout — 6-hour hang risk | High | REGRESSION | ACR | XS |
-| 6 | Null `scope` field in contract causes spurious warning/hard block | Medium | NEW | PMB | XS |
-| — | `.pem` WARN redundancy advisory | Advisory | NEW | PMB | — |
-| — | Sanitization/truncation order | (null result) | — | ACR | — |
+| #   | Title                                                                   | Severity      | Tag        | Repo | Effort |
+| --- | ----------------------------------------------------------------------- | ------------- | ---------- | ---- | ------ |
+| 1   | OllamaProvider throws unhandled TypeError on malformed URL              | Medium        | NEW        | ACR  | XS     |
+| 2   | `0.0.0.0` in Ollama allowlist permits externally-bound instances        | High          | NEW        | ACR  | XS     |
+| 3   | `--no-sanitize` warning silently discarded via `2>/dev/null`            | Low           | NEW        | ACR  | XS     |
+| 4   | gitleaks-action floating `@v2` with `contents:write` + `id-token:write` | High          | REGRESSION | ACR  | XS     |
+| 5   | VS Code extension test step has no timeout — 6-hour hang risk           | High          | REGRESSION | ACR  | XS     |
+| 6   | Null `scope` field in contract causes spurious warning/hard block       | Medium        | NEW        | PMB  | XS     |
+| —   | `.pem` WARN redundancy advisory                                         | Advisory      | NEW        | PMB  | —      |
+| —   | Sanitization/truncation order                                           | (null result) | —          | ACR  | —      |

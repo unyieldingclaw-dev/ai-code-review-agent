@@ -7,10 +7,24 @@ export class OllamaProvider implements LLMProvider {
     private readonly baseUrl: string,
     private readonly model: string
   ) {
-    const { hostname } = new URL(baseUrl)
-    if (!['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(hostname)) {
+    let parsed: URL
+    try {
+      parsed = new URL(baseUrl)
+    } catch {
       throw new Error(
-        `Ollama URL must point to localhost. Got: ${hostname}. ` +
+        `Invalid Ollama URL: "${baseUrl}". Use http://localhost:11434 (or http://127.0.0.1:11434).`
+      )
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error(
+        `Ollama URL must use http or https. Got: ${parsed.protocol}. ` +
+          `Use http://localhost:11434 instead.`
+      )
+    }
+    // 0.0.0.0 is excluded: on Linux it routes to all interfaces including external ones.
+    if (!['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)) {
+      throw new Error(
+        `Ollama URL must point to localhost. Got: ${parsed.hostname}. ` +
           `Use http://localhost:11434 (or http://127.0.0.1:11434) instead. ` +
           `Remote Ollama instances are not supported (SSRF risk).`
       )

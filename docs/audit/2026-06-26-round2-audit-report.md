@@ -1,4 +1,5 @@
 # Round 2 Pre-Production Readiness Audit Report
+
 **Date:** 2026-06-26
 **Auditor:** Claude Sonnet 4.6 — 6-agent parallel audit (Round 2, Approach A: Regression + Discovery)
 **Repositories:** Personal-Memory-Bank | AI-Code-Review-Agent v1.1.0
@@ -47,14 +48,14 @@ about what it enforces. Forward progress is real; production readiness is not.
 
 ## 2. Overall Readiness Assessment
 
-| Domain | Round 1 | Round 2 | Delta | Key Risk |
-|---|---|---|---|---|
-| Security | CAUTION | CAUTION | → | gitleaks @v2 floating; 0.0.0.0 allowlist; \|\| true defeats PreCompact |
-| Reliability | CAUTION | CAUTION | ↓ | 16 files fail format:check; MCP hangs; extension subprocess no wall-clock timeout |
-| Architecture | CAUTION | CAUTION | ↓ | BaseAgent 19 concerns; semantic path zero coverage; silent finding drops |
-| Documentation | CAUTION | NOT READY | ↓ | HOOKS-GUIDE claims block; CLAUDE.md says warn; runtime allows; CHANGELOG missing sprint |
-| CI/CD | NOT READY | NOT READY | → | gitleaks @v2; CI ext test no timeout; format:check fails = release blocked |
-| Integration | CAUTION | CAUTION | → | MCP no shutdown; ollama:// scheme passes allowlist; 0.0.0.0 routes externally |
+| Domain        | Round 1   | Round 2   | Delta | Key Risk                                                                                |
+| ------------- | --------- | --------- | ----- | --------------------------------------------------------------------------------------- |
+| Security      | CAUTION   | CAUTION   | →     | gitleaks @v2 floating; 0.0.0.0 allowlist; \|\| true defeats PreCompact                  |
+| Reliability   | CAUTION   | CAUTION   | ↓     | 16 files fail format:check; MCP hangs; extension subprocess no wall-clock timeout       |
+| Architecture  | CAUTION   | CAUTION   | ↓     | BaseAgent 19 concerns; semantic path zero coverage; silent finding drops                |
+| Documentation | CAUTION   | NOT READY | ↓     | HOOKS-GUIDE claims block; CLAUDE.md says warn; runtime allows; CHANGELOG missing sprint |
+| CI/CD         | NOT READY | NOT READY | →     | gitleaks @v2; CI ext test no timeout; format:check fails = release blocked              |
+| Integration   | CAUTION   | CAUTION   | →     | MCP no shutdown; ollama:// scheme passes allowlist; 0.0.0.0 routes externally           |
 
 **Overall: NOT READY**
 
@@ -64,26 +65,27 @@ about what it enforces. Forward progress is real; production readiness is not.
 
 ### 3.1 Round 1 Regression Summary
 
-| Round 1 Fix | Status | Severity | Notes |
-|---|---|---|---|
-| npm run check fix (1 file formatted) | ❌ Regressed | Critical | 16 files now failing; 20+ commits added unformatted files |
-| OllamaProvider URL validation | ⚠️ Partial | High | 0.0.0.0 routes externally on Linux; ollama:// scheme not rejected; malformed URL throws raw TypeError |
-| CLI try/catch | ✅ Held | — | Guard present; fragile string-prefix match (new Low finding) |
-| matchPattern export | ✅ Held | — | Import correct; typecheck clean |
-| check-contract scope fix | ✅ Held | — | Both formats handled; empty scope and null scope false-positive remains (new Low/Medium) |
-| CONTRACTS-GUIDE.md creation | ⚠️ Partial | Medium | expires_at documented as informational; hook enforces it; PMB format omitted |
-| HOOKS-GUIDE.md creation | ❌ Broken | High | Claims "exits 2 — blocks" but settings.json `\|\| true` ensures always exits 0 on Windows |
-| /change-review --diff fix | ✅ Held | — | --diff flag wired; getDiff priority correct |
-| --no-sanitize warning | ✅ Held | — | Uses stderr.write; sanitize !== false logic correct |
-| gitleaks in release.yml | ❌ Regressed | High | @v2 floating tag never pinned to SHA |
-| vscode-extension tests in CI | ⚠️ Partial | Critical | No timeout-minutes guard; tests pass today but future hang = 6-hour block |
-| runner.ts decomposition | ✅ Held | — | Decomposition intact; test count 284 ≥ threshold |
-| /code-review cloud disclosure | ✅ Held | — | Disclosure in description frontmatter |
-| CLAUDE.md PreCompact wording | ❌ Not fixed | Medium | Still says "warns"; HOOKS-GUIDE says "blocks" (both wrong — runtime allows on Windows) |
+| Round 1 Fix                          | Status       | Severity | Notes                                                                                                 |
+| ------------------------------------ | ------------ | -------- | ----------------------------------------------------------------------------------------------------- |
+| npm run check fix (1 file formatted) | ❌ Regressed | Critical | 16 files now failing; 20+ commits added unformatted files                                             |
+| OllamaProvider URL validation        | ⚠️ Partial   | High     | 0.0.0.0 routes externally on Linux; ollama:// scheme not rejected; malformed URL throws raw TypeError |
+| CLI try/catch                        | ✅ Held      | —        | Guard present; fragile string-prefix match (new Low finding)                                          |
+| matchPattern export                  | ✅ Held      | —        | Import correct; typecheck clean                                                                       |
+| check-contract scope fix             | ✅ Held      | —        | Both formats handled; empty scope and null scope false-positive remains (new Low/Medium)              |
+| CONTRACTS-GUIDE.md creation          | ⚠️ Partial   | Medium   | expires_at documented as informational; hook enforces it; PMB format omitted                          |
+| HOOKS-GUIDE.md creation              | ❌ Broken    | High     | Claims "exits 2 — blocks" but settings.json `\|\| true` ensures always exits 0 on Windows             |
+| /change-review --diff fix            | ✅ Held      | —        | --diff flag wired; getDiff priority correct                                                           |
+| --no-sanitize warning                | ✅ Held      | —        | Uses stderr.write; sanitize !== false logic correct                                                   |
+| gitleaks in release.yml              | ❌ Regressed | High     | @v2 floating tag never pinned to SHA                                                                  |
+| vscode-extension tests in CI         | ⚠️ Partial   | Critical | No timeout-minutes guard; tests pass today but future hang = 6-hour block                             |
+| runner.ts decomposition              | ✅ Held      | —        | Decomposition intact; test count 284 ≥ threshold                                                      |
+| /code-review cloud disclosure        | ✅ Held      | —        | Disclosure in description frontmatter                                                                 |
+| CLAUDE.md PreCompact wording         | ❌ Not fixed | Medium   | Still says "warns"; HOOKS-GUIDE says "blocks" (both wrong — runtime allows on Windows)                |
 
 ### 3.2 Critical Findings
 
 ### Finding: 16 files fail format:check — release pipeline blocked
+
 - **Tag:** [REGRESSION]
 - **Severity:** Critical
 - **Confidence:** Verified
@@ -96,6 +98,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** S
 
 ### Finding: CI vscode-extension test step has no timeout — release hangs up to 6 hours
+
 - **Tag:** [REGRESSION]
 - **Severity:** Critical
 - **Confidence:** Strong Evidence
@@ -117,6 +120,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 4. High Priority Issues
 
 ### Finding: PreCompact `|| true` defeats block claim — compaction not blocked on Windows
+
 - **Tag:** [REGRESSION]
 - **Severity:** High
 - **Confidence:** Verified
@@ -129,6 +133,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** S
 
 ### Finding: gitleaks-action@v2 floating tag with contents:write and id-token:write
+
 - **Tag:** [REGRESSION]
 - **Severity:** High
 - **Confidence:** Verified
@@ -141,6 +146,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: 0.0.0.0 in Ollama allowlist permits externally-bound Ollama instances
+
 - **Tag:** [NEW]
 - **Severity:** High
 - **Confidence:** Strong Evidence
@@ -153,6 +159,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: Extension subprocess has no wall-clock timeout — hangs indefinitely if Ollama stalls
+
 - **Tag:** [NEW]
 - **Severity:** High
 - **Confidence:** Verified
@@ -167,12 +174,15 @@ about what it enforces. Forward progress is real; production readiness is not.
     child.kill()
     reject(new Error(`wall-clock-timeout:${config.timeoutSecs}s`))
   }, WALL_CLOCK_MS)
-  child.on('close', () => { clearTimeout(timer); /* existing logic */ })
+  child.on('close', () => {
+    clearTimeout(timer) /* existing logic */
+  })
   ```
 - **Impact:** VS Code becomes unresponsive due to a frozen Ollama instance or CLI deadlock. Worst-case hang is unbounded.
 - **Effort:** S
 
 ### Finding: BaseAgent violates SRP with 19 distinct concerns
+
 - **Tag:** [NEW]
 - **Severity:** High
 - **Confidence:** Verified
@@ -185,6 +195,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** M
 
 ### Finding: --context-mode semantic silently degrades to no-context when embedding fails
+
 - **Tag:** [NEW]
 - **Severity:** High
 - **Confidence:** Verified
@@ -197,6 +208,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** S
 
 ### Finding: loadAgentContextSemantic and embed() have zero test coverage
+
 - **Tag:** [NEW]
 - **Severity:** High
 - **Confidence:** Verified
@@ -209,6 +221,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** M
 
 ### Finding: Doctor tests mutate real repo directory with fragile restore logic
+
 - **Tag:** [NEW]
 - **Severity:** High
 - **Confidence:** Verified
@@ -225,6 +238,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 5. Medium Priority Issues
 
 ### Finding: CLAUDE.md says PreCompact hook "warns" when it exits 2 (or exits 0 via || true)
+
 - **Tag:** [REGRESSION]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -237,6 +251,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: CONTRACTS-GUIDE.md claims expires_at is informational but hook enforces it
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -249,6 +264,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: Silent zero-finding return when all stage-1 items fail validation
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -259,13 +275,16 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Fix:** After line 60, add:
   ```typescript
   if (parsed.length > 0) {
-    console.error(`[${this.name}] ${parsed.length} item(s) parsed but 0 passed validation. First item: ${JSON.stringify(parsed[0]).slice(0, 200)}`)
+    console.error(
+      `[${this.name}] ${parsed.length} item(s) parsed but 0 passed validation. First item: ${JSON.stringify(parsed[0]).slice(0, 200)}`
+    )
   }
   ```
 - **Impact:** Impossible to distinguish "LLM returned empty array" from "LLM returned findings with wrong schema" without this log.
 - **Effort:** XS
 
 ### Finding: validateFindings drops items silently with no diagnostic output
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -276,13 +295,16 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Fix:** After the `.filter()`, compare lengths:
   ```typescript
   if (items.length > valid.length) {
-    console.warn(`[${this.name}] validateFindings: ${items.length - valid.length} of ${items.length} findings dropped (missing required fields)`)
+    console.warn(
+      `[${this.name}] validateFindings: ${items.length - valid.length} of ${items.length} findings dropped (missing required fields)`
+    )
   }
   ```
 - **Impact:** Cannot distinguish "agent found nothing" from "agent found things but schema broke." Critical for diagnosing prompt regressions.
 - **Effort:** XS
 
 ### Finding: OllamaProvider constructor throws unhandled TypeError on malformed URLs
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -295,6 +317,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: Null scope field in contract causes spurious warning or hard block on all writes
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -307,6 +330,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: PSScriptAnalyzer enforces only Error severity — Warning/Information bypassed
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -319,6 +343,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: Check 5 (Token Budget drift) permanently skipped on Windows Git Bash
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -331,6 +356,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** S
 
 ### Finding: Test suite takes 4+ minutes on Windows (CI wall-time risk)
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -343,6 +369,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** M
 
 ### Finding: ACR activeContext.md test count stale (276 vs 284 actual)
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -355,6 +382,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: ACR progress.md missing remediation sprint entries and stale test count
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -367,6 +395,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** S
 
 ### Finding: CHANGELOG missing Round 1 audit remediation sprint entry
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -379,6 +408,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** S
 
 ### Finding: PMB README says "mb doctor (20 checks)" but doctor has 24 checks
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -391,6 +421,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: PMB README omits mb preflight and mb change-check from command documentation
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -407,6 +438,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 6. Low Priority Issues
 
 ### Finding: check-contract empty scope array triggers spurious out-of-scope warning
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -419,6 +451,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: CONTRACTS-GUIDE.md omits PMB scope format
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -431,6 +464,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: CLI re-throw guard uses fragile string-prefix match
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Strong Evidence
@@ -443,6 +477,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** S
 
 ### Finding: basis→evidence aliasing undocumented; filter rejects evidence-only findings
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -455,6 +490,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** S
 
 ### Finding: mb preflight test suite has no failure-path test
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -467,6 +503,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** S
 
 ### Finding: mb change-check test suite has no error/invalid-ref path
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -479,6 +516,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: --no-sanitize warning silently discarded when stderr is redirected
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -491,6 +529,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: PMB progress.md last-reviewed 4 days behind activeContext.md
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -503,6 +542,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: ollama:// scheme passes hostname allowlist but fails at runtime fetch
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Strong Evidence
@@ -519,6 +559,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 7. Missing Features
 
 ### Finding: No Dependabot configuration for GitHub Actions
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -531,6 +572,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** XS
 
 ### Finding: MCP server has no stdin/signal shutdown handlers — leaks zombie processes
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -547,6 +589,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 8. Missing Guardrails
 
 ### Finding: No pre-commit Prettier hook enforces format locally
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -559,6 +602,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 - **Effort:** S
 
 ### Finding: mb-doctor-self-check does not test the installed mb CLI (PATH install)
+
 - **Tag:** [NEW]
 - **Severity:** Advisory
 - **Confidence:** Verified
@@ -575,6 +619,7 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 9. Incorrect Guardrails
 
 ### Finding: HOOKS-GUIDE.md claims PreCompact exits 2 to block compaction — claim is false on Windows
+
 - **Tag:** [REGRESSION]
 - **Severity:** High
 - **Confidence:** Verified
@@ -591,22 +636,27 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 10. Security Concerns
 
 ### Finding: gitleaks-action@v2 floating tag with write permissions (supply chain risk)
+
 - See Section 4 for full finding detail.
 - **Tag:** [REGRESSION] | **Severity:** High | **Effort:** XS
 
 ### Finding: 0.0.0.0 in allowlist permits externally-bound Ollama on Linux
+
 - See Section 4 for full finding detail.
 - **Tag:** [NEW] | **Severity:** High | **Effort:** XS
 
 ### Finding: --no-sanitize warning discarded in CI pipelines
+
 - See Section 6 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Low | **Effort:** XS
 
 ### Finding: ollama:// scheme bypasses allowlist at construction time
+
 - See Section 6 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Low | **Effort:** XS
 
 ### Finding: OllamaProvider throws raw TypeError on malformed URLs
+
 - See Section 5 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium | **Effort:** XS
 
@@ -615,26 +665,32 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 11. Reliability Concerns
 
 ### Finding: PreCompact || true defeats blocking on Windows
+
 - See Section 4 for full finding detail.
 - **Tag:** [REGRESSION] | **Severity:** High | **Effort:** S
 
 ### Finding: 16 files fail format:check — release pipeline blocked
+
 - See Section 3.2 for full finding detail.
 - **Tag:** [REGRESSION] | **Severity:** Critical | **Effort:** S
 
 ### Finding: Extension subprocess no wall-clock timeout
+
 - See Section 4 for full finding detail.
 - **Tag:** [NEW] | **Severity:** High | **Effort:** S
 
 ### Finding: MCP server leaks zombie processes on client disconnect
+
 - See Section 7 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium | **Effort:** XS
 
 ### Finding: Doctor tests mutate real repo with fragile restore
+
 - See Section 4 for full finding detail.
 - **Tag:** [NEW] | **Severity:** High | **Effort:** M
 
 ### Finding: CI extension test step has no timeout — 6-hour hang risk
+
 - See Section 3.2 for full finding detail.
 - **Tag:** [REGRESSION] | **Severity:** Critical | **Effort:** XS
 
@@ -643,10 +699,12 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 12. Performance Concerns
 
 ### Finding: PMB test suite takes 4+ minutes on Windows
+
 - See Section 5 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium | **Effort:** M
 
 ### Advisory: Check 22/23 inner loop still spawns grep -qF subprocesses per cache entry
+
 - **Tag:** [NEW]
 - **Severity:** Advisory
 - **Confidence:** Verified
@@ -661,42 +719,52 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 13. Documentation Issues
 
 ### Finding: HOOKS-GUIDE.md block claim is false on Windows (|| true)
+
 - See Section 4 and 9 for full finding detail.
 - **Tag:** [REGRESSION] | **Severity:** High
 
 ### Finding: CLAUDE.md says PreCompact "warns"
+
 - See Section 5 for full finding detail.
 - **Tag:** [REGRESSION] | **Severity:** Medium
 
 ### Finding: CONTRACTS-GUIDE expires_at documented as informational
+
 - See Section 5 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium
 
 ### Finding: CONTRACTS-GUIDE omits PMB scope format
+
 - See Sections 5 and 6 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Low
 
 ### Finding: ACR CHANGELOG missing remediation sprint
+
 - See Section 5 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium
 
 ### Finding: ACR activeContext.md stale test count (276 vs 284)
+
 - See Section 5 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium
 
 ### Finding: ACR progress.md stale test count and missing version history
+
 - See Section 5 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium
 
 ### Finding: PMB README doctor check count wrong (20 vs 24)
+
 - See Section 5 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium
 
 ### Finding: PMB README omits mb preflight and mb change-check
+
 - See Section 5 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium
 
 ### Finding: PMB progress.md last-reviewed 4 days behind activeContext.md
+
 - See Section 6 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Low
 
@@ -705,22 +773,27 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 14. Developer Experience Issues
 
 ### Finding: BaseAgent 19 distinct concerns — undiagnosable silent drops
+
 - The SRP violation (Section 4) and the two silent-drop findings (Section 5) combine to make the review agent nearly impossible to debug. When a reviewer gets fewer findings than expected, there is currently no way to determine whether the LLM returned nothing, the LLM returned invalid schema, or the parse stages silently discarded valid findings.
 - **Tag:** [NEW] | **Severity:** High | **Effort:** M (SRP) + 2×XS (logging)
 
 ### Finding: Check 5 permanently skipped on Windows
+
 - See Section 5 for full finding detail. Developers on Windows cannot run the full test suite.
 - **Tag:** [NEW] | **Severity:** Medium | **Effort:** S
 
 ### Finding: 4-minute test suite on Windows discourages pre-commit testing
+
 - See Section 5 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium | **Effort:** M
 
 ### Finding: ollama:// scheme produces confusing runtime TypeError instead of clear constructor error
+
 - See Section 6 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Low | **Effort:** XS
 
 ### Finding: mb preflight and mb change-check not discoverable from README
+
 - See Section 5 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium | **Effort:** XS
 
@@ -729,18 +802,22 @@ about what it enforces. Forward progress is real; production readiness is not.
 ## 15. Integration Problems
 
 ### Finding: MCP server no shutdown handlers — IDE disconnect leaves zombie process
+
 - See Section 7 for full finding detail.
 - **Tag:** [NEW] | **Severity:** Medium | **Effort:** XS
 
 ### Finding: --context-mode semantic silently degrades on embed failure — no fallback
+
 - See Section 4 for full finding detail.
 - **Tag:** [NEW] | **Severity:** High | **Effort:** S
 
 ### Finding: 0.0.0.0 allowlist inconsistency between Windows and Linux Ollama routing
+
 - See Section 4 for full finding detail.
 - **Tag:** [NEW] | **Severity:** High | **Effort:** XS
 
 ### Finding: MCP CallToolResult missing isError:true on error path
+
 - **Tag:** [NEW]
 - **Severity:** Advisory
 - **Confidence:** Strong Evidence
@@ -811,28 +888,28 @@ users install on their machines.
 
 Effort XS or S, Severity Medium or higher, prioritized by impact:
 
-| Finding | Effort | Severity | Repo |
-|---|---|---|---|
-| Add `timeout-minutes: 5` to CI extension test step | XS | Critical | ACR |
-| Pin gitleaks-action to SHA; add dependabot.yml | XS | High | ACR |
-| Remove 0.0.0.0 from Ollama allowlist | XS | High | ACR |
-| Remove `\|\| true` from PreCompact command (3 files) | S | High | Both |
-| Add stdin/SIGTERM handlers to MCP server | XS | Medium | ACR |
-| Fix OllamaProvider raw TypeError on malformed URL | XS | Medium | ACR |
-| Fix null scope field in contract (3-line guard) | XS | Medium | PMB |
-| Fix expires_at documentation in CONTRACTS-GUIDE | XS | Medium | ACR |
-| Add ollama:// scheme check before hostname allowlist | XS | Low→Medium | ACR |
-| Update activeContext.md and progress.md test count | XS | Medium | ACR |
-| Add CHANGELOG entry for remediation sprint | S | Medium | ACR |
-| Update CLAUDE.md "warns" → "blocks compaction" | XS | Medium | ACR |
-| Fix README doctor check count (20→24) | XS | Medium | PMB |
-| Add mb preflight and mb change-check to README | XS | Medium | PMB |
-| Add silent-drop warning log to validateFindings | XS | Medium | ACR |
-| Add zero-finding log when all stage-1 items fail | XS | Medium | ACR |
-| PSScriptAnalyzer: add Warning severity | XS | Medium | PMB |
-| Fix empty scope array false-positive in contract scripts | XS | Low | PMB |
-| Fix --no-sanitize README security callout | XS | Low | ACR |
-| Update PMB progress.md last-reviewed | XS | Low | PMB |
+| Finding                                                  | Effort | Severity   | Repo |
+| -------------------------------------------------------- | ------ | ---------- | ---- |
+| Add `timeout-minutes: 5` to CI extension test step       | XS     | Critical   | ACR  |
+| Pin gitleaks-action to SHA; add dependabot.yml           | XS     | High       | ACR  |
+| Remove 0.0.0.0 from Ollama allowlist                     | XS     | High       | ACR  |
+| Remove `\|\| true` from PreCompact command (3 files)     | S      | High       | Both |
+| Add stdin/SIGTERM handlers to MCP server                 | XS     | Medium     | ACR  |
+| Fix OllamaProvider raw TypeError on malformed URL        | XS     | Medium     | ACR  |
+| Fix null scope field in contract (3-line guard)          | XS     | Medium     | PMB  |
+| Fix expires_at documentation in CONTRACTS-GUIDE          | XS     | Medium     | ACR  |
+| Add ollama:// scheme check before hostname allowlist     | XS     | Low→Medium | ACR  |
+| Update activeContext.md and progress.md test count       | XS     | Medium     | ACR  |
+| Add CHANGELOG entry for remediation sprint               | S      | Medium     | ACR  |
+| Update CLAUDE.md "warns" → "blocks compaction"           | XS     | Medium     | ACR  |
+| Fix README doctor check count (20→24)                    | XS     | Medium     | PMB  |
+| Add mb preflight and mb change-check to README           | XS     | Medium     | PMB  |
+| Add silent-drop warning log to validateFindings          | XS     | Medium     | ACR  |
+| Add zero-finding log when all stage-1 items fail         | XS     | Medium     | ACR  |
+| PSScriptAnalyzer: add Warning severity                   | XS     | Medium     | PMB  |
+| Fix empty scope array false-positive in contract scripts | XS     | Low        | PMB  |
+| Fix --no-sanitize README security callout                | XS     | Low        | ACR  |
+| Update PMB progress.md last-reviewed                     | XS     | Low        | PMB  |
 
 ---
 

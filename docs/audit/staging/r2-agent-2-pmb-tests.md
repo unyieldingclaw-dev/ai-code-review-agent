@@ -1,4 +1,5 @@
 # Agent 2 — PMB Test Suite & CI Audit
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** 7 (1 High, 3 Medium, 2 Low, 1 Advisory)
@@ -29,6 +30,7 @@ All test suites passed.
 ---
 
 ### Finding 1: Test suite takes 4+ minutes on Windows (CI wall-time risk)
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -47,11 +49,13 @@ All test suites passed.
 > CHECK: Do tests create temporary directories isolated from the real repo? Do any tests mutate the real PMB repo? Is there cleanup?
 
 **Verified from source:**
+
 - All 11 test scripts call `mktemp -d` for their test directory and use `trap 'rm -rf "$TMPDIR_X"' EXIT` for cleanup.
 - `setup.sh` creates a fully isolated git repo inside the tmpdir.
 - `tests/test-mb-doctor.sh` is the only suite that mutates `$REPO_ROOT` (the real PMB repo). It does so in three tests: check 0 (renames `$REPO_ROOT/VERSION`), check 2 (renames `$REPO_ROOT/templates/memory-bank/`), check 13 (renames `$REPO_ROOT/fixtures/security/SEC-001-hardcoded-secret`), and check 14 (creates 15 extra files in `$REPO_ROOT/standards/`).
 
 ### Finding 2: Doctor tests mutate real repo directory with fragile restore logic
+
 - **Tag:** [NEW]
 - **Severity:** High
 - **Confidence:** Verified
@@ -73,6 +77,7 @@ All test suites passed.
 **Verified by reading test-mb-doctor.sh in full.**
 
 The test file explicitly covers:
+
 - Baseline (clean project — no ERROR)
 - Check 0 (VERSION missing)
 - Check 1 (not a git repo)
@@ -105,6 +110,7 @@ The test file explicitly covers:
 - Check 24 (docs/plans/ not found)
 
 ### Finding 3: Check 5 (Token Budget drift) permanently skipped on Windows Git Bash
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -137,6 +143,7 @@ The test file explicitly covers:
 ## Check 5: New command test coverage (preflight, change-check)
 
 ### Finding 4: mb preflight test suite has no failure path test
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -149,6 +156,7 @@ The test file explicitly covers:
 - **Effort:** S
 
 ### Finding 5: mb change-check test suite has no error/invalid-ref path
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -165,17 +173,20 @@ The test file explicitly covers:
 ## Check 6: mb-doctor-self-check CI job
 
 > `pmb-health.yml` line 286:
+>
 > ```yaml
 > run: MB_HOME="$(pwd)" bash scripts/mb.sh doctor
 > ```
 
 **Observations:**
+
 1. The job invokes `bash scripts/mb.sh doctor` — it does NOT invoke an `mb` binary on PATH. It sources the script directly with `bash`. This is functionally correct and sufficient for testing `mb doctor` logic, but it does not test the installed `mb` symlink/PATH configuration that end users would actually use.
 2. `MB_HOME="$(pwd)"` is set inline, which correctly points the script at the checked-out repo's templates and fixtures.
 3. If `scripts/mb.sh doctor` fails (exits non-zero), the job fails. The error message will be the last lines of doctor output, which are informative.
 4. The self-check on the PMB repo itself produces `[WARN]` for `core.hooksPath not set` (confirmed by empirical run), which does not cause a non-zero exit. Doctor exits 0 on WARNs.
 
 ### Finding 6: mb-doctor-self-check does not test the installed mb CLI (PATH install)
+
 - **Tag:** [NEW]
 - **Severity:** Advisory
 - **Confidence:** Verified
@@ -200,11 +211,13 @@ $results = $files | ForEach-Object {
 ```
 
 **Observations:**
+
 1. `-Severity Error` — only `Error`-level PSScriptAnalyzer rules are enforced. `Warning` and `Information` severity findings are silently ignored.
 2. Scope: `Get-ChildItem -Recurse -Filter "*.ps1" -Path "scripts","templates/scripts"` — covers all `.ps1` files in both script directories (15 files confirmed). Correct scope.
 3. CRLF line endings: PSScriptAnalyzer does not have a rule for CRLF vs LF line endings. The CRLF warnings visible in the test run output are from `git add` on Windows, not from the scripts themselves, and would not appear in the CI `ubuntu-latest` runner. The lint job would not catch CRLF issues.
 
 ### Finding 7: PSScriptAnalyzer enforces only Error severity — Warning/Information bypassed
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -235,12 +248,12 @@ $results = $files | ForEach-Object {
 
 ## Summary Table
 
-| # | Finding | Tag | Severity | Confidence | Effort |
-|---|---------|-----|----------|------------|--------|
-| 1 | Test suite takes 4+ minutes on Windows | NEW | Medium | Verified | M |
-| 2 | Doctor tests mutate real repo with fragile restore | NEW | High | Verified | M |
-| 3 | Check 5 (Token Budget drift) permanently skipped — grep -c bug | NEW | Medium | Verified | S |
-| 4 | mb preflight has no failure-path test | NEW | Low | Verified | S |
-| 5 | mb change-check has no invalid-ref test | NEW | Low | Verified | XS |
-| 6 | mb-doctor-self-check does not test installed mb CLI | NEW | Advisory | Verified | XS |
-| 7 | PSScriptAnalyzer enforces only Error severity | NEW | Medium | Verified | XS |
+| #   | Finding                                                        | Tag | Severity | Confidence | Effort |
+| --- | -------------------------------------------------------------- | --- | -------- | ---------- | ------ |
+| 1   | Test suite takes 4+ minutes on Windows                         | NEW | Medium   | Verified   | M      |
+| 2   | Doctor tests mutate real repo with fragile restore             | NEW | High     | Verified   | M      |
+| 3   | Check 5 (Token Budget drift) permanently skipped — grep -c bug | NEW | Medium   | Verified   | S      |
+| 4   | mb preflight has no failure-path test                          | NEW | Low      | Verified   | S      |
+| 5   | mb change-check has no invalid-ref test                        | NEW | Low      | Verified   | XS     |
+| 6   | mb-doctor-self-check does not test installed mb CLI            | NEW | Advisory | Verified   | XS     |
+| 7   | PSScriptAnalyzer enforces only Error severity                  | NEW | Medium   | Verified   | XS     |

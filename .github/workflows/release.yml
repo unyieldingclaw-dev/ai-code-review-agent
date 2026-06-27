@@ -38,10 +38,14 @@ jobs:
         run: npm test
 
       - name: VS Code extension tests
+        timeout-minutes: 5
         run: npm run test:extension
 
+      # Pin to a specific commit SHA for supply-chain safety.
+      # To update: find the latest SHA at https://github.com/gitleaks/gitleaks-action/releases
+      # and replace the SHA below, then update the comment.
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v2 # TODO: pin to SHA — see dependabot.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

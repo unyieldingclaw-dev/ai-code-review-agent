@@ -95,7 +95,9 @@ afterEach(() => {
   vi.resetModules()
 })
 
-async function runCli(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+async function runCli(
+  args: string[]
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const stdoutChunks: string[] = []
   const stderrChunks: string[] = []
   const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {

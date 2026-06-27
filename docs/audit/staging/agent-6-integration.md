@@ -1,4 +1,5 @@
 # Agent 6 — Integration & Ecosystem Conflicts Findings
+
 **Date:** 2026-06-25
 **Status:** Complete
 **Finding count:** 13
@@ -8,6 +9,7 @@
 ## Check 1: Duplicate commands between ACR and PMB
 
 Commands present in ACR `.claude/commands/`:
+
 - `ai-review.md` (ACR-only)
 - `change-review.md`
 - `code-review.md`
@@ -17,6 +19,7 @@ Commands present in ACR `.claude/commands/`:
 - `test-audit.md`
 
 Commands present in PMB `.claude/commands/`:
+
 - `accessibility-review.md` (PMB-only)
 - `change-review.md`
 - `code-review.md`
@@ -131,6 +134,7 @@ Commands present in PMB `.claude/commands/`:
 ACR `CLAUDE.md` and PMB `CLAUDE.md` are nearly identical. Classified differences:
 
 **(a) Intentional — ACR-specific content:**
+
 - No items. ACR's CLAUDE.md contains no ACR-specific sections.
 
 **(b) Stale — PMB has newer content not synced to ACR:**
@@ -169,33 +173,33 @@ ACR `CLAUDE.md` and PMB `CLAUDE.md` are nearly identical. Classified differences
 
 `activeContext.md` frontmatter field comparison:
 
-| Field | ACR activeContext.md | PMB activeContext.md |
-|---|---|---|
-| `authority` | present | present |
-| `review-cycle` | present | present |
-| `retention` | present | present |
-| `staleness-threshold` | present (14d) | present (14d) |
-| `tags` | present | present |
-| `last-reviewed` | present | present |
-| `compaction_generation` | present | present |
-| `source_type` | present | present |
-| `confidence` | present (high) | present (high) |
-| `lineage` | present | present |
+| Field                   | ACR activeContext.md | PMB activeContext.md |
+| ----------------------- | -------------------- | -------------------- |
+| `authority`             | present              | present              |
+| `review-cycle`          | present              | present              |
+| `retention`             | present              | present              |
+| `staleness-threshold`   | present (14d)        | present (14d)        |
+| `tags`                  | present              | present              |
+| `last-reviewed`         | present              | present              |
+| `compaction_generation` | present              | present              |
+| `source_type`           | present              | present              |
+| `confidence`            | present (high)       | present (high)       |
+| `lineage`               | present              | present              |
 
 `projectbrief.md` frontmatter field comparison:
 
-| Field | ACR projectbrief.md | PMB projectbrief.md |
-|---|---|---|
-| `authority` | present (immutable) | present (immutable) |
-| `review-cycle` | present (never) | present (never) |
-| `retention` | present (permanent) | present (permanent) |
-| `staleness-threshold` | present (365d) | present (365d) |
-| `tags` | present | present |
-| `last-reviewed` | present | present |
-| `compaction_generation` | present | present |
-| `source_type` | present | present |
-| `confidence` | present | present |
-| `lineage` | present | present |
+| Field                   | ACR projectbrief.md | PMB projectbrief.md |
+| ----------------------- | ------------------- | ------------------- |
+| `authority`             | present (immutable) | present (immutable) |
+| `review-cycle`          | present (never)     | present (never)     |
+| `retention`             | present (permanent) | present (permanent) |
+| `staleness-threshold`   | present (365d)      | present (365d)      |
+| `tags`                  | present             | present             |
+| `last-reviewed`         | present             | present             |
+| `compaction_generation` | present             | present             |
+| `source_type`           | present             | present             |
+| `confidence`            | present             | present             |
+| `lineage`               | present             | present             |
 
 > **CHECK 5:** No finding — frontmatter schemas are fully aligned across both repos for both `activeContext.md` and `projectbrief.md`. All fields present in both, formats consistent.
 
@@ -295,6 +299,7 @@ PMB template `templates/.claude/contracts/active-task.json.example` top-level fi
 ## Check 9: ACR version reference in PMB memory bank
 
 > **CHECK 9a:** `grep` on PMB `memory-bank/` for `ai-review`, `ai-code-review`, `1.0.`, `0.9.`, `ACR` returned:
+>
 > - `activeContext.md:21`: "PMB v1.2.0 and ACR v1.1.0+ are both fully shipped" — current reference
 > - `activeContext.md:31,50`: Labels "ACR Audit:" and "ACR calibration" — no version pinning
 > - `progress.md:60`: "optional ACR bridge" — no version pinning
@@ -344,6 +349,7 @@ PMB template `templates/.claude/contracts/active-task.json.example` top-level fi
 ## Check 11: PMB /change-review ACR invocation correctness
 
 The PMB version of `/change-review.md` is content-identical to ACR's version (both files read in Check 2 match). The bridge in both files correctly:
+
 - Uses `ai-review-agent` binary name
 - Uses `--profile security` flag (not an old flag form)
 - Makes ACR optional with a clear fallback message
@@ -357,21 +363,21 @@ However, the diff-mismatch issue identified in Check 2 applies equally to the PM
 
 ## Summary of Findings
 
-| # | Title | Severity | Effort | Repository |
-|---|---|---|---|---|
-| 1 | /security-review formatting diverged | Medium | XS | Both |
-| 2 | /feature-dev diverged — PMB has `mb plan promote`, ACR does not | Medium | XS | Both |
-| 3 | /code-review `allowed-tools` missing `Agent` in ACR | Low | XS | ACR |
-| 4 | /test-audit and /pmb-status are identical — unnecessary duplication | Advisory | XS | Both |
-| 5 | /change-review ACR bridge does not pass diff to ACR invocation | High | S | Both |
-| 6 | `confidence` is a homonym with three incompatible types | Medium | S | Both |
-| 7 | PMB CLAUDE.md compaction section more accurate than ACR's | Medium | XS | ACR |
-| 8 | PMB CLAUDE.md handoff protocol more complete than ACR's | Medium | XS | ACR |
-| 9 | `standards/extensions/` absent from ACR but referenced in CLAUDE.md | Medium | S | ACR |
-| 10 | standards/CODE-REVIEW.md duplicated — no propagation mechanism | Advisory | XS | Both |
-| 11 | Contract `scope` has three incompatible shapes across ecosystem | Medium | S | Both |
-| 12 | PMB live contract missing `approved_by` field from own template | Low | XS | PMB |
-| 13 | /code-review does not state cloud; /ai-review distinction not prominent | High | XS | ACR |
-| 14 | Commands should be owned in PMB, distributed via `mb upgrade` | Advisory | S | Both |
-| 15 | Contract schema should be defined once in PMB template | Advisory | S | Both |
-| 16 | standards/ files need version tags for satellite drift detection | Advisory | M | PMB |
+| #   | Title                                                                   | Severity | Effort | Repository |
+| --- | ----------------------------------------------------------------------- | -------- | ------ | ---------- |
+| 1   | /security-review formatting diverged                                    | Medium   | XS     | Both       |
+| 2   | /feature-dev diverged — PMB has `mb plan promote`, ACR does not         | Medium   | XS     | Both       |
+| 3   | /code-review `allowed-tools` missing `Agent` in ACR                     | Low      | XS     | ACR        |
+| 4   | /test-audit and /pmb-status are identical — unnecessary duplication     | Advisory | XS     | Both       |
+| 5   | /change-review ACR bridge does not pass diff to ACR invocation          | High     | S      | Both       |
+| 6   | `confidence` is a homonym with three incompatible types                 | Medium   | S      | Both       |
+| 7   | PMB CLAUDE.md compaction section more accurate than ACR's               | Medium   | XS     | ACR        |
+| 8   | PMB CLAUDE.md handoff protocol more complete than ACR's                 | Medium   | XS     | ACR        |
+| 9   | `standards/extensions/` absent from ACR but referenced in CLAUDE.md     | Medium   | S      | ACR        |
+| 10  | standards/CODE-REVIEW.md duplicated — no propagation mechanism          | Advisory | XS     | Both       |
+| 11  | Contract `scope` has three incompatible shapes across ecosystem         | Medium   | S      | Both       |
+| 12  | PMB live contract missing `approved_by` field from own template         | Low      | XS     | PMB        |
+| 13  | /code-review does not state cloud; /ai-review distinction not prominent | High     | XS     | ACR        |
+| 14  | Commands should be owned in PMB, distributed via `mb upgrade`           | Advisory | S      | Both       |
+| 15  | Contract schema should be defined once in PMB template                  | Advisory | S      | Both       |
+| 16  | standards/ files need version tags for satellite drift detection        | Advisory | M      | PMB        |

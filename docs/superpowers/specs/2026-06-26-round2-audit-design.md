@@ -42,6 +42,7 @@ Every finding MUST use this exact format:
 
 ```markdown
 ### Finding: [Short imperative title]
+
 - **Tag:** [REGRESSION] | [NEW]
 - **Severity:** Critical | High | Medium | Low | Advisory
 - **Confidence:** Verified | Strong Evidence | Likely | Speculative
@@ -193,6 +194,7 @@ Null result: `> [CHECK NAME]: No finding — [what was observed].`
 ### Agent 7 — Consolidation
 
 Reads all 6 staging files. Deduplicates by root cause. Labels every finding `[REGRESSION]` or `[NEW]`. Produces:
+
 - §3.1 "Round 1 Regression Summary" — table of every Round 1 fix that degraded
 - Full 20-section report at `docs/audit/2026-06-26-round2-audit-report.md`
 - Commits
@@ -226,12 +228,12 @@ Reads all 6 staging files. Deduplicates by root cause. Labels every finding `[RE
 
 ## Confidence Definitions
 
-| Label | Meaning |
-|---|---|
-| Verified | Command run, output seen, defect confirmed |
-| Strong Evidence | Code read; behavior clearly implied |
-| Likely | Pattern match; not directly tested |
-| Speculative | Reasonable inference; unverified |
+| Label           | Meaning                                    |
+| --------------- | ------------------------------------------ |
+| Verified        | Command run, output seen, defect confirmed |
+| Strong Evidence | Code read; behavior clearly implied        |
+| Likely          | Pattern match; not directly tested         |
+| Speculative     | Reasonable inference; unverified           |
 
 ---
 
@@ -252,18 +254,18 @@ Reads all 6 staging files. Deduplicates by root cause. Labels every finding `[RE
 
 ## Known Round 1 Fixes Being Verified (Agent 1 Seed)
 
-| Fix | What to verify |
-|---|---|
-| npm run check | Fixed for plan file; 14 new violations from subsequent commits |
-| OllamaProvider URL validation | Localhost check behavior; edge cases |
-| CLI try/catch | Re-throw guard correctness |
-| matchPattern export | No circular deps |
-| check-contract scope fix | Both schema formats handled |
-| CONTRACTS-GUIDE.md | Matches actual contract JSON |
-| HOOKS-GUIDE.md | PreCompact exits 2 claim is accurate |
-| /change-review --diff fix | `--diff` flag actually exists in CLI |
-| --no-sanitize warning | Reaches CI stderr |
-| gitleaks in release.yml | Action is pinned |
-| vscode-extension tests in CI | Works headlessly |
-| runner.ts decomposition | No regressions |
-| /code-review cloud disclosure | Visible to Claude at invocation |
+| Fix                           | What to verify                                                 |
+| ----------------------------- | -------------------------------------------------------------- |
+| npm run check                 | Fixed for plan file; 14 new violations from subsequent commits |
+| OllamaProvider URL validation | Localhost check behavior; edge cases                           |
+| CLI try/catch                 | Re-throw guard correctness                                     |
+| matchPattern export           | No circular deps                                               |
+| check-contract scope fix      | Both schema formats handled                                    |
+| CONTRACTS-GUIDE.md            | Matches actual contract JSON                                   |
+| HOOKS-GUIDE.md                | PreCompact exits 2 claim is accurate                           |
+| /change-review --diff fix     | `--diff` flag actually exists in CLI                           |
+| --no-sanitize warning         | Reaches CI stderr                                              |
+| gitleaks in release.yml       | Action is pinned                                               |
+| vscode-extension tests in CI  | Works headlessly                                               |
+| runner.ts decomposition       | No regressions                                                 |
+| /code-review cloud disclosure | Visible to Claude at invocation                                |

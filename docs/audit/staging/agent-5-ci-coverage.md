@@ -1,4 +1,5 @@
 # Agent 5 — CI/CD & Test Coverage Findings
+
 **Date:** 2026-06-25
 **Status:** Complete
 **Finding count:** 10
@@ -41,7 +42,7 @@ Tests: 276 passed (36 files). Typecheck: clean. Build: clean. ESLint: clean. For
 **Overall coverage:**
 
 | Metric     | %     |
-|------------|-------|
+| ---------- | ----- |
 | Statements | 72.99 |
 | Branches   | 85.31 |
 | Functions  | 93.63 |
@@ -49,18 +50,18 @@ Tests: 276 passed (36 files). Typecheck: clean. Build: clean. ESLint: clean. For
 
 **Ten files with lowest branch coverage (ascending):**
 
-| File                          | Branch % | Uncovered lines / notes       |
-|-------------------------------|----------|-------------------------------|
-| `cli/index.ts`                | 0%       | All 280 lines uncovered       |
-| `core/llm/provider.ts`        | 0%       | Interface/type-only, no runtime code |
-| `mcp/server.ts`               | 0%       | All 81 lines uncovered        |
-| `utils/shell.ts`              | 100% (stmt 8%) | Branches trivially covered but body not exercised |
-| `cli/formatters/sarif.ts`     | 71.42%   | Line 65                       |
-| `core/agents/coverageAnalyst.ts` | 71.42% | Lines 101-128, 133-139     |
-| `core/agents/testGen.ts`      | 76.47%   | Lines 76-88                   |
-| `core/agents/base.ts`         | 75.47%   | Lines 100, 102-104, 112       |
-| `core/runner.ts`              | 76.53%   | Lines 261-386, 417-424 (error paths) |
-| `core/llm/ollamaProvider.ts`  | 72.22%   | Lines 49-53                   |
+| File                             | Branch %       | Uncovered lines / notes                           |
+| -------------------------------- | -------------- | ------------------------------------------------- |
+| `cli/index.ts`                   | 0%             | All 280 lines uncovered                           |
+| `core/llm/provider.ts`           | 0%             | Interface/type-only, no runtime code              |
+| `mcp/server.ts`                  | 0%             | All 81 lines uncovered                            |
+| `utils/shell.ts`                 | 100% (stmt 8%) | Branches trivially covered but body not exercised |
+| `cli/formatters/sarif.ts`        | 71.42%         | Line 65                                           |
+| `core/agents/coverageAnalyst.ts` | 71.42%         | Lines 101-128, 133-139                            |
+| `core/agents/testGen.ts`         | 76.47%         | Lines 76-88                                       |
+| `core/agents/base.ts`            | 75.47%         | Lines 100, 102-104, 112                           |
+| `core/runner.ts`                 | 76.53%         | Lines 261-386, 417-424 (error paths)              |
+| `core/llm/ollamaProvider.ts`     | 72.22%         | Lines 49-53                                       |
 
 **Source files with 0% statement coverage:**
 
@@ -133,12 +134,12 @@ Tests: 276 passed (36 files). Typecheck: clean. Build: clean. ESLint: clean. For
 
 All three workflow files read. Secret usages found:
 
-| Workflow         | Secret reference                   | Usage pattern                  | Safe? |
-|------------------|------------------------------------|--------------------------------|-------|
-| `release.yml:40` | `${{ secrets.NPM_TOKEN }}`         | `env: NODE_AUTH_TOKEN: ...`    | Safe  |
-| `release.yml:45` | `${{ github.token }}`              | `env: GH_TOKEN: ...`           | Safe  |
-| `calibrate.yml`  | None                               | N/A                            | N/A   |
-| `review.yml`     | None (uses `github.token` via action) | Passed via `actions/github-script@v7` | Safe |
+| Workflow         | Secret reference                      | Usage pattern                         | Safe? |
+| ---------------- | ------------------------------------- | ------------------------------------- | ----- |
+| `release.yml:40` | `${{ secrets.NPM_TOKEN }}`            | `env: NODE_AUTH_TOKEN: ...`           | Safe  |
+| `release.yml:45` | `${{ github.token }}`                 | `env: GH_TOKEN: ...`                  | Safe  |
+| `calibrate.yml`  | None                                  | N/A                                   | N/A   |
+| `review.yml`     | None (uses `github.token` via action) | Passed via `actions/github-script@v7` | Safe  |
 
 > CHECK 4 (secret injection): No finding — all secret references use the safe `env:` block pattern. No direct shell-string interpolation of secrets found.
 
@@ -191,17 +192,17 @@ All three workflow files read. Secret usages found:
 
 **Verification against `"files": ["dist/", "README.md", "LICENSE"]`:**
 
-| Directory / File     | In pack? | Expected? |
-|----------------------|----------|-----------|
-| `dist/`              | Yes      | Yes       |
-| `README.md`          | Yes      | Yes       |
-| `LICENSE`            | Yes      | Yes       |
-| `tests/`             | No       | Correct — excluded |
-| `calibration/`       | No       | Correct — excluded |
-| `.claude/`           | No       | Correct — excluded |
-| `vscode-extension/`  | No       | Correct — excluded |
-| `docs/`              | No       | Correct — excluded |
-| `src/`               | No       | Correct — excluded |
+| Directory / File    | In pack? | Expected?          |
+| ------------------- | -------- | ------------------ |
+| `dist/`             | Yes      | Yes                |
+| `README.md`         | Yes      | Yes                |
+| `LICENSE`           | Yes      | Yes                |
+| `tests/`            | No       | Correct — excluded |
+| `calibration/`      | No       | Correct — excluded |
+| `.claude/`          | No       | Correct — excluded |
+| `vscode-extension/` | No       | Correct — excluded |
+| `docs/`             | No       | Correct — excluded |
+| `src/`              | No       | Correct — excluded |
 
 > CHECK 7 (npm pack): No finding — pack output matches the declared `"files"` field exactly. No sensitive or unnecessary content included.
 
@@ -211,23 +212,23 @@ All three workflow files read. Secret usages found:
 
 Checked each agent test file for test cases covering malformed/empty/unexpected LLM output.
 
-| Agent test file                  | Has negative-path test? |
-|----------------------------------|------------------------|
-| `securityAgent.test.ts`          | Yes                    |
-| `correctnessAgent.test.ts`       | Yes                    |
-| `performanceAgent.test.ts`       | Yes                    |
-| `designAgent.test.ts`            | Yes                    |
-| `dependenciesAgent.test.ts`      | Yes                    |
-| `adversarialAgent.test.ts`       | Yes                    |
-| `coverageAnalystAgent.test.ts`   | Yes                    |
+| Agent test file                  | Has negative-path test?  |
+| -------------------------------- | ------------------------ |
+| `securityAgent.test.ts`          | Yes                      |
+| `correctnessAgent.test.ts`       | Yes                      |
+| `performanceAgent.test.ts`       | Yes                      |
+| `designAgent.test.ts`            | Yes                      |
+| `dependenciesAgent.test.ts`      | Yes                      |
+| `adversarialAgent.test.ts`       | Yes                      |
+| `coverageAnalystAgent.test.ts`   | Yes                      |
 | `testGenAgent.test.ts`           | Yes (too-short response) |
-| `breakingChangeAgent.test.ts`    | Yes                    |
-| `licenseComplianceAgent.test.ts` | Yes                    |
-| `errorHandlingAgent.test.ts`     | Yes                    |
-| `observabilityAgent.test.ts`     | Yes                    |
-| `migrationSafetyAgent.test.ts`   | Yes                    |
-| `secretsAgent.test.ts`           | Yes                    |
-| `complexityAgent.test.ts`        | No — see below         |
+| `breakingChangeAgent.test.ts`    | Yes                      |
+| `licenseComplianceAgent.test.ts` | Yes                      |
+| `errorHandlingAgent.test.ts`     | Yes                      |
+| `observabilityAgent.test.ts`     | Yes                      |
+| `migrationSafetyAgent.test.ts`   | Yes                      |
+| `secretsAgent.test.ts`           | Yes                      |
+| `complexityAgent.test.ts`        | No — see below           |
 
 ---
 
@@ -250,6 +251,7 @@ Checked each agent test file for test cases covering malformed/empty/unexpected 
 **File read:** `tests/integration/e2e.test.ts`, `tests/helpers/requireOllama.ts`
 
 **Distinct scenarios covered:**
+
 1. Produces at least one finding from a deliberately bad diff
 2. Summary counters are consistent with findings array
 3. Every finding conforms to the `Finding` schema (severity, basis, title, detail, suggestion)
@@ -257,14 +259,14 @@ Checked each agent test file for test cases covering malformed/empty/unexpected 
 
 **Flag coverage assessment:**
 
-| Flag / Feature     | Tested in e2e? |
-|--------------------|---------------|
-| `--format json`    | Implicitly — `SwarmRunner` is called directly, not via CLI; JSON shape validated | Partially |
-| `--fail-on`        | No            |
-| `.aiignore` exclusion | No         |
-| `--fail-fast`      | No            |
-| `--agents` selection | Yes (hardcoded to `['security', 'correctness']`) |
-| Multiple agents    | Yes (2 agents) |
+| Flag / Feature        | Tested in e2e?                                                                   |
+| --------------------- | -------------------------------------------------------------------------------- | --------- |
+| `--format json`       | Implicitly — `SwarmRunner` is called directly, not via CLI; JSON shape validated | Partially |
+| `--fail-on`           | No                                                                               |
+| `.aiignore` exclusion | No                                                                               |
+| `--fail-fast`         | No                                                                               |
+| `--agents` selection  | Yes (hardcoded to `['security', 'correctness']`)                                 |
+| Multiple agents       | Yes (2 agents)                                                                   |
 
 ---
 
@@ -366,19 +368,19 @@ Checked each agent test file for test cases covering malformed/empty/unexpected 
 
 ## Summary Table
 
-| # | Finding                                           | Severity | Confidence | Effort |
-|---|---------------------------------------------------|----------|------------|--------|
-| 1 | Prettier fails on audit plan — `npm run check` broken | Low  | Verified   | XS     |
-| 2 | CLI entry point (`src/cli/index.ts`) at 0% coverage | High   | Verified   | M      |
-| 3 | MCP server (`src/mcp/server.ts`) at 0% coverage   | Medium   | Verified   | S      |
-| 4 | `format:check` + ESLint not gated before npm publish | Low   | Verified   | XS     |
-| 5 | vscode-extension tests never run in CI            | High     | Verified   | S      |
-| 6 | `complexityAgent` missing parse-failure test      | Medium   | Verified   | XS     |
-| 7 | Integration e2e: single scenario, CLI flags untested | Medium | Verified   | M      |
-| 8 | CI only tests Node 24, not minimum Node 18        | Medium   | Verified   | S      |
-| 9 | NPM_TOKEN expires 2026-09-08 with no automated warning | Medium | Verified | XS–S  |
-| — | *No finding* — secret injection in CI             | —        | Verified   | —      |
-| — | *No finding* — calibrate.yml Ollama handling      | —        | Verified   | —      |
-| — | *No finding* — npm pack includes unwanted files   | —        | Verified   | —      |
-| — | *No finding* — PMB lacks CI                       | —        | Verified   | —      |
-| — | *No finding* — publish-before-test race           | —        | Verified   | —      |
+| #   | Finding                                                | Severity | Confidence | Effort |
+| --- | ------------------------------------------------------ | -------- | ---------- | ------ |
+| 1   | Prettier fails on audit plan — `npm run check` broken  | Low      | Verified   | XS     |
+| 2   | CLI entry point (`src/cli/index.ts`) at 0% coverage    | High     | Verified   | M      |
+| 3   | MCP server (`src/mcp/server.ts`) at 0% coverage        | Medium   | Verified   | S      |
+| 4   | `format:check` + ESLint not gated before npm publish   | Low      | Verified   | XS     |
+| 5   | vscode-extension tests never run in CI                 | High     | Verified   | S      |
+| 6   | `complexityAgent` missing parse-failure test           | Medium   | Verified   | XS     |
+| 7   | Integration e2e: single scenario, CLI flags untested   | Medium   | Verified   | M      |
+| 8   | CI only tests Node 24, not minimum Node 18             | Medium   | Verified   | S      |
+| 9   | NPM_TOKEN expires 2026-09-08 with no automated warning | Medium   | Verified   | XS–S   |
+| —   | _No finding_ — secret injection in CI                  | —        | Verified   | —      |
+| —   | _No finding_ — calibrate.yml Ollama handling           | —        | Verified   | —      |
+| —   | _No finding_ — npm pack includes unwanted files        | —        | Verified   | —      |
+| —   | _No finding_ — PMB lacks CI                            | —        | Verified   | —      |
+| —   | _No finding_ — publish-before-test race                | —        | Verified   | —      |

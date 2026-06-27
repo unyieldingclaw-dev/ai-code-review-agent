@@ -79,3 +79,15 @@ const transport = new StdioServerTransport()
 await server.connect(transport)
 
 process.stderr.write('[ai-review-mcp] Server ready.\n')
+
+// Clean up when the MCP client disconnects or the process is terminated.
+// Without these handlers the server stays alive as a zombie with any in-flight
+// Ollama calls still running.
+const shutdown = (): void => {
+  process.stderr.write('[ai-review-mcp] Shutting down.\n')
+  process.exit(0)
+}
+process.on('SIGTERM', shutdown)
+process.on('SIGINT', shutdown)
+process.stdin.on('end', shutdown)
+process.stdin.on('close', shutdown)

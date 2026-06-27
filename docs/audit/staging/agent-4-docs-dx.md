@@ -1,4 +1,5 @@
 # Agent 4 — Documentation & DX Findings
+
 **Date:** 2026-06-25
 **Status:** Complete
 **Finding count:** 14
@@ -156,7 +157,7 @@
 - **Severity:** Medium
 - **Confidence:** Verified
 - **Repository:** ACR
-- **Evidence:** `src/core/runner.ts` line 127: `if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')`. `src/core/llm/ollamaProvider.ts` line 51: `error: \`Ollama not reachable at ${this.baseUrl}: ${(err as Error).message\}`. The thrown error propagates up through `program.action()` in `src/cli/index.ts` without a catch — Commander will print the Node.js stack trace to stderr and exit 1.
+- **Evidence:** `src/core/runner.ts` line 127: `if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')`. `src/core/llm/ollamaProvider.ts` line 51: `error: \`Ollama not reachable at ${this.baseUrl}: ${(err as Error).message\}`. The thrown error propagates up through `program.action()`in`src/cli/index.ts` without a catch — Commander will print the Node.js stack trace to stderr and exit 1.
 - **Reproduction:** Stop Ollama, then run `node dist/cli/index.js` against staged changes. Output includes the connection error message but also the full stack trace from Commander's uncaught error handler, and no instruction for what to do.
 - **Root Cause:** The CLI entry point does not wrap `runner.run()` in a try/catch that intercepts the Ollama ping failure and formats it into a clean actionable message. The error text from `ollamaProvider.ts` is accurate ("Ollama not reachable at...") but is buried in a stack trace.
 - **Fix:** In `src/cli/index.ts`, wrap the `runner.run()` call in a try/catch. Catch errors whose message starts with "Ollama not reachable" and print: `Error: Ollama is not running. Start it with: ollama serve\nThen re-run ai-review-agent.` then `process.exit(1)` cleanly without stack trace.

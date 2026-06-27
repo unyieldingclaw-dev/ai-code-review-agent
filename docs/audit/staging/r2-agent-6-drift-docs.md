@@ -1,4 +1,5 @@
 # Agent 6 — Ecosystem Drift & Documentation Accuracy Post-Fixes
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** 8 (7 NEW, 1 REGRESSION)
@@ -8,6 +9,7 @@
 ## Check 1: ACR Memory Bank Staleness
 
 ### Finding: activeContext.md test count stale after Round 1 remediation commits
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -22,6 +24,7 @@
 ---
 
 ### Finding: progress.md test count and version history missing Round 1 remediation
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -38,6 +41,7 @@
 ## Check 2: ACR CHANGELOG Coverage of Round 1 Fixes
 
 ### Finding: CHANGELOG missing entry for Round 1 audit remediation sprint
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -60,6 +64,7 @@
 ## Check 4: CONTRACTS-GUIDE.md Documents Dual-Format Scope?
 
 ### Finding: CONTRACTS-GUIDE documents only one scope format; dual-format hook support is undocumented
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -76,6 +81,7 @@
 ## Check 5: HOOKS-GUIDE.md PreCompact Exit Code Claim
 
 ### Finding: HOOKS-GUIDE claims PreCompact exits 2 to block compaction, but settings.json wires in `|| true` that suppresses the exit code — compaction cannot actually be blocked
+
 - **Tag:** [REGRESSION]
 - **Severity:** High
 - **Confidence:** Verified
@@ -93,7 +99,7 @@
 - **Fix:** Two options:
   1. (Preferred) Remove `|| true` from the PreCompact hook command. The fail-open rationale does not apply here — if both runners fail to even start (pwsh and bash missing), exit 1 is acceptable. Change to: `"pwsh -NonInteractive -File scripts/pre-compact-check.ps1 2>/dev/null || bash scripts/pre-compact-check.sh 2>/dev/null"`
   2. (Documentation patch only) Update HOOKS-GUIDE to state that PreCompact "warns but does not block" and update CLAUDE.md ACR to align. This is accurate but weakens the stated safety guarantee.
-  Fix must be applied in ACR `settings.json`, PMB `settings.json`, and PMB `templates/.claude/settings.json`.
+     Fix must be applied in ACR `settings.json`, PMB `settings.json`, and PMB `templates/.claude/settings.json`.
 - **Impact:** The memory-gate advertised as a compaction block is actually a compaction warning on Windows. Claude can compact even when `activeContext.md` and `progress.md` are stale, defeating the principal purpose of the PreCompact hook. Users reading the docs believe their governance is enforced when it is not.
 - **Effort:** S
 
@@ -104,6 +110,7 @@
 > [CHECK 6: PMB ACTIVECONTEXT STALENESS]: No finding — `last-reviewed: 2026-06-24`, today is 2026-06-26, delta = 2 days, well within the 14-day staleness threshold. Current Focus accurately describes the completed audit and remediation sprint. No stale state detected.
 
 ### Finding: PMB progress.md last-reviewed frontmatter is 4 days stale relative to activeContext.md
+
 - **Tag:** [NEW]
 - **Severity:** Low
 - **Confidence:** Verified
@@ -120,6 +127,7 @@
 ## Check 7: PMB README Accuracy for New Commands and CI
 
 ### Finding: README Slash Commands table says "mb doctor (20 checks)" but doctor has 24 checks
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -132,6 +140,7 @@
 - **Effort:** XS
 
 ### Finding: README omits mb preflight and mb change-check from command documentation
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -160,13 +169,13 @@
 
 ## Summary Table
 
-| # | Finding | Tag | Severity | Repo | Effort |
-|---|---------|-----|----------|------|--------|
-| 1 | activeContext.md test count stale (276 vs 284 actual) | NEW | Medium | ACR | XS |
-| 2 | progress.md missing remediation sprint entries and stale test count | NEW | Medium | ACR | S |
-| 3 | CHANGELOG missing Round 1 remediation sprint entry | NEW | Medium | ACR | S |
-| 4 | CONTRACTS-GUIDE omits dual-format scope support | NEW | Low | ACR | XS |
-| 5 | PreCompact `|| true` defeats block claim in HOOKS-GUIDE and CLAUDE.md | REGRESSION | High | Both | S |
-| 6 | PMB progress.md last-reviewed 4 days behind activeContext.md | NEW | Low | PMB | XS |
-| 7a | README /health-check table says "20 checks" vs actual 24 | NEW | Medium | PMB | XS |
-| 7b | README omits mb preflight and mb change-check commands | NEW | Medium | PMB | XS |
+| #   | Finding                                                             | Tag | Severity                                               | Repo       | Effort |
+| --- | ------------------------------------------------------------------- | --- | ------------------------------------------------------ | ---------- | ------ | ---- | --- |
+| 1   | activeContext.md test count stale (276 vs 284 actual)               | NEW | Medium                                                 | ACR        | XS     |
+| 2   | progress.md missing remediation sprint entries and stale test count | NEW | Medium                                                 | ACR        | S      |
+| 3   | CHANGELOG missing Round 1 remediation sprint entry                  | NEW | Medium                                                 | ACR        | S      |
+| 4   | CONTRACTS-GUIDE omits dual-format scope support                     | NEW | Low                                                    | ACR        | XS     |
+| 5   | PreCompact `                                                        |     | true` defeats block claim in HOOKS-GUIDE and CLAUDE.md | REGRESSION | High   | Both | S   |
+| 6   | PMB progress.md last-reviewed 4 days behind activeContext.md        | NEW | Low                                                    | PMB        | XS     |
+| 7a  | README /health-check table says "20 checks" vs actual 24            | NEW | Medium                                                 | PMB        | XS     |
+| 7b  | README omits mb preflight and mb change-check commands              | NEW | Medium                                                 | PMB        | XS     |

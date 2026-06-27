@@ -30,28 +30,28 @@ Skip the contract for: single-file edits, typos, config-value changes, changes c
 
 ### Field Reference
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `task` | string | ✅ | One-sentence description of the work |
-| `status` | `"active"` \| `"complete"` \| `"cancelled"` | ✅ | Lifecycle state |
-| `created_at` | ISO 8601 datetime | ✅ | When the contract was created |
-| `expires_at` | ISO 8601 datetime | ✅ | When the contract expires (typically 8 hours from creation) |
-| `scope` | `Array<{file, op}>` | ✅ | Files in scope. Each entry has a `file` path (relative to repo root) and an `op` of `"create"` or `"edit"` |
+| Field        | Type                                        | Required | Description                                                                                                |
+| ------------ | ------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `task`       | string                                      | ✅       | One-sentence description of the work                                                                       |
+| `status`     | `"active"` \| `"complete"` \| `"cancelled"` | ✅       | Lifecycle state                                                                                            |
+| `created_at` | ISO 8601 datetime                           | ✅       | When the contract was created                                                                              |
+| `expires_at` | ISO 8601 datetime                           | ✅       | When the contract expires (typically 8 hours from creation)                                                |
+| `scope`      | `Array<{file, op}>`                         | ✅       | Files in scope. Each entry has a `file` path (relative to repo root) and an `op` of `"create"` or `"edit"` |
 
 ### Status Values
 
-| Value | Meaning |
-|---|---|
-| `"active"` | Contract is in force. Hook enforces scope. |
-| `"complete"` | Task finished successfully. Scope enforcement ends. |
-| `"cancelled"` | Task was stopped mid-way. Scope enforcement ends. |
+| Value         | Meaning                                             |
+| ------------- | --------------------------------------------------- |
+| `"active"`    | Contract is in force. Hook enforces scope.          |
+| `"complete"`  | Task finished successfully. Scope enforcement ends. |
+| `"cancelled"` | Task was stopped mid-way. Scope enforcement ends.   |
 
 ### Op Values
 
-| Value | Meaning |
-|---|---|
+| Value      | Meaning                                     |
+| ---------- | ------------------------------------------- |
 | `"create"` | File does not yet exist and will be created |
-| `"edit"` | File already exists and will be modified |
+| `"edit"`   | File already exists and will be modified    |
 
 ## Creating a Contract
 

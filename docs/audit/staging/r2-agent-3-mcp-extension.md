@@ -1,4 +1,5 @@
 # Agent 3 — MCP Server & vscode-extension Deep Dive
+
 **Date:** 2026-06-26
 **Status:** Complete
 **Finding count:** 3 findings (1 Critical, 1 High, 1 Medium) + 5 null results
@@ -8,6 +9,7 @@
 ## Check 1: MCP server shutdown handling
 
 ### Finding: MCP server hangs indefinitely on client disconnect
+
 - **Tag:** [NEW]
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -52,6 +54,7 @@
 ## Check 5: vscode-extension runner subprocess timeout
 
 ### Finding: Extension subprocess has no wall-clock timeout; hangs indefinitely if Ollama stalls
+
 - **Tag:** [NEW]
 - **Severity:** High
 - **Confidence:** Verified
@@ -70,7 +73,9 @@
     child.kill()
     reject(new Error(`wall-clock-timeout:${config.timeoutSecs}s`))
   }, WALL_CLOCK_MS)
-  child.on('close', () => { clearTimeout(timer); /* ... existing logic */ })
+  child.on('close', () => {
+    clearTimeout(timer) /* ... existing logic */
+  })
   ```
   Caller (`extension.ts`) should surface `wall-clock-timeout` as a user-visible error identical to the cancellation UX.
 - **Impact:** Prevents VS Code becoming unresponsive due to a frozen Ollama instance or CLI deadlock; bounds worst-case user-visible hang to `timeoutSecs + 30` seconds.
@@ -93,6 +98,7 @@
 ## Check 8: vscode-extension CI headless configuration
 
 ### Finding: CI step `npm run test:extension` has no timeout guard and no display server setup, but tests use vitest (not @vscode/test-electron) — pipeline is safe from hang, but the missing timeout is still a risk
+
 - **Tag:** [NEW]
 - **Severity:** Critical
 - **Confidence:** Strong Evidence
@@ -118,10 +124,10 @@
 
 ## Summary Table
 
-| # | Finding | Severity | Confidence | Effort |
-|---|---------|----------|-----------|--------|
-| 1 | MCP server hangs on client disconnect (no stdin/signal handlers) | Medium | Verified | XS |
-| 2 | Extension subprocess has no wall-clock timeout | High | Verified | S |
-| 3 | CI extension test step has no `timeout-minutes:` guard | Critical | Strong Evidence | XS |
+| #   | Finding                                                          | Severity | Confidence      | Effort |
+| --- | ---------------------------------------------------------------- | -------- | --------------- | ------ |
+| 1   | MCP server hangs on client disconnect (no stdin/signal handlers) | Medium   | Verified        | XS     |
+| 2   | Extension subprocess has no wall-clock timeout                   | High     | Verified        | S      |
+| 3   | CI extension test step has no `timeout-minutes:` guard           | Critical | Strong Evidence | XS     |
 
 All three findings are [NEW]. No [REGRESSION] findings were identified. The originally feared regression (display-server hang from `@vscode/test-electron`) is **not present** — the extension test suite uses vitest and runs fully headless.

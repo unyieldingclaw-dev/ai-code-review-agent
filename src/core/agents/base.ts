@@ -58,6 +58,11 @@ export abstract class BaseAgent {
       if (Array.isArray(parsed)) {
         const valid = this.validateFindings(parsed)
         if (valid.length > 0 || parsed.length === 0) return valid
+        // All items failed schema validation — log before falling through to extraction
+        console.error(
+          `[${this.name}] stage-1: ${parsed.length} item(s) failed schema validation. ` +
+            `First item keys: ${Object.keys(parsed[0] ?? {}).join(', ')}`
+        )
       }
       // Stage 2: object with .findings array
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.findings)) {
@@ -113,38 +118,50 @@ export abstract class BaseAgent {
   }
 
   private validateFindings(items: unknown[]): Finding[] {
-    return (items as Finding[])
-      .filter(
-        (f) =>
-          typeof f === 'object' &&
-          f !== null &&
-          typeof f.severity === 'string' &&
-          typeof f.basis === 'string' &&
-          typeof f.file === 'string' &&
-          typeof f.line === 'number' &&
-          typeof f.title === 'string' &&
-          typeof f.detail === 'string' &&
-          // Accept either suggestion (legacy) or recommendation (new) from LLM output
-          (typeof f.suggestion === 'string' || typeof f.recommendation === 'string')
+    const valid: Finding[] = []
+    let dropped = 0
+    for (const f of items as Finding[]) {
+      const passes =
+        typeof f === 'object' &&
+        f !== null &&
+        typeof f.severity === 'string' &&
+        // Accept basis (legacy LLM field) OR evidence (canonical schema name)
+        (typeof f.basis === 'string' || typeof f.evidence === 'string') &&
+        typeof f.file === 'string' &&
+        typeof f.line === 'number' &&
+        typeof f.title === 'string' &&
+        typeof f.detail === 'string' &&
+        // Accept either suggestion (legacy) or recommendation (new) from LLM output
+        (typeof f.suggestion === 'string' || typeof f.recommendation === 'string')
+      if (passes) {
+        valid.push(f)
+      } else {
+        dropped++
+      }
+    }
+    if (dropped > 0) {
+      console.error(
+        `[${this.name}] validateFindings: dropped ${dropped}/${items.length} item(s) — missing required fields (severity, basis/evidence, file, line, title, detail, suggestion/recommendation)`
       )
-      .map((f, i) => {
-        const rawConf = typeof f.confidence === 'number' ? f.confidence : 70
-        const suggestion = f.suggestion ?? f.recommendation ?? ''
-        const recommendation = f.recommendation ?? suggestion
-        return {
-          ...f,
-          id: `${this.name}-${i}`,
-          agent: this.name,
-          confidence: Math.max(0, Math.min(100, rawConf)),
-          domain: f.domain ?? agentDefaultDomain(this.name),
-          evidence: f.evidence ?? f.detail ?? '',
-          impact: f.impact ?? '',
-          recommendation,
-          suggestion,
-          blocking: f.blocking ?? f.severity === 'critical',
-          source: f.source ?? 'llm',
-          ...(f.lineEnd !== undefined ? { lineEnd: Math.max(f.line, f.lineEnd) } : {}),
-        }
-      })
+    }
+    return valid.map((f, i) => {
+      const rawConf = typeof f.confidence === 'number' ? f.confidence : 70
+      const suggestion = f.suggestion ?? f.recommendation ?? ''
+      const recommendation = f.recommendation ?? suggestion
+      return {
+        ...f,
+        id: `${this.name}-${i}`,
+        agent: this.name,
+        confidence: Math.max(0, Math.min(100, rawConf)),
+        domain: f.domain ?? agentDefaultDomain(this.name),
+        evidence: f.evidence ?? f.detail ?? '',
+        impact: f.impact ?? '',
+        recommendation,
+        suggestion,
+        blocking: f.blocking ?? f.severity === 'critical',
+        source: f.source ?? 'llm',
+        ...(f.lineEnd !== undefined ? { lineEnd: Math.max(f.line, f.lineEnd) } : {}),
+      }
+    })
   }
 }

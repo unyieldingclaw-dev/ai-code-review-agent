@@ -1,4 +1,5 @@
 # Agent 1 — Security & Secrets Findings
+
 **Date:** 2026-06-25
 **Status:** Complete
 **Finding count:** 7
@@ -7,7 +8,7 @@
 
 ## Check 1: Hardcoded Secrets Grep
 
-> CHECK 1 (ACR src/): No finding — grep for password/secret/api_key/bearer/sk-/ghp_ patterns returned zero matches across all files in `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src`.
+> CHECK 1 (ACR src/): No finding — grep for password/secret/api*key/bearer/sk-/ghp* patterns returned zero matches across all files in `C:\Users\Mizzo\Claude\AI-Code-Review-Agent\src`.
 
 > CHECK 1 (PMB scripts/): No finding — same grep returned zero matches across all files in `C:\Users\Mizzo\Claude\Personal-Memory-Bank\scripts`.
 
@@ -24,6 +25,7 @@
 ## Check 3: `.claude/settings.json` Permissions Audit
 
 ### Finding: `Bash(npx *)` allows arbitrary package execution
+
 - **Severity:** Medium
 - **Confidence:** Verified
 - **Repository:** Both (identical `permissions.allow` lists in both repos)
@@ -35,6 +37,7 @@
 - **Effort:** XS
 
 ### Finding: `Bash(npm run *)` wildcard allows any npm script without review
+
 - **Severity:** Low
 - **Confidence:** Verified
 - **Repository:** Both
@@ -50,6 +53,7 @@
 ## Check 4: `release.yml` — Secret Scan Before Publish
 
 ### Finding: No secret scan step before `npm publish` in release workflow
+
 - **Severity:** High
 - **Confidence:** Verified
 - **Repository:** ACR
@@ -72,6 +76,7 @@
 ## Check 5: `.gitignore` Coverage Audit
 
 ### Finding: ACR `.gitignore` missing `*.pem`, `*.key`, and `*.p12` patterns
+
 - **Severity:** Medium
 - **Confidence:** Verified
 - **Repository:** ACR
@@ -97,16 +102,17 @@ The `SECRETS.md` file at `C:\Users\Mizzo\Claude\Personal-Memory-Bank\standards\S
 
 **Rule-by-rule mapping:**
 
-| Declared Rule | Hook Coverage |
-|---|---|
-| 1. Never commit a secret | Partially covered: `warn "credentials.json"`, `warn ".pem"`, `warn "id_rsa"`, `warn ".env.production"`. But these are WARN-tier (commands proceed); no BLOCK for secret file access. `.env` (without qualifier) is not covered. |
-| 2. Use a centralized secrets store | Not hookable — advisory only. No gap. |
-| 3. Short-lived tokens | Not hookable — advisory only. No gap. |
-| 4. Agent-safe posture / no long-lived creds in env | Not hookable at this layer. No gap expected. |
-| 5. If `.env` is unavoidable — exclude from MCP read paths | Not enforced by hook — advisory only. |
-| 6. MCP-specific rules — no credentials in `mcp.json` | Not checked by hook. |
+| Declared Rule                                             | Hook Coverage                                                                                                                                                                                                                   |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Never commit a secret                                  | Partially covered: `warn "credentials.json"`, `warn ".pem"`, `warn "id_rsa"`, `warn ".env.production"`. But these are WARN-tier (commands proceed); no BLOCK for secret file access. `.env` (without qualifier) is not covered. |
+| 2. Use a centralized secrets store                        | Not hookable — advisory only. No gap.                                                                                                                                                                                           |
+| 3. Short-lived tokens                                     | Not hookable — advisory only. No gap.                                                                                                                                                                                           |
+| 4. Agent-safe posture / no long-lived creds in env        | Not hookable at this layer. No gap expected.                                                                                                                                                                                    |
+| 5. If `.env` is unavoidable — exclude from MCP read paths | Not enforced by hook — advisory only.                                                                                                                                                                                           |
+| 6. MCP-specific rules — no credentials in `mcp.json`      | Not checked by hook.                                                                                                                                                                                                            |
 
 ### Finding: `dangerous-commands.sh` WARN-tiers credential file access instead of CONFIRM-tier
+
 - **Severity:** Low
 - **Confidence:** Verified
 - **Repository:** PMB
@@ -128,6 +134,7 @@ The `SECRETS.md` file at `C:\Users\Mizzo\Claude\Personal-Memory-Bank\standards\S
 ## Check 8: `sanitizer.ts` — Injection Vector Coverage
 
 ### Finding: Sanitizer does not catch leading-whitespace SYSTEM: variants or comment-embedded directives
+
 - **Severity:** Medium
 - **Confidence:** Strong Evidence
 - **Repository:** ACR
@@ -143,6 +150,7 @@ The `SECRETS.md` file at `C:\Users\Mizzo\Claude\Personal-Memory-Bank\standards\S
 - **Effort:** S
 
 ### Finding: `--no-sanitize` disables sanitization with no user-visible warning on stdout/stderr
+
 - **Severity:** Low
 - **Confidence:** Verified
 - **Repository:** ACR
@@ -174,6 +182,7 @@ The `SECRETS.md` file at `C:\Users\Mizzo\Claude\Personal-Memory-Bank\standards\S
 ## Check 10: `ollamaProvider.ts` — SSRF Risk
 
 ### Finding: Ollama base URL is fully user-configurable with no localhost validation
+
 - **Severity:** Medium
 - **Confidence:** Verified
 - **Repository:** ACR

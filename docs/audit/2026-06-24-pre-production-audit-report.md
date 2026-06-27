@@ -35,14 +35,14 @@ The ecosystem is architecturally sound and the ACR core pipeline is notably clea
 
 ## 2. Overall Readiness Assessment
 
-| Domain | Rating | Key Risk |
-|---|---|---|
-| Security | 🔴 Not Ready | No pre-publish secret scan; `Bash(npx *)` allows arbitrary package execution; SSRF via Ollama URL |
-| Reliability | 🟡 Caution | Unhandled Ollama rejection (stack trace instead of clean error); corrupt contract silently bypasses scope enforcement |
-| Architecture | 🟡 Caution | `runner.ts` 305-line `run()` method; `BaseAgent` owns 6–8 concerns; `matchPattern` copy-pasted; `contextLoader` untested |
-| Documentation / DX | 🟡 Caution | Two broken CLAUDE.md file pointers; stale test counts in README/memory-bank; missing model download size callout |
-| CI / Coverage | 🔴 Not Ready | CLI at 0% coverage; MCP server at 0%; vscode-extension tests never run in CI; `npm run check` currently fails; no Node 18 matrix |
-| Integration | 🟡 Caution | `/change-review` wrong diff surface; contract schema 3-way incompatibility; `confidence` homonym across types |
+| Domain             | Rating       | Key Risk                                                                                                                         |
+| ------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Security           | 🔴 Not Ready | No pre-publish secret scan; `Bash(npx *)` allows arbitrary package execution; SSRF via Ollama URL                                |
+| Reliability        | 🟡 Caution   | Unhandled Ollama rejection (stack trace instead of clean error); corrupt contract silently bypasses scope enforcement            |
+| Architecture       | 🟡 Caution   | `runner.ts` 305-line `run()` method; `BaseAgent` owns 6–8 concerns; `matchPattern` copy-pasted; `contextLoader` untested         |
+| Documentation / DX | 🟡 Caution   | Two broken CLAUDE.md file pointers; stale test counts in README/memory-bank; missing model download size callout                 |
+| CI / Coverage      | 🔴 Not Ready | CLI at 0% coverage; MCP server at 0%; vscode-extension tests never run in CI; `npm run check` currently fails; no Node 18 matrix |
+| Integration        | 🟡 Caution   | `/change-review` wrong diff surface; contract schema 3-way incompatibility; `confidence` homonym across types                    |
 
 **Overall: NOT READY**
 
@@ -218,7 +218,7 @@ No findings reached Critical severity after full deduplication and evidence revi
 
 ---
 
-### Finding: Bash(npx *) wildcard allows arbitrary npm package execution
+### Finding: Bash(npx \*) wildcard allows arbitrary npm package execution
 
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -664,7 +664,7 @@ See Section 5. The integration test uses `SwarmRunner` directly. The CLI binary,
 
 ## 8. Missing Guardrails
 
-### Finding: ACR .gitignore missing *.pem, *.key, *.p12 patterns
+### Finding: ACR .gitignore missing _.pem, _.key, \*.p12 patterns
 
 - **Severity:** Medium
 - **Confidence:** Verified
@@ -707,7 +707,7 @@ See Section 6. A guardrail that warns and proceeds is not a guardrail for creden
 
 **Severity: High.** See Section 4. ACR is a security tool. Publishing to npm without a secret scan is the highest-embarrassment failure mode possible for this project.
 
-### Finding: Bash(npx *) wildcard in settings.json
+### Finding: Bash(npx \*) wildcard in settings.json
 
 **Severity: Medium.** See Section 5. Prompt-injected `npx <package>@latest` executes arbitrary remote code without a permission prompt in both repos.
 
@@ -961,33 +961,33 @@ The PMB-to-ACR propagation architecture has no enforcement layer. Commands, stan
 
 Ordered by value/effort ratio. All Effort XS or S, all Severity Medium or higher.
 
-| Priority | Finding | Effort | Severity |
-|---|---|---|---|
-| 1 | Fix Prettier failure: `npx prettier --write "docs/superpowers/plans/2026-06-24-pre-production-audit.md"` | XS | High |
-| 2 | Add `*.pem`, `*.key`, `*.p12` to ACR `.gitignore` | XS | Medium |
-| 3 | Add `--no-sanitize` stderr warning to `runner.ts` | XS | Low→Medium |
-| 4 | Fix `Bash(npx *)` → enumerate specific npx commands in both settings.json files | XS | Medium |
-| 5 | Add NPM_TOKEN expiry warning step to `release.yml` (Option A) | XS | Medium |
-| 6 | Add `format:check` + `lint:eslint` to `release.yml` before publish | XS | Low |
-| 7 | Fix corrupt contract silent bypass — add warning before `exit 0` in both `.sh` and `.ps1` | XS | Medium |
-| 8 | Update `/health-check` to remove deprecated `mb validate`/`mb audit` steps | XS | Medium |
-| 9 | Add model download size callout (14 GB) to README before `ollama pull` | XS | High |
-| 10 | Add "Install Ollama first" as explicit step 1 in README Installation section | XS | Medium |
-| 11 | Fix ACR `CLAUDE.md` compaction behavior description ("warns" → "blocks") | XS | Medium |
-| 12 | Fix PMB README version badge: `1.1.1` → `1.2.0` | XS | Medium |
-| 13 | Update all three stale test counts: `progress.md` (112→276), `activeContext.md` (120→276), `README.md` (196→276) | XS | Medium |
-| 14 | Update PMB README command count (9→11) and doctor check count (20→24) | XS | Medium |
-| 15 | Add `- Agent` to ACR `/code-review` allowed-tools frontmatter | XS | Low |
-| 16 | Add cloud API disclosure to ACR `/code-review.md` frontmatter description | XS | High |
-| 17 | Fix `/security-review.md` formatting in ACR (copy PMB version) | XS | Medium |
-| 18 | Export `matchPattern` from `ignoreFilter.ts` and remove copy in `policyFilter.ts` | XS | Advisory |
-| 19 | Create `docs/HOOKS-GUIDE.md` in ACR (copy from PMB) | XS | High |
-| 20 | Add gitleaks scan step to `release.yml` before publish | S | High |
-| 21 | Wire vscode-extension tests into CI | S | High |
-| 22 | Fix `/change-review` Job 7 to pass `--diff <tmpfile>` to ACR | S | High |
-| 23 | Create `docs/CONTRACTS-GUIDE.md` with canonical contract schema | S | High |
-| 24 | Add Ollama localhost validation to `OllamaProvider` constructor | S | Medium |
-| 25 | Add CLI try/catch for clean Ollama error message and `process.exit(1)` | XS | Medium |
+| Priority | Finding                                                                                                          | Effort | Severity   |
+| -------- | ---------------------------------------------------------------------------------------------------------------- | ------ | ---------- |
+| 1        | Fix Prettier failure: `npx prettier --write "docs/superpowers/plans/2026-06-24-pre-production-audit.md"`         | XS     | High       |
+| 2        | Add `*.pem`, `*.key`, `*.p12` to ACR `.gitignore`                                                                | XS     | Medium     |
+| 3        | Add `--no-sanitize` stderr warning to `runner.ts`                                                                | XS     | Low→Medium |
+| 4        | Fix `Bash(npx *)` → enumerate specific npx commands in both settings.json files                                  | XS     | Medium     |
+| 5        | Add NPM_TOKEN expiry warning step to `release.yml` (Option A)                                                    | XS     | Medium     |
+| 6        | Add `format:check` + `lint:eslint` to `release.yml` before publish                                               | XS     | Low        |
+| 7        | Fix corrupt contract silent bypass — add warning before `exit 0` in both `.sh` and `.ps1`                        | XS     | Medium     |
+| 8        | Update `/health-check` to remove deprecated `mb validate`/`mb audit` steps                                       | XS     | Medium     |
+| 9        | Add model download size callout (14 GB) to README before `ollama pull`                                           | XS     | High       |
+| 10       | Add "Install Ollama first" as explicit step 1 in README Installation section                                     | XS     | Medium     |
+| 11       | Fix ACR `CLAUDE.md` compaction behavior description ("warns" → "blocks")                                         | XS     | Medium     |
+| 12       | Fix PMB README version badge: `1.1.1` → `1.2.0`                                                                  | XS     | Medium     |
+| 13       | Update all three stale test counts: `progress.md` (112→276), `activeContext.md` (120→276), `README.md` (196→276) | XS     | Medium     |
+| 14       | Update PMB README command count (9→11) and doctor check count (20→24)                                            | XS     | Medium     |
+| 15       | Add `- Agent` to ACR `/code-review` allowed-tools frontmatter                                                    | XS     | Low        |
+| 16       | Add cloud API disclosure to ACR `/code-review.md` frontmatter description                                        | XS     | High       |
+| 17       | Fix `/security-review.md` formatting in ACR (copy PMB version)                                                   | XS     | Medium     |
+| 18       | Export `matchPattern` from `ignoreFilter.ts` and remove copy in `policyFilter.ts`                                | XS     | Advisory   |
+| 19       | Create `docs/HOOKS-GUIDE.md` in ACR (copy from PMB)                                                              | XS     | High       |
+| 20       | Add gitleaks scan step to `release.yml` before publish                                                           | S      | High       |
+| 21       | Wire vscode-extension tests into CI                                                                              | S      | High       |
+| 22       | Fix `/change-review` Job 7 to pass `--diff <tmpfile>` to ACR                                                     | S      | High       |
+| 23       | Create `docs/CONTRACTS-GUIDE.md` with canonical contract schema                                                  | S      | High       |
+| 24       | Add Ollama localhost validation to `OllamaProvider` constructor                                                  | S      | Medium     |
+| 25       | Add CLI try/catch for clean Ollama error message and `process.exit(1)`                                           | XS     | Medium     |
 
 ---
 
@@ -1021,4 +1021,4 @@ None of these findings require architectural redesign. The fix list is concrete,
 
 ---
 
-*Audit performed by Claude Sonnet 4.6 (6-agent parallel methodology). All findings are Verified or Strong Evidence unless noted. Speculative findings were excluded from this report.*
+_Audit performed by Claude Sonnet 4.6 (6-agent parallel methodology). All findings are Verified or Strong Evidence unless noted. Speculative findings were excluded from this report._

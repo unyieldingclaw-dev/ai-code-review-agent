@@ -341,10 +341,7 @@ export class SwarmRunner {
   }
 
   // Aggregates findings into bySeverity and byAgent counts for the result summary.
-  private buildSummary(
-    findings: Finding[],
-    durationMs: number
-  ): ReviewResult['summary'] {
+  private buildSummary(findings: Finding[], durationMs: number): ReviewResult['summary'] {
     const bySeverity = findings.reduce(
       (acc, f) => {
         acc[f.severity] = (acc[f.severity] ?? 0) + 1
