@@ -84,9 +84,9 @@ Fires before Claude Code compacts context. Runs two content-based quality checks
 **Exit codes:**
 
 - **Exits 0** — both checks pass (or `handoff.md` bypass is present). Compaction proceeds normally.
-- **Exits 2** — one or more checks fail. **Compaction is blocked.** Claude Code treats a non-zero exit from a PreCompact hook as a block signal. The hook prints an actionable message explaining what to do.
+- **Warns** — the hook prints a message describing the missing/stale content but compaction proceeds. The `|| true` fail-open in the settings.json command ensures the hook never blocks compaction, even when checks fail.
 
-**To unblock:** address the failing check (see below), then retry. Alternatively, create `handoff.md` to bypass the gate (the handoff file signals that session state has been captured via the Handoff Protocol).
+**To address a warning:** fix the failing check (see below), then retry the compact. Alternatively, create `handoff.md` to bypass the gate (the handoff file signals that session state has been captured via the Handoff Protocol).
 
 **Detection logic (content-based, not mtime):**
 

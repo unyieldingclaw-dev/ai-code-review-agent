@@ -34,6 +34,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.0.1] — 2026-06-26
+
+### Fixed
+- OllamaProvider: removed `0.0.0.0` from localhost allowlist (routes to external interfaces on Linux)
+- OllamaProvider: added HTTP/HTTPS scheme validation; `ollama://` protocol now throws with helpful error
+- OllamaProvider: wrapped `new URL()` in try/catch for helpful error on malformed URL input
+- CLI: added top-level try/catch to action handler — Ollama errors now show clean message + hint
+- CLI: exported `program` from `cli/index.ts` to enable unit testing
+- `release.yml`: added gitleaks secret scan step before npm publish
+- `release.yml`: added VS Code extension test step (with `timeout-minutes: 5`)
+- `release.yml`: added `format:check` and `lint:eslint` steps before publish
+- `release.yml`: added NPM_TOKEN expiry reminder step
+- `/change-review` Job 7: now writes diff to temp file and passes `--diff <tmpfile>` to ACR
+- `check-contract.sh` / `.ps1`: handles both ACR `[{file,op}]` and PMB `{files:[]}` scope formats
+- `check-contract.sh` / `.ps1`: emits warning on malformed JSON instead of silent pass
+- `matchPattern`: exported from `ignoreFilter.ts`; removed copy-paste in `policyFilter.ts`
+- `runner.ts`: decomposed 305-line `run()` into 5 private methods
+- `base.ts`: logs when `validateFindings` drops items; accepts `evidence` field (not just legacy `basis`)
+- MCP server: added SIGTERM/SIGINT/stdin.close shutdown handlers
+
+### Added
+- `docs/CONTRACTS-GUIDE.md`: canonical task contract schema documentation
+- `docs/HOOKS-GUIDE.md`: hook types, enforcement layers, and per-hook behavior
+- `.github/dependabot.yml`: weekly GitHub Actions version tracking
+- CLI unit tests: 7 tests covering argument parsing, exit codes, error paths (`tests/unit/cli.test.ts`)
+
+---
+
 ## [1.0.0] — 2026-06-24
 
 ### Added

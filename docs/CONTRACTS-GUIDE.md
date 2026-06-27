@@ -98,6 +98,15 @@ The `check-contract.sh` / `check-contract.ps1` hook fires on every Write or Edit
 ## Notes
 
 - `.claude/contracts/` is gitignored — contract files are session state, not project history
-- `expires_at` is informational; the hook does not check clock time
+- `expires_at` is enforced: both `check-contract.sh` and `check-contract.ps1` perform a live UTC clock comparison and emit a **CONTRACT EXPIRED** warning when the current time is past the deadline
 - Omit `created_at` if you want minimal contracts; it is informational only
 - The `scope` array should include every file that will be touched, including test files and documentation updates
+
+## Scope Format Compatibility
+
+The hook scripts support two scope formats:
+
+1. **ACR/canonical format** (recommended): `"scope": [{"file": "path/to/file.ts", "op": "edit"}]`
+2. **PMB template format**: `"scope": {"files": ["path/to/file.ts"], "operations": ["edit"]}`
+
+Both formats are parsed correctly by `check-contract.sh` and `check-contract.ps1`. Use the canonical format (array of objects) for new contracts — it is the format documented in the schema above and is more expressive.

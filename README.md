@@ -197,7 +197,7 @@ ai-review-agent --help
 | `--fail-fast`           | off             | Stop swarm on first finding at or above `--fail-on` threshold                            |
 | `--parallel`            | off             | Run specialist agents in parallel (faster; disables fail-fast)                           |
 | `--ignore <glob>`       | —               | Exclude matching files (repeatable)                                                      |
-| `--no-sanitize`         | —               | Skip prompt injection sanitization                                                       |
+| `--no-sanitize`         | —               | Skip prompt injection sanitization. **Security:** disables prompt injection protection. Do not use with untrusted diffs (e.g., reviewing PRs from external contributors). The sanitizer warning is written to stderr — it will be silently discarded if stderr is redirected (`2>/dev/null`). |
 | `--suggest-tests`       | —               | Enable testgen; include suggestions in report (no files written)                         |
 | `--write-tests`         | —               | Enable testgen and write generated test files to `testOutputDir`                         |
 | `--context-budget <n>`  | 4000            | Max chars of memory-bank context per agent                                               |

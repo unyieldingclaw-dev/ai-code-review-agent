@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-06-25
+last-reviewed: 2026-06-26
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,11 +16,11 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-06-25
+**Last Updated**: 2026-06-26
 
 ## Current Focus
 
-**ACR v1.1.0 shipped.** All planned work complete. 276 unit tests passing, 16/16 calibration, 0 ESLint warnings. Published to npm. GitHub Actions runner (mizzo-local) active via Task Scheduler.
+**ACR v1.1.0 shipped.** All planned work complete. 284 unit tests passing, 16/16 calibration, 0 ESLint warnings. Published to npm. GitHub Actions runner (mizzo-local) active via Task Scheduler.
 
 ## What's Working
 
@@ -33,7 +33,7 @@ lineage: []
 - `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, continue-on-error, 10min timeout
-- **276 unit tests** across 35 test files
+- **284 unit tests** across 35 test files
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
 - **npm**: `ai-review-agent@1.1.0`
 
@@ -99,7 +99,7 @@ lineage: []
 ## Key Commands
 
 ```bash
-npm test                    # all unit tests (276 passing)
+npm test                    # all unit tests (284 passing)
 npm run typecheck           # 0 errors
 npm run build               # compile to dist/
 node dist/cli/index.js --help   # smoke test CLI
