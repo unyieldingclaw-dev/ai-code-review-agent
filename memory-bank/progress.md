@@ -7,7 +7,7 @@ tags:
   - work/completed
   - work/in-progress
   - work/backlog
-last-reviewed: 2026-06-25
+last-reviewed: 2026-06-26
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -65,9 +65,9 @@ lineage: []
 
 ### Test Coverage
 
-- **Unit Tests**: 276 passing across 34 test files (run `npm test` for current count)
+- **Unit Tests**: 295 passing across 37 test files (run `npm test` for current count)
 - **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
-- **Total**: 276
+- **Total**: 295
 
 ### Implementation Progress
 
@@ -141,3 +141,4 @@ lineage: []
 | 1.0.0           | 2026-06-24    | --profile (6 presets), --context memory-bank, --format sarif/github-annotations, policy layer (agentPolicy), extended Finding schema (domain/evidence/impact/recommendation/blocking/source), 15 agent prompts updated, 16/16 calibration, 248 tests                          |
 | 1.0.1           | 2026-06-24    | Audit remediation: sanitizer multi-pattern fix, BaseAgent defaults tests, GitHub adapter tests, vitest coverage fix, CHANGELOG, JSDoc, contextBudgetChars, lineEnd clamp, AGENT_PRIORITY docs; 264 tests                                                                      |
 | 1.1.0           | 2026-06-25    | --no-emoji, --context-mode semantic (nomic-embed-text), --context-budget, .aiignore negation, ESLint (0 warnings), coverage parser fixed, orchestrator breaking-change escalation, vscode-extension v0.6.0 (profiles + context), migration-safety fixture expanded; 276 tests |
+| 1.2.0           | 2026-06-26    | SRP: parsing.ts extraction; semantic context warning; vscode-extension timeout; OllamaProvider SSRF hardening; MCP shutdown handlers; 295 tests; all 3-round audit findings resolved                                                                                          |

@@ -20,7 +20,7 @@ lineage: []
 
 ## Current Focus
 
-**ACR v1.1.0 shipped.** All planned work complete. 284 unit tests passing, 16/16 calibration, 0 ESLint warnings. Published to npm. GitHub Actions runner (mizzo-local) active via Task Scheduler.
+**All audit work complete.** Three-round pre-production audit (Rounds 1–3, 2026-06-24 to 2026-06-26) resolved all 90+ findings. Zero open Critical/High issues. 295 unit tests passing. Production ready.
 
 ## What's Working
 
@@ -33,9 +33,12 @@ lineage: []
 - `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, continue-on-error, 10min timeout
-- **284 unit tests** across 35 test files
+- **295 unit tests** across 37 test files
+- `src/core/parsing.ts`: `validateAndNormalizeFindings()` extracted from BaseAgent (SRP)
+- `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
+- `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
-- **npm**: `ai-review-agent@1.1.0`
+- **npm**: `ai-review-agent@1.2.0`
 
 ## Guardrails (All Complete)
 
@@ -59,10 +62,10 @@ lineage: []
 
 ## Next Steps
 
-- **Calibration**: 16/16 PASS confirmed (v0.9.3, commit `754ee08`). No further calibration work needed.
+- **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new Automation token on npmjs.com and update `NPM_TOKEN` GitHub Actions secret before then.
+- **Version 1.2.0**: Ready to publish. Run `git tag v1.2.0 && git push --tags` to trigger npm release.
 - **Anthropic/Claude provider** (backlog): Alternative to Ollama using `claude-sonnet-4-6` via API.
 - **Marketplace publish** (VS Code extension): Explicitly DEFERRED.
-- **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new Automation token on npmjs.com and update `NPM_TOKEN` GitHub Actions secret before then.
 
 ## v0.5.0 Design Decisions (2026-06-11)
 
@@ -99,7 +102,7 @@ lineage: []
 ## Key Commands
 
 ```bash
-npm test                    # all unit tests (284 passing)
+npm test                    # all unit tests (295 passing)
 npm run typecheck           # 0 errors
 npm run build               # compile to dist/
 node dist/cli/index.js --help   # smoke test CLI

@@ -3,6 +3,42 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] — 2026-06-26
+
+### Fixed
+
+- OllamaProvider: removed `0.0.0.0` from localhost allowlist (routes to external interfaces on Linux)
+- OllamaProvider: added HTTP/HTTPS scheme validation (`ollama://` now throws with helpful error)
+- OllamaProvider: wrapped `new URL()` in try/catch for actionable error on malformed input
+- MCP server: added SIGTERM/SIGINT/stdin.close shutdown handlers (was leaking zombie processes on client disconnect)
+- `base.ts` `validateFindings`: now accepts `evidence` field in addition to legacy `basis` field; logs count of dropped findings instead of silent discard
+- contextLoader: emits stderr warning when `nomic-embed-text` is unavailable instead of silently returning empty context
+- PMB `test-mb-doctor.sh`: all mutation sites now use EXIT trap guards — git status is clean after any test outcome (including crashes)
+- PMB `mb.sh` doctor check 5: replaced `grep -c` with `grep -q` + explicit 0/1 assignment, fixing permanent SKIP in Git Bash
+
+### Added
+
+- `src/core/parsing.ts`: `validateAndNormalizeFindings()` extracted from BaseAgent (SRP refactor — finding validation/normalization now independently testable)
+- `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout; extension now rejects with clear message instead of hanging forever if Ollama stalls
+- `tests/unit/embedder.test.ts` (new file): 10 tests covering `embed()` and `cosineSimilarity()` — semantic context path now has test coverage
+- 6 new tests in `contextLoader.test.ts` and `baseAgent.test.ts` for semantic path and SRP extraction
+- `.github/dependabot.yml`: weekly GitHub Actions version tracking
+- `docs/CONTRACTS-GUIDE.md`: canonical task contract schema with dual-format scope compatibility note
+- `docs/HOOKS-GUIDE.md`: hook types, enforcement layers, PreCompact behavior (warns, does not block)
+
+### Security
+
+- `gitleaks/gitleaks-action` pinned to commit SHA `dcedce43` in `release.yml` (was mutable `@v2` tag)
+- `Bash(npx *)` wildcard scoped to `Bash(npx prettier *)` and `Bash(npx tsc *)` in `.claude/settings.json`
+
+### CI
+
+- `release.yml`: format:check and lint:eslint steps added before publish
+- `release.yml`: VS Code extension tests added before publish (with `timeout-minutes: 5`)
+- `release.yml`: NPM_TOKEN expiry reminder step added (expires 2026-09-08)
+
+---
+
 ## [1.1.0] — 2026-06-25
 
 ### Added
