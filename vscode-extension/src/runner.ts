@@ -6,6 +6,8 @@ import type * as vscode from 'vscode'
 import { buildCliArgs } from './config'
 import type { ExtensionConfig, ReviewResult } from './types'
 
+const DEFAULT_SUBPROCESS_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
+
 /**
  * Get the staged diff, spawn the CLI, parse the result.
  *
@@ -16,11 +18,13 @@ import type { ExtensionConfig, ReviewResult } from './types'
  *   'ollama-unreachable:<url>'— CLI exited non-zero with ECONNREFUSED in stderr
  *   'cli-error:<stderr>'      — CLI exited non-zero for another reason
  *   'parse-error:<fragment>'  — stdout contained no parseable JSON object
+ *   'timed out after <N>s'    — CLI did not close within subprocessTimeoutMs (Ollama stalled)
  */
 export async function runReview(
   config: ExtensionConfig,
   workspaceDir: string,
-  token: vscode.CancellationToken
+  token: vscode.CancellationToken,
+  subprocessTimeoutMs = DEFAULT_SUBPROCESS_TIMEOUT_MS
 ): Promise<ReviewResult> {
   const diff = getStagedDiff(workspaceDir)
 
@@ -28,7 +32,7 @@ export async function runReview(
   writeFileSync(tempFile, diff, 'utf-8')
 
   try {
-    return await spawnCli(config, workspaceDir, tempFile, token)
+    return await spawnCli(config, workspaceDir, tempFile, token, subprocessTimeoutMs)
   } finally {
     try {
       unlinkSync(tempFile)
@@ -61,15 +65,28 @@ function spawnCli(
   config: ExtensionConfig,
   workspaceDir: string,
   diffFile: string,
-  token: vscode.CancellationToken
+  token: vscode.CancellationToken,
+  subprocessTimeoutMs: number
 ): Promise<ReviewResult> {
   return new Promise((resolve, reject) => {
     const args = buildCliArgs(config, workspaceDir, diffFile)
     // args[0] is the CLI path; process.execPath is the Node binary
     const child = spawn(process.execPath, args, { cwd: workspaceDir })
 
+    // Wall-clock timeout — kills the child if CLI hangs (e.g. Ollama stalled)
+    const timeoutHandle = setTimeout(() => {
+      child.kill('SIGTERM')
+      reject(
+        new Error(
+          `ai-review-agent timed out after ${Math.round(subprocessTimeoutMs / 1000)}s. ` +
+            `Is Ollama running? Try reducing --timeout or agent count.`
+        )
+      )
+    }, subprocessTimeoutMs)
+
     // Register cancellation handler; keep Disposable to clean up on close
     const cancelDisposable = token.onCancellationRequested(() => {
+      clearTimeout(timeoutHandle)
       child.kill()
       reject(new Error('cancelled'))
     })
@@ -85,6 +102,7 @@ function spawnCli(
     })
 
     child.on('close', (code: number) => {
+      clearTimeout(timeoutHandle)
       cancelDisposable.dispose()
 
       if (code !== 0) {

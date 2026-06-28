@@ -205,4 +205,25 @@ describe('runReview', () => {
     await expect(promise).rejects.toThrow('cancelled')
     expect(child.kill).toHaveBeenCalled()
   })
+
+  it('rejects with timeout error when process does not close in time', async () => {
+    // child.on('close') never fires — simulates a stalled Ollama process
+    const child = {
+      stdout: { on: vi.fn() },
+      stderr: { on: vi.fn() },
+      kill: vi.fn(),
+      on: vi.fn(), // never calls 'close'
+    }
+
+    vi.mocked(spawn).mockReturnValue(child as any)
+    vi.mocked(execSync).mockReturnValue('some diff content\n' as unknown as Buffer)
+    vi.mocked(writeFileSync).mockImplementation(() => {})
+    vi.mocked(unlinkSync).mockImplementation(() => {})
+
+    // Use a 1ms timeout — the child never closes, so timeout fires immediately
+    const promise = runReview(mockConfig, '/workspace', mockToken as any, 1)
+
+    await expect(promise).rejects.toThrow('timed out after')
+    expect(child.kill).toHaveBeenCalled()
+  })
 })
