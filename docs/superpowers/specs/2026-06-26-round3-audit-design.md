@@ -49,6 +49,7 @@ Phase 3
 
 ```markdown
 ### Finding: [Short imperative title]
+
 - **Tag:** [REGRESSION] | [FIXED] | [NEW]
 - **Severity:** Critical | High | Medium | Low | Advisory
 - **Confidence:** Verified | Strong Evidence | Likely | Speculative
@@ -62,6 +63,7 @@ Phase 3
 ```
 
 Tag definitions:
+
 - `[REGRESSION]` — A Round 2 fix degraded after subsequent commits
 - `[FIXED]` — A previously deferred item closed in this round
 - `[NEW]` — Net-new issue not seen in prior rounds
@@ -103,6 +105,7 @@ Tag definitions:
 Problem: `test-mb-doctor.sh` renames real directories in the PMB repo during tests. A crash mid-test leaves the repo in a broken state.
 
 Fix: For each check that currently renames `$REPO_ROOT/X`, change it to:
+
 1. Create a temp directory (`TMPDIR=$(mktemp -d)`)
 2. Copy the asset to the temp directory
 3. Run the check against the temp path
@@ -136,13 +139,11 @@ After fix, run `bash tests/run.sh` — check 5 must show `[OK]` not `[SKIP]`.
 
 ```typescript
 // src/core/parsing.ts
-export function validateAndNormalizeFindings(
-  items: unknown[],
-  agentName: AgentName
-): Finding[]
+export function validateAndNormalizeFindings(items: unknown[], agentName: AgentName): Finding[]
 ```
 
 `BaseAgent.validateFindings()` becomes a one-line delegation:
+
 ```typescript
 private validateFindings(items: unknown[]): Finding[] {
   return validateAndNormalizeFindings(items, this.name)
@@ -150,6 +151,7 @@ private validateFindings(items: unknown[]): Finding[] {
 ```
 
 **Constraints:**
+
 - All 284 existing tests must still pass after refactor
 - `parseFindings()` in `base.ts` must not change its public behavior
 - `validateAndNormalizeFindings` must be exported for direct testing
@@ -220,6 +222,7 @@ child.on('close', (code) => {
 ```
 
 **Test coverage:** Add a test to `vscode-extension/tests/runner.test.ts` that:
+
 1. Spawns a mock process that never closes
 2. Passes a short `timeoutMs` (e.g., 50 ms)
 3. Asserts the promise rejects with the timeout error message
@@ -250,6 +253,7 @@ cd "C:/Users/Mizzo/Claude/Personal-Memory-Bank" && bash tests/run.sh 2>&1 | tail
 **Report:** Reads all staging files (`r3-agent-1-regression.md` through `r3-agent-5-extension-timeout.md`). Produces `docs/audit/2026-06-26-round3-audit-report.md`.
 
 Report sections (same 20-section structure, but condensed):
+
 - §1 Executive Summary: regression count, deferred items closed, net-new findings
 - §2 Overall Readiness Assessment: how ratings changed vs Round 2
 - §3 Critical Issues — §3.1 Round 2 Regression Summary table
@@ -279,10 +283,10 @@ Report sections (same 20-section structure, but condensed):
 
 ## Deferred Items Being Closed This Round
 
-| Item | Agent | Status |
-|---|---|---|
-| BaseAgent SRP (19 concerns) | Agent 3 | Closing |
-| Semantic context 0% test coverage | Agent 4 | Closing |
-| test-mb-doctor.sh mutates real repo | Agent 2 | Closing |
+| Item                                   | Agent   | Status  |
+| -------------------------------------- | ------- | ------- |
+| BaseAgent SRP (19 concerns)            | Agent 3 | Closing |
+| Semantic context 0% test coverage      | Agent 4 | Closing |
+| test-mb-doctor.sh mutates real repo    | Agent 2 | Closing |
 | vscode-extension subprocess no timeout | Agent 5 | Closing |
-| Doctor check 5 permanently SKIP'd | Agent 2 | Closing |
+| Doctor check 5 permanently SKIP'd      | Agent 2 | Closing |
