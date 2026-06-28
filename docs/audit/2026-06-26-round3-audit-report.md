@@ -42,14 +42,14 @@ is more robust. The remaining gap is the PMB gitleaks pin, which is a one-line f
 
 ## 2. Overall Readiness Assessment
 
-| Domain        | Round 2   | Round 3  | Delta | Key change                                                                    |
-| ------------- | --------- | -------- | ----- | ----------------------------------------------------------------------------- |
-| Security      | CAUTION   | CAUTION  | →     | PMB gitleaks @v2.3.9 mutable tag (new, XS fix); ACR supply-chain held        |
-| Reliability   | CAUTION   | READY    | ↑     | Extension subprocess timeout added; MCP shutdown handlers held; check passes  |
-| Architecture  | CAUTION   | CAUTION  | ↑     | BaseAgent SRP improved (parsing.ts); still some complexity in run() method    |
-| Documentation | NOT READY | CAUTION  | ↑     | HOOKS-GUIDE warn/block wording resolved; no new documentation regressions     |
-| CI/CD         | NOT READY | READY    | ↑     | Extension timeout-minutes: 5 added; format:check passes; gitleaks SHA-pinned  |
-| Integration   | CAUTION   | CAUTION  | ↑     | MCP shutdown handlers held; semantic context fallback still silent (pre-Round 2 open item) |
+| Domain        | Round 2   | Round 3 | Delta | Key change                                                                                 |
+| ------------- | --------- | ------- | ----- | ------------------------------------------------------------------------------------------ |
+| Security      | CAUTION   | CAUTION | →     | PMB gitleaks @v2.3.9 mutable tag (new, XS fix); ACR supply-chain held                      |
+| Reliability   | CAUTION   | READY   | ↑     | Extension subprocess timeout added; MCP shutdown handlers held; check passes               |
+| Architecture  | CAUTION   | CAUTION | ↑     | BaseAgent SRP improved (parsing.ts); still some complexity in run() method                 |
+| Documentation | NOT READY | CAUTION | ↑     | HOOKS-GUIDE warn/block wording resolved; no new documentation regressions                  |
+| CI/CD         | NOT READY | READY   | ↑     | Extension timeout-minutes: 5 added; format:check passes; gitleaks SHA-pinned               |
+| Integration   | CAUTION   | CAUTION | ↑     | MCP shutdown handlers held; semantic context fallback still silent (pre-Round 2 open item) |
 
 **Overall: CAUTION — approaching production ready**
 
@@ -61,19 +61,19 @@ is more robust. The remaining gap is the PMB gitleaks pin, which is a one-line f
 
 All 11 Round 2 fixes verified clean by Agent 1.
 
-| Round 2 Fix                         | Round 3 Status |
-| ----------------------------------- | -------------- |
-| npm run check (format + lint)       | ✅ Held        |
-| OllamaProvider 0.0.0.0 + scheme     | ✅ Held        |
-| base.ts evidence/basis aliasing     | ✅ Held        |
-| MCP shutdown handlers (4 signals)   | ✅ Held        |
-| gitleaks SHA pin (ACR release.yml)  | ✅ Held        |
-| dependabot.yml github-actions       | ✅ Held        |
-| extension test timeout-minutes: 5   | ✅ Held        |
-| HOOKS-GUIDE PreCompact warns text   | ✅ Held        |
-| check-contract empty scope guards   | ✅ Held        |
-| PSScriptAnalyzer Warning severity   | ✅ Held        |
-| CONTRACTS-GUIDE scope formats       | ✅ Held        |
+| Round 2 Fix                        | Round 3 Status |
+| ---------------------------------- | -------------- |
+| npm run check (format + lint)      | ✅ Held        |
+| OllamaProvider 0.0.0.0 + scheme    | ✅ Held        |
+| base.ts evidence/basis aliasing    | ✅ Held        |
+| MCP shutdown handlers (4 signals)  | ✅ Held        |
+| gitleaks SHA pin (ACR release.yml) | ✅ Held        |
+| dependabot.yml github-actions      | ✅ Held        |
+| extension test timeout-minutes: 5  | ✅ Held        |
+| HOOKS-GUIDE PreCompact warns text  | ✅ Held        |
+| check-contract empty scope guards  | ✅ Held        |
+| PSScriptAnalyzer Warning severity  | ✅ Held        |
+| CONTRACTS-GUIDE scope formats      | ✅ Held        |
 
 ### 3.2 Critical Findings
 

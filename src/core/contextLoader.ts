@@ -123,7 +123,11 @@ export async function loadAgentContextSemantic(
   const diffSnippet = diff.slice(0, 2000)
   const diffEmbedding = await embed(ollamaUrl, diffSnippet)
   if (!diffEmbedding) {
-    // Ollama unreachable for embeddings — return empty (caller falls back to static)
+    process.stderr.write(
+      '[ai-review] --context-mode semantic: nomic-embed-text unavailable — ' +
+        'run `ollama pull nomic-embed-text` to enable semantic context selection. ' +
+        'Continuing without memory-bank context.\n'
+    )
     return empty()
   }
 
