@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { BaseAgent } from '../../src/core/agents/base.js'
+import { validateAndNormalizeFindings } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 
@@ -223,5 +224,47 @@ describe('BaseAgent', () => {
     ])
     const findings = await new TestAgent(makeProvider(raw), DEFAULT_CONFIG).run({ diff: 'diff' })
     expect(findings[0].lineEnd).toBe(20)
+  })
+})
+
+describe('validateAndNormalizeFindings', () => {
+  const AGENT = 'security' as const
+
+  it('keeps a finding that has evidence (canonical) but no basis (legacy)', () => {
+    const item = {
+      severity: 'high',
+      evidence: 'src/foo.ts:42 — unescaped input',
+      file: 'src/foo.ts',
+      line: 42,
+      title: 'XSS risk',
+      detail: 'User input not escaped',
+      recommendation: 'Escape before render',
+    }
+    const result = validateAndNormalizeFindings([item], AGENT)
+    expect(result).toHaveLength(1)
+    expect(result[0].evidence).toBe('src/foo.ts:42 — unescaped input')
+  })
+
+  it('keeps a finding that has basis (legacy) but no evidence (canonical)', () => {
+    const item = {
+      severity: 'medium',
+      basis: 'VERIFIED',
+      file: 'src/bar.ts',
+      line: 10,
+      title: 'Missing null check',
+      detail: 'Potential NPE',
+      suggestion: 'Add null guard',
+    }
+    const result = validateAndNormalizeFindings([item], AGENT)
+    expect(result).toHaveLength(1)
+  })
+
+  it('drops findings missing required fields and logs the count', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const badItem = { severity: 'high' } // missing file, line, title, detail, basis/evidence
+    const result = validateAndNormalizeFindings([badItem], AGENT)
+    expect(result).toHaveLength(0)
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('dropped 1/1'))
+    consoleSpy.mockRestore()
   })
 })
