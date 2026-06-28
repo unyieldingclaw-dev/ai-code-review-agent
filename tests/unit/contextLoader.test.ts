@@ -1,7 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs'
 import { join } from 'path'
-import { loadAgentContext } from '../../src/core/contextLoader.js'
+import { loadAgentContext, loadAgentContextSemantic } from '../../src/core/contextLoader.js'
+import { embed, cosineSimilarity } from '../../src/core/embedder.js'
+
+vi.mock('../../src/core/embedder.js', () => ({
+  embed: vi.fn(),
+  cosineSimilarity: vi.fn(),
+}))
+
+const mockEmbed = vi.mocked(embed)
+const mockCosine = vi.mocked(cosineSimilarity)
 
 const TMP = join(process.cwd(), '.test-context-tmp')
 
@@ -85,5 +94,45 @@ describe('loadAgentContext', () => {
     const result = loadAgentContext(TMP, 'security', 4000)
     expect(result.truncated).toBe(false)
     expect(result.filesLoaded).toHaveLength(1)
+  })
+})
+
+describe('loadAgentContextSemantic', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns empty context when embed returns null (Ollama unavailable)', async () => {
+    mockEmbed.mockResolvedValue(null)
+    const result = await loadAgentContextSemantic(
+      '/nonexistent/path',
+      'diff content',
+      'http://localhost:11434'
+    )
+    expect(result.content).toBe('')
+    expect(result.filesLoaded).toHaveLength(0)
+  })
+
+  it('returns empty context when memory-bank directory does not exist', async () => {
+    mockEmbed.mockResolvedValue([0.1, 0.2])
+    mockCosine.mockReturnValue(0.5)
+    const result = await loadAgentContextSemantic(
+      '/nonexistent/path',
+      'diff',
+      'http://localhost:11434'
+    )
+    expect(result.content).toBe('')
+  })
+
+  it('returns context when embeddings succeed and memory-bank exists', async () => {
+    setup({
+      'projectbrief.md': 'This project uses TypeScript and Node.js.',
+      'techContext.md': 'Node.js 24, vitest for testing.',
+    })
+    mockEmbed.mockResolvedValue([1, 0, 0])
+    mockCosine.mockReturnValue(0.8)
+    const result = await loadAgentContextSemantic(TMP, 'some diff text', 'http://localhost:11434')
+    expect(result.filesLoaded.length).toBeGreaterThan(0)
+    expect(result.content).toContain('Project Context')
   })
 })
