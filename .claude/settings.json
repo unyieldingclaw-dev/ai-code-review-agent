@@ -28,7 +28,7 @@
           },
           {
             "type": "command",
-            "command": "pwsh -NonInteractive -File scripts/review-reminders.ps1 2>/dev/null || true"
+            "command": "pwsh -NonInteractive -File scripts/review-reminders.ps1 2>/dev/null || bash scripts/review-reminders.sh 2>/dev/null || true"
           }
         ]
       },

@@ -125,9 +125,15 @@ List any missing tests identified by the Testing domain subagent.
 
 One paragraph summary of the most important confirmed findings.
 
+## Step 7 — Record Review Completion
+
+If the Verdict above is **Approve** (no unresolved finding with `Blocking: true`), write an empty marker file at `.claude/.code-review-ok` (create the `.claude` directory first if it doesn't exist). This marker authorizes exactly one `git commit` — a `PreToolUse` hook consumes it automatically on the next commit attempt.
+
+If the Verdict is **Request Changes** or **Needs Discussion**, do not write the marker.
+
 ---
 
-Do NOT edit files, generate tests, or apply fixes during this review. If the user wants remediation after seeing findings, they will ask explicitly.
+Do NOT edit files, generate tests, or apply fixes during this review — writing the `.claude/.code-review-ok` marker per Step 7 is the sole exception. If the user wants remediation after seeing findings, they will ask explicitly.
 
 ---
 

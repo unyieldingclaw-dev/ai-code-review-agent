@@ -209,6 +209,12 @@ _(If no findings: "No findings. Change package looks clean.")_
 - **ACR backend:** used | not installed | disabled
 ```
 
+## Step 6: Record Review Completion
+
+If no finding in the report has `Blocking: Yes` (including the "No findings" case), write an empty marker file at `.claude/.change-review-ok` (create the `.claude` directory first if it doesn't exist). This marker authorizes exactly one `git push` — a `PreToolUse` hook consumes it automatically on the next push attempt.
+
+If any finding has `Blocking: Yes`, do not write the marker.
+
 ## Final instruction
 
-Stop after displaying the report. Do NOT edit files, push commits, or post PR comments unless the user explicitly asks.
+Stop after displaying the report. Do NOT edit files, push commits, or post PR comments unless the user explicitly asks — writing the `.claude/.change-review-ok` marker per Step 6 is the sole exception.
