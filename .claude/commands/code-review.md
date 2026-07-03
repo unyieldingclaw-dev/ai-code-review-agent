@@ -127,7 +127,19 @@ One paragraph summary of the most important confirmed findings.
 
 ## Step 7 — Record Review Completion
 
-If the Verdict above is **Approve** (no unresolved finding with `Blocking: true`), write an empty marker file at `.claude/.code-review-ok` (create the `.claude` directory first if it doesn't exist). This marker authorizes exactly one `git commit` — a `PreToolUse` hook consumes it automatically on the next commit attempt.
+If the Verdict above is **Approve** (no unresolved finding with `Blocking: true`), compute a hash of the reviewed diff and write it to `.claude/.code-review-ok` (create the `.claude` directory first if it doesn't exist). The marker is bound to this exact diff — a `PreToolUse` hook recomputes the same hash before the next `git commit` and only allows it through if the working tree hasn't changed since the review.
+
+Bash:
+```
+git diff HEAD | sha256sum | cut -d' ' -f1 > .claude/.code-review-ok
+```
+
+PowerShell (do NOT pipe `git diff` directly into a hash cmdlet — PowerShell's pipeline re-tokenizes external-command output and will not match the hash `review-reminders.ps1` recomputes; redirect to a file first so the hash covers the exact raw bytes):
+```
+git diff HEAD > "$env:TEMP\pmb-diff-hash.tmp"
+(Get-FileHash "$env:TEMP\pmb-diff-hash.tmp" -Algorithm SHA256).Hash.ToLower() | Set-Content .claude/.code-review-ok
+Remove-Item "$env:TEMP\pmb-diff-hash.tmp" -Force
+```
 
 If the Verdict is **Request Changes** or **Needs Discussion**, do not write the marker.
 

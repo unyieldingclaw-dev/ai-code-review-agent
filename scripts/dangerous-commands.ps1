@@ -6,6 +6,14 @@
     and enforces BLOCK / CONFIRM / WARN tier matching via simple substring checks.
     All output goes to stdout so messages are visible even when stderr is suppressed.
     Fails open: any unexpected error prints [HOOK ERROR] and exits 0.
+
+    WHY hookSpecificOutput.permissionDecision, not exit code: top-level exit codes are
+    unreliable here -- settings.json wires this hook as "... 2>/dev/null || bash ... || true"
+    for cross-platform fail-open portability, and that "|| true" suffix silently converts any
+    nonzero exit code to 0. This was empirically confirmed while building review-reminders.ps1:
+    a hook using "exit 1" to signal block did not actually prevent the tool call from running.
+    hookSpecificOutput.permissionDecision = "deny" is read from stdout JSON regardless of the
+    wrapping shell's final exit code, so it's the only reliable way to actually block.
 #>
 
 param()
@@ -20,12 +28,28 @@ try {
     $raw = $input | Out-String
     if ([string]::IsNullOrWhiteSpace($raw)) { exit 0 }
     $data = $raw | ConvertFrom-Json -ErrorAction Stop
-    $cmd = if ($data.command) { [string]$data.command } else { "" }
+    # WHY .tool_input.command, not .command: the real payload nests everything under
+    # "tool_input" (e.g. {"tool_name":"Bash","tool_input":{"command":"..."}}), confirmed
+    # by capturing a live hook payload. The prior version read $data.command (flat),
+    # which is always null against the real payload shape -- $cmd was always "", so no
+    # BLOCK/CONFIRM/WARN pattern has ever matched anything, regardless of exit code.
+    $cmd = if ($data.tool_input.command) { [string]$data.tool_input.command } else { "" }
 } catch {
     Write-Host "[HOOK ERROR] dangerous-commands.ps1 failed unexpectedly."
     Write-Host "Proceeding in fails-open mode."
     try { Add-Content ".pmb-hook-errors.log" "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [HOOK] dangerous-commands.ps1: $_" -ErrorAction SilentlyContinue } catch {}
     exit 0
+}
+
+function Deny {
+    param([string]$Reason)
+    @{
+        hookSpecificOutput = @{
+            hookEventName            = "PreToolUse"
+            permissionDecision       = "deny"
+            permissionDecisionReason = $Reason
+        }
+    } | ConvertTo-Json -Compress | Write-Output
 }
 
 # BLOCK: irreversible or highly destructive — refuse unconditionally
@@ -37,10 +61,8 @@ $blockPatterns = @(
     @{ pattern = "git push -f";      reason = "force push (short form)" }                   # WHY: same as --force, short flag form
     @{ pattern = "DROP TABLE";       reason = "SQL table drop" }                            # WHY: irreversible schema destruction
     @{ pattern = "DROP DATABASE";    reason = "SQL database drop" }                         # WHY: destroys entire database
-    @{ pattern = "| bash";           reason = "command piped to bash (curl|bash, wget|bash, etc.)" } # WHY: remote code execution vector
-    @{ pattern = "| sh";             reason = "command piped to sh" }                       # WHY: remote code execution via sh
-    @{ pattern = "|bash";            reason = "command piped to bash (no-space form)" }     # WHY: curl|bash without spaces is valid shell and evades space-prefixed pattern
-    @{ pattern = "|sh";              reason = "command piped to sh (no-space form)" }       # WHY: wget|sh without spaces is valid shell and evades space-prefixed pattern
+    @{ pattern = '\|\s*bash\b'; regex = $true; reason = "command piped to bash (curl|bash, wget|bash, etc.)" } # WHY: remote code execution vector. Regex with \b (not a plain substring): matches both spaced ("| bash") and unspaced ("|bash") forms in one pattern.
+    @{ pattern = '\|\s*sh\b';   regex = $true; reason = "command piped to sh" }              # WHY: remote code execution via sh. WHY regex, not substring: a plain "| sh" substring check false-positives on any command containing "| sha256sum", "| shasum", etc. -- tools this repo's own review-gate hash verification depends on (found when fixing the field-path bug that had made this pattern a no-op made this collision real). \b requires "sh" to end at a word boundary, so "sha256sum" (sh immediately followed by "a", no boundary) doesn't match, but a literal pipe-to-sh interpreter does.
     # PowerShell-native equivalents (triggered by the PowerShell tool)
     @{ pattern = "Remove-Item -Recurse -Force"; reason = "recursive force deletion (PowerShell rm -rf equivalent)" }         # WHY: Remove-Item -Recurse -Force is the PS equivalent of rm -rf
     @{ pattern = "Remove-Item -Force -Recurse"; reason = "recursive force deletion (PowerShell rm -rf, flags reversed)" }   # WHY: same as above — flag order varies in real commands
@@ -52,9 +74,10 @@ $blockPatterns = @(
 )
 
 foreach ($entry in $blockPatterns) {
-    if ($cmd.Contains($entry.pattern, [System.StringComparison]::OrdinalIgnoreCase)) {
-        Write-Host ($BLOCK_MSG -f $entry.reason)
-        exit 1
+    $isMatch = if ($entry.regex) { $cmd -imatch $entry.pattern } else { $cmd.Contains($entry.pattern, [System.StringComparison]::OrdinalIgnoreCase) }
+    if ($isMatch) {
+        Deny ($BLOCK_MSG -f $entry.reason)
+        exit 0
     }
 }
 
@@ -69,12 +92,13 @@ $confirmPatterns = @(
 
 foreach ($entry in $confirmPatterns) {
     if ($cmd.Contains($entry.pattern, [System.StringComparison]::OrdinalIgnoreCase)) {
-        Write-Host ($CONFIRM_MSG -f $entry.reason)
-        exit 1
+        Deny ($CONFIRM_MSG -f $entry.reason)
+        exit 0
     }
 }
 
 # WARN: credential/secrets access — legitimate workflows exist, surface the access only
+# (advisory only — no permissionDecision set, so the command proceeds)
 $warnPatterns = @(
     @{ pattern = "id_rsa";           reason = "SSH private key access" }                    # WHY: SSH private key — may be intentional (key setup)
     @{ pattern = ".pem";             reason = "certificate or key file access" }            # WHY: cert/key files — may be intentional (TLS mgmt)

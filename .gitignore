@@ -31,7 +31,11 @@ handoff.md
 # Tool-neutral runtime state
 .memory-bank/state/
 
-# Review gate markers — single-use tokens written by /code-review and /change-review,
-# consumed by review-reminders.ps1/.sh on the next git commit/push
+# Review gate markers — single-use, diff-hash-bound tokens written by /code-review and
+# /change-review, consumed by review-reminders.ps1/.sh on the next git commit/push
 .claude/.code-review-ok
 .claude/.change-review-ok
+.claude/.code-review-ok.claimed*
+.claude/.change-review-ok.claimed*
+.claude/.pending-commit-presha
+.claude/.pending-push-presha
