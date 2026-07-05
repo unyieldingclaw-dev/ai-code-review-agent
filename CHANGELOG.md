@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.1] — 2026-07-03 (review-gate hardening)
+
+### Fixed
+
+- `dangerous-commands.ps1/.sh`, `check-contract.ps1/.sh`: read the wrong JSON field path (flat `.command`/`.file_path` instead of nested `tool_input.command`/`tool_input.file_path`) and signaled denial via exit codes, which `settings.json`'s fail-open wrapper (`|| true`) silently erased — both hooks were near-total no-ops. Fixed to use `hookSpecificOutput.permissionDecision: "deny"`.
+- `check-contract.ps1/.sh`: schema bug — read `scope.files` instead of the documented `scope: [{file, op}]` array, so the scope check never matched an in-scope file even after the payload-path fix. `.sh` version also had a Windows CRLF bug (Python's `print()` adds `\r`) that broke exact-match comparisons.
+- `dangerous-commands.ps1/.sh`: pipe-to-shell BLOCK pattern (`"| sh"` substring) collided with `sha256sum`/`shasum`, the hash tools the new review-gate hash-binding depends on — fixed with word-boundary regex/glob matching.
+- Hash mismatch between documented review-gate commands and hook verification: PowerShell's pipeline re-tokenizes external-command output, so `Out-String`/array-join hashing did not reproduce the byte stream a raw shell pipe sees. Fixed by hashing a file written via redirection instead (confirmed byte-identical across PowerShell and bash).
+
+### Added
+
+- `scripts/review-reminders.ps1/.sh`: `PreToolUse` hook mechanically enforcing review-before-commit/push — `/code-review` and `/change-review` write a SHA-256 hash of the reviewed diff to a marker file, consumed atomically (rename, not check-then-delete) on the next matching `git commit`/`git push`.
+- `scripts/review-reminders-post.ps1/.sh`: `PostToolUse` companion that reissues the marker if the gated commit/push then fails, detected via git ref comparison (`HEAD`/`@{u}` before/after) rather than an unverified response schema.
+- `tests/review-reminders.Tests.ps1`: 23 Pester tests covering the review gate, including regressions for the sha256sum false-positive and the hash-consistency bug.
+
+### Documentation
+
+- `docs/HOOKS-GUIDE.md`: rewrote the dangerous-commands, check-contract, and review-gate sections to describe the fixed mechanisms; added a new section documenting `review-reminders-post`.
+
 ## [1.2.0] — 2026-06-26
 
 ### Fixed

@@ -32,7 +32,7 @@ Configured in `.claude/settings.json`:
 
 Intercepts both Bash and PowerShell tool calls before they run using `scripts/dangerous-commands.ps1`. Enforces 3-tier safety:
 
-**BLOCK** (19 patterns — command exits non-zero, Claude stops):\
+**BLOCK** (19 patterns — denies the tool call, command never runs):\
 _Shell:_ `rm -rf` · `mkfs` · `dd if=` · `git push --force` · `git push -f` · `DROP TABLE` · `DROP DATABASE` · `| bash` · `| sh` · `|bash` · `|sh`\
 _PowerShell-native:_ `Remove-Item -Recurse -Force` · `Remove-Item -Force -Recurse` · `Format-Volume` · `| Invoke-Expression` · `|Invoke-Expression` · `| iex` · `|iex`
 
@@ -42,14 +42,23 @@ _PowerShell-native:_ `Remove-Item -Recurse -Force` · `Remove-Item -Force -Recur
 **WARN** (4 patterns — exits 0, surfaces access alert):
 `id_rsa` · `.pem` · `.env.production` · `credentials.json`
 
-If BLOCK is triggered, Claude sees the block message and stops. The command never runs. CONFIRM and WARN surface the access to Claude so it can decide.
+**WHY `hookSpecificOutput.permissionDecision`, not exit code:** top-level exit codes are unreliable here — `.claude/settings.json` wires this hook as `"... 2>/dev/null || bash ... 2>/dev/null || true"` for cross-platform fail-open portability, and that trailing `|| true` silently converts any nonzero exit code to 0. An earlier version of this hook used `exit 1` to signal BLOCK and never actually prevented the tool call from running — the command still executed. `Deny` instead writes `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "..."}}` to stdout, which Claude Code reads regardless of the wrapping shell's final exit code. CONFIRM and WARN print advisory text and exit 0 — they surface the access to Claude so it can decide, they don't deny.
 
-Implemented in `scripts/dangerous-commands.ps1` (Windows/pwsh) and `scripts/dangerous-commands.sh` (POSIX/bash). Configured in `.claude/settings.json` with two matchers — one for `Bash` (with sh fallback) and one for `PowerShell` (PS-only):
+**WHY the `| sh` / `| bash` patterns use regex with `\b`, not a plain substring:** a bare substring check for `"| sh"` false-positives on any command containing `"| sha256sum"` or `"| shasum"` — the hash tools the review-before-commit gate (section 7) depends on. `\|\s*sh\b` requires `sh` to end at a word boundary, so `sha256sum` (immediately followed by `a`, no boundary) doesn't match, but a literal pipe to the `sh` interpreter does.
+
+Implemented in `scripts/dangerous-commands.ps1` (Windows/pwsh) and `scripts/dangerous-commands.sh` (POSIX/bash). Both read the command from the nested `tool_input.command` field of the hook's stdin JSON payload (`{"tool_name":"Bash","tool_input":{"command":"..."}}`) — not a flat `.command` field, which the real payload never populates. Configured in `.claude/settings.json` with two matchers — one for `Bash` (with sh fallback, shared with the review-gate hook from section 7) and one for `PowerShell` (PS-only):
 
 ```json
-{ "matcher": "Bash",       "command": "pwsh -NonInteractive -File scripts/dangerous-commands.ps1 2>/dev/null || bash scripts/dangerous-commands.sh 2>/dev/null || true" },
-{ "matcher": "PowerShell", "command": "pwsh -NonInteractive -File scripts/dangerous-commands.ps1 2>/dev/null || true" }
+{ "matcher": "Bash",       "hooks": [
+    { "command": "pwsh -NonInteractive -File scripts/dangerous-commands.ps1 2>/dev/null || bash scripts/dangerous-commands.sh 2>/dev/null || true" },
+    { "command": "pwsh -NonInteractive -File scripts/review-reminders.ps1 2>/dev/null || bash scripts/review-reminders.sh 2>/dev/null || true" }
+] },
+{ "matcher": "PowerShell", "hooks": [
+    { "command": "pwsh -NonInteractive -File scripts/dangerous-commands.ps1 2>/dev/null || true" }
+] }
 ```
+
+Both hooks registered under the same matcher run on every matching tool call, even if an earlier one already denies — a denied `dangerous-commands` match does not prevent `review-reminders` from also running (and, e.g., consuming a review marker) on the same call.
 
 **Hook error logging (G2):** if `dangerous-commands.ps1` fails unexpectedly, the catch block appends a timestamped entry to `.pmb-hook-errors.log` (gitignored). `mb doctor` Check 16 surfaces entries from this log as WARN.
 
@@ -63,9 +72,11 @@ Checks whether a file being written is within the scope declared in the active t
 
 - **No contract / inactive contract:** exits 0 silently.
 - **Out-of-scope write (default):** prints a warning and exits 0. Claude sees it and should pause.
-- **Out-of-scope write (hard-block mode):** exits 2 (blocked) when `PMB_CONTRACT_HARD_BLOCK=1` is set in the `env` block of `.claude/settings.json`.
+- **Out-of-scope write (hard-block mode):** denies the tool call via `hookSpecificOutput.permissionDecision: "deny"` when `PMB_CONTRACT_HARD_BLOCK=1` is set in the `env` block of `.claude/settings.json`.
 
 Set `PMB_CONTRACT_HARD_BLOCK=1` for sessions where scope discipline is critical. See `standards/SECURITY-GUARDRAILS.md` for the full env-block example.
+
+**Field paths and schema:** the hook reads the target file from the nested `tool_input.file_path` field of the hook's stdin JSON (`{"tool_name":"Edit","tool_input":{"file_path":"..."}}`), not a flat `.file_path` — the real payload never populates the flat field. Scope is read as the `scope: [{file, op}]` array documented in `docs/CONTRACTS-GUIDE.md` (each entry's `.file` property), not a `scope.files` list.
 
 **Hook error logging (G2):** unexpected errors are logged to `.pmb-hook-errors.log` via a `trap {}` wrapper.
 
@@ -120,6 +131,32 @@ Fires before every `Agent` tool call. Tracks nested agent delegation depth and e
 **Runtime state file:** The hook stores its counter in `.pmb-delegation-depth` in the project root (gitignored). This file is created automatically on the first agent dispatch and resets after 2 hours of inactivity. Delete it manually to reset the depth counter mid-session without restarting.
 
 **Hook error logging:** Unexpected errors are logged to `.pmb-hook-errors.log`.
+
+### 7. Review-Before-Commit/Push Gate (`PreToolUse` — Bash)
+
+Mechanically enforces that `/code-review` or `/change-review` ran on the exact diff being committed or pushed — a hook cannot verify a human read a report, but it can verify a matching diff-hash marker exists. Implemented in `scripts/review-reminders.ps1` and `scripts/review-reminders.sh`, registered under the same `Bash` matcher as the dangerous-command blocker (section 1).
+
+**How the marker works:**
+
+1. `/code-review` (Step 7) and `/change-review` (Step 6) each compute a SHA-256 hash of the reviewed diff and write it to `.claude/.code-review-ok` or `.claude/.change-review-ok` respectively — but only if no finding in the report is `Blocking: Yes`.
+2. When Claude runs a `git commit` or `git push` command, this hook matches the command against `git\s+commit\b` / `git\s+push\b`, recomputes the hash of the diff that would actually be committed/pushed, and compares it to the marker's contents.
+3. **Match:** the marker is consumed atomically via `Move-Item -Force` / `mv` (rename, not check-then-delete) so a second command racing against the first can't also claim it, then the command is allowed through.
+4. **No marker, or hash mismatch (diff changed since review):** denies via `hookSpecificOutput.permissionDecision: "deny"`, instructing Claude to run `/code-review` or `/change-review` first.
+
+**WHY a hash of the diff, not an empty marker file:** an empty marker is trivially fakeable with `touch .claude/.code-review-ok`, which defeats the control's purpose (Claude — or a user — could authorize a commit without actually reviewing it). Binding the marker to a hash of the specific diff means a stale or fabricated marker never matches the diff actually being committed.
+
+**WHY hash a file written via redirection, not a piped command:** PowerShell's pipeline re-tokenizes external-command output when it flows through `|`, so `git diff | <hash cmdlet>` does not reproduce the same byte stream a POSIX shell pipe produces — a marker written by piping in PowerShell would never match this hook's hash. Both the hook and the documented `/code-review`/`/change-review` commands instead redirect the diff to a temp file (`git diff HEAD > $tmp`) and hash the file, which is confirmed byte-identical to a bash `sha256sum` pipe.
+
+**Anti-fabrication note:** writing either marker file directly (without genuinely running the review) defeats the point of this control. Claude Code's own permission classifier treats a direct write to these marker paths as suspicious and requires explicit, per-instance user approval — it does not survive being chained into the same tool call as the gated commit/push.
+
+### 8. Review Marker Reissue on Failure (`PostToolUse` — Bash)
+
+Companion to section 7. If a gated `git commit`/`git push` is allowed through (marker consumed) but then fails for an unrelated reason — a pre-commit hook rejects it, a merge conflict blocks the push, network failure — the marker is gone and Claude would otherwise have to re-run the full review for no diff change. Implemented in `scripts/review-reminders-post.ps1` and `scripts/review-reminders-post.sh`.
+
+**How it detects failure:** rather than parsing the tool's response payload (whose schema isn't guaranteed stable), it compares git ref state before and after. When section 7's hook consumes a marker, it records the pre-command ref (`git rev-parse HEAD` for commit, `git rev-parse @{u}` for push) to `.claude/.pending-commit-presha` / `.claude/.pending-push-presha`. This `PostToolUse` hook reads that file, checks the ref again, and:
+
+- **Ref changed:** the command succeeded — deletes the presha file, no action needed.
+- **Ref unchanged:** the command failed — recomputes the diff hash (same file-redirect method as section 7) and rewrites the marker, so the next attempt doesn't need a fresh review.
 
 ## Git Hooks (versioned)
 
