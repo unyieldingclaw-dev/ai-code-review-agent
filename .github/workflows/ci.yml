@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Format check
+        id: format
+        continue-on-error: true
+        run: npm run format:check
+
+      - name: Lint
+        id: lint
+        continue-on-error: true
+        run: npm run lint:eslint
+
+      - name: Run tests
+        id: test
+        continue-on-error: true
+        run: npm test
+
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: npm run build
+
+      # WHY continue-on-error + this gate, instead of letting each step fail the
+      # job immediately: this repo previously had NO push/PR CI gate at all --
+      # typecheck/lint/test/build only ran at release-tag time, so a broken main
+      # could sit unnoticed for weeks between releases. Running every check
+      # unconditionally and gating at the end surfaces every problem in one CI
+      # run instead of hiding later failures behind an earlier one.
+      - name: Gate on all checks
+        if: always()
+        run: |
+          FAIL=0
+          if [ "${{ steps.typecheck.outcome }}" != "success" ]; then echo "FAILED: Type check"; FAIL=1; fi
+          if [ "${{ steps.format.outcome }}" != "success" ]; then echo "FAILED: Format check"; FAIL=1; fi
+          if [ "${{ steps.lint.outcome }}" != "success" ]; then echo "FAILED: Lint"; FAIL=1; fi
+          if [ "${{ steps.test.outcome }}" != "success" ]; then echo "FAILED: Run tests"; FAIL=1; fi
+          if [ "${{ steps.build.outcome }}" != "success" ]; then echo "FAILED: Build"; FAIL=1; fi
+          exit $FAIL

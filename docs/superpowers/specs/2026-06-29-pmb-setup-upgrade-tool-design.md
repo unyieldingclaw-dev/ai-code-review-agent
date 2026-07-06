@@ -67,6 +67,7 @@ Defines what a valid PMB looks like. Updated here when PMB evolves — script lo
 ```
 
 **File types:**
+
 - `stable` — re-scaffoldable; merge preserves content but updates structure
 - `volatile` — living documents; only missing frontmatter fields are added, content never touched
 
@@ -86,10 +87,10 @@ Read `mb-schema.json` from the same directory as the script. Fail fast with a cl
 
 ### 3. Detect Mode
 
-| Condition | Mode |
-|---|---|
-| No `memory-bank/` folder in target | **INIT** |
-| `memory-bank/` exists | **UPGRADE** |
+| Condition                          | Mode        |
+| ---------------------------------- | ----------- |
+| No `memory-bank/` folder in target | **INIT**    |
+| `memory-bank/` exists              | **UPGRADE** |
 
 ---
 
@@ -107,6 +108,7 @@ Read `mb-schema.json` from the same directory as the script. Fail fast with a cl
 **Step 1 — Analyze current state (read-only):**
 
 Display what was found:
+
 ```
 Files present:    ✅ projectbrief.md  ✅ systemPatterns.md  ❌ newfile.md
 Frontmatter gaps: systemPatterns.md missing "confidence" field
@@ -114,6 +116,7 @@ Obsolete files:   oldfile.md (no longer in schema)
 ```
 
 **Step 2 — Display upgrade plan:**
+
 ```
 Will add:    newfile.md (scaffold from template)
 Will merge:  systemPatterns.md (add missing frontmatter fields)
@@ -122,12 +125,15 @@ Will skip:   activeContext.md, progress.md (volatile — content preserved)
 ```
 
 **Step 3 — Confirmation prompt:**
+
 ```
 Proceed with upgrade? (Y/N)
 ```
+
 Abort cleanly on N.
 
 **Step 4 — Execute plan:**
+
 - Missing files → scaffold from template (full)
 - Stable files with gaps → merge: preserve content, inject missing frontmatter fields
 - Volatile files with gaps → inject missing frontmatter fields only, never touch content
@@ -138,6 +144,7 @@ Abort cleanly on N.
 ### 4. Verify (runs after both INIT and UPGRADE)
 
 Checks run against the schema:
+
 1. **File presence** — all required files exist
 2. **Content quality** — each file meets `minContentLines` threshold
 3. **Frontmatter integrity** — each file has all `requiredFrontmatter` fields

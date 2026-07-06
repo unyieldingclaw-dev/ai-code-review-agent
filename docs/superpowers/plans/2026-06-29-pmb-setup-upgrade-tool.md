@@ -14,11 +14,11 @@
 
 ## File Map
 
-| Action | Path | Change |
-|---|---|---|
-| Rename + modify | `mb-new-project.bat` → `mb-setup.bat` | Rename; call `mb setup %*` instead of pick-folder + `mb init` |
-| Modify | `scripts/mb.ps1` | Add `"setup"` to ValidateSet; add `Invoke-Setup` function; wire switch; update help |
-| Create | `tests/mb-setup.Tests.ps1` | Pester tests for new `Invoke-Setup` function |
+| Action          | Path                                  | Change                                                                              |
+| --------------- | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| Rename + modify | `mb-new-project.bat` → `mb-setup.bat` | Rename; call `mb setup %*` instead of pick-folder + `mb init`                       |
+| Modify          | `scripts/mb.ps1`                      | Add `"setup"` to ValidateSet; add `Invoke-Setup` function; wire switch; update help |
+| Create          | `tests/mb-setup.Tests.ps1`            | Pester tests for new `Invoke-Setup` function                                        |
 
 No new template files, no schema file — `templates/memory-bank/` is already the source of truth and is iterated dynamically.
 
@@ -27,6 +27,7 @@ No new template files, no schema file — `templates/memory-bank/` is already th
 ## Task 1: Rename mb-new-project.bat → mb-setup.bat
 
 **Files:**
+
 - Delete: `mb-new-project.bat`
 - Create: `mb-setup.bat`
 
@@ -62,6 +63,7 @@ git commit -m "feat: rename mb-new-project.bat to mb-setup.bat"
 ## Task 2: Wire `mb setup` into mb.ps1
 
 **Files:**
+
 - Modify: `scripts/mb.ps1` — ValidateSet, switch, Show-Help
 
 - [ ] **Step 1: Add "setup" to ValidateSet**
@@ -115,6 +117,7 @@ git commit -m "feat: wire mb setup command into mb.ps1 CLI"
 ## Task 3: Implement Invoke-Setup
 
 **Files:**
+
 - Modify: `scripts/mb.ps1` — add `Invoke-Setup` function before the `switch` block
 - Create: `tests/mb-setup.Tests.ps1`
 
@@ -444,6 +447,7 @@ git commit -m "feat: add Invoke-Setup with analysis, preview, confirm, verify, a
 Create an empty temp folder, e.g. `C:\Temp\test-new-project\`. Double-click `mb-setup.bat`. Select the temp folder.
 
 Expected output:
+
 ```
 === PMB Setup ===
 Target: C:\Temp\test-new-project
@@ -498,6 +502,7 @@ git commit -m "test: confirm mb-setup.bat smoke tests pass for init and upgrade 
 ## Task 5: Update Help Text and README
 
 **Files:**
+
 - Modify: `scripts/mb.ps1` (Show-Help — already done in Task 2, verify it reads well)
 - Modify: `README.md` (PMB repo root — update quick-start reference)
 
@@ -508,6 +513,7 @@ pwsh -File scripts/mb.ps1 help
 ```
 
 Confirm `setup` line reads:
+
 ```
   setup         Initialize or upgrade a project — folder picker, auto-detects mode
 ```
@@ -516,7 +522,7 @@ Confirm `setup` line reads:
 
 Find the section that references `mb-new-project.bat` (or the "Quick Start" / "Getting Started" section) and update it:
 
-```markdown
+````markdown
 ## Setting Up a Project
 
 Double-click **`mb-setup.bat`** from Windows Explorer to set up Memory Bank in any project:
@@ -526,17 +532,20 @@ Double-click **`mb-setup.bat`** from Windows Explorer to set up Memory Bank in a
 - **Drag-and-drop**: drag a project folder onto the `.bat` to skip the folder picker
 
 Or from the command line:
+
 ```powershell
 mb setup                        # GUI folder picker
 mb setup "C:\path\to\project"  # direct path
 ```
-```
+````
+
+````
 
 - [ ] **Step 3: Run full Pester suite one final time**
 
 ```powershell
 Invoke-Pester tests/ -Output Detailed
-```
+````
 
 Expected: all tests pass.
 

@@ -214,11 +214,13 @@ _(If no findings: "No findings. Change package looks clean.")_
 If no finding in the report has `Blocking: Yes` (including the "No findings" case), compute a hash of the reviewed diff and write it to `.claude/.change-review-ok` (create the `.claude` directory first if it doesn't exist). The marker is bound to this exact diff — a `PreToolUse` hook recomputes the same hash before the next `git push` and only allows it through if the diff hasn't changed since the review. Use the same diff command from Step 1 (`git diff origin/main...HEAD`, or `git diff HEAD` if no upstream):
 
 Bash:
+
 ```
 git diff origin/main...HEAD | sha256sum | cut -d' ' -f1 > .claude/.change-review-ok
 ```
 
 PowerShell (do NOT pipe `git diff` directly into a hash cmdlet — PowerShell's pipeline re-tokenizes external-command output and will not match the hash `review-reminders.ps1` recomputes; redirect to a file first so the hash covers the exact raw bytes):
+
 ```
 git diff origin/main...HEAD > "$env:TEMP\pmb-diff-hash.tmp"
 (Get-FileHash "$env:TEMP\pmb-diff-hash.tmp" -Algorithm SHA256).Hash.ToLower() | Set-Content .claude/.change-review-ok

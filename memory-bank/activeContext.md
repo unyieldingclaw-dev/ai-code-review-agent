@@ -16,9 +16,20 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-06-26
+**Last Updated**: 2026-07-06
 
 ## Current Focus
+
+**New push/PR CI gate added (2026-07-06)**: this repo previously had no CI gate on regular
+push/PR to `main` — `typecheck`/`lint`/`test`/`build` only ran at release-tag time
+(`release.yml`), and `review.yml` only ran `format:check` + posted an AI-review comment without
+failing the build on findings. Added `.github/workflows/ci.yml`: on every push/PR to `main`, runs
+typecheck, format:check, lint:eslint, test, and build as independent steps (`id:` +
+`continue-on-error: true`), followed by a "Gate on all checks" step (`if: always()`) that fails
+the job if any step didn't succeed — same masking-prevention pattern applied to Bowling-Tracker
+and Google-Organizer this session. Also fixed pre-existing `format:check` drift on 6 docs/command
+files (unrelated content, mechanical `prettier --write`) so the new gate is green from day one.
+All 5 checks verified passing locally (295/295 tests) before the workflow was added.
 
 **All audit work complete.** Three-round pre-production audit (Rounds 1–3, 2026-06-24 to 2026-06-26) resolved all 90+ findings. Zero open Critical/High issues. 295 unit tests passing. Production ready.
 

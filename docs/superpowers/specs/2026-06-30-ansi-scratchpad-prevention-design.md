@@ -38,6 +38,7 @@ This is the prevention layer. It instructs Claude to set plain-text rendering mo
 **Trigger:** PostToolUse on `Bash|PowerShell` tool calls (global settings).
 
 **Behavior:**
+
 1. Locate all directories named `scratchpad` under `$env:LOCALAPPDATA\Temp\claude\` (Claude Code's temp root).
 2. For each file in those directories under 5 MB:
    - Read as UTF-8 using `[System.IO.File]::ReadAllText`.
@@ -73,11 +74,11 @@ The `2>$null; true` ensures the hook always exits 0.
 
 ## File Locations
 
-| File | Purpose |
-|------|---------|
-| `C:\Users\Mizzo\.claude\scripts\strip-ansi-scratchpad.ps1` | Hook script |
-| `C:\Users\Mizzo\.claude\settings.json` | Global hook registration |
-| `C:\Users\Mizzo\.claude\CLAUDE.md` | Global guideline |
+| File                                                       | Purpose                  |
+| ---------------------------------------------------------- | ------------------------ |
+| `C:\Users\Mizzo\.claude\scripts\strip-ansi-scratchpad.ps1` | Hook script              |
+| `C:\Users\Mizzo\.claude\settings.json`                     | Global hook registration |
+| `C:\Users\Mizzo\.claude\CLAUDE.md`                         | Global guideline         |
 
 ## Verification
 

@@ -12,17 +12,18 @@
 
 ## File Map
 
-| Action | File | Responsibility |
-|--------|------|---------------|
+| Action | File                                                       | Responsibility                                            |
+| ------ | ---------------------------------------------------------- | --------------------------------------------------------- |
 | Create | `C:\Users\Mizzo\.claude\scripts\strip-ansi-scratchpad.ps1` | Hook script — scans scratchpad dirs, strips ANSI in-place |
-| Modify | `C:\Users\Mizzo\.claude\settings.json` | Global hook registration — adds PostToolUse entry |
-| Modify | `C:\Users\Mizzo\.claude\CLAUDE.md` | Global guideline — Shell Output Safety section |
+| Modify | `C:\Users\Mizzo\.claude\settings.json`                     | Global hook registration — adds PostToolUse entry         |
+| Modify | `C:\Users\Mizzo\.claude\CLAUDE.md`                         | Global guideline — Shell Output Safety section            |
 
 ---
 
 ### Task 1: Create the hook script
 
 **Files:**
+
 - Create: `C:\Users\Mizzo\.claude\scripts\strip-ansi-scratchpad.ps1`
 
 - [ ] **Step 1: Ensure the scripts directory exists**
@@ -83,6 +84,7 @@ Expected: no output, exit 0. (Scratchpad may be empty — that's fine.)
 ### Task 2: Register the hook in global settings.json
 
 **Files:**
+
 - Modify: `C:\Users\Mizzo\.claude\settings.json`
 
 - [ ] **Step 1: Read the current settings.json**
@@ -165,23 +167,27 @@ Expected: `JSON valid: True`, no parse errors.
 ### Task 3: Add guideline to global CLAUDE.md
 
 **Files:**
+
 - Modify: `C:\Users\Mizzo\.claude\CLAUDE.md`
 
 - [ ] **Step 1: Add Shell Output Safety section**
 
 Insert the following section after the `## Shell Command Style` section and before `## Karpathy Coding Principles`:
 
-```markdown
+````markdown
 ## Shell Output Safety
 
 Before capturing PowerShell output to a file, set `$PSStyle.OutputRendering = 'PlainText'` to prevent ANSI escape codes from writing blank lines into scratchpad files and burning context tokens.
 
 Example:
+
 ```powershell
 $PSStyle.OutputRendering = 'PlainText'
 some-command-with-colored-output | Out-File $scratchFile
 ```
-```
+````
+
+````
 
 - [ ] **Step 2: Verify the file looks right**
 
@@ -206,7 +212,7 @@ if ($dirs) {
 } else {
     Write-Host "No scratchpad dir found — hook will run but find nothing. That's OK."
 }
-```
+````
 
 Expected: file written containing the raw ANSI bytes, content shows escape codes.
 
@@ -232,6 +238,7 @@ if ($dirs) {
 ```
 
 Expected output:
+
 ```
 PASS: ANSI sequences stripped. Content:
 GREEN TEXT
