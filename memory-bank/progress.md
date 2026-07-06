@@ -21,13 +21,14 @@ lineage: []
 ## ✅ Completed (Tasks 1–16)
 
 ### CI Gate Added — 2026-07-06
+
 - [x] `.github/workflows/ci.yml` created — first real push/PR quality gate (previously only
-  `release.yml` ran the full check suite, at release-tag time only). Runs typecheck, format:check,
-  lint:eslint, test, build each as an independent `continue-on-error` step, gated by a final
-  "Gate on all checks" step that fails the job on any non-success outcome.
+      `release.yml` ran the full check suite, at release-tag time only). Runs typecheck, format:check,
+      lint:eslint, test, build each as an independent `continue-on-error` step, gated by a final
+      "Gate on all checks" step that fails the job on any non-success outcome.
 - [x] Fixed pre-existing `format:check` drift on 6 files (`.claude/commands/change-review.md`,
-  `.claude/commands/code-review.md`, 4 files under `docs/superpowers/`) via `prettier --write` so
-  the new gate starts green.
+      `.claude/commands/code-review.md`, 4 files under `docs/superpowers/`) via `prettier --write` so
+      the new gate starts green.
 
 ### Core Infrastructure
 
