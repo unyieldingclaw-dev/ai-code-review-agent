@@ -49,11 +49,17 @@ elif [ "$cmd" = "push" ]; then
         rm -f "$preshafile"
         postsha=$(git rev-parse '@{u}' 2>/dev/null)
         if [ -n "$presha" ] && [ -n "$postsha" ] && [ "$postsha" = "$presha" ]; then
-            diff=$(git diff origin/main...HEAD 2>/dev/null)
+            # WHY a temp file, not `diff=$(git diff ...)` piped into sha256: see the
+            # matching comment in review-reminders.sh -- command substitution strips
+            # trailing newlines, producing a hash that doesn't match the direct-pipe
+            # hash /change-review's documented command writes into the marker.
+            tmp=$(mktemp)
+            git diff origin/main...HEAD > "$tmp" 2>/dev/null
             if [ $? -ne 0 ]; then
-                diff=$(git diff HEAD 2>/dev/null)
+                git diff HEAD > "$tmp" 2>/dev/null
             fi
-            printf '%s' "$diff" | sha256 > "$root/.claude/.change-review-ok"
+            sha256 < "$tmp" > "$root/.claude/.change-review-ok"
+            rm -f "$tmp"
         fi
     fi
 fi

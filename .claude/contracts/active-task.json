@@ -1,6 +1,6 @@
 {
   "task": "Harden the review-gate hook (tests, TOCTOU, tamper-resistance, failure recovery), dogfood it in PMB, fix stale PMB config, and fix dangerous-commands/check-contract hooks to actually block via permissionDecision instead of a non-blocking exit code",
-  "status": "active",
+  "status": "complete",
   "created_at": "2026-07-02T22:04:02Z",
   "expires_at": "2026-07-03T06:04:02Z",
   "scope": [

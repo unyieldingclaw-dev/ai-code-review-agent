@@ -83,11 +83,21 @@ case "$input" in
         fi
         ;;
     *'git push'*)
-        expected=$(git diff origin/main...HEAD 2>/dev/null)
+        # WHY hash a temp file written via redirection, not `expected=$(git diff ...)`
+        # piped into sha256 afterward: command substitution strips trailing newlines,
+        # so `expected=$(git diff ...); printf '%s' "$expected" | sha256` hashes a
+        # different byte stream than `git diff ... | sha256sum` (the direct pipe
+        # /change-review's documented command uses) -- empirically confirmed to
+        # produce different hashes for identical diff content. Redirecting to a file
+        # preserves the exact bytes, matching review-reminders.ps1's approach and the
+        # commit-path's direct-pipe hash above.
+        tmp=$(mktemp)
+        git diff origin/main...HEAD > "$tmp" 2>/dev/null
         if [ $? -ne 0 ]; then
-            expected=$(git diff HEAD 2>/dev/null)
+            git diff HEAD > "$tmp" 2>/dev/null
         fi
-        expected=$(printf '%s' "$expected" | sha256)
+        expected=$(sha256 < "$tmp")
+        rm -f "$tmp"
         marker="$root/.claude/.change-review-ok"
         actual=$(consume_marker "$marker")
         if [ -n "$expected" ] && [ "$actual" = "$expected" ]; then
