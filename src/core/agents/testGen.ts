@@ -12,7 +12,8 @@ export class TestGenAgent {
 
   async runWithGaps(
     input: ReviewInput,
-    gaps: CoverageGap[]
+    gaps: CoverageGap[],
+    signal?: AbortSignal
   ): Promise<{ testFiles: GeneratedTestFile[] }> {
     if (gaps.length === 0) return { testFiles: [] }
 
@@ -28,7 +29,7 @@ export class TestGenAgent {
     }
 
     for (const [file, fileGaps] of byFile) {
-      const testFile = await this.generateTestFile(file, fileGaps, framework, input)
+      const testFile = await this.generateTestFile(file, fileGaps, framework, input, signal)
       if (testFile) testFiles.push(testFile)
     }
 
@@ -39,7 +40,8 @@ export class TestGenAgent {
     sourceFile: string,
     gaps: CoverageGap[],
     framework: TestFramework,
-    input: ReviewInput
+    input: ReviewInput,
+    signal?: AbortSignal
   ): Promise<GeneratedTestFile | null> {
     const gapDescriptions = gaps
       .map(
@@ -61,7 +63,7 @@ Tests must: import the module under test, cover the happy path, cover the error/
       },
     ]
 
-    const raw = await this.provider.chat(messages, { think: false })
+    const raw = await this.provider.chat(messages, { think: false, signal })
     const content = raw.replace(/```[a-z]*\s*/gi, '').trim()
     if (!content || content.length < 50) return null
 

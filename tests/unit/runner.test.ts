@@ -131,6 +131,55 @@ describe('SwarmRunner', () => {
     warnSpy.mockRestore()
   })
 
+  it('aborts the underlying chat signal when an agent times out', async () => {
+    // WHY this test: withTimeout used to just race a timer against the agent call without
+    // cancelling the loser, so a "timed out" agent's request kept running server-side and
+    // each retry piled another live request on top instead of replacing it. This proves the
+    // signal passed to provider.chat() actually receives an abort when the timeout fires.
+    let capturedSignal: AbortSignal | undefined
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation((_messages, options) => {
+        capturedSignal = options?.signal
+        return new Promise(() => {}) // never resolves — only the timeout ends this call
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentTimeoutMs: 20,
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    await runner.run({ diff: 'diff' })
+    expect(capturedSignal).toBeInstanceOf(AbortSignal)
+    expect(capturedSignal?.aborted).toBe(true)
+  })
+
+  it('clears the timeout timer after a successful call, leaving no dangling abort', async () => {
+    // WHY this test: withTimeout's setTimeout handle was never captured/cleared, so even a
+    // successful call left a live timer that later fired a pointless controller.abort() after
+    // the work was already done. This proves the timer is cleared once the call succeeds, not
+    // just when it wins the race by timing out.
+    vi.useFakeTimers()
+    try {
+      const provider = makeProvider()
+      const config = {
+        ...DEFAULT_CONFIG,
+        agents: ['security'] as AgentName[],
+        agentTimeoutMs: 1000,
+        retryAttempts: 1,
+        retryDelayMs: 0,
+      }
+      const runner = new SwarmRunner(config, provider)
+      await runner.run({ diff: 'diff' })
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('aborts with error when ping fails', async () => {
     const provider: LLMProvider = {
       chat: vi.fn(),

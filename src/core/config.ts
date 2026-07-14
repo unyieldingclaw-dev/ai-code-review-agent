@@ -57,7 +57,11 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   ],
   testOutputDir: './ai-review-tests',
   maxDiffLines: 2000,
-  agentTimeoutMs: 60000,
+  // 60s was too tight for devstral:latest (23.6B) on VRAM-constrained hardware where it's
+  // partially CPU-offloaded — a realistic diff-sized prompt can take well over a minute to
+  // generate. 180s aligns with the 5-minute ceiling OllamaProvider already assumed
+  // (DEFAULT_TIMEOUT_MS) without being needlessly long for fast hardware.
+  agentTimeoutMs: 180000,
   retryAttempts: 2,
   retryDelayMs: 2000,
   ignorePaths: [],

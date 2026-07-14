@@ -37,6 +37,14 @@ export class OllamaProvider implements LLMProvider {
   }
 
   async chat(messages: Message[], options: ChatOptions = {}): Promise<string> {
+    // WHY prefer the caller's signal over our own timeout: the caller (SwarmRunner) already
+    // races this call against its own agentTimeoutMs and gives up at that deadline -- but
+    // Promise.race doesn't cancel the losing side, so without this the fetch kept running
+    // server-side for up to DEFAULT_TIMEOUT_MS after the runner had already moved on. Each
+    // retry then piled another live, uncancelled request onto Ollama instead of replacing the
+    // abandoned one, making contention worse under load. Honoring the caller's signal lets a
+    // "timed out" agent's request actually stop. Falls back to the old internal timeout for
+    // any caller that doesn't provide one (e.g. direct use outside SwarmRunner).
     const res = await fetch(`${this.baseUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -47,7 +55,7 @@ export class OllamaProvider implements LLMProvider {
         ...(options.format ? { format: options.format } : {}),
         messages,
       }),
-      signal: AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS),
+      signal: options.signal ?? AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS),
     })
     if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`)
     const data = (await res.json()) as { message?: { content?: string } }

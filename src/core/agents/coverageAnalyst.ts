@@ -56,12 +56,12 @@ Rules:
 - If fully covered, return: {"findings":[],"gaps":[]}`
   }
 
-  async runForCoverage(input: ReviewInput): Promise<CoverageAnalystResult> {
+  async runForCoverage(input: ReviewInput, signal?: AbortSignal): Promise<CoverageAnalystResult> {
     const messages: Message[] = [
       { role: 'system', content: this.systemPrompt },
       { role: 'user', content: this.buildUserPrompt(input) },
     ]
-    const raw = await this.provider.chat(messages, { think: true })
+    const raw = await this.provider.chat(messages, { think: true, signal })
     return this.parseCoverageResult(raw, input)
   }
 
