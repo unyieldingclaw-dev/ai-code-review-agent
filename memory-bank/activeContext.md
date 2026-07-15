@@ -20,6 +20,14 @@ lineage: []
 
 ## Current Focus
 
+**`/ai-review` distribution + update-notifier (2026-07-14)**: `/ai-review` previously only existed
+as a slash command inside this repo's own checkout -- `package.json`'s `files` array never shipped
+`.claude/commands/`. Added a `postinstall` script (`scripts/postinstall.mjs`, plain JS so it can't
+be broken by an unbuilt `dist/`) that copies it to `~/.claude/commands/` on every global install
+(resolving the invoking user's real home even under `sudo npm install -g`), plus an
+`update-notifier` check in the CLI entrypoint (7-day cache, non-blocking, never auto-installs). See
+`docs/superpowers/specs/2026-07-14-ai-review-distribution-design.md`.
+
 **New push/PR CI gate added (2026-07-06)**: this repo previously had no CI gate on regular
 push/PR to `main` — `typecheck`/`lint`/`test`/`build` only ran at release-tag time
 (`release.yml`), and `review.yml` only ran `format:check` + posted an AI-review comment without

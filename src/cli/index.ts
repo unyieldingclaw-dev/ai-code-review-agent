@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
+import updateNotifier from 'update-notifier'
 import { spawnSync } from 'child_process'
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs'
 import { fileURLToPath } from 'url'
@@ -14,7 +15,10 @@ import type { FailOnLevel } from './exitCode.js'
 import { resolveProfile } from '../core/profiles.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const { version } = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8')) as {
+const { name, version } = JSON.parse(
+  readFileSync(join(__dirname, '../../package.json'), 'utf-8')
+) as {
+  name: string
   version: string
 }
 
@@ -293,6 +297,20 @@ function getDiff(diffFile?: string, dir?: string): string {
   return gitSync(['diff'])
 }
 
+export function checkForUpdates(): void {
+  updateNotifier({
+    pkg: { name, version },
+    updateCheckInterval: 1000 * 60 * 60 * 24 * 7, // 7 days -- never a live check per invocation
+  }).notify({
+    isGlobal: true, // this CLI is always installed via `npm install -g`
+    message:
+      'A newer version of {packageName} is available ({currentVersion} → {latestVersion}). Run: `{updateCommand}`',
+  })
+}
+
 if (process.env.NODE_ENV !== 'test') {
+  // WHY guarded the same way as program.parse(): keeps this out of the test run entirely
+  // rather than relying on update-notifier's own TTY/network fail-open behavior during tests.
+  checkForUpdates()
   program.parse()
 }

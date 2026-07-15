@@ -20,6 +20,18 @@ lineage: []
 
 ## ✅ Completed (Tasks 1–16)
 
+### `/ai-review` Distribution + Update-Notifier — 2026-07-14
+
+- [x] `scripts/postinstall.mjs` (plain JS, not compiled TS -- must survive running before
+      `dist/` exists) copies `.claude/commands/ai-review.md` to `~/.claude/commands/` on every
+      `npm install -g`/`npm update -g`. Fails open on any error. Resolves the invoking user's
+      real home directory even under `sudo npm install -g` (via `SUDO_USER`).
+- [x] `package.json`'s `files` array now ships `.claude/commands/` and `scripts/postinstall.mjs`.
+- [x] `update-notifier` wired into `src/cli/index.ts`: 7-day cached check, non-blocking, TTY-only
+      notification, never auto-installs.
+- [x] Verified end-to-end via `npm pack` + global install into a throwaway prefix/fake HOME.
+- [x] v1.3.0.
+
 ### CI Gate Added — 2026-07-06
 
 - [x] `.github/workflows/ci.yml` created — first real push/PR quality gate (previously only
