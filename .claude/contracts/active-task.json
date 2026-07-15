@@ -1,22 +1,15 @@
 {
-  "task": "Harden the review-gate hook (tests, TOCTOU, tamper-resistance, failure recovery), dogfood it in PMB, fix stale PMB config, and fix dangerous-commands/check-contract hooks to actually block via permissionDecision instead of a non-blocking exit code",
-  "status": "active",
-  "created_at": "2026-07-02T22:04:02Z",
-  "expires_at": "2026-07-03T06:04:02Z",
+  "task": "Fix clearTimeout gap in the AbortSignal fix, update memory-bank, split unrelated CI fix into its own commit, then land both via /security-review -> commit -> PR",
+  "status": "complete",
+  "created_at": "2026-07-14T02:28:10Z",
+  "expires_at": "2026-07-14T10:28:10Z",
+  "approved_by": "user",
   "scope": [
-    { "file": "scripts/review-reminders.ps1", "op": "edit" },
-    { "file": "scripts/review-reminders.sh", "op": "edit" },
-    { "file": "scripts/review-reminders-post.ps1", "op": "create" },
-    { "file": "scripts/review-reminders-post.sh", "op": "create" },
-    { "file": "scripts/dangerous-commands.ps1", "op": "edit" },
-    { "file": "scripts/dangerous-commands.sh", "op": "edit" },
-    { "file": "scripts/check-contract.ps1", "op": "edit" },
-    { "file": "scripts/check-contract.sh", "op": "edit" },
-    { "file": ".claude/commands/code-review.md", "op": "edit" },
-    { "file": ".claude/commands/change-review.md", "op": "edit" },
-    { "file": ".claude/settings.json", "op": "edit" },
-    { "file": ".gitignore", "op": "edit" },
-    { "file": "tests/review-reminders.Tests.ps1", "op": "create" },
-    { "file": "docs/HOOKS-GUIDE.md", "op": "edit" }
+    { "file": "src/core/runner.ts", "op": "edit" },
+    { "file": "tests/unit/runner.test.ts", "op": "edit" },
+    { "file": "memory-bank/activeContext.md", "op": "edit" },
+    { "file": "memory-bank/progress.md", "op": "edit" },
+    { "file": ".github/workflows/review.yml", "op": "edit" },
+    { "file": "src/core/config.ts", "op": "edit" }
   ]
 }
