@@ -36,17 +36,35 @@ import { MigrationSafetyAgent, hasMigrationFiles } from './agents/migrationSafet
 import { SecretsAgent } from './agents/secrets.js'
 import { ComplexityAgent } from './agents/complexity.js'
 
-function withTimeout<T>(promise: Promise<T>, ms: number, agentName: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Agent ${agentName} timed out after ${ms}ms`)), ms)
-    ),
-  ])
+// WHY an AbortController instead of a bare Promise.race: race() never cancels the losing
+// side, so when the timer wins, fn()'s in-flight fetch to Ollama kept running server-side for
+// up to its own internal timeout (5 minutes) after the runner had already given up on it. Each
+// retry then added another live, uncancelled request on top instead of replacing the abandoned
+// one, compounding contention under load. Calling controller.abort() when the timer fires lets
+// fn() (via OllamaProvider.chat's `signal` option) actually stop the request it's waiting on.
+function withTimeout<T>(
+  fn: (signal: AbortSignal) => Promise<T>,
+  ms: number,
+  agentName: string
+): Promise<T> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout>
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort()
+      reject(new Error(`Agent ${agentName} timed out after ${ms}ms`))
+    }, ms)
+  })
+  // WHY .finally(clearTimeout): without this, a successful fn() left the timer running --
+  // harmless before this diff (it just rejected an unconsumed promise), but now it also fires
+  // a pointless controller.abort() after the call already succeeded. Clearing on either
+  // outcome (fn() wins or the timer wins) stops the dangling abort; clearing an already-fired
+  // timer is a no-op, so this is safe on both paths.
+  return Promise.race([fn(controller.signal), timeoutPromise]).finally(() => clearTimeout(timer))
 }
 
 async function withRetryTimeout<T>(
-  fn: () => Promise<T>,
+  fn: (signal: AbortSignal) => Promise<T>,
   timeoutMs: number,
   agentName: string,
   attempts: number,
@@ -55,7 +73,7 @@ async function withRetryTimeout<T>(
   let lastErr: Error = new Error('no attempts made')
   for (let i = 0; i < attempts; i++) {
     try {
-      return await withTimeout(fn(), timeoutMs, agentName)
+      return await withTimeout(fn, timeoutMs, agentName)
     } catch (err) {
       lastErr = err as Error
       if (i < attempts - 1) {
@@ -188,7 +206,7 @@ export class SwarmRunner {
     const startMs = Date.now()
     try {
       const coverageResult = await withRetryTimeout(
-        async () => agent.runForCoverage(await ctx('coverage')),
+        async (signal) => agent.runForCoverage(await ctx('coverage'), signal),
         timeout,
         'coverage',
         retryAttempts,
@@ -243,7 +261,7 @@ export class SwarmRunner {
       const startMs = Date.now()
       try {
         const agentFindings = await withRetryTimeout(
-          async () => agent.run(await ctx(agent.name)),
+          async (signal) => agent.run(await ctx(agent.name), signal),
           timeout,
           agent.name,
           retryAttempts,
@@ -306,7 +324,7 @@ export class SwarmRunner {
         const startMs = Date.now()
         try {
           const agentFindings = await withRetryTimeout(
-            async () => agent.run(await ctx(agent.name)),
+            async (signal) => agent.run(await ctx(agent.name), signal),
             timeout,
             agent.name,
             retryAttempts,
@@ -482,7 +500,8 @@ export class SwarmRunner {
       if (coverageGaps.length > 0) {
         try {
           const testResult = await withRetryTimeout(
-            async () => this.testGen.runWithGaps(await withContext('testgen'), coverageGaps),
+            async (signal) =>
+              this.testGen.runWithGaps(await withContext('testgen'), coverageGaps, signal),
             this.config.agentTimeoutMs,
             'testgen',
             this.config.retryAttempts,

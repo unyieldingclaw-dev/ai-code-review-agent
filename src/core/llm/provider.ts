@@ -6,7 +6,9 @@ export interface Message {
 export interface ChatOptions {
   think?: boolean
   format?: 'json'
+  /** Ignored when `signal` is also provided — OllamaProvider prefers the caller's signal. */
   timeout?: number
+  signal?: AbortSignal
 }
 
 export interface LLMProvider {

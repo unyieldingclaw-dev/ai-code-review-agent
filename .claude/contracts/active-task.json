@@ -1,22 +1,18 @@
 {
-  "task": "Harden the review-gate hook (tests, TOCTOU, tamper-resistance, failure recovery), dogfood it in PMB, fix stale PMB config, and fix dangerous-commands/check-contract hooks to actually block via permissionDecision instead of a non-blocking exit code",
+  "task": "Implement /ai-review self-distribution via postinstall + update-notifier for the CLI, per docs/superpowers/specs/2026-07-14-ai-review-distribution-design.md",
   "status": "complete",
-  "created_at": "2026-07-02T22:04:02Z",
-  "expires_at": "2026-07-03T06:04:02Z",
+  "created_at": "2026-07-14T16:17:00Z",
+  "expires_at": "2026-07-15T00:17:00Z",
+  "approved_by": "user",
   "scope": [
-    { "file": "scripts/review-reminders.ps1", "op": "edit" },
-    { "file": "scripts/review-reminders.sh", "op": "edit" },
-    { "file": "scripts/review-reminders-post.ps1", "op": "create" },
-    { "file": "scripts/review-reminders-post.sh", "op": "create" },
-    { "file": "scripts/dangerous-commands.ps1", "op": "edit" },
-    { "file": "scripts/dangerous-commands.sh", "op": "edit" },
-    { "file": "scripts/check-contract.ps1", "op": "edit" },
-    { "file": "scripts/check-contract.sh", "op": "edit" },
-    { "file": ".claude/commands/code-review.md", "op": "edit" },
-    { "file": ".claude/commands/change-review.md", "op": "edit" },
-    { "file": ".claude/settings.json", "op": "edit" },
-    { "file": ".gitignore", "op": "edit" },
-    { "file": "tests/review-reminders.Tests.ps1", "op": "create" },
-    { "file": "docs/HOOKS-GUIDE.md", "op": "edit" }
+    { "file": "package.json", "op": "edit" },
+    { "file": "scripts/postinstall.mjs", "op": "create" },
+    { "file": "tests/unit/postinstall.test.ts", "op": "create" },
+    { "file": "src/cli/index.ts", "op": "edit" },
+    { "file": "tests/unit/cli.test.ts", "op": "edit" },
+    { "file": "README.md", "op": "edit" },
+    { "file": "CHANGELOG.md", "op": "edit" },
+    { "file": "memory-bank/activeContext.md", "op": "edit" },
+    { "file": "memory-bank/progress.md", "op": "edit" }
   ]
 }
