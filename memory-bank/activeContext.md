@@ -16,7 +16,7 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-07-06
+**Last Updated**: 2026-07-14
 
 ## Current Focus
 
@@ -27,6 +27,10 @@ be broken by an unbuilt `dist/`) that copies it to `~/.claude/commands/` on ever
 (resolving the invoking user's real home even under `sudo npm install -g`), plus an
 `update-notifier` check in the CLI entrypoint (7-day cache, non-blocking, never auto-installs). See
 `docs/superpowers/specs/2026-07-14-ai-review-distribution-design.md`.
+
+**AbortSignal/timeout-cancellation fix (2026-07-14)**: `withTimeout`'s `Promise.race` never cancelled the losing side, so a timed-out agent's in-flight fetch to Ollama kept running server-side (up to `DEFAULT_TIMEOUT_MS`, 5 min) after the runner had already given up — each retry then piled another live, uncancelled request on top instead of replacing the abandoned one. Fixed by threading an `AbortController`'s signal from `withTimeout` (`runner.ts`) through `agent.run()`/`runForCoverage()`/`runWithGaps()` down to `OllamaProvider.chat()`'s `fetch` call, so a timeout now actually cancels the request. Also fixed a `clearTimeout` gap the fix itself introduced (the timer's handle was never captured, so even a successful call left a dangling timer that fired a pointless `abort()` afterward). Went through full `/code-review` (5 subagents + opponent check) — no other issues found. 297 unit tests passing (up from 295). Also fixed an unrelated CI bug in `.github/workflows/review.yml`: the "Write Step Summary" step used bash-only escaping with no `shell:` declared, defaulting to PowerShell on the self-hosted Windows runner and failing with `ParserError`/`SyntaxError` on every PR — fixed with a job-level `shell: bash` default.
+
+**`agentTimeoutMs` default raised 60s → 180s (2026-07-14)**: dogfooding `/change-review` on this session's own diff surfaced that ACR's security profile timed out on all 4 agents against `devstral:latest` (0 findings via failure, not a clean result). Reproduced directly: a realistic diff-sized prompt (~24KB) took over 100s with no response. Root cause is this dev machine's GPU (8GB VRAM) not fitting the 23.6B-param model — `ollama ps` showed only 6.1GB offloaded to GPU, the rest running on CPU. `DEFAULT_CONFIG.agentTimeoutMs` (`src/core/config.ts:60`) was still 60000ms, far tighter than `OllamaProvider`'s own `DEFAULT_TIMEOUT_MS` (300000ms) already assumed — raised to 180000ms to close that gap. Config-only change; 297 tests still pass, typecheck clean.
 
 **New push/PR CI gate added (2026-07-06)**: this repo previously had no CI gate on regular
 push/PR to `main` — `typecheck`/`lint`/`test`/`build` only ran at release-tag time
@@ -52,7 +56,7 @@ All 5 checks verified passing locally (295/295 tests) before the workflow was ad
 - `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, continue-on-error, 10min timeout
-- **295 unit tests** across 37 test files
+- **297 unit tests** across 37 test files
 - `src/core/parsing.ts`: `validateAndNormalizeFindings()` extracted from BaseAgent (SRP)
 - `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
 - `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable
@@ -121,7 +125,7 @@ All 5 checks verified passing locally (295/295 tests) before the workflow was ad
 ## Key Commands
 
 ```bash
-npm test                    # all unit tests (295 passing)
+npm test                    # all unit tests (297 passing)
 npm run typecheck           # 0 errors
 npm run build               # compile to dist/
 node dist/cli/index.js --help   # smoke test CLI
@@ -157,3 +161,4 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-19: v0.9.2 — Calibration fixes (5 failing cases): balanced-bracket parser in base.ts, wildcard wording in dependencies.ts, integration-tests wording in integrationScout.ts, license.diff fixture node-lame. 118 unit tests pass. Committed `6285207`.
 - 2026-06-19: v0.9.3 — DependenciesAgent prompt restructured to lead with REQUIRED OUTPUT FORMAT + few-shot example. devstral now outputs valid Finding schema for package.json diffs. 16/16 calibration PASS confirmed. Committed `754ee08`.
 - 2026-06-15: v0.8.0 — 5 new specialist agents (ErrorHandlingAgent, ObservabilityAgent, MigrationSafetyAgent, SecretsAgent, ComplexityAgent), `shell.ts` runTool(), conditional MigrationSafety skip in SwarmRunner, 32 new unit tests (112 total), 5 calibration fixtures, DEFAULT_CONFIG updated to 16 agents, package.json v0.8.0, README updated. Tasks 1–9 committed. Task 10 (final verification + tag) is next.
+- 2026-07-14: AbortSignal/timeout-cancellation fix — `withTimeout` now cancels the losing side of the race instead of leaving it running server-side; fixed a `clearTimeout` gap found in review; unrelated CI fix (`shell: bash` default in `review.yml`, was silently defaulting to pwsh on the self-hosted Windows runner). 297 unit tests passing.

@@ -12,6 +12,16 @@ jobs:
     permissions:
       pull-requests: write
       contents: read
+    defaults:
+      run:
+        # WHY: every `run:` step here assumes bash (wc -c, POSIX ||, and the "Write Step
+        # Summary" step's backslash-escaped `${...}` template-literal syntax, which is bash
+        # escaping and not valid PowerShell). GitHub Actions defaults `run:` steps to pwsh on
+        # Windows runners (this one is self-hosted Windows) unless a shell is declared, so
+        # "Write Step Summary" was silently running its script through pwsh, producing a
+        # malformed .ps1 and failing with ParserError/SyntaxError on every PR. Setting bash at
+        # the job level fixes every step at once instead of patching one.
+        shell: bash
 
     steps:
       - name: Checkout

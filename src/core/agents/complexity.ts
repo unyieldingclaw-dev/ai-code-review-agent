@@ -43,21 +43,21 @@ Additional rules:
 - source: "llm" by default; "lizard" if complexity metrics from the tool are shown in the input`
   }
 
-  async run(input: ReviewInput): Promise<Finding[]> {
+  async run(input: ReviewInput, signal?: AbortSignal): Promise<Finding[]> {
     const files = extractChangedFiles(input.diff)
     if (files.length === 0) {
       // No new/modified files in diff — nothing to pass to lizard; fall back to LLM-only.
-      return super.run(input)
+      return super.run(input, signal)
     }
 
     const lizardOutput = await runTool('lizard', files)
     if (lizardOutput === null) {
       // lizard not found — LLM receives plain diff
-      return super.run(input)
+      return super.run(input, signal)
     }
 
     // lizard found — prepend metrics so LLM can focus on high-complexity functions
     const enhancedDiff = `=== Lizard Complexity Metrics ===\n${lizardOutput}\n\n=== Diff ===\n${input.diff}`
-    return super.run({ ...input, diff: enhancedDiff })
+    return super.run({ ...input, diff: enhancedDiff }, signal)
   }
 }

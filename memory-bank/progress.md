@@ -16,7 +16,7 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-07-06
+**Last Updated**: 2026-07-14
 
 ## ✅ Completed (Tasks 1–16)
 
@@ -31,6 +31,38 @@ lineage: []
       notification, never auto-installs.
 - [x] Verified end-to-end via `npm pack` + global install into a throwaway prefix/fake HOME.
 - [x] v1.3.0.
+
+### AbortSignal/Timeout-Cancellation Fix — 2026-07-14
+
+- [x] Root cause: `withTimeout` (`runner.ts`) raced a timer against each agent's LLM call via
+      `Promise.race`, which never cancels the losing side — a timed-out agent's in-flight fetch
+      to Ollama kept running server-side for up to 5 minutes after the runner gave up, and each
+      retry piled another live, uncancelled request on top instead of replacing the abandoned
+      one, compounding contention under load.
+- [x] Fix: threaded an `AbortController`'s signal from `withTimeout` through
+      `agent.run()`/`runForCoverage()`/`runWithGaps()` (`base.ts`, `complexity.ts`,
+      `coverageAnalyst.ts`, `testGen.ts`) down to `OllamaProvider.chat()`'s `fetch` call
+      (`ollamaProvider.ts`, `provider.ts`), so a timeout now actually cancels the request.
+- [x] Found and fixed during review: the fix itself left `withTimeout`'s `setTimeout` handle
+      uncaptured, so even a _successful_ call left a dangling timer that fired a pointless
+      `controller.abort()` afterward — closed with `.finally(() => clearTimeout(timer))`.
+- [x] Full `/code-review` (5 subagents + confidence scoring + opponent check) — no other issues
+      found; all call sites verified complete (only `ComplexityAgent`/`CoverageAnalystAgent`
+      override `run()`, both correctly threaded).
+- [x] New regression tests: proves the signal actually aborts on timeout, and proves the timer
+      is cleared (no dangling abort) on success. 297 unit tests passing (up from 295).
+- [x] Unrelated CI fix bundled in the same working session, landed as a separate commit:
+      `.github/workflows/review.yml`'s "Write Step Summary" step used bash-only escaping with no
+      `shell:` declared, silently defaulting to PowerShell on the self-hosted Windows runner and
+      failing every PR with `ParserError`/`SyntaxError`. Fixed with a job-level `shell: bash`
+      default so every step in the job is consistent.
+- [x] `/change-review` dogfooding (9-job review + ACR invocation) surfaced that ACR's security
+      profile timed out on all 4 agents against `devstral:latest` — reproduced directly with a
+      realistic diff-sized prompt (~24KB) taking over 100s with no response. Root cause: this
+      machine's 8GB-VRAM GPU only fits ~6.1GB of the 23.6B-param model, the rest runs on CPU.
+      `DEFAULT_CONFIG.agentTimeoutMs` (`src/core/config.ts:60`) was 60000ms, far tighter than
+      `OllamaProvider`'s own `DEFAULT_TIMEOUT_MS` (300000ms) already assumed. Raised to 180000ms
+      to close the gap. Config-only change; 297 tests still pass, typecheck clean.
 
 ### CI Gate Added — 2026-07-06
 
@@ -78,7 +110,7 @@ lineage: []
 - [x] **G1**: Hallucination cross-check — Critical/High requires ≥2 agents at same file+line (±5)
 - [x] **G2**: Diff size guard — `maxDiffLines` (default 2000) + `--max-diff-lines` CLI flag
 - [x] **G3**: Finding merge dedup — `corroboratingAgents` field on Finding schema
-- [x] **G4**: Per-agent timeouts — `agentTimeoutMs` (default 60 s) + `--timeout` CLI flag
+- [x] **G4**: Per-agent timeouts — `agentTimeoutMs` (default 180 s, raised from 60 s on 2026-07-14) + `--timeout` CLI flag
 - [x] **G5**: Severity gating — `--fail-on` flag (critical|high|medium|any|never; default: high)
 - [x] **G6**: Path exclusions — `.aiignore` + `--ignore-path` + `ignorePaths` config
 - [x] **G8**: Configurable retry — `retryAttempts`/`retryDelayMs` config + `--retry-attempts`/`--retry-delay` CLI flags (`c2d2387`)
