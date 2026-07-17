@@ -2,6 +2,8 @@
 // Emits GitHub Actions workflow command annotation syntax.
 // Intended for use inside GitHub Actions — findings appear inline in PR diffs.
 // One line per finding: ::level file=...,line=...,title=...::message
+// Plus one ::warning:: line per failed agent (agentStatus !== 'ok'), emitted before the
+// finding lines, so a run with failed agents is never indistinguishable from a clean one.
 
 import type { ReviewResult, Finding, Severity } from '../../core/schema.js'
 

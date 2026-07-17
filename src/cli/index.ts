@@ -54,7 +54,8 @@ program
   .option('--retry-delay <ms>', 'Delay between retries in ms (default: 2000)', parseInt)
   .option(
     '--fail-on <level>',
-    `Exit 1 when any finding meets this severity (${FAIL_ON_OPTIONS.join('|')}; default: high)`,
+    `Exit 1 when any finding meets this severity (${FAIL_ON_OPTIONS.join('|')}; default: high). ` +
+      `Exit 2 takes priority over this if any agent failed.`,
     'high'
   )
   .option('--fail-fast', 'Stop swarm on first finding at or above --fail-on threshold')
