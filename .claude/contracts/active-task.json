@@ -1,6 +1,6 @@
 {
   "task": "Implement silent agent failure reporting (agentStatus on ReviewResult, thrown ParseFailureError, formatter surfacing, exit code 2) per docs/superpowers/plans/2026-07-15-silent-agent-failure-reporting.md",
-  "status": "active",
+  "status": "complete",
   "created_at": "2026-07-16T14:29:42Z",
   "expires_at": "2026-07-16T22:29:42Z",
   "approved_by": "user",
