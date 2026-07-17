@@ -98,7 +98,7 @@ export interface ReviewResult {
   }
   sanitizer?: SanitizerMetadata
   policy?: PolicyResult
-  agentStatus?: Partial<Record<AgentName | 'coverage' | 'testgen', AgentStatus>>
+  agentStatus?: Partial<Record<AgentName, AgentStatus>>
 }
 ```
 
@@ -233,7 +233,7 @@ landing — this split keeps each commit's diff focused and reviewable.
 
 ---
 
-## Task 3: Update the 15 existing parse-failure tests + add a coverage-specific one
+## Task 3: Update the 16 existing parse-failure tests + add a coverage-specific one
 
 **Files:**
 
@@ -251,50 +251,54 @@ landing — this split keeps each commit's diff focused and reviewable.
 - Modify: `tests/unit/migrationSafetyAgent.test.ts`
 - Modify: `tests/unit/observabilityAgent.test.ts`
 - Modify: `tests/unit/performanceAgent.test.ts`
+- Modify: `tests/unit/secretsAgent.test.ts`
 - Modify: `tests/unit/securityAgent.test.ts`
 
-Every one of these 15 files has an identical-shape test named `'returns empty array on parse
-failure'`. Two exact shapes appear across the files — check which one a given file uses before
-editing:
+Confirmed by actually running the suite after Task 2 landed: it's **16 files, not 15** — an
+initial file search for the exact string `'returns empty array on parse failure'` missed
+`secretsAgent.test.ts`, whose test is named `'returns empty array on LLM parse failure'`
+(slightly different wording) and uses a `FAKE_DIFF` variable instead of `{ diff: 'diff' }`
+inline, but is otherwise Shape A below. Every one of these 16 files has an identical-shape test
+(3 exact variations in wording/fixtures) — check which one a given file uses before editing:
 
 **Shape A** (most files, e.g. `securityAgent.test.ts`):
 
 ```typescript
-  it('returns empty array on parse failure', async () => {
-    expect(
-      await new SecurityAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
-    ).toEqual([])
-  })
+it('returns empty array on parse failure', async () => {
+  expect(
+    await new SecurityAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
+  ).toEqual([])
+})
 ```
 
 Replace with (adjust the class name and provider content per file — keep everything else
 identical):
 
 ```typescript
-  it('throws ParseFailureError on parse failure', async () => {
-    await expect(
-      new SecurityAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
-    ).rejects.toThrow(ParseFailureError)
-  })
+it('throws ParseFailureError on parse failure', async () => {
+  await expect(
+    new SecurityAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
+  ).rejects.toThrow(ParseFailureError)
+})
 ```
 
 **Shape B** (`baseAgent.test.ts`):
 
 ```typescript
-  it('returns empty array on parse failure', async () => {
-    const agent = new TestAgent(makeProvider('not json at all'), DEFAULT_CONFIG)
-    const findings = await agent.run({ diff: 'diff' })
-    expect(findings).toEqual([])
-  })
+it('returns empty array on parse failure', async () => {
+  const agent = new TestAgent(makeProvider('not json at all'), DEFAULT_CONFIG)
+  const findings = await agent.run({ diff: 'diff' })
+  expect(findings).toEqual([])
+})
 ```
 
 Replace with:
 
 ```typescript
-  it('throws ParseFailureError on parse failure', async () => {
-    const agent = new TestAgent(makeProvider('not json at all'), DEFAULT_CONFIG)
-    await expect(agent.run({ diff: 'diff' })).rejects.toThrow(ParseFailureError)
-  })
+it('throws ParseFailureError on parse failure', async () => {
+  const agent = new TestAgent(makeProvider('not json at all'), DEFAULT_CONFIG)
+  await expect(agent.run({ diff: 'diff' })).rejects.toThrow(ParseFailureError)
+})
 ```
 
 - [ ] **Step 1: Add the `ParseFailureError` import to each of the 15 files**
@@ -314,18 +318,18 @@ assertion changes).
 - [ ] **Step 3: Add a dedicated `runForCoverage` parse-failure test to `coverageAnalystAgent.test.ts`**
 
 The existing (now-updated) `'returns empty array on parse failure'` test in this file calls
-`.run(...)`, which only exercises the *inherited* `BaseAgent.parseFindings` path — it never
+`.run(...)`, which only exercises the _inherited_ `BaseAgent.parseFindings` path — it never
 exercises `coverageAnalyst.ts`'s own `parseCoverageResult` fallback, which has never had a
 dedicated test. Add a new test alongside it:
 
 ```typescript
-  it('runForCoverage throws ParseFailureError on parse failure', async () => {
-    await expect(
-      new CoverageAnalystAgent(makeProvider('not json at all'), DEFAULT_CONFIG).runForCoverage({
-        diff: 'diff',
-      })
-    ).rejects.toThrow(ParseFailureError)
-  })
+it('runForCoverage throws ParseFailureError on parse failure', async () => {
+  await expect(
+    new CoverageAnalystAgent(makeProvider('not json at all'), DEFAULT_CONFIG).runForCoverage({
+      diff: 'diff',
+    })
+  ).rejects.toThrow(ParseFailureError)
+})
 ```
 
 - [ ] **Step 4: Run the full suite**
@@ -348,9 +352,9 @@ Expected: clean.
 - [ ] **Step 6: Format and commit**
 
 ```bash
-npx prettier --write tests/unit/adversarialAgent.test.ts tests/unit/baseAgent.test.ts tests/unit/breakingChangeAgent.test.ts tests/unit/complexityAgent.test.ts tests/unit/correctnessAgent.test.ts tests/unit/coverageAnalystAgent.test.ts tests/unit/dependenciesAgent.test.ts tests/unit/designAgent.test.ts tests/unit/errorHandlingAgent.test.ts tests/unit/integrationScoutAgent.test.ts tests/unit/licenseComplianceAgent.test.ts tests/unit/migrationSafetyAgent.test.ts tests/unit/observabilityAgent.test.ts tests/unit/performanceAgent.test.ts tests/unit/securityAgent.test.ts
+npx prettier --write tests/unit/adversarialAgent.test.ts tests/unit/baseAgent.test.ts tests/unit/breakingChangeAgent.test.ts tests/unit/complexityAgent.test.ts tests/unit/correctnessAgent.test.ts tests/unit/coverageAnalystAgent.test.ts tests/unit/dependenciesAgent.test.ts tests/unit/designAgent.test.ts tests/unit/errorHandlingAgent.test.ts tests/unit/integrationScoutAgent.test.ts tests/unit/licenseComplianceAgent.test.ts tests/unit/migrationSafetyAgent.test.ts tests/unit/observabilityAgent.test.ts tests/unit/performanceAgent.test.ts tests/unit/secretsAgent.test.ts tests/unit/securityAgent.test.ts
 
-git add tests/unit/adversarialAgent.test.ts tests/unit/baseAgent.test.ts tests/unit/breakingChangeAgent.test.ts tests/unit/complexityAgent.test.ts tests/unit/correctnessAgent.test.ts tests/unit/coverageAnalystAgent.test.ts tests/unit/dependenciesAgent.test.ts tests/unit/designAgent.test.ts tests/unit/errorHandlingAgent.test.ts tests/unit/integrationScoutAgent.test.ts tests/unit/licenseComplianceAgent.test.ts tests/unit/migrationSafetyAgent.test.ts tests/unit/observabilityAgent.test.ts tests/unit/performanceAgent.test.ts tests/unit/securityAgent.test.ts
+git add tests/unit/adversarialAgent.test.ts tests/unit/baseAgent.test.ts tests/unit/breakingChangeAgent.test.ts tests/unit/complexityAgent.test.ts tests/unit/correctnessAgent.test.ts tests/unit/coverageAnalystAgent.test.ts tests/unit/dependenciesAgent.test.ts tests/unit/designAgent.test.ts tests/unit/errorHandlingAgent.test.ts tests/unit/integrationScoutAgent.test.ts tests/unit/licenseComplianceAgent.test.ts tests/unit/migrationSafetyAgent.test.ts tests/unit/observabilityAgent.test.ts tests/unit/performanceAgent.test.ts tests/unit/secretsAgent.test.ts tests/unit/securityAgent.test.ts
 
 git commit -m "test: update parse-failure tests for ParseFailureError, add coverage-specific case"
 ```
@@ -372,62 +376,62 @@ match the file's existing `makeProvider`/`DEFAULT_CONFIG` helper conventions alr
 elsewhere in the file):
 
 ```typescript
-  it('records agentStatus "ok" for agents that succeed', async () => {
-    const provider = makeProvider() // existing helper returning valid empty findings JSON
-    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[] }
-    const runner = new SwarmRunner(config, provider)
-    const result = await runner.run({ diff: 'diff' })
-    expect(result.agentStatus?.security).toBe('ok')
-  })
+it('records agentStatus "ok" for agents that succeed', async () => {
+  const provider = makeProvider() // existing helper returning valid empty findings JSON
+  const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[] }
+  const runner = new SwarmRunner(config, provider)
+  const result = await runner.run({ diff: 'diff' })
+  expect(result.agentStatus?.security).toBe('ok')
+})
 
-  it('records agentStatus "timeout" when an agent times out', async () => {
-    const provider: LLMProvider = {
-      chat: vi.fn().mockImplementation(() => new Promise(() => {})), // never resolves
-      ping: vi.fn().mockResolvedValue({ ok: true }),
-    }
-    const config = {
-      ...DEFAULT_CONFIG,
-      agents: ['security'] as AgentName[],
-      agentTimeoutMs: 20,
-      retryAttempts: 1,
-      retryDelayMs: 0,
-    }
-    const runner = new SwarmRunner(config, provider)
-    const result = await runner.run({ diff: 'diff' })
-    expect(result.agentStatus?.security).toBe('timeout')
-  })
+it('records agentStatus "timeout" when an agent times out', async () => {
+  const provider: LLMProvider = {
+    chat: vi.fn().mockImplementation(() => new Promise(() => {})), // never resolves
+    ping: vi.fn().mockResolvedValue({ ok: true }),
+  }
+  const config = {
+    ...DEFAULT_CONFIG,
+    agents: ['security'] as AgentName[],
+    agentTimeoutMs: 20,
+    retryAttempts: 1,
+    retryDelayMs: 0,
+  }
+  const runner = new SwarmRunner(config, provider)
+  const result = await runner.run({ diff: 'diff' })
+  expect(result.agentStatus?.security).toBe('timeout')
+})
 
-  it('records agentStatus "parse-error" when an agent returns unparseable output', async () => {
-    const provider: LLMProvider = {
-      chat: vi.fn().mockResolvedValue('not json at all, just prose from the model'),
-      ping: vi.fn().mockResolvedValue({ ok: true }),
-    }
-    const config = {
-      ...DEFAULT_CONFIG,
-      agents: ['security'] as AgentName[],
-      retryAttempts: 1,
-      retryDelayMs: 0,
-    }
-    const runner = new SwarmRunner(config, provider)
-    const result = await runner.run({ diff: 'diff' })
-    expect(result.agentStatus?.security).toBe('parse-error')
-  })
+it('records agentStatus "parse-error" when an agent returns unparseable output', async () => {
+  const provider: LLMProvider = {
+    chat: vi.fn().mockResolvedValue('not json at all, just prose from the model'),
+    ping: vi.fn().mockResolvedValue({ ok: true }),
+  }
+  const config = {
+    ...DEFAULT_CONFIG,
+    agents: ['security'] as AgentName[],
+    retryAttempts: 1,
+    retryDelayMs: 0,
+  }
+  const runner = new SwarmRunner(config, provider)
+  const result = await runner.run({ diff: 'diff' })
+  expect(result.agentStatus?.security).toBe('parse-error')
+})
 
-  it('records agentStatus for coverage and testgen', async () => {
-    const provider: LLMProvider = {
-      chat: vi.fn().mockResolvedValue('{"findings":[],"gaps":[]}'),
-      ping: vi.fn().mockResolvedValue({ ok: true }),
-    }
-    const config = {
-      ...DEFAULT_CONFIG,
-      agents: ['coverage'] as AgentName[],
-      retryAttempts: 1,
-      retryDelayMs: 0,
-    }
-    const runner = new SwarmRunner(config, provider)
-    const result = await runner.run({ diff: 'diff' })
-    expect(result.agentStatus?.coverage).toBe('ok')
-  })
+it('records agentStatus for coverage and testgen', async () => {
+  const provider: LLMProvider = {
+    chat: vi.fn().mockResolvedValue('{"findings":[],"gaps":[]}'),
+    ping: vi.fn().mockResolvedValue({ ok: true }),
+  }
+  const config = {
+    ...DEFAULT_CONFIG,
+    agents: ['coverage'] as AgentName[],
+    retryAttempts: 1,
+    retryDelayMs: 0,
+  }
+  const runner = new SwarmRunner(config, provider)
+  const result = await runner.run({ diff: 'diff' })
+  expect(result.agentStatus?.coverage).toBe('ok')
+})
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -471,7 +475,7 @@ In `runAgentsSequential`, change the signature to accept the shared status map, 
     ctx: (name: AgentName) => Promise<ReviewInput>,
     baseIndex: number,
     total: number,
-    agentStatus: Partial<Record<AgentName | 'coverage' | 'testgen', AgentStatus>>,
+    agentStatus: Partial<Record<AgentName, AgentStatus>>,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<{ findings: Finding[]; earlyExitAgent?: AgentName }> {
 ```
@@ -479,7 +483,7 @@ In `runAgentsSequential`, change the signature to accept the shared status map, 
 Inside the loop's try block, right after `findings.push(...agentFindings)`, add:
 
 ```typescript
-        agentStatus[agent.name] = 'ok'
+agentStatus[agent.name] = 'ok'
 ```
 
 In the catch block, replace:
@@ -513,7 +517,7 @@ In the main `run()` method, declare the shared map near the other accumulator va
 (`allFindings`, `coverageGaps`, `testFiles`):
 
 ```typescript
-    const agentStatus: Partial<Record<AgentName | 'coverage' | 'testgen', AgentStatus>> = {}
+const agentStatus: Partial<Record<AgentName, AgentStatus>> = {}
 ```
 
 Pass `agentStatus` as an argument at each of the three call sites (`runCoverageAgent`,
@@ -524,7 +528,7 @@ before `onProgress`).
 In the TestGen block, right after `testFiles = testResult.testFiles`, add:
 
 ```typescript
-          agentStatus.testgen = 'ok'
+agentStatus.testgen = 'ok'
 ```
 
 And in its catch block, replace:
@@ -598,54 +602,54 @@ invent a new one.
 In `tests/unit/formatters/markdown.test.ts`, add:
 
 ```typescript
-  it('shows an agent-failure warning instead of a clean checkmark when agentStatus has failures', () => {
-    const result = makeResult({
-      findings: [],
-      agentStatus: { security: 'timeout', correctness: 'ok', performance: 'parse-error' },
-    })
-    const output = formatMarkdown(result)
-    expect(output).toContain('agents failed')
-    expect(output).not.toContain('No issues found')
-    expect(output).toContain('security')
-    expect(output).toContain('timeout')
-    expect(output).toContain('performance')
-    expect(output).toContain('parse-error')
+it('shows an agent-failure warning instead of a clean checkmark when agentStatus has failures', () => {
+  const result = makeResult({
+    findings: [],
+    agentStatus: { security: 'timeout', correctness: 'ok', performance: 'parse-error' },
   })
+  const output = formatMarkdown(result)
+  expect(output).toContain('agents failed')
+  expect(output).not.toContain('No issues found')
+  expect(output).toContain('security')
+  expect(output).toContain('timeout')
+  expect(output).toContain('performance')
+  expect(output).toContain('parse-error')
+})
 
-  it('still shows the clean checkmark when agentStatus is all ok', () => {
-    const result = makeResult({
-      findings: [],
-      agentStatus: { security: 'ok', correctness: 'ok' },
-    })
-    const output = formatMarkdown(result)
-    expect(output).toContain('No issues found')
+it('still shows the clean checkmark when agentStatus is all ok', () => {
+  const result = makeResult({
+    findings: [],
+    agentStatus: { security: 'ok', correctness: 'ok' },
   })
+  const output = formatMarkdown(result)
+  expect(output).toContain('No issues found')
+})
 ```
 
 In `tests/unit/formatters/sarif.test.ts`, add:
 
 ```typescript
-  it('includes agentStatus in run-level properties when present', () => {
-    const result = makeResult({ agentStatus: { security: 'timeout' } })
-    const sarif = JSON.parse(formatSarif(result))
-    expect(sarif.runs[0].properties.agentStatus).toEqual({ security: 'timeout' })
-  })
+it('includes agentStatus in run-level properties when present', () => {
+  const result = makeResult({ agentStatus: { security: 'timeout' } })
+  const sarif = JSON.parse(formatSarif(result))
+  expect(sarif.runs[0].properties.agentStatus).toEqual({ security: 'timeout' })
+})
 ```
 
 In `tests/unit/formatters/githubAnnotations.test.ts`, add:
 
 ```typescript
-  it('emits a warning annotation when any agent failed, even with zero findings', () => {
-    const result = makeResult({ findings: [], agentStatus: { security: 'timeout' } })
-    const output = formatGithubAnnotations(result)
-    expect(output).toContain('::warning')
-    expect(output).toContain('security')
-  })
+it('emits a warning annotation when any agent failed, even with zero findings', () => {
+  const result = makeResult({ findings: [], agentStatus: { security: 'timeout' } })
+  const output = formatGithubAnnotations(result)
+  expect(output).toContain('::warning')
+  expect(output).toContain('security')
+})
 
-  it('emits nothing when there are no findings and no agent failures', () => {
-    const result = makeResult({ findings: [], agentStatus: { security: 'ok' } })
-    expect(formatGithubAnnotations(result)).toBe('')
-  })
+it('emits nothing when there are no findings and no agent failures', () => {
+  const result = makeResult({ findings: [], agentStatus: { security: 'ok' } })
+  expect(formatGithubAnnotations(result)).toBe('')
+})
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -662,61 +666,61 @@ read by any formatter yet).
 Open `src/cli/formatter.ts`. Find:
 
 ```typescript
-  const { findings, testFiles, summary } = result
-  const lines: string[] = []
+const { findings, testFiles, summary } = result
+const lines: string[] = []
 
-  lines.push('# AI Code Review Report')
-  lines.push('')
-  lines.push(
-    `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`
-  )
-  lines.push('')
+lines.push('# AI Code Review Report')
+lines.push('')
+lines.push(
+  `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`
+)
+lines.push('')
 
-  if (findings.length === 0) {
-    lines.push(useEmoji ? '✅ No issues found.' : 'No issues found.')
-    return lines.join('\n')
-  }
+if (findings.length === 0) {
+  lines.push(useEmoji ? '✅ No issues found.' : 'No issues found.')
+  return lines.join('\n')
+}
 ```
 
 Replace with:
 
 ```typescript
-  const { findings, testFiles, summary, agentStatus } = result
-  const lines: string[] = []
+const { findings, testFiles, summary, agentStatus } = result
+const lines: string[] = []
 
-  const failedAgents = Object.entries(agentStatus ?? {}).filter(([, status]) => status !== 'ok')
-  const totalAgents = Object.keys(agentStatus ?? {}).length
+const failedAgents = Object.entries(agentStatus ?? {}).filter(([, status]) => status !== 'ok')
+const totalAgents = Object.keys(agentStatus ?? {}).length
 
-  lines.push('# AI Code Review Report')
-  lines.push('')
+lines.push('# AI Code Review Report')
+lines.push('')
+lines.push(
+  `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`
+)
+lines.push('')
+
+if (failedAgents.length > 0) {
   lines.push(
-    `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`
+    `${useEmoji ? '⚠️ ' : ''}${failedAgents.length}/${totalAgents} agents failed — results incomplete`
   )
   lines.push('')
-
-  if (failedAgents.length > 0) {
-    lines.push(
-      `${useEmoji ? '⚠️ ' : ''}${failedAgents.length}/${totalAgents} agents failed — results incomplete`
-    )
-    lines.push('')
-    for (const [name, status] of failedAgents) {
-      const advice =
-        status === 'timeout'
-          ? 'raise --timeout or reduce --max-lines'
-          : status === 'parse-error'
-            ? 'diff likely too large for this model'
-            : 'see stderr for details'
-      lines.push(`- \`${name}\`: ${status} — ${advice}`)
-    }
-    lines.push('')
+  for (const [name, status] of failedAgents) {
+    const advice =
+      status === 'timeout'
+        ? 'raise --timeout or reduce --max-lines'
+        : status === 'parse-error'
+          ? 'diff likely too large for this model'
+          : 'see stderr for details'
+    lines.push(`- \`${name}\`: ${status} — ${advice}`)
   }
+  lines.push('')
+}
 
-  if (findings.length === 0) {
-    if (failedAgents.length === 0) {
-      lines.push(useEmoji ? '✅ No issues found.' : 'No issues found.')
-    }
-    return lines.join('\n')
+if (findings.length === 0) {
+  if (failedAgents.length === 0) {
+    lines.push(useEmoji ? '✅ No issues found.' : 'No issues found.')
   }
+  return lines.join('\n')
+}
 ```
 
 - [ ] **Step 4: Update `sarif.ts`**
@@ -765,8 +769,7 @@ export function formatGithubAnnotations(result: ReviewResult): string {
     ([, status]) => status !== 'ok'
   )
   const warningLines = failedAgents.map(
-    ([name, status]) =>
-      `::warning::Agent ${name} failed (${status}) — results may be incomplete`
+    ([name, status]) => `::warning::Agent ${name} failed (${status}) — results may be incomplete`
   )
   const findingLines = result.findings.map(findingToAnnotation)
   return [...warningLines, ...findingLines].join('\n')
@@ -788,7 +791,7 @@ npm test -- --run
 npm run typecheck
 ```
 
-Expected: all green. Pay attention to whether any *existing* formatter tests broke — e.g. a
+Expected: all green. Pay attention to whether any _existing_ formatter tests broke — e.g. a
 test asserting `formatMarkdown` output for a clean run with no `agentStatus` field at all should
 still show the checkmark (since `agentStatus` is optional and `failedAgents.length` would be 0
 when `agentStatus` is `undefined`).
@@ -879,64 +882,62 @@ Open `tests/unit/cli.test.ts`. Add a test near the other exit-code-related tests
 searching the file for `process.exit`):
 
 ```typescript
-  it('exits 2 when any agent failed, even if remaining findings would pass --fail-on', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [],
-          agentStatus: { security: 'timeout' },
-        })
-      ),
-    }))
-    const { exitCode } = await runCli(['review', '--fail-on', 'never'])
-    expect(exitCode).toBe(2)
-  })
+it('exits 2 when any agent failed, even if remaining findings would pass --fail-on', async () => {
+  MockSwarmRunner.mockImplementation(() => ({
+    run: vi.fn().mockResolvedValue(
+      makeResult({
+        findings: [],
+        agentStatus: { security: 'timeout' },
+      })
+    ),
+  }))
+  const { exitCode } = await runCli(['review', '--fail-on', 'never'])
+  expect(exitCode).toBe(2)
+})
 
-  it('exits 2 (not 1) when agents failed AND findings would also trip --fail-on', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [
-            {
-              id: 'f-0',
-              agent: 'security',
-              severity: 'critical',
-              basis: 'VERIFIED',
-              file: 'a.ts',
-              line: 1,
-              title: 'T',
-              detail: 'D',
-              domain: 'Security',
-              evidence: 'E',
-              impact: 'I',
-              recommendation: 'R',
-              suggestion: 'S',
-              blocking: true,
-              source: 'llm',
-              confidence: 90,
-            },
-          ],
-          agentStatus: { security: 'ok', correctness: 'timeout' },
-        })
-      ),
-    }))
-    const { exitCode } = await runCli(['review', '--fail-on', 'high'])
-    expect(exitCode).toBe(2)
-  })
+it('exits 2 (not 1) when agents failed AND findings would also trip --fail-on', async () => {
+  MockSwarmRunner.mockImplementation(() => ({
+    run: vi.fn().mockResolvedValue(
+      makeResult({
+        findings: [
+          {
+            id: 'f-0',
+            agent: 'security',
+            severity: 'critical',
+            basis: 'VERIFIED',
+            file: 'a.ts',
+            line: 1,
+            title: 'T',
+            detail: 'D',
+            domain: 'Security',
+            evidence: 'E',
+            impact: 'I',
+            recommendation: 'R',
+            suggestion: 'S',
+            blocking: true,
+            source: 'llm',
+            confidence: 90,
+          },
+        ],
+        agentStatus: { security: 'ok', correctness: 'timeout' },
+      })
+    ),
+  }))
+  const { exitCode } = await runCli(['review', '--fail-on', 'high'])
+  expect(exitCode).toBe(2)
+})
 
-  it('exits 0 when all agents succeed and no findings trip --fail-on', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({ findings: [], agentStatus: { security: 'ok' } })
-      ),
-    }))
-    const { exitCode } = await runCli(['review', '--fail-on', 'high'])
-    expect(exitCode).toBe(0)
-  })
+it('exits 0 when all agents succeed and no findings trip --fail-on', async () => {
+  MockSwarmRunner.mockImplementation(() => ({
+    run: vi.fn().mockResolvedValue(makeResult({ findings: [], agentStatus: { security: 'ok' } })),
+  }))
+  const { exitCode } = await runCli(['review', '--fail-on', 'high'])
+  expect(exitCode).toBe(0)
+})
 ```
 
 Confirmed: `runCli(args: string[]): Promise<{ exitCode, stdout, stderr }>`, `MockSwarmRunner`,
-and `makeResult` above match this file's actual existing helpers exactly. Note: one *pre-existing*
+and `makeResult` above match this file's actual existing helpers exactly. Note: one _pre-existing_
 test elsewhere in this file (`'exits 0 for a high finding when --fail-on critical'`) uses
 `agentName`/`description` field names on its `Finding` object, which don't match the real
 `Finding` interface (`agent`/`detail` — see `src/core/schema.ts:53-74`). That's a pre-existing
@@ -965,18 +966,18 @@ import { hasAgentFailures, AGENT_FAILURE_EXIT_CODE } from './exitCode.js'
 Find:
 
 ```typescript
-        const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
-        process.exit(hasBlocker ? 1 : 0)
+const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
+process.exit(hasBlocker ? 1 : 0)
 ```
 
 Replace with:
 
 ```typescript
-        const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
-        if (hasAgentFailures(result.agentStatus)) {
-          process.exit(AGENT_FAILURE_EXIT_CODE)
-        }
-        process.exit(hasBlocker ? 1 : 0)
+const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
+if (hasAgentFailures(result.agentStatus)) {
+  process.exit(AGENT_FAILURE_EXIT_CODE)
+}
+process.exit(hasBlocker ? 1 : 0)
 ```
 
 - [ ] **Step 8: Run the tests to verify they pass**
@@ -1021,33 +1022,33 @@ unparseable prose, and the final result must NOT look like a clean pass.
 If added to `runner.test.ts`:
 
 ```typescript
-  it('BUG REGRESSION: a run where every agent returns unparseable prose is not reported as clean', async () => {
-    const provider: LLMProvider = {
-      chat: vi
-        .fn()
-        .mockResolvedValue(
-          "It looks like you've updated a number of files. Let me review them for you..."
-        ),
-      ping: vi.fn().mockResolvedValue({ ok: true }),
-    }
-    const config = {
-      ...DEFAULT_CONFIG,
-      agents: ['security', 'performance', 'correctness'] as AgentName[],
-      retryAttempts: 1,
-      retryDelayMs: 0,
-    }
-    const runner = new SwarmRunner(config, provider)
-    const result = await runner.run({ diff: 'diff' })
+it('BUG REGRESSION: a run where every agent returns unparseable prose is not reported as clean', async () => {
+  const provider: LLMProvider = {
+    chat: vi
+      .fn()
+      .mockResolvedValue(
+        "It looks like you've updated a number of files. Let me review them for you..."
+      ),
+    ping: vi.fn().mockResolvedValue({ ok: true }),
+  }
+  const config = {
+    ...DEFAULT_CONFIG,
+    agents: ['security', 'performance', 'correctness'] as AgentName[],
+    retryAttempts: 1,
+    retryDelayMs: 0,
+  }
+  const runner = new SwarmRunner(config, provider)
+  const result = await runner.run({ diff: 'diff' })
 
-    expect(result.findings).toEqual([])
-    expect(result.agentStatus?.security).toBe('parse-error')
-    expect(result.agentStatus?.performance).toBe('parse-error')
-    expect(result.agentStatus?.correctness).toBe('parse-error')
+  expect(result.findings).toEqual([])
+  expect(result.agentStatus?.security).toBe('parse-error')
+  expect(result.agentStatus?.performance).toBe('parse-error')
+  expect(result.agentStatus?.correctness).toBe('parse-error')
 
-    const markdown = formatMarkdown(result)
-    expect(markdown).not.toContain('No issues found')
-    expect(markdown).toContain('agents failed')
-  })
+  const markdown = formatMarkdown(result)
+  expect(markdown).not.toContain('No issues found')
+  expect(markdown).toContain('agents failed')
+})
 ```
 
 Add the `formatMarkdown` import to the top of the file if it isn't already imported there.
@@ -1059,7 +1060,7 @@ npx vitest run tests/unit/runner.test.ts
 ```
 
 Expected: PASS (this should already pass given Tasks 1–5 are complete — this test exists to
-prove the *end-to-end* scenario, not to drive new implementation).
+prove the _end-to-end_ scenario, not to drive new implementation).
 
 - [ ] **Step 3: Run the full suite and typecheck**
 
@@ -1133,7 +1134,7 @@ returned unparseable prose instead of JSON rendered identically to a genuinely c
 `0 findings | ✅ No issues found` in both cases, only visible in stderr. `parseFindings`
 (`base.ts`) and `parseCoverageResult` (`coverageAnalyst.ts`) now throw `ParseFailureError`
 instead of silently returning `[]`; `runner.ts`'s 4 catch blocks classify it into a new
-`agentStatus: Partial<Record<AgentName | 'coverage' | 'testgen', AgentStatus>>` field on
+`agentStatus: Partial<Record<AgentName, AgentStatus>>` field on
 `ReviewResult`. All 4 formatters surface it; a new exit code 2 (independent of and taking
 priority over `--fail-on`) means CI can no longer silently treat a broken run as passing. See
 `docs/superpowers/specs/2026-07-15-silent-agent-failure-reporting-design.md`.

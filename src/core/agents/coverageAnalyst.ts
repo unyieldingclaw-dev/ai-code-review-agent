@@ -1,6 +1,7 @@
 import { BaseAgent } from './base.js'
 import type { AgentName, CoverageGap, Finding, ReviewInput } from '../schema.js'
 import type { Message } from '../llm/provider.js'
+import { ParseFailureError } from '../parsing.js'
 
 export interface CoverageAnalystResult {
   findings: Finding[]
@@ -75,7 +76,8 @@ Rules:
         findings: this.parseFindings(JSON.stringify(parsed.findings ?? [])),
         gaps: this.validateGaps(parsed.gaps ?? []),
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof ParseFailureError) throw err
       /* fall through */
     }
 
@@ -89,12 +91,13 @@ Rules:
           gaps: this.validateGaps(parsed.gaps ?? []),
         }
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof ParseFailureError) throw err
       /* fall through */
     }
 
     console.error(`[coverage] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
-    return { findings: [], gaps: [] }
+    throw new ParseFailureError('coverage', raw)
   }
 
   private extractJsonObject(text: string): string | null {

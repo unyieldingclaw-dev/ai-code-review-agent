@@ -215,4 +215,16 @@ describe('formatGithubAnnotations', () => {
     )
     expect(output).toContain('Text%0DWith%0DCR')
   })
+
+  it('emits a warning annotation when any agent failed, even with zero findings', () => {
+    const result = makeResult({ findings: [], agentStatus: { security: 'timeout' } })
+    const output = formatGithubAnnotations(result)
+    expect(output).toContain('::warning')
+    expect(output).toContain('security')
+  })
+
+  it('emits nothing when there are no findings and no agent failures', () => {
+    const result = makeResult({ findings: [], agentStatus: { security: 'ok' } })
+    expect(formatGithubAnnotations(result)).toBe('')
+  })
 })

@@ -3,6 +3,28 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] — 2026-07-16 (silent agent failure reporting)
+
+### Added
+
+- `ReviewResult.agentStatus`: records `'ok' | 'timeout' | 'parse-error' | 'error'` per agent
+  (15 specialists + coverage + testgen). Previously a run where every agent timed out or
+  returned unparseable output rendered identically to a genuinely clean review
+  (`0 findings | ✅ No issues found`) — both silent-failure sites (`parseFindings`'s final
+  fallback, and `runner.ts`'s 4 catch blocks) now surface the distinction.
+- Markdown, SARIF, and github-annotations formatters show a clear `⚠️ N/M agents failed` warning
+  (with per-agent, per-failure-type remediation advice) instead of a clean checkmark when any
+  agent didn't succeed. JSON gets `agentStatus` for free (whole-object serialization).
+- New exit code `2`: a run with any agent failure exits 2, independent of and taking priority
+  over the existing `--fail-on` severity gate (exit 1) — CI can no longer silently treat a
+  broken run as a passing one.
+
+### Fixed
+
+- `parseFindings` (`base.ts`) and `parseCoverageResult` (`coverageAnalyst.ts`) now throw
+  `ParseFailureError` on total parse failure instead of silently returning `[]` — the same
+  value a genuinely clean review produces.
+
 ## [1.2.1] — 2026-07-03 (review-gate hardening)
 
 ### Fixed

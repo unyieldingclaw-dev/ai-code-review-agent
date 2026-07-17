@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { BaseAgent } from '../../src/core/agents/base.js'
-import { validateAndNormalizeFindings } from '../../src/core/parsing.js'
+import { validateAndNormalizeFindings, ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 
@@ -67,10 +67,9 @@ describe('BaseAgent', () => {
     expect(findings).toHaveLength(1)
   })
 
-  it('returns empty array on parse failure', async () => {
+  it('throws ParseFailureError on parse failure', async () => {
     const agent = new TestAgent(makeProvider('not json at all'), DEFAULT_CONFIG)
-    const findings = await agent.run({ diff: 'diff' })
-    expect(findings).toEqual([])
+    await expect(agent.run({ diff: 'diff' })).rejects.toThrow(ParseFailureError)
   })
 
   it('filters out findings missing required fields', async () => {

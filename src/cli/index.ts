@@ -9,7 +9,12 @@ import { loadConfig } from '../core/config.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
 import { formatMarkdown, formatJson, formatSarif, formatGithubAnnotations } from './formatter.js'
 import type { AgentName, AgentProgressEvent } from '../core/schema.js'
-import { shouldFail, FAIL_ON_OPTIONS } from './exitCode.js'
+import {
+  shouldFail,
+  FAIL_ON_OPTIONS,
+  hasAgentFailures,
+  AGENT_FAILURE_EXIT_CODE,
+} from './exitCode.js'
 import type { FailOnLevel } from './exitCode.js'
 import { resolveProfile } from '../core/profiles.js'
 
@@ -247,6 +252,9 @@ program
         }
 
         const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
+        if (hasAgentFailures(result.agentStatus)) {
+          process.exit(AGENT_FAILURE_EXIT_CODE)
+        }
         process.exit(hasBlocker ? 1 : 0)
       } catch (err) {
         // Re-throw synthetic exits (e.g. process.exit mocks in tests) so they propagate correctly

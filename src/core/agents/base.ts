@@ -1,7 +1,7 @@
 import type { LLMProvider, Message } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
 import type { Finding, ReviewInput, AgentName } from '../schema.js'
-import { validateAndNormalizeFindings } from '../parsing.js'
+import { validateAndNormalizeFindings, ParseFailureError } from '../parsing.js'
 
 export abstract class BaseAgent {
   constructor(
@@ -63,7 +63,7 @@ export abstract class BaseAgent {
     }
 
     console.error(`[${this.name}] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
-    return []
+    throw new ParseFailureError(this.name, raw)
   }
 
   private extractJsonArray(text: string): string | null {

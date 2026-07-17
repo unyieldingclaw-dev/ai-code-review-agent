@@ -20,6 +20,21 @@ lineage: []
 
 ## ✅ Completed (Tasks 1–16)
 
+### Silent Agent Failure Reporting — 2026-07-16
+
+- [x] `ParseFailureError` thrown by `parseFindings`/`parseCoverageResult` instead of silently
+      returning `[]` on total parse failure.
+- [x] `agentStatus` field added to `ReviewResult`, populated across all 4 `runner.ts`
+      catch-block sites (sequential, parallel, coverage, testgen) plus their success paths.
+- [x] All 4 output formats (markdown, json, sarif, github-annotations) surface agent failures
+      clearly instead of an indistinguishable clean checkmark.
+- [x] New exit code 2 for agent failures, independent of and taking priority over `--fail-on`.
+- [x] 16 existing agent test files updated from asserting a silent `[]` return to asserting
+      `ParseFailureError` is thrown; new dedicated tests for the runner-level classification,
+      formatter output, exit code priority, and an end-to-end regression test for the original
+      bug report scenario.
+- [x] v1.3.0.
+
 ### AbortSignal/Timeout-Cancellation Fix — 2026-07-14
 
 - [x] Root cause: `withTimeout` (`runner.ts`) raced a timer against each agent's LLM call via

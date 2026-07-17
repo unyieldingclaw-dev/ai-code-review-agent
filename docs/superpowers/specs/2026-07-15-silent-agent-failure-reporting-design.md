@@ -44,12 +44,12 @@ agent-level success/failure — only `earlyExit`, `sanitizer`, `policy`, `contex
 
 - Auto-retry with a smaller diff chunk on parse failure — detection and reporting only, no
   automatic remediation.
-- Distinguishing *why* a parse failure happened (diff too large vs. model confusion vs. something
-  else) beyond the existing `console.error` snippet already logged — `agentStatus` records *that*
-  it failed and *how* (timeout/parse-error/error), not a root-cause diagnosis.
+- Distinguishing _why_ a parse failure happened (diff too large vs. model confusion vs. something
+  else) beyond the existing `console.error` snippet already logged — `agentStatus` records _that_
+  it failed and _how_ (timeout/parse-error/error), not a root-cause diagnosis.
 - Changing `testGen`'s existing per-file `null` skip behavior (when a single generated test file's
   content is too short) — that's a different, lower-severity gap than the whole-agent silent
-  failure this spec addresses. The catch block around the *entire* `testgen` call (timeout/thrown
+  failure this spec addresses. The catch block around the _entire_ `testgen` call (timeout/thrown
   error) is in scope; the per-file inner skip is not.
 
 ## Design
@@ -92,17 +92,17 @@ Optional (not required) so existing consumers that don't check it keep working u
 
 - **`formatter.ts`** (all 4 formats — markdown, json, sarif, github-annotations): when any status
   isn't `'ok'`, markdown replaces the clean checkmark with `⚠️ N/M agents failed — results
-  incomplete` plus a per-agent breakdown (agent name + reason + tailored advice: timeout → "raise
+incomplete` plus a per-agent breakdown (agent name + reason + tailored advice: timeout → "raise
   --timeout or reduce --max-lines"; parse-error → "diff likely too large for this model").
   JSON/SARIF/github-annotations include the raw `agentStatus` map in their existing metadata
   sections (same place `context`/`policy` already live) — additive field on `ReviewResult`, no
   restructuring needed.
 - **`exitCode.ts`**: new `AGENT_FAILURE_EXIT_CODE = 2` and a helper `hasAgentFailures(agentStatus)`.
-  `cli/index.ts`'s exit logic checks this *before* the existing `shouldFail` severity check.
+  `cli/index.ts`'s exit logic checks this _before_ the existing `shouldFail` severity check.
   **Priority when both conditions are true** (some agents failed AND remaining findings are
   severe enough to trip `--fail-on`): agent failure always wins (exit 2), regardless of findings
   severity — "don't trust this result, it's incomplete" is the strongest possible signal, even if
-  what *did* come back looks bad. Existing exit 1 (severity-gate failure) and exit 0 (clean pass)
+  what _did_ come back looks bad. Existing exit 1 (severity-gate failure) and exit 0 (clean pass)
   behavior is unchanged when no agent failed.
 
 ### Scope

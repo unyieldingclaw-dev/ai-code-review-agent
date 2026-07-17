@@ -266,4 +266,57 @@ describe('CLI — argument parsing and output', () => {
     const { exitCode } = await runCli(['--fail-on', 'never'])
     expect(exitCode).toBe(0)
   })
+
+  it('exits 2 when any agent failed, even if remaining findings would pass --fail-on', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          findings: [],
+          agentStatus: { security: 'timeout' },
+        })
+      ),
+    }))
+    const { exitCode } = await runCli(['--fail-on', 'never'])
+    expect(exitCode).toBe(2)
+  })
+
+  it('exits 2 (not 1) when agents failed AND findings would also trip --fail-on', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          findings: [
+            {
+              id: 'f-0',
+              agent: 'security',
+              severity: 'critical',
+              basis: 'VERIFIED',
+              file: 'a.ts',
+              line: 1,
+              title: 'T',
+              detail: 'D',
+              domain: 'Security',
+              evidence: 'E',
+              impact: 'I',
+              recommendation: 'R',
+              suggestion: 'S',
+              blocking: true,
+              source: 'llm',
+              confidence: 90,
+            },
+          ],
+          agentStatus: { security: 'ok', correctness: 'timeout' },
+        })
+      ),
+    }))
+    const { exitCode } = await runCli(['--fail-on', 'high'])
+    expect(exitCode).toBe(2)
+  })
+
+  it('exits 0 when all agents succeed and no findings trip --fail-on', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult({ findings: [], agentStatus: { security: 'ok' } })),
+    }))
+    const { exitCode } = await runCli(['--fail-on', 'high'])
+    expect(exitCode).toBe(0)
+  })
 })

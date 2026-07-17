@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { CoverageAnalystAgent } from '../../src/core/agents/coverageAnalyst.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -41,12 +42,20 @@ describe('CoverageAnalystAgent', () => {
     expect(findings[0].id).toBe('coverage-0')
   })
 
-  it('returns empty array on parse failure', async () => {
-    expect(
-      await new CoverageAnalystAgent(makeProvider('[invalid]'), DEFAULT_CONFIG).run({
+  it('throws ParseFailureError on parse failure', async () => {
+    await expect(
+      new CoverageAnalystAgent(makeProvider('[invalid]'), DEFAULT_CONFIG).run({
         diff: 'diff',
       })
-    ).toEqual([])
+    ).rejects.toThrow(ParseFailureError)
+  })
+
+  it('runForCoverage throws ParseFailureError on parse failure', async () => {
+    await expect(
+      new CoverageAnalystAgent(makeProvider('not json at all'), DEFAULT_CONFIG).runForCoverage({
+        diff: 'diff',
+      })
+    ).rejects.toThrow(ParseFailureError)
   })
 
   it('system prompt mentions coverage or testing', () => {

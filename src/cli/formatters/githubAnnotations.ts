@@ -26,6 +26,12 @@ function findingToAnnotation(f: Finding): string {
 }
 
 export function formatGithubAnnotations(result: ReviewResult): string {
-  if (result.findings.length === 0) return ''
-  return result.findings.map(findingToAnnotation).join('\n')
+  const failedAgents = Object.entries(result.agentStatus ?? {}).filter(
+    ([, status]) => status !== 'ok'
+  )
+  const warningLines = failedAgents.map(
+    ([name, status]) => `::warning::Agent ${name} failed (${status}) — results may be incomplete`
+  )
+  const findingLines = result.findings.map(findingToAnnotation)
+  return [...warningLines, ...findingLines].join('\n')
 }

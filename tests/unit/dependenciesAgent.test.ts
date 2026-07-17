@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { DependenciesAgent } from '../../src/core/agents/dependencies.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -41,10 +42,10 @@ describe('DependenciesAgent', () => {
     expect(findings[0].id).toBe('dependencies-0')
   })
 
-  it('returns empty array on parse failure', async () => {
-    expect(
-      await new DependenciesAgent(makeProvider(''), DEFAULT_CONFIG).run({ diff: 'diff' })
-    ).toEqual([])
+  it('throws ParseFailureError on parse failure', async () => {
+    await expect(
+      new DependenciesAgent(makeProvider(''), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).rejects.toThrow(ParseFailureError)
   })
 
   it('system prompt mentions dependencies or packages', () => {
