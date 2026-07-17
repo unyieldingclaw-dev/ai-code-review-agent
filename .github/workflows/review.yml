@@ -21,7 +21,16 @@ jobs:
         # "Write Step Summary" was silently running its script through pwsh, producing a
         # malformed .ps1 and failing with ParserError/SyntaxError on every PR. Setting bash at
         # the job level fixes every step at once instead of patching one.
-        shell: bash
+        #
+        # WHY the full path instead of plain `shell: bash`: on this self-hosted Windows runner,
+        # `C:\Windows\system32\bash.exe` (the WSL launcher stub) is on PATH ahead of Git for
+        # Windows' real bash (`C:\Program Files\Git\bin`, which isn't on PATH at all), so a bare
+        # `bash` lookup resolved to the WSL stub. WSL's default distro is `docker-desktop`,
+        # which has no usable `/bin/bash` for this relay, so every step failed with
+        # `WSL ERROR: execvpe(/bin/bash) failed: No such file or directory`. Pointing directly
+        # at Git's bash.exe bypasses PATH resolution entirely. Flags match GitHub's own default
+        # bash invocation (`--noprofile --norc -eo pipefail {0}`).
+        shell: '"C:\Program Files\Git\bin\bash.exe" --noprofile --norc -eo pipefail {0}'
 
     steps:
       - name: Checkout
