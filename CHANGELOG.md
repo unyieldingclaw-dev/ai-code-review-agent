@@ -3,6 +3,19 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] — 2026-07-14 (ai-review distribution)
+
+### Added
+
+- `scripts/postinstall.mjs`: `postinstall` lifecycle script that copies `.claude/commands/ai-review.md`
+  into the user-level `~/.claude/commands/`, so `/ai-review` is available in every Claude Code
+  project after a global install — not just this repo's own checkout. Fails open (warns, exits 0)
+  on any permissions/environment issue. Resolves the invoking user's real home directory even
+  under `sudo npm install -g` (via `SUDO_USER`), instead of silently writing into root's home.
+- `update-notifier` integration in the CLI entrypoint: checks for a newer published version at
+  most once every 7 days, asynchronously and non-blocking, and prints a one-line reminder if
+  found. Never auto-installs.
+
 ## [1.2.1] — 2026-07-03 (review-gate hardening)
 
 ### Fixed
