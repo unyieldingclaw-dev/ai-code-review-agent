@@ -21,22 +21,28 @@ jobs:
         # "Write Step Summary" was silently running its script through pwsh, producing a
         # malformed .ps1 and failing with ParserError/SyntaxError on every PR. Setting bash at
         # the job level fixes every step at once instead of patching one.
-        #
-        # WHY the full path instead of plain `shell: bash`: on this self-hosted Windows runner,
-        # `C:\Windows\system32\bash.exe` (the WSL launcher stub) is on PATH ahead of Git for
-        # Windows' real bash (`C:\Program Files\Git\bin`, which isn't on PATH at all), so a bare
-        # `bash` lookup resolved to the WSL stub. WSL's default distro is `docker-desktop`,
-        # which has no usable `/bin/bash` for this relay, so every step failed with
-        # `WSL ERROR: execvpe(/bin/bash) failed: No such file or directory`. Pointing directly
-        # at Git's bash.exe bypasses PATH resolution entirely. Flags match GitHub's own default
-        # bash invocation (`--noprofile --norc -eo pipefail {0}`).
-        shell: '"C:\Program Files\Git\bin\bash.exe" --noprofile --norc -eo pipefail {0}'
+        shell: bash
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # WHY this step, before anything else needs `shell: bash` to work: on this self-hosted
+      # Windows runner, `C:\Windows\system32\bash.exe` (the WSL launcher stub) is on PATH ahead
+      # of Git for Windows' real bash (`C:\Program Files\Git\bin`, which isn't on PATH at all),
+      # so a bare `bash` lookup resolved to the WSL stub. WSL's default distro is
+      # `docker-desktop`, which has no usable `/bin/bash` for this relay, so every later step
+      # failed with `WSL ERROR: execvpe(/bin/bash) failed: No such file or directory` --
+      # regardless of the PR's content. Prepending Git's bin dir to $GITHUB_PATH here (via an
+      # explicit `shell: pwsh`, since bash isn't resolvable yet) fixes resolution for every
+      # subsequent step's plain `shell: bash` without hand-constructing a custom shell command
+      # string (which GitHub Actions' Windows shell parser mishandles for quoted paths with
+      # spaces -- confirmed empirically: it mangles the quote into the tool-cache path prefix).
+      - name: Fix bash resolution (Git's bash, not the WSL stub)
+        shell: pwsh
+        run: echo "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup Node
         uses: actions/setup-node@v4
