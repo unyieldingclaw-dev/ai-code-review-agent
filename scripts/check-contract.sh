@@ -8,6 +8,13 @@ set -euo pipefail
 
 CONTRACT_FILE=".claude/contracts/active-task.json"
 
+# WHY: trap on ERR logs unexpected failures to .pmb-hook-errors.log so mb doctor can
+# surface them, mirroring check-contract.ps1's outer trap (this file previously had no
+# equivalent -- an unhandled failure under `set -e` would exit non-zero with no trail).
+# Still fails open (exit 0) after logging, since a hook must never block on its own
+# internal error.
+trap 'echo "[$(date "+%Y-%m-%d %H:%M:%S")] [HOOK] check-contract.sh: unexpected error at line $LINENO" >> .pmb-hook-errors.log 2>/dev/null; exit 0' ERR
+
 deny() {
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$1"
 }

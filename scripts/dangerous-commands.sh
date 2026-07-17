@@ -23,13 +23,23 @@ if [ -z "$input" ]; then
     exit 0
 fi
 
+# WHY lowercase the input once and match lowercase patterns only, instead of a
+# duplicate pattern per tier: POSIX case is case-sensitive, but ps1's
+# .Contains(..., OrdinalIgnoreCase) isn't -- a differently-cased command (e.g.
+# "Sudo RM -rf /", "CHMOD -R 777") was caught on Windows/pwsh but passed through
+# silently here. A prior fix added lowercase duplicate entries for 2 of ~13
+# patterns (DROP TABLE/DATABASE) but never extended it to the CONFIRM or WARN
+# tiers. Normalizing once gives case-insensitive parity everywhere in one place
+# instead of a duplicate-entry pattern that's easy to forget for new patterns.
+input_lc=$(printf '%s' "$input" | tr '[:upper:]' '[:lower:]')
+
 deny() {
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$1"
 }
 
 block() {
     # BLOCK: irreversible or highly destructive — refuse unconditionally
-    case "$input" in
+    case "$input_lc" in
         *"$1"*)
             deny "BLOCK: $2. Refusing this command."
             exit 0
@@ -45,7 +55,7 @@ block_boundary() {
     # field-path bug that had made this pattern a no-op made the collision real). POSIX
     # case globs have no \b, so this approximates it: match $1 followed by a non-letter,
     # or match $1 as the literal end of the string.
-    case "$input" in
+    case "$input_lc" in
         *"$1"[!a-zA-Z]*|*"$1")
             deny "BLOCK: $2. Refusing this command."
             exit 0
@@ -55,7 +65,7 @@ block_boundary() {
 
 confirm() {
     # CONFIRM: advanced op with legitimate uses — require explicit manual invocation
-    case "$input" in
+    case "$input_lc" in
         *"$1"*)
             deny "CONFIRM REQUIRED: $2. Run manually if intentional."
             exit 0
@@ -65,7 +75,7 @@ confirm() {
 
 warn() {
     # WARN: credential/secrets access — command proceeds, access is surfaced
-    case "$input" in
+    case "$input_lc" in
         *"$1"*)
             printf "WARNING: %s. Proceeding.\n" "$2"
             ;;
@@ -73,16 +83,16 @@ warn() {
 }
 
 # BLOCK: irreversible or highly destructive — refuse unconditionally
+# NOTE: all patterns below are lowercase — matched against $input_lc, so this is
+# case-insensitive by construction (parity with ps1's OrdinalIgnoreCase), not by
+# per-pattern duplication.
 block "rm -rf"           "irreversible recursive deletion"      # WHY: recursive deletion is irreversible
 block "mkfs"             "filesystem format"                    # WHY: formats/destroys entire filesystem
 block "dd if="           "disk wipe or dump"                    # WHY: raw disk access, wipes or dumps data
 block "git push --force" "force push (long form)"               # WHY: rewrites remote history irreversibly
 block "git push -f"      "force push (short form)"              # WHY: same as --force, short flag form
-# NOTE: POSIX case is case-sensitive. Adding lowercase variants to match ps1 OrdinalIgnoreCase behavior.
-block "DROP TABLE"       "SQL table drop"                       # WHY: irreversible schema destruction
-block "DROP DATABASE"    "SQL database drop"                    # WHY: destroys entire database
-block "drop table"       "SQL table drop (lowercase)"           # WHY: parity with ps1 OrdinalIgnoreCase — catches lowercase SQL
-block "drop database"    "SQL database drop (lowercase)"        # WHY: parity with ps1 OrdinalIgnoreCase — catches lowercase SQL
+block "drop table"       "SQL table drop"                       # WHY: irreversible schema destruction
+block "drop database"    "SQL database drop"                    # WHY: destroys entire database
 block_boundary "| bash" "command piped to bash (curl|bash, wget|bash, etc.)"  # WHY: remote code execution vector
 block_boundary "| sh"   "command piped to sh"                  # WHY: remote code execution via sh
 block_boundary "|bash"  "command piped to bash (no-space form)"  # WHY: curl|bash without spaces evades space-prefixed pattern
@@ -92,7 +102,7 @@ block_boundary "|sh"    "command piped to sh (no-space form)"    # WHY: wget|sh 
 confirm "git filter-branch" "history rewriting"                 # WHY: rewrites commit history, rarely intentional
 confirm "git update-ref"    "low-level ref manipulation"        # WHY: low-level plumbing, bypasses safety checks
 confirm "sudo rm"           "privileged deletion"               # WHY: elevated deletion can remove system files
-confirm "chmod -R 777"      "world-writable recursive chmod"    # WHY: makes entire tree world-writable
+confirm "chmod -r 777"      "world-writable recursive chmod"    # WHY: makes entire tree world-writable
 confirm "--no-verify"       "bypasses pre-commit hooks (local governance)"  # WHY: skips safety hooks on commit
 
 # WARN: credential/secrets access — legitimate workflows exist, surface the access only

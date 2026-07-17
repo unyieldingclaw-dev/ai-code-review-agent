@@ -37,7 +37,10 @@ try {
     $raw = [Console]::In.ReadToEnd()
     if ([string]::IsNullOrWhiteSpace($raw)) { exit 0 }
     $cmd = ($raw | ConvertFrom-Json).tool_input.command
-} catch { exit 0 }
+} catch {
+    try { Add-Content ".pmb-hook-errors.log" "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [HOOK] review-reminders.ps1: $_" -ErrorAction SilentlyContinue } catch {}
+    exit 0
+}
 
 if (-not $cmd) { exit 0 }
 

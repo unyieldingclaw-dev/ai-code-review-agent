@@ -20,7 +20,7 @@ lineage: []
 
 ## ✅ Completed (Tasks 1–16)
 
-### Silent Agent Failure Reporting — 2026-07-16
+### Silent Agent Failure Reporting — 2026-07-17
 
 - [x] `ParseFailureError` thrown by `parseFindings`/`parseCoverageResult` instead of silently
       returning `[]` on total parse failure.
@@ -33,6 +33,18 @@ lineage: []
       `ParseFailureError` is thrown; new dedicated tests for the runner-level classification,
       formatter output, exit code priority, and an end-to-end regression test for the original
       bug report scenario.
+- [x] v1.4.0.
+
+### `/ai-review` Distribution + Update-Notifier — 2026-07-14
+
+- [x] `scripts/postinstall.mjs` (plain JS, not compiled TS -- must survive running before
+      `dist/` exists) copies `.claude/commands/ai-review.md` to `~/.claude/commands/` on every
+      `npm install -g`/`npm update -g`. Fails open on any error. Resolves the invoking user's
+      real home directory even under `sudo npm install -g` (via `SUDO_USER`).
+- [x] `package.json`'s `files` array now ships `.claude/commands/` and `scripts/postinstall.mjs`.
+- [x] `update-notifier` wired into `src/cli/index.ts`: 7-day cached check, non-blocking, TTY-only
+      notification, never auto-installs.
+- [x] Verified end-to-end via `npm pack` + global install into a throwaway prefix/fake HOME.
 - [x] v1.3.0.
 
 ### AbortSignal/Timeout-Cancellation Fix — 2026-07-14

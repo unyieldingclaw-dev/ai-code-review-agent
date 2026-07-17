@@ -20,15 +20,24 @@ lineage: []
 
 ## Current Focus
 
-**Silent agent failure reporting fix (2026-07-16)**: a run where every agent timed out or
+**Silent agent failure reporting fix (2026-07-17)**: a run where every agent timed out or
 returned unparseable prose instead of JSON rendered identically to a genuinely clean review —
 `0 findings | ✅ No issues found` in both cases, only visible in stderr. `parseFindings`
 (`base.ts`) and `parseCoverageResult` (`coverageAnalyst.ts`) now throw `ParseFailureError`
 instead of silently returning `[]`; `runner.ts`'s 4 catch blocks classify it into a new
 `agentStatus: Partial<Record<AgentName, AgentStatus>>` field on
 `ReviewResult`. All 4 formatters surface it; a new exit code 2 (independent of and taking
-priority over `--fail-on`) means CI can no longer silently treat a broken run as passing. See
-`docs/superpowers/specs/2026-07-15-silent-agent-failure-reporting-design.md`.
+priority over `--fail-on`) means CI can no longer silently treat a broken run as passing. Shipped
+as v1.4.0 (v1.3.0 was already taken by the ai-review-distribution feature below, merged first).
+See `docs/superpowers/specs/2026-07-15-silent-agent-failure-reporting-design.md`.
+
+**`/ai-review` distribution + update-notifier (2026-07-14)**: `/ai-review` previously only existed
+as a slash command inside this repo's own checkout -- `package.json`'s `files` array never shipped
+`.claude/commands/`. Added a `postinstall` script (`scripts/postinstall.mjs`, plain JS so it can't
+be broken by an unbuilt `dist/`) that copies it to `~/.claude/commands/` on every global install
+(resolving the invoking user's real home even under `sudo npm install -g`), plus an
+`update-notifier` check in the CLI entrypoint (7-day cache, non-blocking, never auto-installs). See
+`docs/superpowers/specs/2026-07-14-ai-review-distribution-design.md`.
 
 **AbortSignal/timeout-cancellation fix (2026-07-14)**: `withTimeout`'s `Promise.race` never cancelled the losing side, so a timed-out agent's in-flight fetch to Ollama kept running server-side (up to `DEFAULT_TIMEOUT_MS`, 5 min) after the runner had already given up — each retry then piled another live, uncancelled request on top instead of replacing the abandoned one. Fixed by threading an `AbortController`'s signal from `withTimeout` (`runner.ts`) through `agent.run()`/`runForCoverage()`/`runWithGaps()` down to `OllamaProvider.chat()`'s `fetch` call, so a timeout now actually cancels the request. Also fixed a `clearTimeout` gap the fix itself introduced (the timer's handle was never captured, so even a successful call left a dangling timer that fired a pointless `abort()` afterward). Went through full `/code-review` (5 subagents + opponent check) — no other issues found. 297 unit tests passing (up from 295). Also fixed an unrelated CI bug in `.github/workflows/review.yml`: the "Write Step Summary" step used bash-only escaping with no `shell:` declared, defaulting to PowerShell on the self-hosted Windows runner and failing with `ParserError`/`SyntaxError` on every PR — fixed with a job-level `shell: bash` default.
 

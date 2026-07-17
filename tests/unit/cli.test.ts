@@ -14,13 +14,21 @@ vi.mock('fs', async (importOriginal) => {
     ...actual,
     existsSync: vi.fn().mockReturnValue(true),
     readFileSync: vi.fn().mockImplementation((path: string) => {
-      if (String(path).endsWith('package.json')) return JSON.stringify({ version: '0.0.0-test' })
+      if (String(path).endsWith('package.json'))
+        return JSON.stringify({ name: 'ai-review-agent', version: '0.0.0-test' })
       return '+ added line\n- removed line'
     }),
     mkdirSync: vi.fn(),
     writeFileSync: vi.fn(),
   }
 })
+
+// Mock update-notifier so tests never hit the network or print notifier output
+vi.mock('update-notifier', () => ({
+  default: vi.fn().mockReturnValue({
+    notify: vi.fn(),
+  }),
+}))
 
 // Minimal ReviewResult factory
 const makeResult = (overrides: Partial<ReviewResult> = {}): ReviewResult => ({
@@ -234,6 +242,32 @@ describe('CLI — argument parsing and output', () => {
     const { exitCode, stderr } = await runCli([])
     expect(exitCode).toBe(1)
     expect(stderr).toMatch(/ollama serve/)
+  })
+
+  it('checkForUpdates calls update-notifier with a 7-day interval and the expected message', async () => {
+    const updateNotifier = (await import('update-notifier')).default
+    const notifyMock = vi.fn()
+    vi.mocked(updateNotifier).mockReturnValue({ notify: notifyMock } as ReturnType<
+      typeof updateNotifier
+    >)
+    const { checkForUpdates } = await import('../../src/cli/index.js')
+
+    checkForUpdates()
+
+    expect(updateNotifier).toHaveBeenCalledWith({
+      pkg: { name: 'ai-review-agent', version: expect.any(String) },
+      updateCheckInterval: 1000 * 60 * 60 * 24 * 7,
+    })
+    expect(notifyMock).toHaveBeenCalledWith({
+      isGlobal: true,
+      message: expect.stringContaining('newer version'),
+    })
+  })
+
+  it('does not call update-notifier automatically when NODE_ENV=test', async () => {
+    const updateNotifier = (await import('update-notifier')).default
+    await import('../../src/cli/index.js')
+    expect(updateNotifier).not.toHaveBeenCalled()
   })
 
   it('passes --fail-on never: exits 0 even with critical finding', async () => {

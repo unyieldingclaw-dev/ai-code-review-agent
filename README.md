@@ -126,6 +126,18 @@ or invoke directly:
 
 Requires Ollama running locally with `devstral:latest` pulled. The tool runs 15 agents (all except `testgen`). For generated test files, use the CLI (`ai-review-agent`).
 
+## `/ai-review` in Claude Code
+
+Installing globally (`npm install -g ai-review-agent`, or via `setup.bat`/`setup.command`)
+automatically installs the `/ai-review` slash command for **every** Claude Code project, not just
+this repo — a `postinstall` script copies it to `~/.claude/commands/ai-review.md`. Re-running
+`npm install -g ai-review-agent@latest` refreshes it automatically; there's nothing to copy by
+hand and nothing to keep in sync manually.
+
+Every `ai-review-agent` run also checks (at most once every 7 days, asynchronously, never
+blocking) whether a newer version is available and prints a one-line reminder if so. It never
+auto-installs anything — you decide when to update.
+
 ## Usage
 
 ### CLI
