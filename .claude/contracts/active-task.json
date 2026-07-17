@@ -1,15 +1,18 @@
 {
-  "task": "Fix clearTimeout gap in the AbortSignal fix, update memory-bank, split unrelated CI fix into its own commit, then land both via /security-review -> commit -> PR",
+  "task": "Implement /ai-review self-distribution via postinstall + update-notifier for the CLI, per docs/superpowers/specs/2026-07-14-ai-review-distribution-design.md",
   "status": "complete",
-  "created_at": "2026-07-14T02:28:10Z",
-  "expires_at": "2026-07-14T10:28:10Z",
+  "created_at": "2026-07-14T16:17:00Z",
+  "expires_at": "2026-07-15T00:17:00Z",
   "approved_by": "user",
   "scope": [
-    { "file": "src/core/runner.ts", "op": "edit" },
-    { "file": "tests/unit/runner.test.ts", "op": "edit" },
+    { "file": "package.json", "op": "edit" },
+    { "file": "scripts/postinstall.mjs", "op": "create" },
+    { "file": "tests/unit/postinstall.test.ts", "op": "create" },
+    { "file": "src/cli/index.ts", "op": "edit" },
+    { "file": "tests/unit/cli.test.ts", "op": "edit" },
+    { "file": "README.md", "op": "edit" },
+    { "file": "CHANGELOG.md", "op": "edit" },
     { "file": "memory-bank/activeContext.md", "op": "edit" },
-    { "file": "memory-bank/progress.md", "op": "edit" },
-    { "file": ".github/workflows/review.yml", "op": "edit" },
-    { "file": "src/core/config.ts", "op": "edit" }
+    { "file": "memory-bank/progress.md", "op": "edit" }
   ]
 }
