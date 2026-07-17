@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { SecretsAgent } from '../../src/core/agents/secrets.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -47,10 +48,10 @@ describe('SecretsAgent', () => {
     expect(findings[0].id).toBe('secrets-0')
   })
 
-  it('returns empty array on LLM parse failure', async () => {
-    expect(
-      await new SecretsAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: FAKE_DIFF })
-    ).toEqual([])
+  it('throws ParseFailureError on LLM parse failure', async () => {
+    await expect(
+      new SecretsAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: FAKE_DIFF })
+    ).rejects.toThrow(ParseFailureError)
   })
 
   it('system prompt mentions credentials and secrets', () => {

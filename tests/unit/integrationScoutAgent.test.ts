@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { IntegrationScoutAgent } from '../../src/core/agents/integrationScout.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -41,12 +42,12 @@ describe('IntegrationScoutAgent', () => {
     expect(findings[0].id).toBe('integration-0')
   })
 
-  it('returns empty array on parse failure', async () => {
-    expect(
-      await new IntegrationScoutAgent(makeProvider('not-json'), DEFAULT_CONFIG).run({
+  it('throws ParseFailureError on parse failure', async () => {
+    await expect(
+      new IntegrationScoutAgent(makeProvider('not-json'), DEFAULT_CONFIG).run({
         diff: 'diff',
       })
-    ).toEqual([])
+    ).rejects.toThrow(ParseFailureError)
   })
 
   it('system prompt mentions integration or contract', () => {

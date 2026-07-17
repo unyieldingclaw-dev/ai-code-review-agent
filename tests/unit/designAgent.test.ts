@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { DesignAgent } from '../../src/core/agents/design.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -39,10 +40,10 @@ describe('DesignAgent', () => {
     expect(findings[0].id).toBe('design-0')
   })
 
-  it('returns empty array on parse failure', async () => {
-    expect(
-      await new DesignAgent(makeProvider('null'), DEFAULT_CONFIG).run({ diff: 'diff' })
-    ).toEqual([])
+  it('throws ParseFailureError on parse failure', async () => {
+    await expect(
+      new DesignAgent(makeProvider('null'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).rejects.toThrow(ParseFailureError)
   })
 
   it('system prompt mentions design or architecture', () => {

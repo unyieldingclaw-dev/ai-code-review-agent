@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { AdversarialAgent } from '../../src/core/agents/adversarial.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -41,10 +42,10 @@ describe('AdversarialAgent', () => {
     expect(findings[0].id).toBe('adversarial-0')
   })
 
-  it('returns empty array on parse failure', async () => {
-    expect(
-      await new AdversarialAgent(makeProvider('{}'), DEFAULT_CONFIG).run({ diff: 'diff' })
-    ).toEqual([])
+  it('throws ParseFailureError on parse failure', async () => {
+    await expect(
+      new AdversarialAgent(makeProvider('{}'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).rejects.toThrow(ParseFailureError)
   })
 
   it('system prompt mentions adversarial or abuse', () => {

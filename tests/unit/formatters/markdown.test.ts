@@ -110,4 +110,27 @@ describe('formatMarkdown', () => {
     const output = formatMarkdown(result)
     expect(output).toContain('🧪')
   })
+
+  it('shows an agent-failure warning instead of a clean checkmark when agentStatus has failures', () => {
+    const result = makeResult({
+      findings: [],
+      agentStatus: { security: 'timeout', correctness: 'ok', performance: 'parse-error' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('agents failed')
+    expect(output).not.toContain('No issues found')
+    expect(output).toContain('security')
+    expect(output).toContain('timeout')
+    expect(output).toContain('performance')
+    expect(output).toContain('parse-error')
+  })
+
+  it('still shows the clean checkmark when agentStatus is all ok', () => {
+    const result = makeResult({
+      findings: [],
+      agentStatus: { security: 'ok', correctness: 'ok' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('No issues found')
+  })
 })

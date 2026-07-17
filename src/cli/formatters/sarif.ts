@@ -64,6 +64,7 @@ export function formatSarif(result: ReviewResult): string {
           ...(result.policy && result.policy.agentsSkipped.length > 0
             ? { policy: result.policy }
             : {}),
+          ...(result.agentStatus ? { agentStatus: result.agentStatus } : {}),
         },
       },
     ],

@@ -138,4 +138,10 @@ describe('formatSarif', () => {
     expect(region.startLine).toBe(42)
     expect(region.endLine).toBe(42)
   })
+
+  it('includes agentStatus in run-level properties when present', () => {
+    const result = makeResult({ agentStatus: { security: 'timeout' } })
+    const sarif = JSON.parse(formatSarif(result))
+    expect(sarif.runs[0].properties.agentStatus).toEqual({ security: 'timeout' })
+  })
 })

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { MigrationSafetyAgent, hasMigrationFiles } from '../../src/core/agents/migrationSafety.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -43,10 +44,10 @@ describe('MigrationSafetyAgent', () => {
     expect(findings[0].id).toBe('migration-safety-0')
   })
 
-  it('returns empty array on parse failure', async () => {
-    expect(
-      await new MigrationSafetyAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
-    ).toEqual([])
+  it('throws ParseFailureError on parse failure', async () => {
+    await expect(
+      new MigrationSafetyAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).rejects.toThrow(ParseFailureError)
   })
 
   it('system prompt mentions NOT NULL and migration', () => {

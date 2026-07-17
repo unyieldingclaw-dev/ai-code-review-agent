@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ObservabilityAgent } from '../../src/core/agents/observability.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -39,10 +40,10 @@ describe('ObservabilityAgent', () => {
     expect(findings[0].id).toBe('observability-0')
   })
 
-  it('returns empty array on parse failure', async () => {
-    expect(
-      await new ObservabilityAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
-    ).toEqual([])
+  it('throws ParseFailureError on parse failure', async () => {
+    await expect(
+      new ObservabilityAgent(makeProvider('not json'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).rejects.toThrow(ParseFailureError)
   })
 
   it('system prompt mentions logging and code paths', () => {

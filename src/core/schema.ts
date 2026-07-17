@@ -112,6 +112,8 @@ export interface PolicyResult {
   reason: Partial<Record<AgentName, string>>
 }
 
+export type AgentStatus = 'ok' | 'timeout' | 'parse-error' | 'error'
+
 export interface ReviewResult {
   schemaVersion?: 'ai-review-agent/v1'
   toolVersion?: string
@@ -128,6 +130,7 @@ export interface ReviewResult {
   }
   sanitizer?: SanitizerMetadata
   policy?: PolicyResult
+  agentStatus?: Partial<Record<AgentName, AgentStatus>>
 }
 
 export const SEVERITY_RANK: Record<Severity, number> = {

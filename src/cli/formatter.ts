@@ -20,8 +20,11 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
   const useEmoji = !options?.noEmoji
   const sevLabel = (s: Severity) => (useEmoji ? SEVERITY_EMOJI[s] : SEVERITY_TEXT[s])
 
-  const { findings, testFiles, summary } = result
+  const { findings, testFiles, summary, agentStatus } = result
   const lines: string[] = []
+
+  const failedAgents = Object.entries(agentStatus ?? {}).filter(([, status]) => status !== 'ok')
+  const totalAgents = Object.keys(agentStatus ?? {}).length
 
   lines.push('# AI Code Review Report')
   lines.push('')
@@ -30,8 +33,27 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
   )
   lines.push('')
 
+  if (failedAgents.length > 0) {
+    lines.push(
+      `${useEmoji ? '⚠️ ' : ''}${failedAgents.length}/${totalAgents} agents failed — results incomplete`
+    )
+    lines.push('')
+    for (const [name, status] of failedAgents) {
+      const advice =
+        status === 'timeout'
+          ? 'raise --timeout or reduce --max-lines'
+          : status === 'parse-error'
+            ? 'diff likely too large for this model'
+            : 'see stderr for details'
+      lines.push(`- \`${name}\`: ${status} — ${advice}`)
+    }
+    lines.push('')
+  }
+
   if (findings.length === 0) {
-    lines.push(useEmoji ? '✅ No issues found.' : 'No issues found.')
+    if (failedAgents.length === 0) {
+      lines.push(useEmoji ? '✅ No issues found.' : 'No issues found.')
+    }
     return lines.join('\n')
   }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { LicenseComplianceAgent } from '../../src/core/agents/licenseCompliance.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -39,10 +40,9 @@ describe('LicenseComplianceAgent', () => {
     expect(findings[0].id).toBe('license-0')
   })
 
-  it('returns empty array on parse failure', async () => {
+  it('throws ParseFailureError on parse failure', async () => {
     const agent = new LicenseComplianceAgent(makeProvider('not json'), DEFAULT_CONFIG)
-    const findings = await agent.run({ diff: 'diff' })
-    expect(findings).toEqual([])
+    await expect(agent.run({ diff: 'diff' })).rejects.toThrow(ParseFailureError)
   })
 
   it('system prompt mentions GPL AGPL SSPL and Commons Clause', () => {

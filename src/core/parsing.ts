@@ -3,7 +3,23 @@
 // Accepts both legacy LLM field names (basis, detail, suggestion) and canonical
 // schema names (evidence, description, recommendation).
 
-import type { Finding, AgentName, ReviewDomain } from './schema.js'
+import type { Finding, AgentName, ReviewDomain, AgentStatus } from './schema.js'
+
+export class ParseFailureError extends Error {
+  constructor(
+    public readonly agentName: string,
+    rawSnippet: string
+  ) {
+    super(`[${agentName}] failed to parse a usable response: ${rawSnippet.slice(0, 200)}`)
+    this.name = 'ParseFailureError'
+  }
+}
+
+export function classifyAgentError(err: unknown): AgentStatus {
+  if (err instanceof ParseFailureError) return 'parse-error'
+  if (err instanceof Error && err.message.includes('timed out')) return 'timeout'
+  return 'error'
+}
 
 function agentDefaultDomain(name: AgentName): ReviewDomain {
   const map: Record<AgentName, ReviewDomain> = {

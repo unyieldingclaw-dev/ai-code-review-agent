@@ -8,6 +8,7 @@ const mockRunTool = vi.mocked(runTool)
 
 import { ComplexityAgent } from '../../src/core/agents/complexity.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -85,10 +86,9 @@ describe('ComplexityAgent', () => {
     expect(agent.systemPrompt).toMatch(/cyclomatic/i)
   })
 
-  it('returns empty array on parse failure', async () => {
+  it('throws ParseFailureError on parse failure', async () => {
     mockRunTool.mockResolvedValue(null)
     const agent = new ComplexityAgent(makeProvider('not json'), DEFAULT_CONFIG)
-    const findings = await agent.run({ diff: DIFF_WITH_FILE })
-    expect(findings).toEqual([])
+    await expect(agent.run({ diff: DIFF_WITH_FILE })).rejects.toThrow(ParseFailureError)
   })
 })

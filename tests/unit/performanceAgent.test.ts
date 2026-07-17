@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { PerformanceAgent } from '../../src/core/agents/performance.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { ParseFailureError } from '../../src/core/parsing.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 
 const makeProvider = (response: string): LLMProvider => ({
@@ -41,10 +42,10 @@ describe('PerformanceAgent', () => {
     expect(findings[0].id).toBe('performance-0')
   })
 
-  it('returns empty array on parse failure', async () => {
-    expect(
-      await new PerformanceAgent(makeProvider('{bad}'), DEFAULT_CONFIG).run({ diff: 'diff' })
-    ).toEqual([])
+  it('throws ParseFailureError on parse failure', async () => {
+    await expect(
+      new PerformanceAgent(makeProvider('{bad}'), DEFAULT_CONFIG).run({ diff: 'diff' })
+    ).rejects.toThrow(ParseFailureError)
   })
 
   it('system prompt mentions performance or efficiency', () => {

@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { SwarmRunner } from '../../src/core/runner.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import { formatMarkdown } from '../../src/cli/formatter.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 import type { AgentName, AgentProgressEvent, FailOnLevel } from '../../src/core/schema.js'
 
@@ -359,5 +360,106 @@ describe('SwarmRunner', () => {
     const result = await runner.run({ diff: 'diff' })
     expect(result.earlyExit).toBeUndefined()
     expect(provider.chat).toHaveBeenCalledTimes(2)
+  })
+
+  it('records agentStatus "ok" for agents that succeed', async () => {
+    const provider = makeProvider()
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.agentStatus?.security).toBe('ok')
+  })
+
+  it('records agentStatus "timeout" when an agent times out', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => new Promise(() => {})), // never resolves
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentTimeoutMs: 20,
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.agentStatus?.security).toBe('timeout')
+  })
+
+  it('records agentStatus "parse-error" when an agent returns unparseable output', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue('not json at all, just prose from the model'),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.agentStatus?.security).toBe('parse-error')
+  })
+
+  it('records agentStatus "ok" for coverage', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue('{"findings":[],"gaps":[]}'),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['coverage'] as AgentName[],
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.agentStatus?.coverage).toBe('ok')
+  })
+
+  it('records agentStatus "ok" for testgen when there are no coverage gaps to process', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue('{"findings":[],"gaps":[]}'), // coverage runs, finds zero gaps
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['coverage', 'testgen'] as AgentName[],
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.agentStatus?.testgen).toBe('ok')
+  })
+
+  it('BUG REGRESSION: a run where every agent returns unparseable prose is not reported as clean', async () => {
+    const provider: LLMProvider = {
+      chat: vi
+        .fn()
+        .mockResolvedValue(
+          "It looks like you've updated a number of files. Let me review them for you..."
+        ),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'performance', 'correctness'] as AgentName[],
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+
+    expect(result.findings).toEqual([])
+    expect(result.agentStatus?.security).toBe('parse-error')
+    expect(result.agentStatus?.performance).toBe('parse-error')
+    expect(result.agentStatus?.correctness).toBe('parse-error')
+
+    const markdown = formatMarkdown(result)
+    expect(markdown).not.toContain('No issues found')
+    expect(markdown).toContain('agents failed')
   })
 })

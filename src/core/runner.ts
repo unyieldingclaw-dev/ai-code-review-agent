@@ -10,8 +10,10 @@ import type {
   GeneratedTestFile,
   AgentProgressEvent,
   SanitizerMetadata,
+  AgentStatus,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
+import { classifyAgentError } from './parsing.js'
 import { loadAgentContext, loadAgentContextSemantic } from './contextLoader.js'
 import type { ContextResult } from './contextLoader.js'
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
@@ -196,6 +198,7 @@ export class SwarmRunner {
     ctx: (name: AgentName) => Promise<ReviewInput>,
     total: number,
     index: number,
+    agentStatus: Partial<Record<AgentName, AgentStatus>>,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<{ findings: Finding[]; gaps: CoverageGap[]; earlyExit: boolean }> {
     const timeout = this.config.agentTimeoutMs
@@ -215,6 +218,7 @@ export class SwarmRunner {
       const findings = coverageResult.findings
       const gaps = coverageResult.gaps
       const earlyExit = shouldEarlyExit(this.config, findings)
+      agentStatus.coverage = 'ok'
       onProgress?.({
         phase: 'end',
         name: 'coverage',
@@ -226,6 +230,7 @@ export class SwarmRunner {
       })
       return { findings, gaps, earlyExit }
     } catch (err) {
+      agentStatus.coverage = classifyAgentError(err)
       console.warn(`[ai-review] Agent coverage timed out or failed: ${(err as Error).message}`)
       onProgress?.({
         phase: 'end',
@@ -245,6 +250,7 @@ export class SwarmRunner {
     ctx: (name: AgentName) => Promise<ReviewInput>,
     baseIndex: number,
     total: number,
+    agentStatus: Partial<Record<AgentName, AgentStatus>>,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<{ findings: Finding[]; earlyExitAgent?: AgentName }> {
     const timeout = this.config.agentTimeoutMs
@@ -268,6 +274,7 @@ export class SwarmRunner {
           retryDelayMs
         )
         findings.push(...agentFindings)
+        agentStatus[agent.name] = 'ok'
         const shouldStop = shouldEarlyExit(this.config, findings)
         onProgress?.({
           phase: 'end',
@@ -283,6 +290,7 @@ export class SwarmRunner {
           break
         }
       } catch (err) {
+        agentStatus[agent.name] = classifyAgentError(err)
         console.warn(
           `[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`
         )
@@ -306,6 +314,7 @@ export class SwarmRunner {
     ctx: (name: AgentName) => Promise<ReviewInput>,
     baseIndex: number,
     total: number,
+    agentStatus: Partial<Record<AgentName, AgentStatus>>,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<Finding[]> {
     const timeout = this.config.agentTimeoutMs
@@ -331,6 +340,7 @@ export class SwarmRunner {
             retryDelayMs
           )
           findings.push(...agentFindings)
+          agentStatus[agent.name] = 'ok'
           onProgress?.({
             phase: 'end',
             name: agent.name,
@@ -340,6 +350,7 @@ export class SwarmRunner {
             elapsedMs: Date.now() - startMs,
           })
         } catch (err) {
+          agentStatus[agent.name] = classifyAgentError(err)
           console.warn(
             `[ai-review] Agent ${agent.name} timed out or failed: ${(err as Error).message}`
           )
@@ -396,6 +407,7 @@ export class SwarmRunner {
     const allFindings: Finding[] = []
     let coverageGaps: CoverageGap[] = []
     let testFiles: GeneratedTestFile[] = []
+    const agentStatus: Partial<Record<AgentName, AgentStatus>> = {}
 
     // Context tracking — accumulate across all agents for the final metadata block
     const allFilesLoaded: string[] = []
@@ -458,6 +470,7 @@ export class SwarmRunner {
         withContext,
         total,
         index,
+        agentStatus,
         onProgress
       )
       allFindings.push(...coverageResult.findings)
@@ -474,6 +487,7 @@ export class SwarmRunner {
           withContext,
           baseIndex,
           total,
+          agentStatus,
           onProgress
         )
         allFindings.push(...parallelFindings)
@@ -484,6 +498,7 @@ export class SwarmRunner {
           withContext,
           baseIndex,
           total,
+          agentStatus,
           onProgress
         )
         allFindings.push(...seqResult.findings)
@@ -508,9 +523,15 @@ export class SwarmRunner {
             this.config.retryDelayMs
           )
           testFiles = testResult.testFiles
+          agentStatus.testgen = 'ok'
         } catch (err) {
+          agentStatus.testgen = classifyAgentError(err)
           console.warn(`[ai-review] Agent testgen timed out or failed: ${(err as Error).message}`)
         }
+      } else {
+        // No coverage gaps means nothing for TestGen to generate -- this is a successful
+        // no-op, not a failure, so it must still be recorded as 'ok'.
+        agentStatus.testgen = 'ok'
       }
       onProgress?.({
         phase: 'end',
@@ -541,6 +562,7 @@ export class SwarmRunner {
         : {}),
       sanitizer: sanitizerMeta,
       ...(policyResult.agentsSkipped.length > 0 ? { policy: policyResult } : {}),
+      ...(Object.keys(agentStatus).length > 0 ? { agentStatus } : {}),
     }
   }
 }

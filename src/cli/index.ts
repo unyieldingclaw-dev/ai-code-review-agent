@@ -10,7 +10,12 @@ import { loadConfig } from '../core/config.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
 import { formatMarkdown, formatJson, formatSarif, formatGithubAnnotations } from './formatter.js'
 import type { AgentName, AgentProgressEvent } from '../core/schema.js'
-import { shouldFail, FAIL_ON_OPTIONS } from './exitCode.js'
+import {
+  shouldFail,
+  FAIL_ON_OPTIONS,
+  hasAgentFailures,
+  AGENT_FAILURE_EXIT_CODE,
+} from './exitCode.js'
 import type { FailOnLevel } from './exitCode.js'
 import { resolveProfile } from '../core/profiles.js'
 
@@ -53,7 +58,8 @@ program
   .option('--retry-delay <ms>', 'Delay between retries in ms (default: 2000)', parseInt)
   .option(
     '--fail-on <level>',
-    `Exit 1 when any finding meets this severity (${FAIL_ON_OPTIONS.join('|')}; default: high)`,
+    `Exit 1 when any finding meets this severity (${FAIL_ON_OPTIONS.join('|')}; default: high). ` +
+      `Exit 2 takes priority over this if any agent failed.`,
     'high'
   )
   .option('--fail-fast', 'Stop swarm on first finding at or above --fail-on threshold')
@@ -251,6 +257,9 @@ program
         }
 
         const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
+        if (hasAgentFailures(result.agentStatus)) {
+          process.exit(AGENT_FAILURE_EXIT_CODE)
+        }
         process.exit(hasBlocker ? 1 : 0)
       } catch (err) {
         // Re-throw synthetic exits (e.g. process.exit mocks in tests) so they propagate correctly
