@@ -20,6 +20,17 @@ lineage: []
 
 ## ✅ Completed (Tasks 1–16)
 
+### Diff-Truncation Visibility — 2026-07-18
+
+- [x] `ReviewResult.truncation` field (`{ truncated, originalLines, keptLines }`) added,
+      populated by `preprocessDiff()` in `runner.ts`, mirroring the existing `SanitizerMetadata`
+      pattern.
+- [x] All 4 output formats surface it — markdown gets a prominent warning near the top (not
+      buried at the bottom), SARIF gets run-level properties, github-annotations gets a
+      `::warning::` line even with zero findings, JSON is free.
+- [x] Deliberately not wired into exit code 2 — scoped as visibility-only per explicit decision.
+- [x] v1.5.0.
+
 ### Silent Agent Failure Reporting — 2026-07-17
 
 - [x] `ParseFailureError` thrown by `parseFindings`/`parseCoverageResult` instead of silently
