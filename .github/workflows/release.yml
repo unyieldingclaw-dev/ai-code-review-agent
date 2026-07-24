@@ -43,7 +43,7 @@ jobs:
 
       # Pinned to v2 tag SHA for supply-chain safety. Dependabot will auto-PR updates.
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
