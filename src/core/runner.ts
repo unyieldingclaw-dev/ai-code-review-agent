@@ -11,6 +11,7 @@ import type {
   AgentProgressEvent,
   SanitizerMetadata,
   AgentStatus,
+  TruncationMetadata,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
 import { classifyAgentError } from './parsing.js'
@@ -140,9 +141,11 @@ export class SwarmRunner {
 
   // Handles ignore filtering, sanitization, and diff truncation.
   // Returns the (possibly modified) input and sanitizer metadata.
-  private async preprocessDiff(
+  private async preprocessDiff(input: ReviewInput): Promise<{
     input: ReviewInput
-  ): Promise<{ input: ReviewInput; sanitizerMeta: SanitizerMetadata }> {
+    sanitizerMeta: SanitizerMetadata
+    truncationMeta: TruncationMetadata
+  }> {
     // Path exclusions — filter files matching .aiignore or config.ignorePaths
     if (input.projectPath || this.config.ignorePaths.length > 0) {
       const patterns = loadIgnorePatterns(input.projectPath ?? '', this.config.ignorePaths)
@@ -176,6 +179,11 @@ export class SwarmRunner {
 
     // Diff size guard — truncate oversized diffs before sending to agents
     const diffLines = input.diff.split('\n').length
+    let truncationMeta: TruncationMetadata = {
+      truncated: false,
+      originalLines: diffLines,
+      keptLines: diffLines,
+    }
     if (diffLines > this.config.maxDiffLines) {
       console.warn(
         `[ai-review] diff is ${diffLines} lines (limit ${this.config.maxDiffLines}). ` +
@@ -185,9 +193,14 @@ export class SwarmRunner {
         ...input,
         diff: input.diff.split('\n').slice(0, this.config.maxDiffLines).join('\n'),
       }
+      truncationMeta = {
+        truncated: true,
+        originalLines: diffLines,
+        keptLines: this.config.maxDiffLines,
+      }
     }
 
-    return { input, sanitizerMeta }
+    return { input, sanitizerMeta, truncationMeta }
   }
 
   // Runs the coverage agent with progress reporting and error handling.
@@ -402,6 +415,7 @@ export class SwarmRunner {
     const preprocessed = await this.preprocessDiff(input)
     input = preprocessed.input
     const sanitizerMeta = preprocessed.sanitizerMeta
+    const truncationMeta = preprocessed.truncationMeta
 
     const start = Date.now()
     const allFindings: Finding[] = []
@@ -563,6 +577,7 @@ export class SwarmRunner {
       sanitizer: sanitizerMeta,
       ...(policyResult.agentsSkipped.length > 0 ? { policy: policyResult } : {}),
       ...(Object.keys(agentStatus).length > 0 ? { agentStatus } : {}),
+      ...(truncationMeta.truncated ? { truncation: truncationMeta } : {}),
     }
   }
 }

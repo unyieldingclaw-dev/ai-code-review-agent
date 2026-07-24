@@ -227,4 +227,23 @@ describe('formatGithubAnnotations', () => {
     const result = makeResult({ findings: [], agentStatus: { security: 'ok' } })
     expect(formatGithubAnnotations(result)).toBe('')
   })
+
+  it('emits a warning annotation when the diff was truncated, even with zero findings', () => {
+    const result = makeResult({
+      findings: [],
+      truncation: { truncated: true, originalLines: 4188, keptLines: 2000 },
+    })
+    const output = formatGithubAnnotations(result)
+    expect(output).toContain('::warning')
+    expect(output).toContain('2000')
+    expect(output).toContain('4188')
+  })
+
+  it('emits nothing when there are no findings and the diff was not truncated', () => {
+    const result = makeResult({
+      findings: [],
+      truncation: { truncated: false, originalLines: 100, keptLines: 100 },
+    })
+    expect(formatGithubAnnotations(result)).toBe('')
+  })
 })

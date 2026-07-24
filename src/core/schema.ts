@@ -112,6 +112,12 @@ export interface PolicyResult {
   reason: Partial<Record<AgentName, string>>
 }
 
+export interface TruncationMetadata {
+  truncated: boolean
+  originalLines: number
+  keptLines: number
+}
+
 export type AgentStatus = 'ok' | 'timeout' | 'parse-error' | 'error'
 
 export interface ReviewResult {
@@ -131,6 +137,7 @@ export interface ReviewResult {
   sanitizer?: SanitizerMetadata
   policy?: PolicyResult
   agentStatus?: Partial<Record<AgentName, AgentStatus>>
+  truncation?: TruncationMetadata
 }
 
 export const SEVERITY_RANK: Record<Severity, number> = {
