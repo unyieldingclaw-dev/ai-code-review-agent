@@ -133,4 +133,25 @@ describe('formatMarkdown', () => {
     const output = formatMarkdown(result)
     expect(output).toContain('No issues found')
   })
+
+  it('shows a truncation warning near the top when the diff was truncated', () => {
+    const result = makeResult({
+      findings: [],
+      truncation: { truncated: true, originalLines: 4188, keptLines: 2000 },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('truncated')
+    expect(output).toContain('2000')
+    expect(output).toContain('4188')
+    expect(output.indexOf('truncated')).toBeLessThan(output.indexOf('No issues found'))
+  })
+
+  it('does not show a truncation warning when the diff was not truncated', () => {
+    const result = makeResult({
+      findings: [],
+      truncation: { truncated: false, originalLines: 100, keptLines: 100 },
+    })
+    const output = formatMarkdown(result)
+    expect(output).not.toContain('truncated')
+  })
 })

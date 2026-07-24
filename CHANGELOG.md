@@ -3,6 +3,18 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.5.0] — 2026-07-18 (diff-truncation visibility)
+
+### Added
+
+- `ReviewResult.truncation`: records `{ truncated, originalLines, keptLines }` when a diff
+  exceeds `--max-lines` and gets truncated before any agent runs. Previously this only logged
+  to stderr (`console.warn`) — a caller reading just the report had no way to know a large
+  chunk of the diff was silently excluded from analysis. Now surfaced prominently near the top
+  of the markdown report, in SARIF run-level properties, and as a `::warning::` github-annotation
+  (even with zero findings). JSON gets it for free. Follow-up to v1.4.0's `agentStatus` work —
+  reported via a real bug hit running `/change-review` against a 4188-line diff.
+
 ## [1.4.0] — 2026-07-17 (silent agent failure reporting)
 
 ### Added

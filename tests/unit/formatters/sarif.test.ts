@@ -144,4 +144,24 @@ describe('formatSarif', () => {
     const sarif = JSON.parse(formatSarif(result))
     expect(sarif.runs[0].properties.agentStatus).toEqual({ security: 'timeout' })
   })
+
+  it('includes truncation in run-level properties when the diff was truncated', () => {
+    const result = makeResult({
+      truncation: { truncated: true, originalLines: 4188, keptLines: 2000 },
+    })
+    const sarif = JSON.parse(formatSarif(result))
+    expect(sarif.runs[0].properties.truncation).toEqual({
+      truncated: true,
+      originalLines: 4188,
+      keptLines: 2000,
+    })
+  })
+
+  it('omits truncation from run-level properties when the diff was not truncated', () => {
+    const result = makeResult({
+      truncation: { truncated: false, originalLines: 100, keptLines: 100 },
+    })
+    const sarif = JSON.parse(formatSarif(result))
+    expect(sarif.runs[0].properties.truncation).toBeUndefined()
+  })
 })
