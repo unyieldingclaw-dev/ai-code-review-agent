@@ -20,7 +20,7 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
   const useEmoji = !options?.noEmoji
   const sevLabel = (s: Severity) => (useEmoji ? SEVERITY_EMOJI[s] : SEVERITY_TEXT[s])
 
-  const { findings, testFiles, summary, agentStatus } = result
+  const { findings, testFiles, summary, agentStatus, truncation } = result
   const lines: string[] = []
 
   const failedAgents = Object.entries(agentStatus ?? {}).filter(([, status]) => status !== 'ok')
@@ -32,6 +32,14 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`
   )
   lines.push('')
+
+  if (truncation?.truncated) {
+    lines.push(
+      `${useEmoji ? '⚠️ ' : ''}Diff truncated: reviewed ${truncation.keptLines}/${truncation.originalLines} lines — ` +
+        `findings past this point were never analyzed. Raise --max-lines to review the full diff.`
+    )
+    lines.push('')
+  }
 
   if (failedAgents.length > 0) {
     lines.push(

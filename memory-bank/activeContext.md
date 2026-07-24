@@ -20,6 +20,19 @@ lineage: []
 
 ## Current Focus
 
+**Diff-truncation visibility (2026-07-18)**: real bug report against v1.2.0 (PMB running
+`/change-review` against a 4188-line diff) — truncation to `--max-lines` (default 2000) only
+ever logged to stderr, never appeared in the report itself, so a caller reading just the
+markdown/JSON/SARIF/annotations output had no way to know over half the diff was excluded.
+Added `ReviewResult.truncation: { truncated, originalLines, keptLines }` (same conditional-spread
+pattern as `agentStatus`), surfaced prominently near the top of the markdown report (not buried
+at the bottom like `sanitizer`/`context`), in SARIF run properties, and as a `::warning::`
+github-annotation even with zero findings. Deliberately NOT wired into exit code 2 — a truncated
+but successful review is a different kind of "incomplete" than an agent that outright failed.
+Shipped as v1.5.0. The bug report's core complaint (false-clean result on agent failure) turned
+out to already be fixed on `main` as v1.4.0 but stuck unpublished at npm v1.2.0 — published via
+`git tag v1.4.0 && git push --tags` before this follow-up started.
+
 **Silent agent failure reporting fix (2026-07-17)**: a run where every agent timed out or
 returned unparseable prose instead of JSON rendered identically to a genuinely clean review —
 `0 findings | ✅ No issues found` in both cases, only visible in stderr. `parseFindings`

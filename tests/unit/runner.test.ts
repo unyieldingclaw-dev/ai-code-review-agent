@@ -32,7 +32,7 @@ describe('SwarmRunner', () => {
     expect(progress.length).toBe(DEFAULT_CONFIG.agents.length - 1)
   })
 
-  it('truncates diff that exceeds maxDiffLines and warns', async () => {
+  it('truncates diff that exceeds maxDiffLines, warns, and records truncation metadata', async () => {
     const provider = makeProvider()
     const config = { ...DEFAULT_CONFIG, maxDiffLines: 3 }
     const runner = new SwarmRunner(config, provider)
@@ -41,7 +41,15 @@ describe('SwarmRunner', () => {
     const result = await runner.run({ diff: largeDiff })
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Truncating'))
     expect(result.findings).toBeInstanceOf(Array)
+    expect(result.truncation).toEqual({ truncated: true, originalLines: 10, keptLines: 3 })
     warnSpy.mockRestore()
+  })
+
+  it('does not include truncation metadata when the diff is within maxDiffLines', async () => {
+    const provider = makeProvider()
+    const runner = new SwarmRunner(DEFAULT_CONFIG, provider)
+    const result = await runner.run({ diff: 'a short diff\nwith two lines' })
+    expect(result.truncation).toBeUndefined()
   })
 
   it('continues with other agents when one agent times out', async () => {
