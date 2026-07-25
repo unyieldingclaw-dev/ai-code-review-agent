@@ -3,6 +3,19 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.0] — 2026-07-18 (truncation-aware timeout scaling)
+
+### Added
+
+- Per-agent timeouts now scale up to 2x `agentTimeoutMs` as the (post-truncation) diff
+  approaches `--max-lines`, on by default. A diff at the truncation point previously got the
+  same flat timeout budget as a tiny one — the same real bug report that motivated
+  `ReviewResult.truncation` (v1.5.0) also hit this: 4 agents each burned a full timeout+retry
+  cycle failing against a diff truncated to 2000 lines. Passing `--timeout` explicitly disables
+  scaling and uses exactly that value, matching prior behavior.
+- `--timeout`'s help text corrected: it was still documenting the old 60000ms default from
+  before the earlier 60s→180s fix.
+
 ## [1.5.0] — 2026-07-18 (diff-truncation visibility)
 
 ### Added

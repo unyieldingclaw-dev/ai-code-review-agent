@@ -20,6 +20,18 @@ lineage: []
 
 ## Current Focus
 
+**Truncation-aware timeout scaling (2026-07-18)**: follow-up to diff-truncation visibility
+below, addressing the same bug report's other suggested fix. `agentTimeoutMs` was flat
+regardless of diff size — `scaleAgentTimeout(base, diffLines, maxDiffLines)` in `runner.ts`
+now linearly scales it up to 2x as the post-truncation diff size approaches `maxDiffLines`, on
+by default (`ReviewConfig.timeoutScalingEnabled`). Passing `--timeout` explicitly sets
+`timeoutScalingEnabled = false` so an explicit override always wins — no scaling. Threaded
+through as a new `timeout` parameter to `runCoverageAgent`/`runAgentsSequential`/
+`runAgentsParallel` and the inline TestGen block, computed once in `run()` right after
+`preprocessDiff()` produces `truncationMeta`. Also fixed a stale CLI help-text bug found along
+the way (`--timeout` still documented the old 60000ms default, pre-dating the earlier 60s→180s
+fix). Shipped as v1.6.0.
+
 **Diff-truncation visibility (2026-07-18)**: real bug report against v1.2.0 (PMB running
 `/change-review` against a 4188-line diff) — truncation to `--max-lines` (default 2000) only
 ever logged to stderr, never appeared in the report itself, so a caller reading just the

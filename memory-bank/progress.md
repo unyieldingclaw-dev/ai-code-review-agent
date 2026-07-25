@@ -20,6 +20,22 @@ lineage: []
 
 ## ✅ Completed (Tasks 1–16)
 
+### Truncation-Aware Timeout Scaling — 2026-07-18
+
+- [x] `scaleAgentTimeout(base, diffLines, maxDiffLines)` pure function in `runner.ts` — linear
+      scale from `base` up to `base * 2` as diff size approaches `maxDiffLines`, clamped.
+- [x] `ReviewConfig.timeoutScalingEnabled` (default `true`); `--timeout` passed explicitly sets
+      it to `false` so an explicit override always wins.
+- [x] Threaded through as a new parameter to all 4 agent-running call sites in `runner.ts`,
+      computed once in `run()` from `truncationMeta.keptLines`.
+- [x] Fixed stale `--timeout` help text (still said "default: 60000", pre-dating the earlier
+      60s→180s default change).
+- [x] Also fixed a pre-existing test-isolation bug in `cli.test.ts`'s `loadConfig` mock
+      (`mockReturnValue` shared one object across tests; `cli/index.ts` mutates config in
+      place, so earlier tests' `--timeout` leaked into later tests — switched to
+      `mockImplementation` returning a fresh object per call).
+- [x] v1.6.0.
+
 ### Diff-Truncation Visibility — 2026-07-18
 
 - [x] `ReviewResult.truncation` field (`{ truncated, originalLines, keptLines }`) added,

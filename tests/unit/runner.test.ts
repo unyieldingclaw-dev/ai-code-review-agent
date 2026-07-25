@@ -1,6 +1,6 @@
 // tests/unit/runner.test.ts
 import { describe, it, expect, vi } from 'vitest'
-import { SwarmRunner } from '../../src/core/runner.js'
+import { SwarmRunner, scaleAgentTimeout } from '../../src/core/runner.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import { formatMarkdown } from '../../src/cli/formatter.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
@@ -51,6 +51,76 @@ describe('SwarmRunner', () => {
     const result = await runner.run({ diff: 'a short diff\nwith two lines' })
     expect(result.truncation).toBeUndefined()
   })
+
+  it('scales the effective agent timeout up for a diff at the maxDiffLines truncation point', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => new Promise(() => {})), // never resolves
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentTimeoutMs: 30, // base; scaled 2x -> 60ms at maxDiffLines
+      maxDiffLines: 10,
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const largeDiff = Array.from({ length: 20 }, (_, i) => `line ${i}`).join('\n')
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const start = Date.now()
+    await runner.run({ diff: largeDiff })
+    const elapsed = Date.now() - start
+    expect(elapsed).toBeGreaterThanOrEqual(50)
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('timed out'))
+    warnSpy.mockRestore()
+  }, 10000)
+
+  it('does not scale the timeout for a diff well under maxDiffLines', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => new Promise(() => {})),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentTimeoutMs: 30,
+      maxDiffLines: 2000,
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const start = Date.now()
+    await runner.run({ diff: 'a\nb\nc' })
+    const elapsed = Date.now() - start
+    expect(elapsed).toBeLessThan(50)
+    warnSpy.mockRestore()
+  }, 10000)
+
+  it('does not scale the timeout when timeoutScalingEnabled is false, even for a large diff', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => new Promise(() => {})),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentTimeoutMs: 30,
+      maxDiffLines: 10,
+      timeoutScalingEnabled: false,
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const largeDiff = Array.from({ length: 20 }, (_, i) => `line ${i}`).join('\n')
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const start = Date.now()
+    await runner.run({ diff: largeDiff })
+    const elapsed = Date.now() - start
+    expect(elapsed).toBeLessThan(50)
+    warnSpy.mockRestore()
+  }, 10000)
 
   it('continues with other agents when one agent times out', async () => {
     let callCount = 0
@@ -469,5 +539,27 @@ describe('SwarmRunner', () => {
     const markdown = formatMarkdown(result)
     expect(markdown).not.toContain('No issues found')
     expect(markdown).toContain('agents failed')
+  })
+})
+
+describe('scaleAgentTimeout', () => {
+  it('returns the base timeout unscaled for an empty diff', () => {
+    expect(scaleAgentTimeout(180000, 0, 2000)).toBe(180000)
+  })
+
+  it('returns 2x the base timeout at exactly maxDiffLines', () => {
+    expect(scaleAgentTimeout(180000, 2000, 2000)).toBe(360000)
+  })
+
+  it('scales linearly at the halfway point', () => {
+    expect(scaleAgentTimeout(180000, 1000, 2000)).toBe(270000)
+  })
+
+  it('clamps to 2x when diffLines exceeds maxDiffLines', () => {
+    expect(scaleAgentTimeout(180000, 3000, 2000)).toBe(360000)
+  })
+
+  it('returns the base timeout unscaled when maxDiffLines is 0', () => {
+    expect(scaleAgentTimeout(180000, 500, 0)).toBe(180000)
   })
 })

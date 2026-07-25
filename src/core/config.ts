@@ -11,6 +11,7 @@ export interface ReviewConfig {
   testOutputDir: string
   maxDiffLines: number
   agentTimeoutMs: number
+  timeoutScalingEnabled: boolean
   retryAttempts: number
   retryDelayMs: number
   ignorePaths: string[]
@@ -62,6 +63,14 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   // generate. 180s aligns with the 5-minute ceiling OllamaProvider already assumed
   // (DEFAULT_TIMEOUT_MS) without being needlessly long for fast hardware.
   agentTimeoutMs: 180000,
+  // WHY on by default: a diff at the maxDiffLines truncation point takes meaningfully longer
+  // for the model to process than a small one, but agentTimeoutMs was flat regardless of size
+  // -- a real bug report hit this (488s wall time, all 4 agents timing out, on a diff truncated
+  // to 2000 lines). Scaling up to 2x agentTimeoutMs as diff size approaches maxDiffLines gives
+  // large diffs more headroom without changing behavior for small ones. Disabled automatically
+  // when --timeout is passed explicitly -- an explicit override means the user wants exactly
+  // that value, not a scaled one.
+  timeoutScalingEnabled: true,
   retryAttempts: 2,
   retryDelayMs: 2000,
   ignorePaths: [],

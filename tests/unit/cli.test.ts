@@ -54,9 +54,11 @@ vi.mock('../../src/core/llm/ollamaProvider.js', () => ({
   OllamaProvider: vi.fn().mockImplementation(() => ({})),
 }))
 
-// Mock loadConfig
+// Mock loadConfig — returns a fresh object each call. cli/index.ts mutates the returned
+// config in place (e.g. --timeout sets agentTimeoutMs/timeoutScalingEnabled directly on it),
+// so a shared object reference here would leak mutations from one test into the next.
 vi.mock('../../src/core/config.js', () => ({
-  loadConfig: vi.fn().mockReturnValue({
+  loadConfig: vi.fn().mockImplementation(() => ({
     model: 'devstral:latest',
     provider: 'ollama',
     ollamaUrl: 'http://localhost:11434',
@@ -66,6 +68,7 @@ vi.mock('../../src/core/config.js', () => ({
     testOutputDir: './ai-review-tests',
     maxDiffLines: 2000,
     agentTimeoutMs: 60000,
+    timeoutScalingEnabled: true,
     ignorePaths: [],
     sanitize: true,
     failOn: 'high',
@@ -76,7 +79,7 @@ vi.mock('../../src/core/config.js', () => ({
     contextBudgetChars: 4000,
     contextMode: 'static',
     agentPolicy: {},
-  }),
+  })),
 }))
 
 import { spawnSync } from 'child_process'
@@ -352,5 +355,24 @@ describe('CLI — argument parsing and output', () => {
     }))
     const { exitCode } = await runCli(['--fail-on', 'high'])
     expect(exitCode).toBe(0)
+  })
+
+  it('--timeout sets agentTimeoutMs and disables timeout scaling', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli(['--timeout', '5000'])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    expect(config.agentTimeoutMs).toBe(5000)
+    expect(config.timeoutScalingEnabled).toBe(false)
+  })
+
+  it('leaves timeout scaling enabled when --timeout is not passed', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli([])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    expect(config.timeoutScalingEnabled).toBe(true)
   })
 })
