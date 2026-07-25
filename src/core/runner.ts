@@ -119,6 +119,21 @@ function buildAgents(config: ReviewConfig, provider: LLMProvider): BaseAgent[] {
     })
 }
 
+// Linear scale from baseTimeoutMs (diffLines <= 0) up to baseTimeoutMs * TIMEOUT_SCALE_CAP
+// (diffLines >= maxDiffLines) -- a diff at the truncation point needs meaningfully more time
+// than a small one, but a flat timeout gave every diff the same budget regardless of size.
+const TIMEOUT_SCALE_CAP = 2
+
+export function scaleAgentTimeout(
+  baseTimeoutMs: number,
+  diffLines: number,
+  maxDiffLines: number
+): number {
+  if (maxDiffLines <= 0) return baseTimeoutMs
+  const ratio = Math.min(1, Math.max(0, diffLines / maxDiffLines))
+  return Math.round(baseTimeoutMs * (1 + (TIMEOUT_SCALE_CAP - 1) * ratio))
+}
+
 function shouldEarlyExit(config: ReviewConfig, allFindings: Finding[]): boolean {
   if (!config.failFast) return false
   const level = config.failOn ?? 'high'
@@ -212,9 +227,9 @@ export class SwarmRunner {
     total: number,
     index: number,
     agentStatus: Partial<Record<AgentName, AgentStatus>>,
+    timeout: number,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<{ findings: Finding[]; gaps: CoverageGap[]; earlyExit: boolean }> {
-    const timeout = this.config.agentTimeoutMs
     const retryAttempts = this.config.retryAttempts
     const retryDelayMs = this.config.retryDelayMs
 
@@ -264,9 +279,9 @@ export class SwarmRunner {
     baseIndex: number,
     total: number,
     agentStatus: Partial<Record<AgentName, AgentStatus>>,
+    timeout: number,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<{ findings: Finding[]; earlyExitAgent?: AgentName }> {
-    const timeout = this.config.agentTimeoutMs
     const retryAttempts = this.config.retryAttempts
     const retryDelayMs = this.config.retryDelayMs
 
@@ -328,9 +343,9 @@ export class SwarmRunner {
     baseIndex: number,
     total: number,
     agentStatus: Partial<Record<AgentName, AgentStatus>>,
+    timeout: number,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<Finding[]> {
-    const timeout = this.config.agentTimeoutMs
     const retryAttempts = this.config.retryAttempts
     const retryDelayMs = this.config.retryDelayMs
 
@@ -416,6 +431,13 @@ export class SwarmRunner {
     input = preprocessed.input
     const sanitizerMeta = preprocessed.sanitizerMeta
     const truncationMeta = preprocessed.truncationMeta
+    const effectiveTimeoutMs = this.config.timeoutScalingEnabled
+      ? scaleAgentTimeout(
+          this.config.agentTimeoutMs,
+          truncationMeta.keptLines,
+          this.config.maxDiffLines
+        )
+      : this.config.agentTimeoutMs
 
     const start = Date.now()
     const allFindings: Finding[] = []
@@ -485,6 +507,7 @@ export class SwarmRunner {
         total,
         index,
         agentStatus,
+        effectiveTimeoutMs,
         onProgress
       )
       allFindings.push(...coverageResult.findings)
@@ -502,6 +525,7 @@ export class SwarmRunner {
           baseIndex,
           total,
           agentStatus,
+          effectiveTimeoutMs,
           onProgress
         )
         allFindings.push(...parallelFindings)
@@ -513,6 +537,7 @@ export class SwarmRunner {
           baseIndex,
           total,
           agentStatus,
+          effectiveTimeoutMs,
           onProgress
         )
         allFindings.push(...seqResult.findings)
@@ -531,7 +556,7 @@ export class SwarmRunner {
           const testResult = await withRetryTimeout(
             async (signal) =>
               this.testGen.runWithGaps(await withContext('testgen'), coverageGaps, signal),
-            this.config.agentTimeoutMs,
+            effectiveTimeoutMs,
             'testgen',
             this.config.retryAttempts,
             this.config.retryDelayMs

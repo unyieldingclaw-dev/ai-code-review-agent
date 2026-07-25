@@ -49,7 +49,11 @@ program
   )
   .option('--out <path>', 'Write output to file instead of stdout')
   .option('--max-lines <n>', 'Truncate diff to this many lines (default: 2000)', parseInt)
-  .option('--timeout <ms>', 'Per-agent timeout in milliseconds (default: 60000)', parseInt)
+  .option(
+    '--timeout <ms>',
+    'Per-agent timeout in milliseconds (default: 180000, scaled up to 2x for large diffs unless set explicitly here)',
+    parseInt
+  )
   .option(
     '--retry-attempts <n>',
     'Number of attempts per agent before skipping (default: 2)',
@@ -144,7 +148,10 @@ program
           }
         }
         if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
-        if (options.timeout !== undefined) config.agentTimeoutMs = options.timeout
+        if (options.timeout !== undefined) {
+          config.agentTimeoutMs = options.timeout
+          config.timeoutScalingEnabled = false
+        }
         if (options.retryAttempts !== undefined) config.retryAttempts = options.retryAttempts
         if (options.retryDelay !== undefined) config.retryDelayMs = options.retryDelay
         if (options.ignore.length > 0)
