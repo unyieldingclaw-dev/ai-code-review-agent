@@ -80,7 +80,10 @@ program
     collect,
     [] as string[]
   )
-  .option('--no-sanitize', 'Skip prompt-injection sanitization of the diff')
+  .option(
+    '--no-sanitize',
+    'Skip prompt-injection sanitization of the diff, and of memory-bank context when --context memory-bank is also set'
+  )
   .option(
     '--suggest-tests',
     'Enable testgen agent and include suggestions in report (no files written)'

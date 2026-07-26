@@ -444,6 +444,16 @@ export class SwarmRunner {
     input = preprocessed.input
     const sanitizerMeta = preprocessed.sanitizerMeta
     const truncationMeta = preprocessed.truncationMeta
+
+    // --no-sanitize disables diff sanitization above (own warning already printed in
+    // preprocessDiff); when memory-bank context is also in play, it disables that too --
+    // preprocessDiff doesn't know about contextMode, so this scope is covered here instead.
+    if (this.config.sanitize === false && contextMode === 'memory-bank') {
+      process.stderr.write(
+        '[ai-review] WARNING: --no-sanitize is active. Prompt injection from memory-bank ' +
+          'context is not prevented either.\n'
+      )
+    }
     const effectiveTimeoutMs = this.config.timeoutScalingEnabled
       ? scaleAgentTimeout(
           this.config.agentTimeoutMs,
@@ -491,7 +501,17 @@ export class SwarmRunner {
         for (const w of sanitizeResult.warnings) {
           console.warn(`[ai-review] ${w} (memory-bank context for ${agentName})`)
         }
-        if (sanitizeResult.applied) context = sanitizeResult.sanitized
+        if (sanitizeResult.applied) {
+          context = sanitizeResult.sanitized
+          // Merge into the same metadata object the final report exposes as `sanitizer` --
+          // this used to be console.warn-only, invisible to any structured (JSON/markdown)
+          // consumer of the report even though a real redaction had happened.
+          sanitizerMeta.applied = true
+          sanitizerMeta.redactedLines += sanitizeResult.redactedLines
+          sanitizerMeta.warnings.push(
+            ...sanitizeResult.warnings.map((w) => `${w} (memory-bank context for ${agentName})`)
+          )
+        }
       }
       return { ...input, context }
     }

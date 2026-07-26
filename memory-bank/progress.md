@@ -20,7 +20,41 @@ lineage: []
 
 ## ✅ Completed (Tasks 1–16)
 
-### Code Review Follow-Up: CoverageAnalyst Truncation Parity — 2026-07-26
+### Code Review Follow-Up, Part 2: Remaining Findings — 2026-07-26
+
+User said "fix it all" after the CoverageAnalyst parity fix below landed — closed every
+remaining open item from the `/code-review` gate rather than leaving them as tracked follow-ups:
+
+- [x] Sanitizer's "act as a/an ..." pattern required an AI/assistant/bot/model word directly
+      adjacent, which fixed the earlier false positive but missed real jailbreak framings without
+      one — "act as a Linux terminal", "act as DAN" — confirmed by the opposition reviewer testing
+      both strings directly. Broadened to also match `terminal`, `hacker`, `unrestricted`,
+      `unfiltered`, `jailbroken` without reopening the original false positive (verified: "acts as
+      a validator"/"acts as a gatekeeper" still don't match).
+- [x] Fixed the SRI-hash base64 false positive for real this time. The earlier attempt (a
+      negative lookbehind) was correctly deferred after empirical testing showed the regex engine
+      could find an alternate match-start position that bypassed it. Real fix: `INJECTION_PATTERNS`
+      entries can now carry an `isFalsePositive(line, matchOffset)` check applied in code, after a
+      match is found via `String.replace`'s callback — not vulnerable to the same bypass since
+      there's no alternate-start-position escape hatch when you're checking actual match context
+      directly.
+- [x] Memory-bank sanitizer redactions were `console.warn`-only, invisible to any consumer of the
+      structured JSON/markdown report. `sanitizerMeta` is now mutated (not just read) inside
+      `withContext`, merging `applied`/`redactedLines`/`warnings` from every agent's context
+      sanitization into the same object the diff's own sanitization already populates.
+- [x] `--no-sanitize`'s CLI help, README, and runtime warning only described disabling diff
+      sanitization. Updated all three to mention it also disables memory-bank context
+      sanitization when `--context memory-bank` is set.
+- [x] Hardened `OllamaProvider.stripThinkTags` against the SPECULATIVE finding from the
+      opposition review: a `<think>` block truncated before it closes now has itself and
+      everything after it dropped entirely, instead of leaving raw reasoning prose in the
+      response where Stage 4's object scanner could mistake a coincidentally schema-shaped
+      object inside it for a real finding the model never asserted. Confirmed this risk is inert
+      under the current `devstral` default (`supportsThinking()` excludes it) — hardened anyway
+      since it was cheap and protects against a future model switch.
+- [x] 378 unit tests passing (up from 371), typecheck/lint/build/format clean.
+
+### Code Review Follow-Up, Part 1: CoverageAnalyst Truncation Parity — 2026-07-26
 
 - [x] Ran the full `/code-review` gate (5 domain subagents + opposition review) on the
       structured-JSON-output/truncation-recovery/sanitization diff below before committing. Four
@@ -54,11 +88,8 @@ lineage: []
       schema, unlike `base.ts`'s array-shaped one — an earlier draft of this test incorrectly
       asserted it should throw).
 - [x] 371 unit tests passing (up from 358), typecheck/lint/build/format clean.
-- Remaining findings from the review not addressed in this pass (tracked, not blocking): the
-  tightened "act as a" sanitizer regex now misses "act as a Linux terminal"/"act as DAN" phrasing;
-  memory-bank sanitizer redactions aren't merged into the structured report's `sanitizer` field
-  (console.warn only); the known SRI-hash base64 false positive is now reachable via memory-bank
-  content too (not just diffs), though it doesn't fire against this repo's own memory-bank today.
+- Remaining findings from the review were not addressed in this pass — all fixed in the Part 2
+  entry above, in a follow-up commit the same day.
 
 ### Structured JSON Output, Truncation Recovery, Memory-Bank Context Sanitization — 2026-07-25
 

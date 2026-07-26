@@ -20,7 +20,25 @@ lineage: []
 
 ## Current Focus
 
-**Code review follow-up: CoverageAnalyst truncation parity (2026-07-26)**: ran the full
+**Code review follow-up, part 2: remaining findings closed (2026-07-26)**: after the
+CoverageAnalyst parity fix below landed, user said "fix it all" for the rest of the `/code-review`
+findings rather than leaving them tracked-but-deferred. Closed: broadened the "act as a" sanitizer
+regex to also catch "act as a Linux terminal"/"act as DAN" jailbreak framings that don't use an
+AI/assistant/bot/model word (without reopening the earlier false positive on ordinary phrases);
+fixed the SRI-hash base64 false positive properly this time via a per-pattern
+`isFalsePositive(line, matchOffset)` context check applied after a regex match is found (the
+earlier negative-lookbehind attempt was correctly abandoned after proving the regex engine could
+bypass it via an alternate match-start position — checking actual match context in code has no
+equivalent bypass); merged memory-bank sanitizer redactions into `result.sanitizer` (previously
+console.warn-only, invisible to the structured report); updated `--no-sanitize`'s CLI
+help/README/runtime warning to mention it also covers memory-bank context; hardened
+`OllamaProvider.stripThinkTags` to drop an unclosed `<think>` block and everything after it,
+closing the opposition review's SPECULATIVE finding about Stage 4 potentially recovering a
+coincidental object from unstripped reasoning prose (confirmed inert under the current `devstral`
+default, hardened anyway since it was cheap). 378 tests passing (up from 371). Full detail in
+`progress.md`'s "Part 2" entry.
+
+**Code review follow-up, part 1: CoverageAnalyst truncation parity (2026-07-26)**: ran the full
 `/code-review` gate (5 domain subagents + opposition review) on the v1.8.0 diff below before
 committing. Four of five domain reviewers independently converged on one finding:
 `coverageAnalyst.ts` got `format:'json'` (which the diff's own calibration data shows raises

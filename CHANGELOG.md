@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [1.8.0] — 2026-07-25 (structured JSON output, truncation recovery, memory-bank context sanitization)
 
+### Fixed (2026-07-26 follow-up — remaining /code-review findings)
+
+- Sanitizer's "act as a/an ..." pattern required an AI/assistant/bot/model word directly, which
+  correctly stopped an earlier false positive but was found (by the same review) to also miss
+  real jailbreak framings that don't use one, like "act as a Linux terminal" and "act as DAN".
+  Broadened to also match those and similar framings (`terminal`, `hacker`, `unrestricted`,
+  `unfiltered`, `jailbroken`) without reopening the original false positive.
+- Fixed the SRI-hash base64 false positive properly (a prior attempt using a negative lookbehind
+  was deferred after empirical testing showed the regex engine could find an alternate
+  match-start position that bypassed it). The sanitizer now supports a per-pattern
+  `isFalsePositive` context check applied after a match is found, which a lookbehind can't be
+  bypassed around. An SRI hash (`integrity="sha256-..."`) is no longer redacted; a genuine 80+
+  char base64 blob elsewhere still is.
+- Memory-bank context sanitization (added in this release) logged redactions via `console.warn`
+  only — invisible to any consumer of the structured JSON/markdown report even though a real
+  redaction had happened. Now merged into the same `sanitizer` field the diff's own sanitization
+  populates.
+- `--no-sanitize`'s CLI help text, README, and runtime warning only mentioned disabling diff
+  sanitization, not that it also disables memory-bank context sanitization (added in this
+  release) when `--context memory-bank` is set.
+- `OllamaProvider.stripThinkTags` only removed a `<think>` block that actually closed; a response
+  truncated mid-reasoning left the unstripped `<think>` prefix in place, where `BaseAgent`'s
+  truncation-recovery pass could theoretically mistake a coincidentally schema-shaped object
+  inside the model's raw chain-of-thought for a real finding it never asserted as output. Now
+  drops an unclosed `<think>` block and everything after it. (Speculative risk, inert under the
+  current `devstral` default since `supportsThinking()` only applies to qwen/deepseek-r1 models —
+  hardened anyway since the fix was cheap and the risk applies to any future model switch.)
+
 ### Added
 
 - Every standard agent and the coverage agent now request Ollama's `format: "json"` structured
