@@ -20,6 +20,57 @@ lineage: []
 
 ## Current Focus
 
+**Code review follow-up: CoverageAnalyst truncation parity (2026-07-26)**: ran the full
+`/code-review` gate (5 domain subagents + opposition review) on the v1.8.0 diff below before
+committing. Four of five domain reviewers independently converged on one finding:
+`coverageAnalyst.ts` got `format:'json'` (which the diff's own calibration data shows raises
+truncation frequency) without the Stage 4 recovery that made it safe in `base.ts`. Opposition
+review downgraded the initial High/Blocking rating after confirming `runner.ts`'s existing
+`agentStatus`/exit-code-2 mechanism means this fails loudly, not silently — but still recommended
+fixing it in-PR since it was cheap and already had a repro. Fixed: extracted
+`extractBalancedSpan`/`extractCompleteObjects` into `parsing.ts` as shared helpers (replacing
+three near-duplicate hand-rolled bracket scanners with two), fixed a negative-depth bug in the
+scanner found via direct execution during Correctness review (a stray leading `}` used to
+permanently break recovery for the rest of the response — now uses a stack of open-brace
+positions instead of a depth counter, self-healing from any stray unmatched `}`), and gave
+`CoverageAnalystAgent.parseCoverageResult` its own Stage 3 truncation recovery. Full detail in
+`progress.md`'s "Code Review Follow-Up" entry. 371 tests passing (up from 358).
+
+**Structured JSON output, truncation recovery, memory-bank context sanitization (2026-07-25,
+v1.8.0)**: follow-up to calibration bake-off runs surfacing real parse-truncation failures
+(devstral cut off mid-generation on `performance`; gemma3:12b similarly on `integration`).
+Implemented `format: 'json'` (Ollama's grammar-constrained structured output) in `base.ts`'s
+`run()` and `coverageAnalyst.ts`'s `runForCoverage()` — `ChatOptions.format` existed end-to-end
+but nothing ever passed it. NOT applied to `TestGenAgent` (outputs raw test code, not JSON).
+**Important, non-obvious result from re-running calibration afterward**: `format: 'json'` alone
+made truncation _more_ common, not less — 11/16 cases truncated mid-generation (vs. 1/16 before),
+apparently because strict schema compliance (every verbose required field filled in exactly)
+removes whatever slack let the model wrap up more tersely. The real reliability win came from a
+new Stage 4 in `BaseAgent.parseFindings`: `extractCompleteObjects()` scans for complete `{...}`
+objects regardless of whether the enclosing array ever closes, salvaging whatever the model
+finished instead of discarding everything. Recovered objects still go through the same
+`validateFindings` schema check as every other stage — caught and fixed a real regression during
+implementation where a trivially-parseable garbage response (`"{}"`) was being treated as a
+successful "0 findings" recovery instead of throwing `ParseFailureError`, exactly the silent-clean
+-pass anti-pattern this whole project exists to prevent. With both changes together: 15/16 passed
+on devstral, with the recovery stage salvaging all 11 truncated cases — same headline score as
+before, but demonstrably more robust underneath. Separately answered "are there any guardrails we
+are missing": found `contextLoader.ts`'s comment falsely claimed memory-bank context was already
+sanitized ("sanitizer applies separately") — it wasn't; `sanitizeDiff()` was only ever called on
+the diff. Added `sanitizeText()` (scans every line, since `sanitizeDiff`'s `+`-prefix convention
+is diff-specific) and wired it into `runner.ts`'s `withContext`, respecting `--no-sanitize`.
+Dogfooding this against the repo's own real memory-bank files caught a live false positive: the
+sanitizer's "act as a" pattern fired on `activeContext.md`/`progress.md`'s own prose describing
+that same bug ("act as a validator") — tightened the pattern to require it target an
+AI/assistant/bot/model role (matching the existing "you are now" pattern's structure), confirmed
+real injection attempts still match and the repo's own memory-bank no longer false-positives.
+Considered but did not attempt fixing the SRI-hash base64 false positive from the earlier
+architecture review — a naive negative-lookbehind doesn't work due to the regex engine finding an
+alternate match-start position that bypasses it; needs a proper code-level (non-regex) fix,
+deferred. Open follow-up, not yet decided: add an explicit `num_predict` to counteract
+`format: 'json'`'s higher truncation rate directly, now that there's concrete evidence it's
+needed, rather than relying solely on the recovery stage to paper over frequent truncation.
+
 **Actionable truncation warning; parallel-by-default investigated and rejected (2026-07-25)**:
 follow-up to a real bug report (ACR's 4-agent security profile took ~22 minutes against a
 4658-line diff, zero findings). Initially implemented `DEFAULT_CONFIG.parallel: true` after a
@@ -152,7 +203,7 @@ All 5 checks verified passing locally (295/295 tests) before the workflow was ad
 - `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, continue-on-error, 10min timeout
-- **348 unit tests** across 39 test files
+- **358 unit tests** across 39 test files
 - `src/core/parsing.ts`: `validateAndNormalizeFindings()` extracted from BaseAgent (SRP)
 - `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
 - `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable
@@ -259,3 +310,4 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-15: v0.8.0 — 5 new specialist agents (ErrorHandlingAgent, ObservabilityAgent, MigrationSafetyAgent, SecretsAgent, ComplexityAgent), `shell.ts` runTool(), conditional MigrationSafety skip in SwarmRunner, 32 new unit tests (112 total), 5 calibration fixtures, DEFAULT_CONFIG updated to 16 agents, package.json v0.8.0, README updated. Tasks 1–9 committed. Task 10 (final verification + tag) is next.
 - 2026-07-14: AbortSignal/timeout-cancellation fix — `withTimeout` now cancels the losing side of the race instead of leaving it running server-side; fixed a `clearTimeout` gap found in review; unrelated CI fix (`shell: bash` default in `review.yml`, was silently defaulting to pwsh on the self-hosted Windows runner). 297 unit tests passing.
 - 2026-07-25: v1.7.0 — attempted flipping `parallel` default to `true` after a promising small-scale test, then reverted after a deeper test at real scale (14 concurrent, realistic diff size) showed near-linear serialization and spurious-timeout risk. Kept the truncation-warning wording improvement. Separately: verified `devstral:latest` remains the correct configured model after more Ollama models were downloaded (measured GPU/CPU split for all of them); ran a "not made up" architecture deep-dive that found `format: 'json'` is unused, `--context-mode semantic` recomputes embeddings ~14x redundantly, and the sanitizer false-positives on real code (SRI hashes, common comments). 348 unit tests passing.
+- 2026-07-25: v1.8.0 — implemented `format: 'json'` (turned out to increase truncation frequency, not decrease it) plus a truncation-recovery stage in `parseFindings` that ended up doing the real reliability work; fixed a real gap where memory-bank context wasn't actually sanitized despite a comment claiming it was; dogfooding that fix on this repo's own memory-bank caught and fixed a live sanitizer false positive. 358 unit tests passing.

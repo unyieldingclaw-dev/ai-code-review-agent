@@ -19,7 +19,7 @@ import { loadAgentContext, loadAgentContextSemantic } from './contextLoader.js'
 import type { ContextResult } from './contextLoader.js'
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
 import { evaluatePolicy, extractChangedFiles } from './policyFilter.js'
-import { sanitizeDiff } from './sanitizer.js'
+import { sanitizeDiff, sanitizeText } from './sanitizer.js'
 import { BreakingChangeAgent } from './agents/breakingChange.js'
 import { LicenseComplianceAgent } from './agents/licenseCompliance.js'
 import { BaseAgent } from './agents/base.js'
@@ -480,7 +480,20 @@ export class SwarmRunner {
         if (ctx.truncated) anyTruncated = true
         totalTokens += ctx.estimatedTokens
       }
-      return ctx.content ? { ...input, context: ctx.content } : input
+      if (!ctx.content) return input
+
+      // Memory-bank files are data, not instructions -- but nothing enforced that until now.
+      // Sanitize the same way the diff itself is sanitized, since memory-bank content can be
+      // AI-edited or come from a shared/multi-contributor repo just like diff content can.
+      let context = ctx.content
+      if (this.config.sanitize !== false) {
+        const sanitizeResult = sanitizeText(context)
+        for (const w of sanitizeResult.warnings) {
+          console.warn(`[ai-review] ${w} (memory-bank context for ${agentName})`)
+        }
+        if (sanitizeResult.applied) context = sanitizeResult.sanitized
+      }
+      return { ...input, context }
     }
 
     // Determine which agents will run — hoist before coverage so total is known upfront

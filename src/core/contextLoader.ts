@@ -3,7 +3,9 @@
 // Loads per-agent context from a project's memory-bank/ directory.
 // Only called when --context memory-bank is active.
 // Budget-bounded: never loads more than budgetChars per agent.
-// Treats memory-bank content as data, not instructions (sanitizer applies separately).
+// Content returned here is data, not instructions -- runner.ts's withContext() runs it through
+// sanitizeText() (src/core/sanitizer.ts) before prepending it to any agent's prompt, the same
+// protection sanitizeDiff() gives the diff itself.
 
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'

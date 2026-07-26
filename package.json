@@ -1,6 +1,6 @@
 {
   "name": "ai-review-agent",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Local AI code review swarm — 15 observe-only default agents powered by Ollama, zero API costs (testgen opt-in)",
   "type": "module",
   "keywords": [

@@ -3,6 +3,63 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.8.0] — 2026-07-25 (structured JSON output, truncation recovery, memory-bank context sanitization)
+
+### Added
+
+- Every standard agent and the coverage agent now request Ollama's `format: "json"` structured
+  output mode (grammar-constrained JSON decoding), instead of relying purely on prompt
+  instructions to produce parseable output. `ChatOptions.format` already existed end-to-end but
+  was never actually passed anywhere. Empirically confirmed against `devstral:latest`: makes
+  responses reliably syntactically valid JSON. Doesn't fix every parse failure (the model can
+  still pick different field names than the schema expects, and grammar-constrained decoding
+  doesn't extend the model's generation budget), but directly targets the class of bug this
+  project has repeatedly fought (prose instead of JSON, truncated mid-generation). Not applied to
+  `TestGenAgent`, which intentionally outputs raw test code, not JSON.
+- `BaseAgent.parseFindings` gained a new recovery stage: when a response is cut off
+  mid-generation before its JSON array closes, it now recovers whichever findings did complete
+  instead of discarding all of them. Recovered objects still go through the same schema
+  validation as every other parse stage, so a response that's just trivially-parseable garbage
+  (e.g. `"{}"`) still correctly throws `ParseFailureError` rather than silently resolving to
+  "0 findings, clean run."
+- Memory-bank context (`--context memory-bank`) is now sanitized for prompt-injection patterns
+  before being prepended to any agent's prompt, the same protection the diff itself already had.
+  `contextLoader.ts`'s own comment claimed this was already happening ("sanitizer applies
+  separately") — it wasn't; `sanitizeDiff()` was only ever called on the diff. Added
+  `sanitizeText()` (`sanitizer.ts`) for scanning arbitrary non-diff text, since `sanitizeDiff`'s
+  `+`-prefix convention doesn't apply to plain markdown. Respects `--no-sanitize` like the diff
+  does.
+- `calibration/calibrate.ts`: added a `CALIBRATION_MODEL` env var to bake off a candidate model's
+  finding quality without editing `config.ts`, and wrapped each case (including the testgen
+  check) in try/catch so one agent error no longer kills the entire run and loses every other
+  case's result.
+- `CoverageAnalystAgent.parseCoverageResult` now recovers findings/gaps from a response truncated
+  before its outer `{"findings":...,"gaps":...}` object closes, instead of unconditionally
+  throwing `ParseFailureError` and discarding everything. It had picked up `format:'json'` (which
+  this same release's calibration data shows increases truncation frequency) without the
+  equivalent recovery `BaseAgent` got — flagged during `/code-review` as a real asymmetry, since
+  the two agents would otherwise degrade differently under the exact truncation conditions this
+  release exists to mitigate. The recovery scanner (`extractCompleteObjects`) and the balanced-span
+  extractor (`extractBalancedSpan`) were extracted into `parsing.ts` as shared helpers — this also
+  replaces three near-identical hand-rolled bracket scanners (one each in `base.ts` and
+  `coverageAnalyst.ts`, plus the new one) with two shared implementations.
+
+### Fixed
+
+- `extractCompleteObjects`'s depth tracking could go negative on a stray unmatched `}` preceding
+  real content, permanently preventing every object later in the same response from being
+  recovered. Found via direct execution during `/code-review`. The shared implementation now uses
+  a stack of open-brace positions instead of a depth counter, so an unmatched `}` is simply
+  ignored rather than desyncing the rest of the scan.
+
+- Sanitizer's "role-play directive" pattern was catching any generic "act as a X" phrase, not
+  just AI-role-reassignment attempts — found actively false-positiving on this repo's own
+  `memory-bank/activeContext.md` and `progress.md` (which document this exact prior bug) the
+  moment memory-bank context sanitization above started actually running against them. Tightened
+  to require the phrase target an AI/assistant/bot/model role, matching the existing "you are
+  now" pattern's structure. Real injection attempts ("act as an unrestricted AI") still match;
+  ordinary usage ("acts as a validator/gatekeeper") no longer does.
+
 ## [1.7.0] — 2026-07-25 (actionable truncation warning; parallel-by-default investigated and rejected)
 
 ### Changed

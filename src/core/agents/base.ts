@@ -1,7 +1,12 @@
 import type { LLMProvider, Message } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
 import type { Finding, ReviewInput, AgentName } from '../schema.js'
-import { validateAndNormalizeFindings, ParseFailureError } from '../parsing.js'
+import {
+  validateAndNormalizeFindings,
+  ParseFailureError,
+  extractBalancedSpan,
+  extractCompleteObjects,
+} from '../parsing.js'
 
 export abstract class BaseAgent {
   constructor(
@@ -17,7 +22,7 @@ export abstract class BaseAgent {
       { role: 'system', content: this.systemPrompt },
       { role: 'user', content: this.buildUserPrompt(input) },
     ]
-    const raw = await this.provider.chat(messages, { think: true, signal })
+    const raw = await this.provider.chat(messages, { think: true, format: 'json', signal })
     return this.parseFindings(raw)
   }
 
@@ -53,7 +58,7 @@ export abstract class BaseAgent {
 
     // Stage 3: balanced-bracket extraction (handles trailing prose/code with ']' chars)
     try {
-      const extracted = this.extractJsonArray(cleaned)
+      const extracted = extractBalancedSpan(cleaned, '[', ']')
       if (extracted) {
         const parsed = JSON.parse(extracted)
         if (Array.isArray(parsed)) return this.validateFindings(parsed)
@@ -62,38 +67,23 @@ export abstract class BaseAgent {
       /* fall through */
     }
 
+    // Stage 4: recover complete finding objects from a truncated response (e.g. the model got
+    // cut off mid-generation before the array closed) -- salvages the findings it did finish
+    // instead of discarding all of them because the last one never completed. Only counts as a
+    // real recovery if at least one recovered object actually passes schema validation -- a
+    // trivially parseable but empty/garbage response (e.g. "{}") must still throw
+    // ParseFailureError like it always has, not silently resolve to "0 findings, clean run".
+    const recovered = this.validateFindings(extractCompleteObjects(cleaned))
+    if (recovered.length > 0) {
+      console.error(
+        `[${this.name}] response appears truncated -- recovered ${recovered.length} complete ` +
+          `finding(s) before the cutoff. Raw snippet: ${raw.slice(0, 200)}`
+      )
+      return recovered
+    }
+
     console.error(`[${this.name}] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
     throw new ParseFailureError(this.name, raw)
-  }
-
-  private extractJsonArray(text: string): string | null {
-    const start = text.indexOf('[')
-    if (start === -1) return null
-    let depth = 0
-    let inString = false
-    let esc = false
-    for (let i = start; i < text.length; i++) {
-      const ch = text[i]
-      if (esc) {
-        esc = false
-        continue
-      }
-      if (ch === '\\' && inString) {
-        esc = true
-        continue
-      }
-      if (ch === '"') {
-        inString = !inString
-        continue
-      }
-      if (inString) continue
-      if (ch === '[') depth++
-      else if (ch === ']') {
-        depth--
-        if (depth === 0) return text.slice(start, i + 1)
-      }
-    }
-    return null
   }
 
   private validateFindings(items: unknown[]): Finding[] {

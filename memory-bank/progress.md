@@ -20,6 +20,86 @@ lineage: []
 
 ## ✅ Completed (Tasks 1–16)
 
+### Code Review Follow-Up: CoverageAnalyst Truncation Parity — 2026-07-26
+
+- [x] Ran the full `/code-review` gate (5 domain subagents + opposition review) on the
+      structured-JSON-output/truncation-recovery/sanitization diff below before committing. Four
+      of five domain reviewers independently converged on the same finding: `coverageAnalyst.ts`
+      picked up `format:'json'` (which the diff's own calibration data shows raises truncation
+      frequency) without the Stage 4 recovery that made it safe in `base.ts` — Correctness and
+      Testing rated it High/Blocking.
+- [x] Opposition review downgraded the Blocking rating after reading `runner.ts:263-275` and
+      `cli/exitCode.ts`: a coverage parse failure is caught, classified into `agentStatus`, and
+      surfaces as exit code 2 — it fails loudly, not silently. Still recommended fixing it in this
+      PR rather than deferring, since the diff's own stated goal is truncation resilience and the
+      fix was cheap with a repro already in hand.
+- [x] Also caught during review and fixed in the same pass: `extractCompleteObjects`'s depth
+      counter could go negative on a stray leading `}`, permanently breaking recovery for the rest
+      of the response (reproduced by direct execution during Correctness review).
+- [x] Extracted `extractBalancedSpan` and `extractCompleteObjects` into `src/core/parsing.ts` as
+      shared helpers — replaces three near-identical hand-rolled bracket scanners (`base.ts` had
+      two, `coverageAnalyst.ts` had one) with two, fixing the depth bug in one place instead of
+      three (this was also an independent Maintainability finding). `extractCompleteObjects` now
+      recovers objects at any nesting depth via a stack of open-brace positions, not just
+      top-level ones — required for `coverageAnalyst`'s schema, where findings/gaps sit one level
+      inside an outer wrapper object that's exactly what's truncated.
+- [x] Gave `CoverageAnalystAgent.parseCoverageResult` a Stage 3: when the outer object never
+      closes, scan the raw text for complete finding/gap objects and salvage them, splitting
+      recovered objects by which required-field shape they match (a Finding and a CoverageGap
+      share no required fields besides `file`, so no cross-contamination risk).
+- [x] Added regression tests: `extractCompleteObjects` negative-depth case (`parsing.test.ts`),
+      `extractBalancedSpan`/`extractCompleteObjects` direct unit coverage (braces-in-strings,
+      escaped quotes, empty input), and `coverageAnalyst`'s new Stage 3 recovery + a corrected test
+      for `{}` (which is a legitimate "fully covered" response for coverage's object-shaped
+      schema, unlike `base.ts`'s array-shaped one — an earlier draft of this test incorrectly
+      asserted it should throw).
+- [x] 371 unit tests passing (up from 358), typecheck/lint/build/format clean.
+- Remaining findings from the review not addressed in this pass (tracked, not blocking): the
+  tightened "act as a" sanitizer regex now misses "act as a Linux terminal"/"act as DAN" phrasing;
+  memory-bank sanitizer redactions aren't merged into the structured report's `sanitizer` field
+  (console.warn only); the known SRI-hash base64 false positive is now reachable via memory-bank
+  content too (not just diffs), though it doesn't fire against this repo's own memory-bank today.
+
+### Structured JSON Output, Truncation Recovery, Memory-Bank Context Sanitization — 2026-07-25
+
+- [x] `format: 'json'` (Ollama's structured-output mode) now requested by `base.ts`'s `run()` and
+      `coverageAnalyst.ts`'s `runForCoverage()`. `ChatOptions.format` existed end-to-end but
+      nothing ever passed it. Not applied to `TestGenAgent` (outputs raw test code, not JSON).
+- [x] **Real result, not the expected one**: re-running calibration afterward showed
+      `format: 'json'` alone increases truncation frequency (11/16 cases vs. 1/16 before) rather
+      than reducing it — strict schema compliance appears to remove whatever slack let the model
+      wrap up more tersely before.
+- [x] Added a Stage 4 recovery path to `BaseAgent.parseFindings`:
+      `extractCompleteObjects()` scans for complete `{...}` objects regardless of whether the
+      enclosing array ever closes, salvaging whatever the model finished. This is what actually
+      carried the reliability improvement — all 11 truncated cases in the calibration re-run were
+      successfully salvaged.
+- [x] Caught and fixed a real regression in the recovery stage during implementation: a trivially
+      parseable garbage response (`"{}"`) was passing through as a successful "0 findings"
+      recovery instead of throwing `ParseFailureError` — exactly the silent-clean-pass anti-pattern
+      this project exists to prevent. Fixed by requiring at least one recovered object to actually
+      pass schema validation, not just parse.
+- [x] Full calibration re-run on `devstral:latest`: 15/16 passed (same as baseline), but with the
+      recovery stage doing real work instead of the truncation rate staying low on its own.
+- [x] Answered "are there any guardrails we are missing": `contextLoader.ts`'s comment falsely
+      claimed memory-bank context was already sanitized ("sanitizer applies separately") — it
+      wasn't; `sanitizeDiff()` was only ever called on the diff. Added `sanitizeText()` (scans
+      every line, since `sanitizeDiff`'s `+`-prefix convention is diff-specific) and wired it into
+      `runner.ts`'s `withContext`, respecting `--no-sanitize`.
+- [x] Dogfooding the above against this repo's own real memory-bank files caught a live false
+      positive: the sanitizer's "act as a" pattern fired on `activeContext.md`/`progress.md`'s own
+      prose describing that same bug. Tightened to require the phrase target an
+      AI/assistant/bot/model role (matching the existing "you are now" pattern) — confirmed real
+      injection attempts still match, this repo's memory-bank no longer false-positives.
+- [x] Attempted a fix for the SRI-hash base64 false positive found in the earlier architecture
+      review; a naive negative-lookbehind doesn't work (the regex engine finds an alternate
+      match-start position that bypasses it). Needs a proper code-level fix — deferred, not
+      implemented this pass.
+- [x] 358 unit tests passing, typecheck/lint/build/format clean. v1.8.0.
+- Open follow-up, not yet decided: add an explicit `num_predict` to directly counteract
+  `format: 'json'`'s higher truncation rate, now that there's concrete evidence it's needed,
+  rather than relying solely on the recovery stage.
+
 ### Actionable Truncation Warning; Parallel-by-Default Investigated and Rejected — 2026-07-25
 
 - [x] Strengthened the pre-flight diff-truncation stderr warning (`runner.ts`) to state the

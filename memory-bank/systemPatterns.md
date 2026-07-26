@@ -7,7 +7,7 @@ tags:
   - architecture/decisions
   - patterns/code
   - anti-patterns
-last-reviewed: 2026-07-25
+last-reviewed: 2026-07-26
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,7 +16,7 @@ lineage: []
 
 # System Patterns & Architecture Decisions
 
-**Last Updated**: 2026-07-25
+**Last Updated**: 2026-07-26
 
 ## Architecture Patterns
 
@@ -83,15 +83,40 @@ actually benefits from it.
 
 ## Code Patterns
 
-### BaseAgent — 3-Stage JSON Parse
+### BaseAgent — 4-Stage JSON Parse (2026-07-25)
 
-LLMs produce messy output. Parse in order:
+LLMs produce messy output. `BaseAgent.parseFindings` tries, in order:
 
-1. Parse entire response as JSON array
-2. Parse `{"findings": [...]}` wrapped object
-3. Regex-extract first JSON array from fenced block
+1. Parse entire response as a JSON array (or a `{"findings": [...]}` wrapped object)
+2. Parse `{"findings": [...]}` wrapped object (same try block as stage 1)
+3. Balanced-bracket extraction — find the first `[...]` span and require it to actually close,
+   handling trailing prose/code fences around the array
+4. Truncation recovery — scan the whole response for whatever complete `{...}` objects exist,
+   regardless of whether the enclosing array or a wrapper object around it ever closed. Salvages
+   findings the model finished before getting cut off instead of discarding all of them.
 
-**Never** fail hard on parse — fall back to empty array and log a warning.
+Stages 3 and 4 share two helpers exported from `src/core/parsing.ts` — `extractBalancedSpan`
+(single balanced span) and `extractCompleteObjects` (every complete `{...}` object anywhere in
+the text, at any nesting depth, via a stack of open-brace positions rather than a depth counter
+so a stray unmatched `}` can't desync the rest of the scan). `CoverageAnalystAgent` reuses the
+same two helpers for its own two-stage parse (its schema is `{"findings":[...],"gaps":[...]}`,
+one level of nesting deeper, which is exactly why it needs `extractCompleteObjects` rather than
+`extractBalancedSpan` alone to recover anything once the outer wrapper object is truncated).
+
+Every stage's recovered/parsed items still go through the same schema validation
+(`validateAndNormalizeFindings`) before being accepted. **Never** silently resolve to "0
+findings, clean run" on a response that didn't actually parse — if nothing recoverable passes
+validation, throw `ParseFailureError` (see `AgentStatus`/exit-code-2 reporting above). A
+trivially-parseable-but-empty response (e.g. `"{}"` for `BaseAgent`'s array-shaped schema) must
+still throw, not be treated as a successful zero-finding recovery — validate before checking
+`recovered.length > 0`, not after.
+
+All JSON-emitting agents (`BaseAgent` subclasses, `CoverageAnalystAgent`) also request Ollama's
+`format: 'json'` grammar-constrained decoding. This guarantees syntactic JSON validity but does
+**not** extend the model's generation budget — calibration testing found it actually _increases_
+truncation frequency on `devstral:latest` (1/16 → 11/16 cases in one run), which is precisely why
+stage 4 exists and why every `format:'json'` call site needs equivalent recovery. Not applied to
+`TestGenAgent`, which intentionally outputs raw test code, not JSON.
 
 ### OllamaProvider — Think-Tag Stripping
 
@@ -99,7 +124,11 @@ LLMs produce messy output. Parse in order:
 
 ### Agent Config
 
-All agents use `think: true`. Unlike Google-Organizer (which uses `think: false`), reasoning depth matters for code review quality.
+All agents request `think: true`, but `OllamaProvider.supportsThinking()` only honors it for
+models whose name starts with `qwen` or `deepseek-r1` — it's silently a no-op for the actual
+configured default (`devstral`), which doesn't support it. Unlike Google-Organizer (which uses
+`think: false` unconditionally), the intent is that reasoning depth matters for code review
+quality on models that support it.
 
 ### Finding Schema
 
