@@ -1,8 +1,8 @@
 {
-  "task": "Truncation-aware per-agent timeout scaling: scale agentTimeoutMs linearly (up to 2x) based on the (post-truncation) diff size relative to maxDiffLines, on by default, disabled automatically when --timeout is explicitly passed",
+  "task": "Strengthen the pre-flight diff-truncation stderr warning to be actionable (explicit line count excluded, remediation guidance). Investigate flipping parallel agent execution to the default -- empirically tested at real scale (14 concurrent agents, realistic diff size) and REJECTED after finding it causes near-total request serialization and spurious timeouts on this hardware; reverted to sequential-by-default with --parallel remaining as opt-in.",
   "status": "complete",
-  "created_at": "2026-07-18T09:00:00Z",
-  "expires_at": "2026-07-18T17:00:00Z",
+  "created_at": "2026-07-18T11:00:00Z",
+  "expires_at": "2026-07-18T19:00:00Z",
   "approved_by": "user",
   "scope": [
     { "file": "src/core/config.ts", "op": "edit" },
@@ -12,7 +12,9 @@
     { "file": "tests/unit/cli.test.ts", "op": "edit" },
     { "file": "CHANGELOG.md", "op": "edit" },
     { "file": "package.json", "op": "edit" },
+    { "file": "README.md", "op": "edit" },
     { "file": "memory-bank/activeContext.md", "op": "edit" },
-    { "file": "memory-bank/progress.md", "op": "edit" }
+    { "file": "memory-bank/progress.md", "op": "edit" },
+    { "file": "memory-bank/systemPatterns.md", "op": "edit" }
   ]
 }

@@ -200,9 +200,12 @@ export class SwarmRunner {
       keptLines: diffLines,
     }
     if (diffLines > this.config.maxDiffLines) {
+      const excludedLines = diffLines - this.config.maxDiffLines
       console.warn(
-        `[ai-review] diff is ${diffLines} lines (limit ${this.config.maxDiffLines}). ` +
-          `Truncating to first ${this.config.maxDiffLines} lines.`
+        `[ai-review] Diff truncated: ${excludedLines} of ${diffLines} lines were excluded ` +
+          `(kept the first ${this.config.maxDiffLines}, the --max-lines limit). Findings past ` +
+          `that point were never analyzed. Raise --max-lines to review the full diff, or split ` +
+          `it into smaller changes.`
       )
       input = {
         ...input,
@@ -425,6 +428,16 @@ export class SwarmRunner {
   ): Promise<ReviewResult> {
     const ping = await this.provider.ping()
     if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')
+
+    // --fail-fast's early exit is only checked in the sequential code path (shouldEarlyExit is
+    // never called from runAgentsParallel) -- warn instead of silently no-opping the flag when
+    // both are combined.
+    if (this.config.failFast && this.config.parallel) {
+      console.warn(
+        '[ai-review] --fail-fast has no effect while --parallel is enabled. ' +
+          "Drop --parallel to get --fail-fast's early exit."
+      )
+    }
 
     // Preprocess: ignore filtering, sanitization, truncation
     const preprocessed = await this.preprocessDiff(input)

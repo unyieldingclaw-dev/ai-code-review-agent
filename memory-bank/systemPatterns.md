@@ -7,7 +7,7 @@ tags:
   - architecture/decisions
   - patterns/code
   - anti-patterns
-last-reviewed: 2026-06-04
+last-reviewed: 2026-07-25
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,7 +16,7 @@ lineage: []
 
 # System Patterns & Architecture Decisions
 
-**Last Updated**: 2026-06-04
+**Last Updated**: 2026-07-25
 
 ## Architecture Patterns
 
@@ -50,9 +50,30 @@ SwarmRunner
 
 ### Sequential Execution
 
-**Decision**: Agents run one-at-a-time, not in parallel.
+**Decision**: Agents run one-at-a-time by default. `--parallel` is available as an explicit,
+off-by-default opt-in for hardware that's been verified to benefit from it.
 
-**Rationale**: Ollama is single-threaded; parallel requests queue anyway and add overhead.
+**Rationale**: Ollama serializes `devstral:latest` inference on this hardware — confirmed
+directly, not assumed. A 2026-07-25 investigation (prompted by a real bug report about slow
+security-profile runs) tried flipping this default to parallel-by-default. An initial test (4
+concurrent requests, a trivial short prompt) showed a ~1.63x wall-clock speedup and looked
+promising, but that result didn't hold at the scale and prompt size the default swarm actually
+uses. A follow-up test at real scale — 14 concurrent requests (matching the default agent count)
+with a realistic ~30KB diff prompt — showed near-linear serialization instead: completions at
+58.7s, 91.5s, 120.6s, 172.7s, 235.0s, 305.7s, then a header-timeout failure past 300s for a
+still-pending request. Reproduced with `curl` directly (bypassing Node's fetch client) using the
+short prompt to rule out a client-side connection-pool artifact — same staggered pattern. Since
+each queued request's client-side timeout clock starts the moment it's dispatched (not when
+Ollama actually begins generating for it), firing the full default swarm concurrently would have
+caused most agents to spuriously time out purely from queue wait — reproducing the exact
+"everything times out, 0 findings" failure mode this tool exists to prevent. The original
+"parallel requests queue anyway and add overhead" rationale was correct; the parallel-by-default
+change was reverted before shipping (`config.ts`'s `parallel: false` has the short version of
+this note). `ai-review-agent` has no Anthropic/Claude API integration — every review run is 100%
+local Ollama inference, so there's no token-cost pressure to justify accepting this reliability
+risk for a modest, hardware-dependent wall-clock speedup. `--parallel` remains available for
+users who've verified their own Ollama setup (e.g. more VRAM headroom, `OLLAMA_NUM_PARALLEL` > 1)
+actually benefits from it.
 
 ### Option B — Coexistence with PMB `/code-review`
 
@@ -110,7 +131,9 @@ Types: feat, fix, chore, docs, refactor, test, style
 
 ## Never Do This
 
-- ❌ Add parallel agent execution (Ollama can't use it)
+- ❌ Default agent execution to parallel without verifying it actually helps on real hardware at
+  real scale (see "Sequential Execution" above — a 2026-07-25 attempt looked good on a small,
+  unrepresentative test and made things worse at the real default scale)
 - ❌ Hard-fail on JSON parse errors (degrade gracefully)
 - ❌ Call Anthropic/OpenAI APIs in the review pipeline
 - ❌ Replace PMB's `/code-review` — both coexist

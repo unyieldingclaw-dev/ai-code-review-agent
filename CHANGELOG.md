@@ -3,6 +3,35 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.7.0] — 2026-07-25 (actionable truncation warning; parallel-by-default investigated and rejected)
+
+### Changed
+
+- The pre-flight diff-truncation stderr warning is now actionable: it states how many lines were
+  excluded and suggests raising `--max-lines` or splitting the change, instead of a bare factual
+  notice.
+- `README.md`'s CLI options table had a stale `--timeout` default (`60000`) left over from the
+  60s→180s fix in v1.4.0 — corrected.
+- `--fail-fast` now warns on stderr when combined with `--parallel`, since its early-exit check
+  only runs in the sequential code path and previously no-opped silently.
+
+### Investigated and explicitly rejected: parallel-by-default
+
+A real bug report (ACR's 4-agent security profile took ~22 minutes against a 4658-line diff)
+prompted flipping `DEFAULT_CONFIG.parallel` to `true`. An initial test (4 concurrent
+`devstral:latest` requests, a trivial short prompt) showed a ~1.63x speedup and looked
+promising. A deeper test at the real default scale — 14 concurrent requests (the actual default
+agent count) with a realistic ~30KB diff prompt — showed near-linear serialization instead:
+completions at 58.7s, 91.5s, 120.6s, 172.7s, 235.0s, 305.7s, then a header-timeout failure past
+300s for a still-pending request. Reproduced with `curl` directly (bypassing Node's fetch client)
+to rule out a client-side connection-pool artifact — same staggered pattern. Since each queued
+request's client-side timeout clock starts the moment it's dispatched (not when Ollama actually
+begins generating for it), defaulting to parallel would have caused most of the default 14-agent
+swarm to spuriously time out — reproducing the exact "everything times out, 0 findings" failure
+mode this tool exists to prevent, just via queueing instead of genuine slowness. `--parallel`
+remains available as an explicit opt-in for hardware verified to actually benefit from it. Full
+writeup in `memory-bank/systemPatterns.md`'s "Sequential Execution" section.
+
 ## [1.6.0] — 2026-07-18 (truncation-aware timeout scaling)
 
 ### Added

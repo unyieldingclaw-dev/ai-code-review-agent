@@ -16,9 +16,66 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-07-14
+**Last Updated**: 2026-07-25
 
 ## ✅ Completed (Tasks 1–16)
+
+### Actionable Truncation Warning; Parallel-by-Default Investigated and Rejected — 2026-07-25
+
+- [x] Strengthened the pre-flight diff-truncation stderr warning (`runner.ts`) to state the
+      excluded line count and suggest `--max-lines`/splitting the diff.
+- [x] Fixed a stale `README.md` CLI options table: `--timeout` default still said `60000`
+      (pre-dating the 60s→180s fix).
+- [x] `--fail-fast` now warns on stderr when combined with `--parallel` (its early-exit check
+      only runs in the sequential code path).
+- [x] **Investigated and reverted** a `parallel`-by-default change. Initial 4-concurrent-request,
+      trivial-prompt test showed a promising ~1.63x speedup; a deeper test at the real default
+      scale (14 concurrent requests, realistic ~30KB diff prompt) showed near-linear
+      serialization instead (completions at 58.7s/91.5s/120.6s/172.7s/235.0s/305.7s, then a
+      header-timeout past 300s), reproduced with `curl` directly to rule out a client-side
+      artifact. Defaulting to parallel would have caused most of the default 14-agent swarm to
+      spuriously time out from queue wait alone. Also confirmed the tool has zero Anthropic/Claude
+      API usage (100% local Ollama), so there was no token-cost pressure to justify the risk.
+      Reverted `DEFAULT_CONFIG.parallel` to `false`, `--no-parallel` back to opt-in `--parallel`,
+      and restored `memory-bank/systemPatterns.md`'s original rationale (updated with the
+      investigation's data rather than struck through as superseded).
+- [x] 348 unit tests passing, typecheck/lint/build/format clean. v1.7.0.
+- Deferred to follow-up PRs (same bug report, user-selected): retry with a shrunk prompt on
+  timeout, and parse-failure fallback extraction.
+
+### Model Configuration Verification — 2026-07-25
+
+- [x] Confirmed `DEFAULT_CONFIG.model: 'devstral:latest'` is consistently referenced everywhere
+      (including `calibration/calibrate.ts`) — no drift after more Ollama models were downloaded.
+- [x] Measured actual GPU/CPU split (not on-disk size) for every locally-downloaded model at the
+      real 32k context: `devstral:latest` 30% GPU, `deepseek-r1:14b` 38% GPU, `gemma3:12b` 49%
+      GPU, `qwen3:latest` 59% GPU, `gemma3:4b` **100% GPU** (only fully-resident option).
+- [x] Recommended not switching yet — no calibration evidence any alternative matches devstral's
+      review quality, and `gemma3:4b` is a large capability step down (4B vs 23.6B params).
+- Next (agreed, not started): add a model override to `calibration/calibrate.ts` (currently
+  hardcoded to `DEFAULT_CONFIG.model`, no env var/flag), then bake-off `qwen3:latest` and
+  `gemma3:12b` against the existing 16-case calibration suite.
+
+### Architecture Deep-Dive — 2026-07-25
+
+Prompted by an explicit "true design suggestions, not made up" request — verified findings only,
+no speculation. User approved items 1, 2, 4 for implementation (not yet started):
+
+1. `ChatOptions.format?: 'json'` (Ollama's structured-output mode) is fully plumbed end-to-end
+   but never called anywhere. Empirically confirmed it makes `devstral:latest` reliably emit
+   valid JSON — should reduce the `ParseFailureError` class of bug fought since v1.4.0.
+2. `--context-mode semantic`'s `loadAgentContextSemantic` has zero caching and is called once per
+   agent in `runner.ts`'s `withContext` closure — ~14x redundant Ollama embedding calls per run.
+3. `orchestrator.ts`'s `applyPublicationFilter` unconditionally discards all `severity: 'low'`
+   findings with no override, yet `complexity.ts`/`observability.ts` explicitly prompt the model
+   to generate them — wasted generation time, guaranteed to be thrown away.
+4. `sanitizer.ts`'s regexes false-positive on ordinary code, empirically reproduced: SRI
+   integrity hashes and comments like "act as a validator" get silently redacted. Zero test
+   coverage for this.
+5. `base.ts` unconditionally sends `think: true`, but it's only actually forwarded to Ollama for
+   `qwen`/`deepseek-r1` models, never `devstral` (the real default) — `systemPatterns.md`'s
+   "reasoning depth matters" claim doesn't describe what's actually running.
+6. `OrchestratorAgent` takes an unused `LLMProvider` constructor param (pure dead dependency).
 
 ### Truncation-Aware Timeout Scaling — 2026-07-18
 

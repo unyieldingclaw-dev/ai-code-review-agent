@@ -16,9 +16,69 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-07-14
+**Last Updated**: 2026-07-25
 
 ## Current Focus
+
+**Actionable truncation warning; parallel-by-default investigated and rejected (2026-07-25)**:
+follow-up to a real bug report (ACR's 4-agent security profile took ~22 minutes against a
+4658-line diff, zero findings). Initially implemented `DEFAULT_CONFIG.parallel: true` after a
+4-concurrent-request, trivial-prompt test showed a ~1.63x speedup — but a deeper test at the real
+default scale (14 concurrent requests, matching the actual default agent count, with a realistic
+~30KB diff prompt) showed near-linear serialization instead: completions at 58.7s, 91.5s, 120.6s,
+172.7s, 235.0s, 305.7s, then a header-timeout past 300s for a still-pending request. Reproduced
+with `curl` directly (bypassing Node's fetch client) to rule out a client-side artifact — same
+staggered pattern. Since each queued request's client-side timeout clock starts at dispatch, not
+when Ollama actually begins generating, defaulting to parallel would have caused most of the
+default swarm to spuriously time out — reproducing the exact "everything times out, 0 findings"
+bug this tool exists to prevent. Also confirmed `ai-review-agent` has zero Anthropic/Claude API
+integration (100% local Ollama inference), so there's no token-cost pressure to justify the
+reliability risk. **Reverted** `DEFAULT_CONFIG.parallel` back to `false`, `--no-parallel` back to
+plain opt-in `--parallel`, and `memory-bank/systemPatterns.md`'s original "Sequential Execution"
+rationale back (it was correct all along — updated with the investigation's findings rather than
+struck through). Kept: the truncation-warning wording improvement (unrelated, still good), and
+the `--fail-fast`+`--parallel` combination warning (still useful for opt-in parallel users).
+Shipped as v1.7.0, 348 tests. This repo's own `/code-review` pre-commit gate caught 2 real
+Blocking findings on the (pre-revert) parallel-default version, both moot after the revert. Model
+choice was separately investigated (see "Model configuration" below) — `devstral:latest` remains
+correct; a real bake-off against `qwen3:latest`/`gemma3:12b` is next. Deferred to follow-up PRs
+per the same bug report: retry with a shrunk prompt on timeout, and parse-failure fallback
+extraction (surface the model's raw response instead of discarding it). A separate deep
+architecture review (same session) surfaced 6 more findings — see "Architecture review findings"
+below.
+
+**Architecture review findings (2026-07-25)**: a request for "true design suggestions, not made
+up" prompted a verified (not speculative) pass over the core source. Highest-value: (1)
+`ChatOptions.format?: 'json'` is fully plumbed (`provider.ts`, `ollamaProvider.ts`) but never
+called anywhere — empirically confirmed `format: "json"` makes `devstral:latest` reliably emit
+syntactically valid JSON, which should reduce the `ParseFailureError`/prose-instead-of-JSON class
+of bug this project has fought since v1.4.0. (2) `--context-mode semantic`
+(`loadAgentContextSemantic` in `contextLoader.ts`) has zero caching and is called once per agent
+in `runner.ts`'s `withContext` closure — ~14x redundant Ollama embedding calls per run for
+identical inputs, adding unnecessary contention on top of the concurrency findings above. (3)
+`orchestrator.ts`'s `applyPublicationFilter` unconditionally discards all `severity: 'low'`
+findings with no override, yet `complexity.ts` and `observability.ts` explicitly instruct the
+model to generate them — pure wasted generation time for those two agents. (4) `sanitizer.ts`'s
+regex heuristics false-positive on ordinary code — empirically reproduced: SRI integrity hashes
+(`sha512-...`, common in dependency-update diffs) and comments like "act as a validator" both get
+silently redacted before reaching the LLM; zero existing tests check for this. (5) `base.ts`
+unconditionally sends `think: true`, but `OllamaProvider.supportsThinking()` only forwards it for
+`qwen`/`deepseek-r1` models — never `devstral`, the actual default — so `systemPatterns.md`'s
+"reasoning depth matters" claim doesn't describe what's actually running. (6) `OrchestratorAgent`
+takes an unused `LLMProvider` constructor param (100% deterministic synthesis, no LLM calls).
+User approved items 1, 2, 4 as worth implementing; not yet started.
+
+**Model configuration investigation (2026-07-25)**: user asked to verify the correct Ollama model
+is configured given more models were downloaded. Confirmed `DEFAULT_CONFIG.model: 'devstral:latest'`
+(`config.ts:38`) is consistently referenced everywhere (including `calibration/calibrate.ts:138`)
+— no drift or misconfiguration. Measured actual GPU/CPU split at the real 32k context for every
+locally-downloaded model: `devstral:latest` 20GB/30%-GPU, `deepseek-r1:14b` 15GB/38%-GPU,
+`gemma3:12b` 9.1GB/49%-GPU, `qwen3:latest` 10GB/59%-GPU, `gemma3:4b` 2.9GB/**100%-GPU** (the only
+fully GPU-resident option). Recommendation: don't switch yet — no evidence any alternative
+matches devstral's review quality on this project's calibration suite, and `gemma3:4b`
+specifically is a large capability step down (4B vs 23.6B params). `calibration/calibrate.ts` has
+no model override (hardcoded to `DEFAULT_CONFIG.model`) — adding one to run a real bake-off
+against `qwen3:latest`/`gemma3:12b` is the agreed next step, not yet started.
 
 **Truncation-aware timeout scaling (2026-07-18)**: follow-up to diff-truncation visibility
 below, addressing the same bug report's other suggested fix. `agentTimeoutMs` was flat
@@ -92,7 +152,7 @@ All 5 checks verified passing locally (295/295 tests) before the workflow was ad
 - `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, continue-on-error, 10min timeout
-- **297 unit tests** across 37 test files
+- **348 unit tests** across 39 test files
 - `src/core/parsing.ts`: `validateAndNormalizeFindings()` extracted from BaseAgent (SRP)
 - `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
 - `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable
@@ -198,3 +258,4 @@ node dist/cli/index.js --help   # smoke test CLI
 - 2026-06-19: v0.9.3 — DependenciesAgent prompt restructured to lead with REQUIRED OUTPUT FORMAT + few-shot example. devstral now outputs valid Finding schema for package.json diffs. 16/16 calibration PASS confirmed. Committed `754ee08`.
 - 2026-06-15: v0.8.0 — 5 new specialist agents (ErrorHandlingAgent, ObservabilityAgent, MigrationSafetyAgent, SecretsAgent, ComplexityAgent), `shell.ts` runTool(), conditional MigrationSafety skip in SwarmRunner, 32 new unit tests (112 total), 5 calibration fixtures, DEFAULT_CONFIG updated to 16 agents, package.json v0.8.0, README updated. Tasks 1–9 committed. Task 10 (final verification + tag) is next.
 - 2026-07-14: AbortSignal/timeout-cancellation fix — `withTimeout` now cancels the losing side of the race instead of leaving it running server-side; fixed a `clearTimeout` gap found in review; unrelated CI fix (`shell: bash` default in `review.yml`, was silently defaulting to pwsh on the self-hosted Windows runner). 297 unit tests passing.
+- 2026-07-25: v1.7.0 — attempted flipping `parallel` default to `true` after a promising small-scale test, then reverted after a deeper test at real scale (14 concurrent, realistic diff size) showed near-linear serialization and spurious-timeout risk. Kept the truncation-warning wording improvement. Separately: verified `devstral:latest` remains the correct configured model after more Ollama models were downloaded (measured GPU/CPU split for all of them); ran a "not made up" architecture deep-dive that found `format: 'json'` is unused, `--context-mode semantic` recomputes embeddings ~14x redundantly, and the sanitizer false-positives on real code (SRI hashes, common comments). 348 unit tests passing.

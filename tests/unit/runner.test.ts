@@ -39,7 +39,8 @@ describe('SwarmRunner', () => {
     const largeDiff = Array.from({ length: 10 }, (_, i) => `line ${i}`).join('\n')
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const result = await runner.run({ diff: largeDiff })
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Truncating'))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('7 of 10 lines were excluded'))
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('--max-lines'))
     expect(result.findings).toBeInstanceOf(Array)
     expect(result.truncation).toEqual({ truncated: true, originalLines: 10, keptLines: 3 })
     warnSpy.mockRestore()
@@ -309,6 +310,35 @@ describe('SwarmRunner', () => {
     expect(endEvents).toHaveLength(1)
     expect(endEvents[0].findings).toBeInstanceOf(Array)
     expect(typeof endEvents[0].elapsedMs).toBe('number')
+  })
+
+  it('warns that --fail-fast has no effect when --parallel is also enabled', async () => {
+    const provider = makeProvider()
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      failFast: true,
+      parallel: true,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await runner.run({ diff: 'diff' })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('--fail-fast has no effect'))
+    warnSpy.mockRestore()
+  })
+
+  it('does not warn about --fail-fast when parallel is left at its default (sequential)', async () => {
+    const provider = makeProvider()
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      failFast: true,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await runner.run({ diff: 'diff' })
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('--fail-fast has no effect'))
+    warnSpy.mockRestore()
   })
 
   it('failFast stops swarm after critical finding; remaining agents not called', async () => {
