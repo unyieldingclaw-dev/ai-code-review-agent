@@ -62,12 +62,14 @@ The original finding catalogued 4 duplicated functions per language (`sha256_fil
 surface is different:
 
 **Bash** — 3 functions duplicated verbatim across both `.sh` files:
+
 - `sha256_file(file)`
 - `diff_hash(...)` (mktemp + redirect + hash + cleanup, with an EXIT trap)
 - `resolve_cd_root()` — already embeds the JSON `tool_input.command` extraction inline via a
   `python3` heredoc. There is no separate `extract_command()`.
 
 **PowerShell** — duplication is uneven, and worse in one place than the finding assumed:
+
 - `Get-FileHashHex($Path)` — duplicated verbatim, both files.
 - `Get-CommitDiffHash` / `Get-PushDiffHash` — defined in `review-reminders.ps1`, but
   `review-reminders-post.ps1` does **not** call them. It inlines the same diff+hash pattern a
@@ -115,13 +117,13 @@ fourth (blast radius) is an accepted, deliberate tradeoff, addressed explicitly 
   the global `$input` (raw JSON stdin payload) before calling it — today's implicit contract,
   preserved as-is rather than changed to take a parameter, to keep the extraction surgical.
   This is safe to leave implicit because nothing else in either bash hook file needs the
-  *parsed* command value — the surrounding `case "$input" in *'git commit'*)` matching in both
+  _parsed_ command value — the surrounding `case "$input" in *'git commit'*)` matching in both
   bash files operates on the **raw** stdin string, not a parsed field, so JSON parsing only
   ever happens inside `resolve_cd_root()` itself.
 - PowerShell `Resolve-CdRoot($cmd)` **takes the already-parsed `$cmd` string as an explicit
   parameter** — a deliberate divergence from bash's implicit-global convention, not an
   oversight. Both PowerShell hook files already parse `$raw` into `$cmd` near the top of the
-  file (`($raw | ConvertFrom-Json).tool_input.command`) because their *own* subsequent
+  file (`($raw | ConvertFrom-Json).tool_input.command`) because their _own_ subsequent
   case-matching (`$cmd -match 'git\s+commit\b'`, etc.) operates on the parsed value, not the
   raw payload — unlike bash, PowerShell needs the parsed command string for reasons unrelated
   to root-resolution. Since the caller has already parsed `$cmd` for its own purposes before
