@@ -19,7 +19,7 @@ import { loadAgentContext, loadAgentContextSemantic } from './contextLoader.js'
 import type { ContextResult } from './contextLoader.js'
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
 import { evaluatePolicy, extractChangedFiles } from './policyFilter.js'
-import { sanitizeDiff } from './sanitizer.js'
+import { sanitizeDiff, sanitizeText } from './sanitizer.js'
 import { BreakingChangeAgent } from './agents/breakingChange.js'
 import { LicenseComplianceAgent } from './agents/licenseCompliance.js'
 import { BaseAgent } from './agents/base.js'
@@ -200,9 +200,12 @@ export class SwarmRunner {
       keptLines: diffLines,
     }
     if (diffLines > this.config.maxDiffLines) {
+      const excludedLines = diffLines - this.config.maxDiffLines
       console.warn(
-        `[ai-review] diff is ${diffLines} lines (limit ${this.config.maxDiffLines}). ` +
-          `Truncating to first ${this.config.maxDiffLines} lines.`
+        `[ai-review] Diff truncated: ${excludedLines} of ${diffLines} lines were excluded ` +
+          `(kept the first ${this.config.maxDiffLines}, the --max-lines limit). Findings past ` +
+          `that point were never analyzed. Raise --max-lines to review the full diff, or split ` +
+          `it into smaller changes.`
       )
       input = {
         ...input,
@@ -426,11 +429,31 @@ export class SwarmRunner {
     const ping = await this.provider.ping()
     if (!ping.ok) throw new Error(ping.error ?? 'LLM provider not available')
 
+    // --fail-fast's early exit is only checked in the sequential code path (shouldEarlyExit is
+    // never called from runAgentsParallel) -- warn instead of silently no-opping the flag when
+    // both are combined.
+    if (this.config.failFast && this.config.parallel) {
+      console.warn(
+        '[ai-review] --fail-fast has no effect while --parallel is enabled. ' +
+          "Drop --parallel to get --fail-fast's early exit."
+      )
+    }
+
     // Preprocess: ignore filtering, sanitization, truncation
     const preprocessed = await this.preprocessDiff(input)
     input = preprocessed.input
     const sanitizerMeta = preprocessed.sanitizerMeta
     const truncationMeta = preprocessed.truncationMeta
+
+    // --no-sanitize disables diff sanitization above (own warning already printed in
+    // preprocessDiff); when memory-bank context is also in play, it disables that too --
+    // preprocessDiff doesn't know about contextMode, so this scope is covered here instead.
+    if (this.config.sanitize === false && contextMode === 'memory-bank') {
+      process.stderr.write(
+        '[ai-review] WARNING: --no-sanitize is active. Prompt injection from memory-bank ' +
+          'context is not prevented either.\n'
+      )
+    }
     const effectiveTimeoutMs = this.config.timeoutScalingEnabled
       ? scaleAgentTimeout(
           this.config.agentTimeoutMs,
@@ -467,7 +490,30 @@ export class SwarmRunner {
         if (ctx.truncated) anyTruncated = true
         totalTokens += ctx.estimatedTokens
       }
-      return ctx.content ? { ...input, context: ctx.content } : input
+      if (!ctx.content) return input
+
+      // Memory-bank files are data, not instructions -- but nothing enforced that until now.
+      // Sanitize the same way the diff itself is sanitized, since memory-bank content can be
+      // AI-edited or come from a shared/multi-contributor repo just like diff content can.
+      let context = ctx.content
+      if (this.config.sanitize !== false) {
+        const sanitizeResult = sanitizeText(context)
+        for (const w of sanitizeResult.warnings) {
+          console.warn(`[ai-review] ${w} (memory-bank context for ${agentName})`)
+        }
+        if (sanitizeResult.applied) {
+          context = sanitizeResult.sanitized
+          // Merge into the same metadata object the final report exposes as `sanitizer` --
+          // this used to be console.warn-only, invisible to any structured (JSON/markdown)
+          // consumer of the report even though a real redaction had happened.
+          sanitizerMeta.applied = true
+          sanitizerMeta.redactedLines += sanitizeResult.redactedLines
+          sanitizerMeta.warnings.push(
+            ...sanitizeResult.warnings.map((w) => `${w} (memory-bank context for ${agentName})`)
+          )
+        }
+      }
+      return { ...input, context }
     }
 
     // Determine which agents will run — hoist before coverage so total is known upfront

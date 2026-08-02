@@ -85,6 +85,15 @@ export class OllamaProvider implements LLMProvider {
   }
 
   private stripThinkTags(text: string): string {
-    return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+    const withClosedTagsRemoved = text.replace(/<think>[\s\S]*?<\/think>/g, '')
+    // A <think> block that never closed (response truncated mid-reasoning) has no real JSON
+    // answer after it -- drop it and everything following, rather than leaving raw reasoning
+    // prose in the response where BaseAgent's truncation-recovery pass could mistake a
+    // coincidentally schema-shaped object inside the model's unstripped chain-of-thought for
+    // a real finding it never actually asserted as output.
+    const openThinkIndex = withClosedTagsRemoved.indexOf('<think>')
+    const stripped =
+      openThinkIndex === -1 ? withClosedTagsRemoved : withClosedTagsRemoved.slice(0, openThinkIndex)
+    return stripped.trim()
   }
 }

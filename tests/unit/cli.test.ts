@@ -375,4 +375,22 @@ describe('CLI — argument parsing and output', () => {
     const config = MockSwarmRunner.mock.calls[0][0]
     expect(config.timeoutScalingEnabled).toBe(true)
   })
+
+  it('--parallel enables parallel execution', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli(['--parallel'])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    expect(config.parallel).toBe(true)
+  })
+
+  it('leaves parallel execution off by default when --parallel is not passed', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli([])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    expect(config.parallel).toBe(false)
+  })
 })

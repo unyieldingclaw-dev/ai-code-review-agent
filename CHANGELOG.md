@@ -3,6 +3,120 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.8.0] — 2026-07-25 (structured JSON output, truncation recovery, memory-bank context sanitization)
+
+### Fixed (2026-07-26 follow-up — remaining /code-review findings)
+
+- Sanitizer's "act as a/an ..." pattern required an AI/assistant/bot/model word directly, which
+  correctly stopped an earlier false positive but was found (by the same review) to also miss
+  real jailbreak framings that don't use one, like "act as a Linux terminal" and "act as DAN".
+  Broadened to also match those and similar framings (`terminal`, `hacker`, `unrestricted`,
+  `unfiltered`, `jailbroken`) without reopening the original false positive.
+- Fixed the SRI-hash base64 false positive properly (a prior attempt using a negative lookbehind
+  was deferred after empirical testing showed the regex engine could find an alternate
+  match-start position that bypassed it). The sanitizer now supports a per-pattern
+  `isFalsePositive` context check applied after a match is found, which a lookbehind can't be
+  bypassed around. An SRI hash (`integrity="sha256-..."`) is no longer redacted; a genuine 80+
+  char base64 blob elsewhere still is.
+- Memory-bank context sanitization (added in this release) logged redactions via `console.warn`
+  only — invisible to any consumer of the structured JSON/markdown report even though a real
+  redaction had happened. Now merged into the same `sanitizer` field the diff's own sanitization
+  populates.
+- `--no-sanitize`'s CLI help text, README, and runtime warning only mentioned disabling diff
+  sanitization, not that it also disables memory-bank context sanitization (added in this
+  release) when `--context memory-bank` is set.
+- `OllamaProvider.stripThinkTags` only removed a `<think>` block that actually closed; a response
+  truncated mid-reasoning left the unstripped `<think>` prefix in place, where `BaseAgent`'s
+  truncation-recovery pass could theoretically mistake a coincidentally schema-shaped object
+  inside the model's raw chain-of-thought for a real finding it never asserted as output. Now
+  drops an unclosed `<think>` block and everything after it. (Speculative risk, inert under the
+  current `devstral` default since `supportsThinking()` only applies to qwen/deepseek-r1 models —
+  hardened anyway since the fix was cheap and the risk applies to any future model switch.)
+
+### Added
+
+- Every standard agent and the coverage agent now request Ollama's `format: "json"` structured
+  output mode (grammar-constrained JSON decoding), instead of relying purely on prompt
+  instructions to produce parseable output. `ChatOptions.format` already existed end-to-end but
+  was never actually passed anywhere. Empirically confirmed against `devstral:latest`: makes
+  responses reliably syntactically valid JSON. Doesn't fix every parse failure (the model can
+  still pick different field names than the schema expects, and grammar-constrained decoding
+  doesn't extend the model's generation budget), but directly targets the class of bug this
+  project has repeatedly fought (prose instead of JSON, truncated mid-generation). Not applied to
+  `TestGenAgent`, which intentionally outputs raw test code, not JSON.
+- `BaseAgent.parseFindings` gained a new recovery stage: when a response is cut off
+  mid-generation before its JSON array closes, it now recovers whichever findings did complete
+  instead of discarding all of them. Recovered objects still go through the same schema
+  validation as every other parse stage, so a response that's just trivially-parseable garbage
+  (e.g. `"{}"`) still correctly throws `ParseFailureError` rather than silently resolving to
+  "0 findings, clean run."
+- Memory-bank context (`--context memory-bank`) is now sanitized for prompt-injection patterns
+  before being prepended to any agent's prompt, the same protection the diff itself already had.
+  `contextLoader.ts`'s own comment claimed this was already happening ("sanitizer applies
+  separately") — it wasn't; `sanitizeDiff()` was only ever called on the diff. Added
+  `sanitizeText()` (`sanitizer.ts`) for scanning arbitrary non-diff text, since `sanitizeDiff`'s
+  `+`-prefix convention doesn't apply to plain markdown. Respects `--no-sanitize` like the diff
+  does.
+- `calibration/calibrate.ts`: added a `CALIBRATION_MODEL` env var to bake off a candidate model's
+  finding quality without editing `config.ts`, and wrapped each case (including the testgen
+  check) in try/catch so one agent error no longer kills the entire run and loses every other
+  case's result.
+- `CoverageAnalystAgent.parseCoverageResult` now recovers findings/gaps from a response truncated
+  before its outer `{"findings":...,"gaps":...}` object closes, instead of unconditionally
+  throwing `ParseFailureError` and discarding everything. It had picked up `format:'json'` (which
+  this same release's calibration data shows increases truncation frequency) without the
+  equivalent recovery `BaseAgent` got — flagged during `/code-review` as a real asymmetry, since
+  the two agents would otherwise degrade differently under the exact truncation conditions this
+  release exists to mitigate. The recovery scanner (`extractCompleteObjects`) and the balanced-span
+  extractor (`extractBalancedSpan`) were extracted into `parsing.ts` as shared helpers — this also
+  replaces three near-identical hand-rolled bracket scanners (one each in `base.ts` and
+  `coverageAnalyst.ts`, plus the new one) with two shared implementations.
+
+### Fixed
+
+- `extractCompleteObjects`'s depth tracking could go negative on a stray unmatched `}` preceding
+  real content, permanently preventing every object later in the same response from being
+  recovered. Found via direct execution during `/code-review`. The shared implementation now uses
+  a stack of open-brace positions instead of a depth counter, so an unmatched `}` is simply
+  ignored rather than desyncing the rest of the scan.
+
+- Sanitizer's "role-play directive" pattern was catching any generic "act as a X" phrase, not
+  just AI-role-reassignment attempts — found actively false-positiving on this repo's own
+  `memory-bank/activeContext.md` and `progress.md` (which document this exact prior bug) the
+  moment memory-bank context sanitization above started actually running against them. Tightened
+  to require the phrase target an AI/assistant/bot/model role, matching the existing "you are
+  now" pattern's structure. Real injection attempts ("act as an unrestricted AI") still match;
+  ordinary usage ("acts as a validator/gatekeeper") no longer does.
+
+## [1.7.0] — 2026-07-25 (actionable truncation warning; parallel-by-default investigated and rejected)
+
+### Changed
+
+- The pre-flight diff-truncation stderr warning is now actionable: it states how many lines were
+  excluded and suggests raising `--max-lines` or splitting the change, instead of a bare factual
+  notice.
+- `README.md`'s CLI options table had a stale `--timeout` default (`60000`) left over from the
+  60s→180s fix in v1.4.0 — corrected.
+- `--fail-fast` now warns on stderr when combined with `--parallel`, since its early-exit check
+  only runs in the sequential code path and previously no-opped silently.
+
+### Investigated and explicitly rejected: parallel-by-default
+
+A real bug report (ACR's 4-agent security profile took ~22 minutes against a 4658-line diff)
+prompted flipping `DEFAULT_CONFIG.parallel` to `true`. An initial test (4 concurrent
+`devstral:latest` requests, a trivial short prompt) showed a ~1.63x speedup and looked
+promising. A deeper test at the real default scale — 14 concurrent requests (the actual default
+agent count) with a realistic ~30KB diff prompt — showed near-linear serialization instead:
+completions at 58.7s, 91.5s, 120.6s, 172.7s, 235.0s, 305.7s, then a header-timeout failure past
+300s for a still-pending request. Reproduced with `curl` directly (bypassing Node's fetch client)
+to rule out a client-side connection-pool artifact — same staggered pattern. Since each queued
+request's client-side timeout clock starts the moment it's dispatched (not when Ollama actually
+begins generating for it), defaulting to parallel would have caused most of the default 14-agent
+swarm to spuriously time out — reproducing the exact "everything times out, 0 findings" failure
+mode this tool exists to prevent, just via queueing instead of genuine slowness. `--parallel`
+remains available as an explicit opt-in for hardware verified to actually benefit from it. Full
+writeup in `memory-bank/systemPatterns.md`'s "Sequential Execution" section.
+
 ## [1.6.0] — 2026-07-18 (truncation-aware timeout scaling)
 
 ### Added

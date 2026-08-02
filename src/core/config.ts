@@ -79,6 +79,16 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   contextMode: 'static',
   failFast: false,
   failOn: 'high',
+  // WHY false by default: a "parallel by default" change was implemented and empirically tested
+  // in depth (2026-07-25) before being reverted -- see memory-bank/systemPatterns.md's "Parallel
+  // Execution" section for the full investigation and data. Short version: an initial 4-request,
+  // trivial-prompt test showed a ~1.63x speedup, but that didn't hold at the real default scale
+  // (14 agents) or with realistic diff-sized prompts -- concurrent requests queue almost fully
+  // serially on this VRAM-constrained hardware (confirmed with both Node's fetch and curl,
+  // ruling out a client-side artifact), and each queued request's client-side timeout clock
+  // keeps running while it waits its turn, causing most of the swarm to spuriously time out.
+  // `--parallel` remains available as an explicit opt-in for hardware where it's been verified
+  // to actually help.
   parallel: false,
 }
 

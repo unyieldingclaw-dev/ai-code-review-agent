@@ -66,15 +66,24 @@ program
       `Exit 2 takes priority over this if any agent failed.`,
     'high'
   )
-  .option('--fail-fast', 'Stop swarm on first finding at or above --fail-on threshold')
-  .option('--parallel', 'Run specialist agents in parallel (faster; disables fail-fast early exit)')
+  .option(
+    '--fail-fast',
+    'Stop swarm on first finding at or above --fail-on threshold (requires sequential execution -- has no effect with --parallel)'
+  )
+  .option(
+    '--parallel',
+    'Run specialist agents concurrently (faster on hardware where Ollama can genuinely overlap requests; disables --fail-fast early exit). Off by default -- verify it helps on your hardware before enabling'
+  )
   .option(
     '--ignore <pattern>',
     'Exclude files matching this glob pattern (repeatable)',
     collect,
     [] as string[]
   )
-  .option('--no-sanitize', 'Skip prompt-injection sanitization of the diff')
+  .option(
+    '--no-sanitize',
+    'Skip prompt-injection sanitization of the diff, and of memory-bank context when --context memory-bank is also set'
+  )
   .option(
     '--suggest-tests',
     'Enable testgen agent and include suggestions in report (no files written)'

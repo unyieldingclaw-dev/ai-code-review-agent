@@ -135,7 +135,10 @@ const CASES: CalibrationCase[] = [
 ]
 
 async function main() {
-  const provider = new OllamaProvider(DEFAULT_CONFIG.ollamaUrl, DEFAULT_CONFIG.model)
+  // Override which model calibration runs against without editing config.ts -- e.g. to bake
+  // off a candidate model's finding quality: CALIBRATION_MODEL=qwen3:latest npm run calibrate
+  const model = process.env.CALIBRATION_MODEL || DEFAULT_CONFIG.model
+  const provider = new OllamaProvider(DEFAULT_CONFIG.ollamaUrl, model)
 
   // Check 1: Ollama reachable
   const ping = await provider.ping()
@@ -156,15 +159,15 @@ async function main() {
       signal: AbortSignal.timeout(3000),
     })
     const data = (await res.json()) as { models: Array<{ name: string }> }
-    if (!data.models.some((m) => m.name === DEFAULT_CONFIG.model)) {
+    if (!data.models.some((m) => m.name === model)) {
       printBox([
         'CALIBRATION SKIPPED — model not available',
         '',
-        `  Required model: ${DEFAULT_CONFIG.model}`,
+        `  Required model: ${model}`,
         '  Ollama is running but this model is not pulled.',
         '',
         'Solution:',
-        `  ollama pull ${DEFAULT_CONFIG.model}`,
+        `  ollama pull ${model}`,
         '  then: npm run calibrate',
       ])
       process.exit(1)
@@ -199,24 +202,29 @@ async function main() {
   for (const c of CASES) {
     process.stdout.write(`\nRunning calibration: ${c.name}...\n`)
     const diff = readFileSync(c.fixtureFile, 'utf-8')
-    const rawFindings: Finding[] = await agentMap[c.name].run({ diff })
-    const findings = orch.synthesize(rawFindings)
+    try {
+      const rawFindings: Finding[] = await agentMap[c.name].run({ diff })
+      const findings = orch.synthesize(rawFindings)
 
-    const hasLegitimate = findings.some(
-      (f) =>
-        f.title.toLowerCase().includes(c.expectedKeyword.toLowerCase()) ||
-        f.detail.toLowerCase().includes(c.expectedKeyword.toLowerCase())
-    )
-    const hasBait = findings.some(
-      (f) => f.title.includes(c.baitKeyword) || f.detail.includes(c.baitKeyword)
-    )
+      const hasLegitimate = findings.some(
+        (f) =>
+          f.title.toLowerCase().includes(c.expectedKeyword.toLowerCase()) ||
+          f.detail.toLowerCase().includes(c.expectedKeyword.toLowerCase())
+      )
+      const hasBait = findings.some(
+        (f) => f.title.includes(c.baitKeyword) || f.detail.includes(c.baitKeyword)
+      )
 
-    if (hasLegitimate && !hasBait) {
-      console.log(`  ✅ PASS — found '${c.expectedKeyword}', rejected '${c.baitKeyword}'`)
-      passed++
-    } else {
-      if (!hasLegitimate) console.log(`  ❌ FAIL — missed '${c.expectedKeyword}'`)
-      if (hasBait) console.log(`  ❌ FAIL — false positive '${c.baitKeyword}'`)
+      if (hasLegitimate && !hasBait) {
+        console.log(`  ✅ PASS — found '${c.expectedKeyword}', rejected '${c.baitKeyword}'`)
+        passed++
+      } else {
+        if (!hasLegitimate) console.log(`  ❌ FAIL — missed '${c.expectedKeyword}'`)
+        if (hasBait) console.log(`  ❌ FAIL — false positive '${c.baitKeyword}'`)
+        failed++
+      }
+    } catch (err) {
+      console.log(`  ❌ FAIL — agent error: ${(err as Error).message}`)
       failed++
     }
   }
@@ -224,30 +232,35 @@ async function main() {
   // TestGen: verify test generation from gaps
   {
     process.stdout.write(`\nRunning calibration: testgen...\n`)
-    const diff = readFileSync('calibration/fixtures/testgen.diff', 'utf-8')
-    const testGen = new TestGenAgent(provider, DEFAULT_CONFIG)
-    const { testFiles } = await testGen.runWithGaps({ diff }, [
-      {
-        file: 'src/billing/invoice.ts',
-        functionName: 'calculateTax',
-        lineStart: 1,
-        lineEnd: 9,
-        description:
-          'Calculates tax by multiplying subtotal by taxRate, rounds to 2 decimal places. Validates taxRate is 0-1.',
-      },
-    ])
-    const hasTestContent =
-      testFiles.length > 0 && testFiles[0].content.toLowerCase().includes('calculatetax')
-    if (hasTestContent) {
-      console.log(`  ✅ PASS — generated test file with calculateTax coverage`)
-      passed++
-    } else {
-      console.log(`  ❌ FAIL — no test content generated for calculateTax`)
+    try {
+      const diff = readFileSync('calibration/fixtures/testgen.diff', 'utf-8')
+      const testGen = new TestGenAgent(provider, DEFAULT_CONFIG)
+      const { testFiles } = await testGen.runWithGaps({ diff }, [
+        {
+          file: 'src/billing/invoice.ts',
+          functionName: 'calculateTax',
+          lineStart: 1,
+          lineEnd: 9,
+          description:
+            'Calculates tax by multiplying subtotal by taxRate, rounds to 2 decimal places. Validates taxRate is 0-1.',
+        },
+      ])
+      const hasTestContent =
+        testFiles.length > 0 && testFiles[0].content.toLowerCase().includes('calculatetax')
+      if (hasTestContent) {
+        console.log(`  ✅ PASS — generated test file with calculateTax coverage`)
+        passed++
+      } else {
+        console.log(`  ❌ FAIL — no test content generated for calculateTax`)
+        failed++
+      }
+    } catch (err) {
+      console.log(`  ❌ FAIL — agent error: ${(err as Error).message}`)
       failed++
     }
   }
 
-  console.log(`\nCalibration: ${passed} passed, ${failed} failed`)
+  console.log(`\nCalibration [${model}]: ${passed} passed, ${failed} failed`)
   process.exit(failed > 0 ? 1 : 0)
 }
 

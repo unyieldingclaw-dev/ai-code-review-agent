@@ -21,6 +21,86 @@ export function classifyAgentError(err: unknown): AgentStatus {
   return 'error'
 }
 
+// Shared string/escape-aware bracket scanner, used by every agent that has to recover JSON
+// from LLM output that may have trailing prose or get cut off mid-generation. Depth is clamped
+// at 0 so a stray unmatched close-bracket before the real content can't desync the rest of the
+// scan (e.g. `extractCompleteObjects('}{"a":1}')` still recovers `{"a":1}` instead of silently
+// dropping every object for the rest of the text).
+
+/** Finds the first `open`...`close` span in `text` and returns it only if it actually closes
+ *  (i.e. isn't truncated). Returns null if `open` never appears or the span never balances. */
+export function extractBalancedSpan(text: string, open: string, close: string): string | null {
+  const start = text.indexOf(open)
+  if (start === -1) return null
+  let depth = 0
+  let inString = false
+  let esc = false
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (esc) {
+      esc = false
+      continue
+    }
+    if (ch === '\\' && inString) {
+      esc = true
+      continue
+    }
+    if (ch === '"') {
+      inString = !inString
+      continue
+    }
+    if (inString) continue
+    if (ch === open) depth++
+    else if (ch === close) {
+      depth = Math.max(0, depth - 1)
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+  return null
+}
+
+/** Scans the entire text for complete `{...}` objects at any nesting depth, regardless of
+ *  whether any enclosing array/object ever closes -- recovers whatever finished objects exist
+ *  before a truncation point instead of discarding all of them because the last one never
+ *  completed. A stack of open-brace positions means a stray unmatched `}` is simply ignored
+ *  (nothing to pop) rather than desyncing recovery for the rest of the text, and an object
+ *  nested inside an outer wrapper that itself never closes (e.g. `{"findings":[{...}],"gaps":[..
+ *  truncated) is still recovered on its own. */
+export function extractCompleteObjects(text: string): unknown[] {
+  const objects: unknown[] = []
+  const starts: number[] = []
+  let inString = false
+  let esc = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (esc) {
+      esc = false
+      continue
+    }
+    if (ch === '\\' && inString) {
+      esc = true
+      continue
+    }
+    if (ch === '"') {
+      inString = !inString
+      continue
+    }
+    if (inString) continue
+    if (ch === '{') {
+      starts.push(i)
+    } else if (ch === '}') {
+      const start = starts.pop()
+      if (start === undefined) continue // stray unmatched close-brace -- ignore
+      try {
+        objects.push(JSON.parse(text.slice(start, i + 1)))
+      } catch {
+        /* malformed object -- skip it and keep scanning */
+      }
+    }
+  }
+  return objects
+}
+
 function agentDefaultDomain(name: AgentName): ReviewDomain {
   const map: Record<AgentName, ReviewDomain> = {
     security: 'Security',

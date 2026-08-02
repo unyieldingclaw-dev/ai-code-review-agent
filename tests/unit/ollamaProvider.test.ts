@@ -21,6 +21,23 @@ describe('OllamaProvider', () => {
       expect(result).not.toContain('<think>')
     })
 
+    it('drops an unclosed think block and everything after it (truncated mid-reasoning)', async () => {
+      // A response cut off before </think> ever appears has no real JSON answer following it --
+      // must not leave raw reasoning prose (which could coincidentally contain a schema-shaped
+      // object) for BaseAgent's truncation-recovery pass to mistake for a real finding.
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          message: {
+            content: '<think>Let me check {"severity":"high","file":"a.ts"} as an example',
+          },
+        }),
+      })
+      const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
+      const result = await provider.chat([{ role: 'user', content: 'test' }])
+      expect(result).toBe('')
+    })
+
     it('passes think:true for qwen models when think option is set', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

@@ -20,6 +20,43 @@ const makeProvider = (response: string): LLMProvider => ({
 })
 
 describe('BaseAgent', () => {
+  it('requests structured JSON output from the provider', async () => {
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        file: 'src/foo.ts',
+        line: 10,
+        title: 'T',
+        detail: 'D',
+        suggestion: 'S',
+      },
+    ])
+    const provider = makeProvider(raw)
+    await new TestAgent(provider, DEFAULT_CONFIG).run({ diff: 'diff content' })
+    expect(provider.chat).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ format: 'json' })
+    )
+  })
+
+  it('recovers complete findings from a truncated response instead of discarding all of them', async () => {
+    // Response cut off mid-generation on the second finding -- first one is complete.
+    const raw =
+      '[{"severity":"high","basis":"VERIFIED","file":"a.ts","line":1,"title":"First","detail":"D1","suggestion":"S1"},{"severity":"medium","basis":"VERIFIED","file":"b.ts","line":2,"title":"Sec'
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
+    const findings = await agent.run({ diff: 'diff' })
+    expect(findings).toHaveLength(1)
+    expect(findings[0].title).toBe('First')
+  })
+
+  it('still throws ParseFailureError when nothing recoverable passes schema validation', async () => {
+    // A trivially parseable but empty/garbage object must not be silently treated as
+    // "0 findings, clean run" -- it's a real parse failure.
+    const agent = new TestAgent(makeProvider('{}'), DEFAULT_CONFIG)
+    await expect(agent.run({ diff: 'diff' })).rejects.toThrow(ParseFailureError)
+  })
+
   it('parses bare JSON array', async () => {
     const raw = JSON.stringify([
       {

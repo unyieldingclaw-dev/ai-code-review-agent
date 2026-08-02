@@ -1,7 +1,12 @@
 import { BaseAgent } from './base.js'
 import type { AgentName, CoverageGap, Finding, ReviewInput } from '../schema.js'
 import type { Message } from '../llm/provider.js'
-import { ParseFailureError } from '../parsing.js'
+import {
+  ParseFailureError,
+  extractBalancedSpan,
+  extractCompleteObjects,
+  validateAndNormalizeFindings,
+} from '../parsing.js'
 
 export interface CoverageAnalystResult {
   findings: Finding[]
@@ -62,7 +67,7 @@ Rules:
       { role: 'system', content: this.systemPrompt },
       { role: 'user', content: this.buildUserPrompt(input) },
     ]
-    const raw = await this.provider.chat(messages, { think: true, signal })
+    const raw = await this.provider.chat(messages, { think: true, format: 'json', signal })
     return this.parseCoverageResult(raw, input)
   }
 
@@ -83,7 +88,7 @@ Rules:
 
     // Stage 2: balanced-brace extraction
     try {
-      const extracted = this.extractJsonObject(cleaned)
+      const extracted = extractBalancedSpan(cleaned, '{', '}')
       if (extracted) {
         const parsed = JSON.parse(extracted) as { findings?: unknown[]; gaps?: unknown[] }
         return {
@@ -96,38 +101,25 @@ Rules:
       /* fall through */
     }
 
+    // Stage 3: the outer object itself never closed (truncated before generation finished) --
+    // scan the whole raw text for whatever complete finding/gap objects exist, the same salvage
+    // BaseAgent.parseFindings does for standard agents. A Finding and a CoverageGap share no
+    // required fields besides "file", so recovered objects sort cleanly into one bucket or the
+    // other without cross-contamination.
+    const recoveredObjects = extractCompleteObjects(cleaned)
+    const recoveredFindings = validateAndNormalizeFindings(recoveredObjects, this.name)
+    const recoveredGaps = this.validateGaps(recoveredObjects)
+    if (recoveredFindings.length > 0 || recoveredGaps.length > 0) {
+      console.error(
+        `[coverage] response appears truncated -- recovered ${recoveredFindings.length} ` +
+          `finding(s) and ${recoveredGaps.length} gap(s) before the cutoff. ` +
+          `Raw snippet: ${raw.slice(0, 200)}`
+      )
+      return { findings: recoveredFindings, gaps: recoveredGaps }
+    }
+
     console.error(`[coverage] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
     throw new ParseFailureError('coverage', raw)
-  }
-
-  private extractJsonObject(text: string): string | null {
-    const start = text.indexOf('{')
-    if (start === -1) return null
-    let depth = 0
-    let inString = false
-    let esc = false
-    for (let i = start; i < text.length; i++) {
-      const ch = text[i]
-      if (esc) {
-        esc = false
-        continue
-      }
-      if (ch === '\\' && inString) {
-        esc = true
-        continue
-      }
-      if (ch === '"') {
-        inString = !inString
-        continue
-      }
-      if (inString) continue
-      if (ch === '{') depth++
-      else if (ch === '}') {
-        depth--
-        if (depth === 0) return text.slice(start, i + 1)
-      }
-    }
-    return null
   }
 
   private validateGaps(items: unknown[]): CoverageGap[] {

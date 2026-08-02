@@ -16,9 +16,177 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-07-14
+**Last Updated**: 2026-07-25
 
 ## ✅ Completed (Tasks 1–16)
+
+### Code Review Follow-Up, Part 2: Remaining Findings — 2026-07-26
+
+User said "fix it all" after the CoverageAnalyst parity fix below landed — closed every
+remaining open item from the `/code-review` gate rather than leaving them as tracked follow-ups:
+
+- [x] Sanitizer's "act as a/an ..." pattern required an AI/assistant/bot/model word directly
+      adjacent, which fixed the earlier false positive but missed real jailbreak framings without
+      one — "act as a Linux terminal", "act as DAN" — confirmed by the opposition reviewer testing
+      both strings directly. Broadened to also match `terminal`, `hacker`, `unrestricted`,
+      `unfiltered`, `jailbroken` without reopening the original false positive (verified: "acts as
+      a validator"/"acts as a gatekeeper" still don't match).
+- [x] Fixed the SRI-hash base64 false positive for real this time. The earlier attempt (a
+      negative lookbehind) was correctly deferred after empirical testing showed the regex engine
+      could find an alternate match-start position that bypassed it. Real fix: `INJECTION_PATTERNS`
+      entries can now carry an `isFalsePositive(line, matchOffset)` check applied in code, after a
+      match is found via `String.replace`'s callback — not vulnerable to the same bypass since
+      there's no alternate-start-position escape hatch when you're checking actual match context
+      directly.
+- [x] Memory-bank sanitizer redactions were `console.warn`-only, invisible to any consumer of the
+      structured JSON/markdown report. `sanitizerMeta` is now mutated (not just read) inside
+      `withContext`, merging `applied`/`redactedLines`/`warnings` from every agent's context
+      sanitization into the same object the diff's own sanitization already populates.
+- [x] `--no-sanitize`'s CLI help, README, and runtime warning only described disabling diff
+      sanitization. Updated all three to mention it also disables memory-bank context
+      sanitization when `--context memory-bank` is set.
+- [x] Hardened `OllamaProvider.stripThinkTags` against the SPECULATIVE finding from the
+      opposition review: a `<think>` block truncated before it closes now has itself and
+      everything after it dropped entirely, instead of leaving raw reasoning prose in the
+      response where Stage 4's object scanner could mistake a coincidentally schema-shaped
+      object inside it for a real finding the model never asserted. Confirmed this risk is inert
+      under the current `devstral` default (`supportsThinking()` excludes it) — hardened anyway
+      since it was cheap and protects against a future model switch.
+- [x] 378 unit tests passing (up from 371), typecheck/lint/build/format clean.
+
+### Code Review Follow-Up, Part 1: CoverageAnalyst Truncation Parity — 2026-07-26
+
+- [x] Ran the full `/code-review` gate (5 domain subagents + opposition review) on the
+      structured-JSON-output/truncation-recovery/sanitization diff below before committing. Four
+      of five domain reviewers independently converged on the same finding: `coverageAnalyst.ts`
+      picked up `format:'json'` (which the diff's own calibration data shows raises truncation
+      frequency) without the Stage 4 recovery that made it safe in `base.ts` — Correctness and
+      Testing rated it High/Blocking.
+- [x] Opposition review downgraded the Blocking rating after reading `runner.ts:263-275` and
+      `cli/exitCode.ts`: a coverage parse failure is caught, classified into `agentStatus`, and
+      surfaces as exit code 2 — it fails loudly, not silently. Still recommended fixing it in this
+      PR rather than deferring, since the diff's own stated goal is truncation resilience and the
+      fix was cheap with a repro already in hand.
+- [x] Also caught during review and fixed in the same pass: `extractCompleteObjects`'s depth
+      counter could go negative on a stray leading `}`, permanently breaking recovery for the rest
+      of the response (reproduced by direct execution during Correctness review).
+- [x] Extracted `extractBalancedSpan` and `extractCompleteObjects` into `src/core/parsing.ts` as
+      shared helpers — replaces three near-identical hand-rolled bracket scanners (`base.ts` had
+      two, `coverageAnalyst.ts` had one) with two, fixing the depth bug in one place instead of
+      three (this was also an independent Maintainability finding). `extractCompleteObjects` now
+      recovers objects at any nesting depth via a stack of open-brace positions, not just
+      top-level ones — required for `coverageAnalyst`'s schema, where findings/gaps sit one level
+      inside an outer wrapper object that's exactly what's truncated.
+- [x] Gave `CoverageAnalystAgent.parseCoverageResult` a Stage 3: when the outer object never
+      closes, scan the raw text for complete finding/gap objects and salvage them, splitting
+      recovered objects by which required-field shape they match (a Finding and a CoverageGap
+      share no required fields besides `file`, so no cross-contamination risk).
+- [x] Added regression tests: `extractCompleteObjects` negative-depth case (`parsing.test.ts`),
+      `extractBalancedSpan`/`extractCompleteObjects` direct unit coverage (braces-in-strings,
+      escaped quotes, empty input), and `coverageAnalyst`'s new Stage 3 recovery + a corrected test
+      for `{}` (which is a legitimate "fully covered" response for coverage's object-shaped
+      schema, unlike `base.ts`'s array-shaped one — an earlier draft of this test incorrectly
+      asserted it should throw).
+- [x] 371 unit tests passing (up from 358), typecheck/lint/build/format clean.
+- Remaining findings from the review were not addressed in this pass — all fixed in the Part 2
+  entry above, in a follow-up commit the same day.
+
+### Structured JSON Output, Truncation Recovery, Memory-Bank Context Sanitization — 2026-07-25
+
+- [x] `format: 'json'` (Ollama's structured-output mode) now requested by `base.ts`'s `run()` and
+      `coverageAnalyst.ts`'s `runForCoverage()`. `ChatOptions.format` existed end-to-end but
+      nothing ever passed it. Not applied to `TestGenAgent` (outputs raw test code, not JSON).
+- [x] **Real result, not the expected one**: re-running calibration afterward showed
+      `format: 'json'` alone increases truncation frequency (11/16 cases vs. 1/16 before) rather
+      than reducing it — strict schema compliance appears to remove whatever slack let the model
+      wrap up more tersely before.
+- [x] Added a Stage 4 recovery path to `BaseAgent.parseFindings`:
+      `extractCompleteObjects()` scans for complete `{...}` objects regardless of whether the
+      enclosing array ever closes, salvaging whatever the model finished. This is what actually
+      carried the reliability improvement — all 11 truncated cases in the calibration re-run were
+      successfully salvaged.
+- [x] Caught and fixed a real regression in the recovery stage during implementation: a trivially
+      parseable garbage response (`"{}"`) was passing through as a successful "0 findings"
+      recovery instead of throwing `ParseFailureError` — exactly the silent-clean-pass anti-pattern
+      this project exists to prevent. Fixed by requiring at least one recovered object to actually
+      pass schema validation, not just parse.
+- [x] Full calibration re-run on `devstral:latest`: 15/16 passed (same as baseline), but with the
+      recovery stage doing real work instead of the truncation rate staying low on its own.
+- [x] Answered "are there any guardrails we are missing": `contextLoader.ts`'s comment falsely
+      claimed memory-bank context was already sanitized ("sanitizer applies separately") — it
+      wasn't; `sanitizeDiff()` was only ever called on the diff. Added `sanitizeText()` (scans
+      every line, since `sanitizeDiff`'s `+`-prefix convention is diff-specific) and wired it into
+      `runner.ts`'s `withContext`, respecting `--no-sanitize`.
+- [x] Dogfooding the above against this repo's own real memory-bank files caught a live false
+      positive: the sanitizer's "act as a" pattern fired on `activeContext.md`/`progress.md`'s own
+      prose describing that same bug. Tightened to require the phrase target an
+      AI/assistant/bot/model role (matching the existing "you are now" pattern) — confirmed real
+      injection attempts still match, this repo's memory-bank no longer false-positives.
+- [x] Attempted a fix for the SRI-hash base64 false positive found in the earlier architecture
+      review; a naive negative-lookbehind doesn't work (the regex engine finds an alternate
+      match-start position that bypasses it). Needs a proper code-level fix — deferred, not
+      implemented this pass.
+- [x] 358 unit tests passing, typecheck/lint/build/format clean. v1.8.0.
+- Open follow-up, not yet decided: add an explicit `num_predict` to directly counteract
+  `format: 'json'`'s higher truncation rate, now that there's concrete evidence it's needed,
+  rather than relying solely on the recovery stage.
+
+### Actionable Truncation Warning; Parallel-by-Default Investigated and Rejected — 2026-07-25
+
+- [x] Strengthened the pre-flight diff-truncation stderr warning (`runner.ts`) to state the
+      excluded line count and suggest `--max-lines`/splitting the diff.
+- [x] Fixed a stale `README.md` CLI options table: `--timeout` default still said `60000`
+      (pre-dating the 60s→180s fix).
+- [x] `--fail-fast` now warns on stderr when combined with `--parallel` (its early-exit check
+      only runs in the sequential code path).
+- [x] **Investigated and reverted** a `parallel`-by-default change. Initial 4-concurrent-request,
+      trivial-prompt test showed a promising ~1.63x speedup; a deeper test at the real default
+      scale (14 concurrent requests, realistic ~30KB diff prompt) showed near-linear
+      serialization instead (completions at 58.7s/91.5s/120.6s/172.7s/235.0s/305.7s, then a
+      header-timeout past 300s), reproduced with `curl` directly to rule out a client-side
+      artifact. Defaulting to parallel would have caused most of the default 14-agent swarm to
+      spuriously time out from queue wait alone. Also confirmed the tool has zero Anthropic/Claude
+      API usage (100% local Ollama), so there was no token-cost pressure to justify the risk.
+      Reverted `DEFAULT_CONFIG.parallel` to `false`, `--no-parallel` back to opt-in `--parallel`,
+      and restored `memory-bank/systemPatterns.md`'s original rationale (updated with the
+      investigation's data rather than struck through as superseded).
+- [x] 348 unit tests passing, typecheck/lint/build/format clean. v1.7.0.
+- Deferred to follow-up PRs (same bug report, user-selected): retry with a shrunk prompt on
+  timeout, and parse-failure fallback extraction.
+
+### Model Configuration Verification — 2026-07-25
+
+- [x] Confirmed `DEFAULT_CONFIG.model: 'devstral:latest'` is consistently referenced everywhere
+      (including `calibration/calibrate.ts`) — no drift after more Ollama models were downloaded.
+- [x] Measured actual GPU/CPU split (not on-disk size) for every locally-downloaded model at the
+      real 32k context: `devstral:latest` 30% GPU, `deepseek-r1:14b` 38% GPU, `gemma3:12b` 49%
+      GPU, `qwen3:latest` 59% GPU, `gemma3:4b` **100% GPU** (only fully-resident option).
+- [x] Recommended not switching yet — no calibration evidence any alternative matches devstral's
+      review quality, and `gemma3:4b` is a large capability step down (4B vs 23.6B params).
+- Next (agreed, not started): add a model override to `calibration/calibrate.ts` (currently
+  hardcoded to `DEFAULT_CONFIG.model`, no env var/flag), then bake-off `qwen3:latest` and
+  `gemma3:12b` against the existing 16-case calibration suite.
+
+### Architecture Deep-Dive — 2026-07-25
+
+Prompted by an explicit "true design suggestions, not made up" request — verified findings only,
+no speculation. User approved items 1, 2, 4 for implementation (not yet started):
+
+1. `ChatOptions.format?: 'json'` (Ollama's structured-output mode) is fully plumbed end-to-end
+   but never called anywhere. Empirically confirmed it makes `devstral:latest` reliably emit
+   valid JSON — should reduce the `ParseFailureError` class of bug fought since v1.4.0.
+2. `--context-mode semantic`'s `loadAgentContextSemantic` has zero caching and is called once per
+   agent in `runner.ts`'s `withContext` closure — ~14x redundant Ollama embedding calls per run.
+3. `orchestrator.ts`'s `applyPublicationFilter` unconditionally discards all `severity: 'low'`
+   findings with no override, yet `complexity.ts`/`observability.ts` explicitly prompt the model
+   to generate them — wasted generation time, guaranteed to be thrown away.
+4. `sanitizer.ts`'s regexes false-positive on ordinary code, empirically reproduced: SRI
+   integrity hashes and comments like "act as a validator" get silently redacted. Zero test
+   coverage for this.
+5. `base.ts` unconditionally sends `think: true`, but it's only actually forwarded to Ollama for
+   `qwen`/`deepseek-r1` models, never `devstral` (the real default) — `systemPatterns.md`'s
+   "reasoning depth matters" claim doesn't describe what's actually running.
+6. `OrchestratorAgent` takes an unused `LLMProvider` constructor param (pure dead dependency).
 
 ### Truncation-Aware Timeout Scaling — 2026-07-18
 
