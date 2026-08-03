@@ -14,9 +14,26 @@ jobs:
     continue-on-error: true # non-blocking — release publishes even if runner is offline
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+    defaults:
+      run:
+        # WHY: `run:` steps default to pwsh on this self-hosted Windows runner unless a shell
+        # is declared, and the "Check Ollama availability" step below uses bash if/then/fi
+        # syntax -- see review.yml's matching comment for the exact ParserError this caused
+        # here, confirmed via this workflow's own run history: every calibrate run failed at
+        # that step in ~16s, masked as workflow-level "success" only because of
+        # continue-on-error above.
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # WHY this step: see the matching comment in review.yml -- a bare `bash` on this runner
+      # resolves to a broken WSL stub ahead of Git for Windows' real bash on PATH. Prepending
+      # Git's bin dir here (via explicit `shell: pwsh`, since bash isn't resolvable yet) fixes
+      # resolution for every subsequent `shell: bash` step.
+      - name: Fix bash resolution (Git's bash, not the WSL stub)
+        shell: pwsh
+        run: echo "C:\Program Files\Git\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup Node
         uses: actions/setup-node@v7
