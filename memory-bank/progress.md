@@ -16,9 +16,54 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-07-25
+**Last Updated**: 2026-08-03
 
 ## ✅ Completed (Tasks 1–16)
+
+### Calibration CI Shell-Default Fix — 2026-08-03
+
+- [x] `.github/workflows/calibrate.yml`'s "Check Ollama availability" step is bash `if/then/fi`
+      syntax with no `shell:` declared — silently defaulted to PowerShell on the self-hosted
+      Windows runner and hit a `ParserError`, same bug class as `review.yml`'s earlier fix.
+      `continue-on-error: true` at the job level masked every failure as workflow-level
+      "success," so this had been failing on 100% of runs for at least a month (confirmed via
+      `gh run view`'s job-level `conclusion` on the last 4 runs, back to 2026-07-06) with nobody
+      noticing.
+- [x] Fixed by porting `review.yml`'s proven two-part fix verbatim: job-level
+      `defaults: run: shell: bash`, plus a bootstrap step (explicit `shell: pwsh`) prepending
+      Git's real bash to `$GITHUB_PATH` ahead of the broken WSL stub a bare `bash` lookup
+      otherwise resolves to on this runner.
+- [x] Full 5-domain `/code-review` — no Blocking findings. Fixed two non-blocking ones inline: a
+      comment overstating "every step below is bash syntax" (only one step is), and this file's
+      own stale `activeContext.md` line still describing Calibration CI as healthy.
+- [x] `/code-review`'s Testing domain flagged that `review.yml`'s own fix took 3 iterations to
+      actually work in practice — ran manual `workflow_dispatch` verification runs on the branch
+      rather than trusting the next weekly cron:
+  - **Run 1** (`timeout-minutes: 10`, pre-existing value): shell fix confirmed working — bash
+    steps executed correctly, Ollama detected, real calibration cases ran with real PASS/FAIL
+    results. Got cancelled mid-suite (case 13 of 16) purely from hitting the old 10min budget,
+    which had never actually been validated against real suite runtime (the job never got past
+    the shell bug far enough to reach it before).
+  - [x] Raised `timeout-minutes` to 20, with a comment explaining why (own commit).
+  - **Run 2** (`timeout-minutes: 20`): also got cancelled mid-suite (case 15 of 16) — but cases
+    5+ ran 3-5x slower than the same cases in run 1 (e.g. "coverage": 72s in run 1 vs. 248s in
+    run 2). Investigated directly on the runner machine rather than guessing: Ollama's
+    `server.log` showed the model loaded exactly once and stayed loaded (ruled out reload
+    cycling); Windows System event log had no `nvlddmkm` driver-reset events (ruled out a GPU
+    crash); no WARN/ERROR in Ollama's log during the run window. Root cause not conclusively
+    provable after the fact — no retroactive GPU utilization time-series existed to check — but
+    the leading, evidence-consistent hypothesis is transient resource contention on this shared,
+    personal-use machine (this session's own concurrent activity during that window is a
+    plausible contributor), not a defect in the shell fix or the calibration code.
+  - **Run 3** (`timeout-minutes: 20`, monitored): ran `nvidia-smi --query-gpu=...` sampled every
+    5s for the full duration in parallel. Completed the entire 16-case suite + testgen suite in
+    ~13-14min with consistent ~30-70s/case pacing (no degradation) — 15/16 passed, 1 genuine
+    miss ("adversarial" missed 'empty', a real calibration result, not an error).
+    `clocks_event_reasons.active` was `0x0` (no thermal/power/software throttling) for the
+    entire run; VRAM stayed stable (~7.3-7.5GB); utilization showed normal inference-burst
+    pattern. Confirms the same code/hardware/budget runs consistently within real margin when
+    nothing else is contending — `timeout-minutes: 20` is empirically validated, not a guess.
+- [x] No test-suite changes (CI YAML only, no vitest-covered code touched).
 
 ### Code Review Follow-Up, Part 2: Remaining Findings — 2026-07-26
 
