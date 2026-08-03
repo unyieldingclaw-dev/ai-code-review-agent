@@ -16,9 +16,39 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-07-25
+**Last Updated**: 2026-08-03
 
 ## Current Focus
+
+**Calibration CI shell-default fix (2026-08-03)**: `.github/workflows/calibrate.yml`'s "Check
+Ollama availability" step is bash `if/then/fi` syntax with no `shell:` declared, so it silently
+defaulted to PowerShell on the self-hosted Windows runner and failed with a `ParserError` — the
+same bug class already fixed once in `review.yml`. `continue-on-error: true` at the job level
+masked every failure as workflow-level "success," so this had been failing on 100% of runs
+(confirmed via `gh run view` job-level `conclusion` on the last 4 runs, going back at least to
+2026-07-06) with nobody noticing. Fixed by porting `review.yml`'s proven two-part fix verbatim:
+a job-level `defaults: run: shell: bash`, plus a bootstrap step (explicit `shell: pwsh`, since
+bash isn't resolvable yet) prepending Git's real bash to `$GITHUB_PATH` ahead of the broken WSL
+stub. `/code-review`'s Testing domain flagged that `review.yml`'s own fix took 3 iterations to
+actually work in practice (each failure only visible at runtime) — so before merging, ran 3
+manual `workflow_dispatch` verification runs on this branch rather than trusting the next weekly
+cron. The shell fix itself worked correctly in all 3 (bash steps executed, Ollama correctly
+detected, real PASS/FAIL results) — but runs 1-2 also surfaced a second, separate pre-existing
+bug: `timeout-minutes: 10` had never been validated against real suite runtime (the job never
+got past the shell bug far enough to reach it), and both runs got cancelled mid-suite. Raised to
+20 (own commit). Run 2 additionally showed cases 5+ running 3-5x slower than run 1's pace for the
+same cases — investigated directly on the runner machine (Ollama's own server.log, `nvidia-smi`,
+Windows System event log) rather than guessing: ruled out model-reload cycling (loaded once,
+stayed loaded) and GPU driver reset/crash (no `nvlddmkm` events); no throttling or resource
+exhaustion visible in Ollama's log for that window either. Root cause not conclusively provable
+after the fact (no retroactive GPU time-series available) — leading hypothesis is transient
+resource contention on this shared, personal-use machine (possibly this very session's own
+concurrent activity), not a code defect. Confirmed by a 3rd monitored run (`nvidia-smi --query-gpu`
+sampled every 5s throughout): completed the full 16-case suite + testgen in ~13-14min with
+consistent ~30-70s/case pacing and zero throttle-reason flags the entire time — same code, same
+hardware, same 20min budget, no degradation, when nothing else was contending. `timeout-minutes:
+20` is empirically validated with real margin under normal conditions. See progress.md for full
+detail and the calibration results themselves (15/16 passed, 1 genuine miss on "adversarial").
 
 **Code review follow-up, part 2: remaining findings closed (2026-07-26)**: after the
 CoverageAnalyst parity fix below landed, user said "fix it all" for the rest of the `/code-review`
@@ -220,7 +250,9 @@ All 5 checks verified passing locally (295/295 tests) before the workflow was ad
 - Policy layer: `agentPolicy` per-agent include/exclude glob path filtering
 - `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
-- Calibration CI: self-hosted runner, continue-on-error, 10min timeout
+- Calibration CI: self-hosted runner, continue-on-error, 10min timeout. Was silently failing on
+  every run for at least a month (missing `shell: bash`, same class of bug as review.yml's
+  earlier fix below) until 2026-08-03 — see progress.md's matching entry.
 - **358 unit tests** across 39 test files
 - `src/core/parsing.ts`: `validateAndNormalizeFindings()` extracted from BaseAgent (SRP)
 - `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
