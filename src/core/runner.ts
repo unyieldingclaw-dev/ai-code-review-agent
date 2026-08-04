@@ -12,6 +12,7 @@ import type {
   SanitizerMetadata,
   AgentStatus,
   TruncationMetadata,
+  DroppedHallucinatedFinding,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
 import { classifyAgentError } from './parsing.js'
@@ -628,7 +629,8 @@ export class SwarmRunner {
       })
     }
 
-    const findings = this.orchestrator.synthesize(allFindings)
+    const droppedHallucinated: DroppedHallucinatedFinding[] = []
+    const findings = this.orchestrator.synthesize(allFindings, changedFiles, droppedHallucinated)
 
     return {
       findings,
@@ -649,6 +651,9 @@ export class SwarmRunner {
       ...(policyResult.agentsSkipped.length > 0 ? { policy: policyResult } : {}),
       ...(Object.keys(agentStatus).length > 0 ? { agentStatus } : {}),
       ...(truncationMeta.truncated ? { truncation: truncationMeta } : {}),
+      ...(droppedHallucinated.length > 0
+        ? { hallucinationFilter: { dropped: droppedHallucinated } }
+        : {}),
     }
   }
 }

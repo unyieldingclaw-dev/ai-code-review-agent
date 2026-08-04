@@ -20,6 +20,55 @@ lineage: []
 
 ## ✅ Completed (Tasks 1–16)
 
+### Hallucination-Filter Visibility Follow-Up — 2026-08-04
+
+- [x] Self-flagged gap in the fix below: dropped findings were only `console.error`'d, invisible
+      to `ReviewResult` — same anti-pattern already fixed once for sanitizer/context redactions
+      (2026-07-26). Risky because the filter itself can false-positive.
+- [x] `OrchestratorAgent.synthesize()`/`filterNonexistentFiles` take an optional
+      `dropped?: DroppedHallucinatedFinding[]` sink (no-op when omitted); `runner.ts` surfaces it
+      as `ReviewResult.hallucinationFilter: { droppedCount, dropped }`.
+- [x] Found a second pre-existing gap while wiring the markdown formatter: the
+      `findings.length === 0` early return skips the entire sanitizer/context/policy footer —
+      would have hidden the new note in exactly the case it matters most. Placed the note near
+      the top with the truncation warning instead of the bottom footer.
+- [x] Added to `sarif.ts` run-level properties for parity; `formatJson`/`mcp/formatter.ts`
+      needed no change.
+- [x] 392 unit tests passing (up from 385). Files: `schema.ts`, `orchestrator.ts`, `runner.ts`,
+      `cli/formatter.ts`, `cli/formatters/sarif.ts`, plus matching test files.
+
+### Dependencies-Agent Hallucination Fix — 2026-08-03
+
+- [x] Root cause: `dependencies.ts`'s prompt carried a concrete "lodash wildcard" example as its
+      REQUIRED OUTPUT FORMAT (every other agent uses a placeholder) — model reproduced it
+      near-verbatim on a diff with nothing dependency-related to report, after `validateFindings`
+      forced a retry on a legitimate empty response lacking file/line.
+- [x] Rejected loosening `BaseAgent.parseFindings` to accept a no-file/line "empty" shape —
+      `baseAgent.test.ts` has a deliberate test asserting bare `{}` must throw
+      `ParseFailureError`, a prior fix for a silent-clean-pass bug; would have reverted a correct
+      safety property.
+- [x] Fix A: replaced the concrete example with a placeholder (`dependencies.ts`).
+- [x] Fix D: new `OrchestratorAgent.filterNonexistentFiles` synthesis stage drops any finding
+      whose `file` isn't among the diff's actual changed files (`extractChangedFiles`, threaded
+      through from `runner.ts` as an optional `changedFiles` param on `synthesize()`, no-op when
+      omitted, fails open when empty/undetermined). Live verification showed Fix A alone did not
+      stop fabrication — Fix D turned out to be the load-bearing defense, not just a backstop.
+- [x] Found and fixed two self-introduced bugs before considering this done: `calibrate.ts`
+      wasn't passing `changedFiles` into `synthesize()` (Fix D never activated during
+      calibration); `filterNonexistentFiles`'s path `normalize()` didn't strip a leading `a/`/`b/`
+      git-diff-header prefix, which a full calibration run showed causing two genuinely real
+      findings (`correctness`, `migration-safety`) to be wrongly dropped as hallucinated when the
+      model echoed the diff's own `--- a/path`/`+++ b/path` convention into `file`. Fixed by
+      trying both the normalized and prefix-stripped form before rejecting.
+- [x] New calibration case `dependencies-clean` (clean-diff fixture, `expectEmpty: true`) as a
+      permanent regression guard.
+- [x] Final calibration: 16/16 passed except `adversarial` — same single failure as the original
+      pre-change baseline (unrelated keyword-match flakiness on that fixture), confirmed not a
+      regression.
+- [x] 385 unit tests passing (up from 358). Files: `dependencies.ts`, `orchestrator.ts`,
+      `runner.ts`, `calibration/calibrate.ts` + new fixture, `orchestrator.test.ts`,
+      `runner.test.ts`.
+
 ### Calibration CI Shell-Default Fix — 2026-08-03
 
 - [x] `.github/workflows/calibrate.yml`'s "Check Ollama availability" step is bash `if/then/fi`

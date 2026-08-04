@@ -118,6 +118,16 @@ export interface TruncationMetadata {
   keptLines: number
 }
 
+export interface DroppedHallucinatedFinding {
+  agent: AgentName
+  title: string
+  file: string
+}
+
+export interface HallucinationFilterMetadata {
+  dropped: DroppedHallucinatedFinding[]
+}
+
 export type AgentStatus = 'ok' | 'timeout' | 'parse-error' | 'error'
 
 export interface ReviewResult {
@@ -138,6 +148,7 @@ export interface ReviewResult {
   policy?: PolicyResult
   agentStatus?: Partial<Record<AgentName, AgentStatus>>
   truncation?: TruncationMetadata
+  hallucinationFilter?: HallucinationFilterMetadata
 }
 
 export const SEVERITY_RANK: Record<Severity, number> = {

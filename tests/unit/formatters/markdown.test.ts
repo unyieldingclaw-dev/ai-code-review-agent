@@ -154,4 +154,21 @@ describe('formatMarkdown', () => {
     const output = formatMarkdown(result)
     expect(output).not.toContain('truncated')
   })
+
+  it('surfaces a hallucination-filter note when findings were dropped', () => {
+    const result = makeResult({
+      findings: [],
+      hallucinationFilter: {
+        dropped: [{ agent: 'dependencies', title: 'Wildcard version', file: 'package.json' }],
+      },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('1')
+    expect(output).toMatch(/hallucinat/i)
+  })
+
+  it('does not show a hallucination-filter note when nothing was dropped', () => {
+    const output = formatMarkdown(makeResult())
+    expect(output).not.toMatch(/hallucinat/i)
+  })
 })

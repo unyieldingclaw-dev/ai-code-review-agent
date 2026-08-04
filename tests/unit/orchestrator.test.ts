@@ -214,6 +214,87 @@ describe('OrchestratorAgent', () => {
     })
   })
 
+  describe('file-existence filter (hallucination defense)', () => {
+    it('drops a finding whose file is not in the diff’s changed files', () => {
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [
+        finding({ id: 'dependencies-0', agent: 'dependencies', file: 'package.json' }),
+      ]
+      const result = orch.synthesize(findings, ['src/other.ts'])
+      expect(result).toHaveLength(0)
+    })
+
+    it('keeps a finding whose file is in the diff’s changed files', () => {
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [finding({ id: 'security-0', file: 'src/auth.ts' })]
+      const result = orch.synthesize(findings, ['src/auth.ts', 'package.json'])
+      expect(result).toHaveLength(1)
+    })
+
+    it('does not filter anything when changedFiles is omitted (backward compatible)', () => {
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [finding({ id: 'security-0', file: 'anything/not/real.ts' })]
+      const result = orch.synthesize(findings)
+      expect(result).toHaveLength(1)
+    })
+
+    it('matches despite a leading "./" on the finding’s file path', () => {
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [finding({ id: 'security-0', file: './src/auth.ts' })]
+      const result = orch.synthesize(findings, ['src/auth.ts'])
+      expect(result).toHaveLength(1)
+    })
+
+    it('matches despite a git-diff "a/" prefix on the finding’s file path', () => {
+      // Reproduced live: the model sometimes echoes the diff's own `a/`/`b/` path prefix
+      // (from "--- a/path" / "+++ b/path" headers) into the file field, even though
+      // extractChangedFiles always strips it. A real finding was wrongly dropped as
+      // hallucinated because of this exact mismatch.
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [finding({ id: 'correctness-0', file: 'a/src/cart/calculator.ts' })]
+      const result = orch.synthesize(findings, ['src/cart/calculator.ts'])
+      expect(result).toHaveLength(1)
+    })
+
+    it('does not filter anything when changedFiles is an empty array (fail open, not fail closed)', () => {
+      // An empty list means extractChangedFiles couldn't confidently parse any files from the
+      // diff -- not "this diff touches zero files." Filtering against an empty set would reject
+      // every finding, a worse failure mode than the one this feature defends against.
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [finding({ id: 'security-0', file: 'anything/not/real.ts' })]
+      const result = orch.synthesize(findings, [])
+      expect(result).toHaveLength(1)
+    })
+
+    it('records a dropped finding into the optional sink instead of only logging it', () => {
+      // A dropped finding used to be visible only via console.error -- invisible to any caller
+      // reading the ReviewResult itself. The sink lets runner.ts surface this in the report.
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [
+        finding({
+          id: 'dependencies-0',
+          agent: 'dependencies',
+          file: 'package.json',
+          title: 'Wildcard version',
+        }),
+      ]
+      const dropped: Array<{ agent: string; title: string; file: string }> = []
+      const result = orch.synthesize(findings, ['src/other.ts'], dropped)
+      expect(result).toHaveLength(0)
+      expect(dropped).toEqual([
+        { agent: 'dependencies', title: 'Wildcard version', file: 'package.json' },
+      ])
+    })
+
+    it('does not push into the sink when nothing is dropped', () => {
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [finding({ id: 'security-0', file: 'src/auth.ts' })]
+      const dropped: Array<{ agent: string; title: string; file: string }> = []
+      orch.synthesize(findings, ['src/auth.ts'], dropped)
+      expect(dropped).toEqual([])
+    })
+  })
+
   describe('publication filter', () => {
     it('excludes SPECULATIVE findings below high severity', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)

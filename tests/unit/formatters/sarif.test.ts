@@ -164,4 +164,29 @@ describe('formatSarif', () => {
     const sarif = JSON.parse(formatSarif(result))
     expect(sarif.runs[0].properties.truncation).toBeUndefined()
   })
+
+  it('includes hallucinationFilter in run-level properties when findings were dropped', () => {
+    const result = makeResult({
+      hallucinationFilter: {
+        dropped: [{ agent: 'dependencies', title: 'Wildcard version', file: 'package.json' }],
+      },
+    })
+    const sarif = JSON.parse(formatSarif(result))
+    expect(sarif.runs[0].properties.hallucinationFilter).toEqual({
+      dropped: [{ agent: 'dependencies', title: 'Wildcard version', file: 'package.json' }],
+    })
+  })
+
+  it('omits hallucinationFilter from run-level properties when nothing was dropped', () => {
+    const sarif = JSON.parse(formatSarif(makeResult()))
+    expect(sarif.runs[0].properties.hallucinationFilter).toBeUndefined()
+  })
+
+  it('omits hallucinationFilter from run-level properties when dropped is explicitly empty', () => {
+    // Defensive consistency with the markdown formatter's dropped.length > 0 check -- not
+    // reachable via runner.ts today (it only ever sets hallucinationFilter when non-empty), but
+    // the formatter shouldn't emit a misleading empty block if some future caller populates it.
+    const sarif = JSON.parse(formatSarif(makeResult({ hallucinationFilter: { dropped: [] } })))
+    expect(sarif.runs[0].properties.hallucinationFilter).toBeUndefined()
+  })
 })
