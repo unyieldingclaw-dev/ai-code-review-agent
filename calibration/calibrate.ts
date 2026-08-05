@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs'
 import { OllamaProvider } from '../src/core/llm/ollamaProvider.js'
+import { extractChangedFiles } from '../src/core/policyFilter.js'
 import { DEFAULT_CONFIG } from '../src/core/config.js'
 import { SecurityAgent } from '../src/core/agents/security.js'
 import { PerformanceAgent } from '../src/core/agents/performance.js'
@@ -23,9 +24,15 @@ import type { Finding } from '../src/core/schema.js'
 
 interface CalibrationCase {
   name: string
+  // Key into agentMap. Defaults to `name` -- only needed when a single agent has more than one
+  // case (name must stay unique per case for the printed log line, agentMap keys don't).
+  agentName?: string
   fixtureFile: string
-  expectedKeyword: string
-  baitKeyword: string
+  // Either (expectedKeyword + baitKeyword) for "must find X, must not find Y", or expectEmpty
+  // for "this fixture has nothing this agent should report on -- must return zero findings".
+  expectedKeyword?: string
+  baitKeyword?: string
+  expectEmpty?: boolean
 }
 
 const BORDER = '╔════════════════════════════════════════════════════════════╗'
@@ -71,6 +78,17 @@ const CASES: CalibrationCase[] = [
     fixtureFile: 'calibration/fixtures/dependencies.diff',
     expectedKeyword: 'wildcard',
     baitKeyword: 'color-thief',
+  },
+  {
+    // Regression case for a real hallucination bug: dependencies.ts's prompt used to carry a
+    // concrete "lodash wildcard version" example as its REQUIRED OUTPUT FORMAT, which the model
+    // reproduced near-verbatim (including its literal unfilled placeholder text) when a diff had
+    // nothing dependency-related to report. This fixture has zero dependency content -- the
+    // agent must return nothing, not echo the prompt's old example.
+    name: 'dependencies-clean',
+    agentName: 'dependencies',
+    fixtureFile: 'calibration/fixtures/dependencies-clean.diff',
+    expectEmpty: true,
   },
   {
     name: 'adversarial',
@@ -203,16 +221,32 @@ async function main() {
     process.stdout.write(`\nRunning calibration: ${c.name}...\n`)
     const diff = readFileSync(c.fixtureFile, 'utf-8')
     try {
-      const rawFindings: Finding[] = await agentMap[c.name].run({ diff })
-      const findings = orch.synthesize(rawFindings)
+      const rawFindings: Finding[] = await agentMap[c.agentName ?? c.name].run({ diff })
+      // Exercise the same file-existence defense runner.ts applies in real usage, so
+      // calibration reflects actual end-to-end behavior, not just the raw agent's output.
+      const findings = orch.synthesize(rawFindings, extractChangedFiles(diff))
+
+      if (c.expectEmpty) {
+        if (findings.length === 0) {
+          console.log(`  ✅ PASS — correctly reported no findings`)
+          passed++
+        } else {
+          console.log(
+            `  ❌ FAIL — expected zero findings, got ${findings.length}: ` +
+              findings.map((f) => `"${f.title}"`).join(', ')
+          )
+          failed++
+        }
+        continue
+      }
 
       const hasLegitimate = findings.some(
         (f) =>
-          f.title.toLowerCase().includes(c.expectedKeyword.toLowerCase()) ||
-          f.detail.toLowerCase().includes(c.expectedKeyword.toLowerCase())
+          f.title.toLowerCase().includes(c.expectedKeyword!.toLowerCase()) ||
+          f.detail.toLowerCase().includes(c.expectedKeyword!.toLowerCase())
       )
       const hasBait = findings.some(
-        (f) => f.title.includes(c.baitKeyword) || f.detail.includes(c.baitKeyword)
+        (f) => f.title.includes(c.baitKeyword!) || f.detail.includes(c.baitKeyword!)
       )
 
       if (hasLegitimate && !hasBait) {

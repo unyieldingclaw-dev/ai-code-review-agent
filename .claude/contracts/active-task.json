@@ -1,25 +1,18 @@
 {
-  "task": "Harden agent response reliability and a memory-bank context sanitization gap, per user request 'harden the design if possible and implement' following calibration-observed truncation failures and a 'are there any guardrails we are missing' question. Implemented: format:'json' structured output (base.ts, coverageAnalyst.ts, not testGen.ts which outputs raw code); a Stage 4 truncated-response recovery path in BaseAgent.parseFindings with a schema-validation safety net against a real '{}' garbage-response regression caught during implementation; sanitizeText() in sanitizer.ts wired into runner.ts's withContext to close a real gap where memory-bank context was never actually sanitized despite a code comment claiming it was; a sanitizer 'act as a' false-positive fix found via dogfooding against this repo's own real memory-bank files. Follow-up (2026-07-26, per /code-review gate findings, user-approved): extracted extractBalancedSpan/extractCompleteObjects into parsing.ts as shared helpers (fixing a reproduced negative-depth bug and eliminating 3 near-duplicate hand-rolled scanners), and gave CoverageAnalystAgent.parseCoverageResult a Stage 3 truncation-recovery path matching BaseAgent's, closing the truncation-parity gap 4 of 5 domain reviewers independently flagged.",
+  "task": "Hallucination-filter visibility follow-up: OrchestratorAgent.filterNonexistentFiles previously only console.error'd a dropped finding, invisible to ReviewResult -- same anti-pattern already fixed once before for sanitizer/context redactions. Added an optional dropped sink to synthesize(), surfaced as ReviewResult.hallucinationFilter in runner.ts, and rendered in the markdown and SARIF formatters. Also fixed a related gap found along the way: the markdown formatter's zero-findings early return was skipping the entire footer block, which would have hidden the new note in exactly the case it matters most.",
   "status": "complete",
-  "created_at": "2026-07-25T14:00:00Z",
-  "expires_at": "2026-07-26T22:00:00Z",
+  "created_at": "2026-08-04T08:30:00Z",
+  "expires_at": "2026-08-04T16:30:00Z",
   "approved_by": "user",
   "scope": [
-    { "file": "src/core/agents/base.ts", "op": "edit" },
-    { "file": "src/core/agents/coverageAnalyst.ts", "op": "edit" },
-    { "file": "src/core/contextLoader.ts", "op": "edit" },
+    { "file": "src/core/schema.ts", "op": "edit" },
+    { "file": "src/core/agents/orchestrator.ts", "op": "edit" },
     { "file": "src/core/runner.ts", "op": "edit" },
-    { "file": "src/core/sanitizer.ts", "op": "edit" },
-    { "file": "src/core/parsing.ts", "op": "edit" },
-    { "file": "tests/unit/baseAgent.test.ts", "op": "edit" },
-    { "file": "tests/unit/coverageAnalystAgent.test.ts", "op": "edit" },
+    { "file": "src/cli/formatter.ts", "op": "edit" },
+    { "file": "src/cli/formatters/sarif.ts", "op": "edit" },
+    { "file": "tests/unit/orchestrator.test.ts", "op": "edit" },
     { "file": "tests/unit/runner.test.ts", "op": "edit" },
-    { "file": "tests/unit/sanitizer.test.ts", "op": "edit" },
-    { "file": "tests/unit/parsing.test.ts", "op": "edit" },
-    { "file": "CHANGELOG.md", "op": "edit" },
-    { "file": "package.json", "op": "edit" },
-    { "file": "memory-bank/activeContext.md", "op": "edit" },
-    { "file": "memory-bank/progress.md", "op": "edit" },
-    { "file": "memory-bank/systemPatterns.md", "op": "edit" }
+    { "file": "tests/unit/formatters/markdown.test.ts", "op": "edit" },
+    { "file": "tests/unit/formatters/sarif.test.ts", "op": "edit" }
   ]
 }

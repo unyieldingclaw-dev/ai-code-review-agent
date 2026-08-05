@@ -41,6 +41,13 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     lines.push('')
   }
 
+  if (result.hallucinationFilter && result.hallucinationFilter.dropped.length > 0) {
+    lines.push(
+      `${useEmoji ? '🔍 ' : ''}Hallucination filter: ${result.hallucinationFilter.dropped.length} finding(s) dropped — referenced file(s) not present in the reviewed diff.`
+    )
+    lines.push('')
+  }
+
   if (failedAgents.length > 0) {
     lines.push(
       `${useEmoji ? '⚠️ ' : ''}${failedAgents.length}/${totalAgents} agents failed — results incomplete`

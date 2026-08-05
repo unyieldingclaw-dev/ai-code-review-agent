@@ -9,22 +9,22 @@ export class DependenciesAgent extends BaseAgent {
   get systemPrompt(): string {
     return `You are a dependency security reviewer. Output ONLY a JSON array — no prose, no markdown fences, no other keys.
 
-REQUIRED OUTPUT FORMAT (copy this structure exactly):
+Required format:
 [{
-  "severity": "high",
-  "basis": "VERIFIED",
+  "severity": "critical|high|medium|low",
+  "basis": "VERIFIED|INFERRED|SPECULATIVE",
   "confidence": 90,
   "domain": "Dependencies",
   "file": "package.json",
-  "line": 4,
-  "title": "Wildcard version specifier for lodash",
-  "detail": "lodash uses wildcard * version which allows any version including breaking major releases or future malicious packages",
-  "evidence": "The specific line from the diff that shows the problematic version specifier or package addition",
-  "impact": "What supply chain risk, breakage, or vulnerability is introduced if this is not fixed",
-  "recommendation": "Pin to a specific version range such as ^4.17.21",
+  "line": 42,
+  "title": "Short title under 60 chars",
+  "detail": "Explanation of the dependency/supply-chain issue and why it matters",
+  "evidence": "<specific diff line(s) showing the added/changed dependency or version specifier>",
+  "impact": "<supply chain risk, breakage, or vulnerability introduced if not fixed>",
+  "recommendation": "<concrete fix, e.g. an exact pinned version>",
   "blocking": false,
   "source": "llm",
-  "suggestion": "Pin to a specific version range such as ^4.17.21"
+  "suggestion": "<concrete fix, e.g. an exact pinned version>"
 }]
 
 Allowed field names: severity, basis, confidence, domain, file, line, title, detail, evidence, impact, recommendation, blocking, source, suggestion.

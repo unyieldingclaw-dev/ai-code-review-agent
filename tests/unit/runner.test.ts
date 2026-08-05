@@ -689,3 +689,71 @@ describe('SwarmRunner memory-bank context sanitization', () => {
     warnSpy.mockRestore()
   })
 })
+
+describe('SwarmRunner hallucinated-file defense', () => {
+  it('drops a finding whose file was never touched by the reviewed diff', async () => {
+    const fabricated = JSON.stringify([
+      {
+        severity: 'medium',
+        basis: 'VERIFIED',
+        file: 'package.json',
+        line: 4,
+        title: 'Wildcard version specifier for lodash',
+        detail: 'lodash uses wildcard * version',
+        suggestion: 'Pin to a specific version range',
+      },
+    ])
+    const diff = [
+      'diff --git a/src/foo.ts b/src/foo.ts',
+      '--- a/src/foo.ts',
+      '+++ b/src/foo.ts',
+      '@@ -1 +1 @@',
+      '-old',
+      '+new',
+    ].join('\n')
+    const provider = makeProvider(fabricated)
+    const config = { ...DEFAULT_CONFIG, agents: ['dependencies'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff })
+
+    expect(result.findings).toHaveLength(0)
+  })
+
+  it('surfaces dropped findings on the result instead of only logging them', async () => {
+    const fabricated = JSON.stringify([
+      {
+        severity: 'medium',
+        basis: 'VERIFIED',
+        file: 'package.json',
+        line: 4,
+        title: 'Wildcard version specifier for lodash',
+        detail: 'lodash uses wildcard * version',
+        suggestion: 'Pin to a specific version range',
+      },
+    ])
+    const diff = [
+      'diff --git a/src/foo.ts b/src/foo.ts',
+      '--- a/src/foo.ts',
+      '+++ b/src/foo.ts',
+      '@@ -1 +1 @@',
+      '-old',
+      '+new',
+    ].join('\n')
+    const provider = makeProvider(fabricated)
+    const config = { ...DEFAULT_CONFIG, agents: ['dependencies'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff })
+
+    expect(result.hallucinationFilter).toEqual({
+      dropped: [
+        {
+          agent: 'dependencies',
+          title: 'Wildcard version specifier for lodash',
+          file: 'package.json',
+        },
+      ],
+    })
+  })
+})

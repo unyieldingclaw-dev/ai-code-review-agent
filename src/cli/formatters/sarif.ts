@@ -66,6 +66,9 @@ export function formatSarif(result: ReviewResult): string {
             : {}),
           ...(result.agentStatus ? { agentStatus: result.agentStatus } : {}),
           ...(result.truncation?.truncated ? { truncation: result.truncation } : {}),
+          ...(result.hallucinationFilter && result.hallucinationFilter.dropped.length > 0
+            ? { hallucinationFilter: result.hallucinationFilter }
+            : {}),
         },
       },
     ],

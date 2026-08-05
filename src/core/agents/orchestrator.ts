@@ -1,6 +1,12 @@
 import type { LLMProvider } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
-import type { Finding, Severity, AgentName, EvidenceSource } from '../schema.js'
+import type {
+  Finding,
+  Severity,
+  AgentName,
+  EvidenceSource,
+  DroppedHallucinatedFinding,
+} from '../schema.js'
 import { SEVERITY_RANK } from '../schema.js'
 
 const DETERMINISTIC_SOURCES: EvidenceSource[] = [
@@ -49,8 +55,29 @@ export class OrchestratorAgent {
     private readonly config: ReviewConfig
   ) {}
 
-  synthesize(findings: Finding[]): Finding[] {
+  // changedFiles is optional so existing/other callers that don't have a diff's file list handy
+  // (e.g. every existing test in this file) are unaffected -- the filter simply no-ops when
+  // omitted. The real runner.ts call site always provides it.
+  // dropped is an optional sink the caller can pass to collect findings this filter drops, so
+  // they can be surfaced in the report instead of only logged -- no-op to omit it.
+  synthesize(
+    findings: Finding[],
+    changedFiles?: string[],
+    dropped?: DroppedHallucinatedFinding[]
+  ): Finding[] {
     let result = [...findings]
+    // Drop findings referencing a file the diff never touched, before anything downstream
+    // (corroboration, dedup) can act on a fabricated finding as if it were real. See
+    // hallucinationCrossCheck below for the sibling defense against uncorroborated severity.
+    // WHY require non-empty changedFiles: an empty list doesn't mean "this diff touches no
+    // files" in practice -- it means extractChangedFiles couldn't confidently parse any from
+    // this input (malformed/non-standard diff format). Filtering against an empty set would
+    // reject every finding, which is a worse failure mode than the one this defends against --
+    // fail open (skip the check) when we can't determine changed files with confidence, matching
+    // this project's existing convention elsewhere for uncertain/missing state.
+    if (changedFiles && changedFiles.length > 0) {
+      result = this.filterNonexistentFiles(result, changedFiles, dropped)
+    }
     // Cross-reference before dedup so coverage gaps can escalate correctness findings
     result = this.crossReference(result)
     // Require 2+ independent agents for Critical/High before publishing
@@ -59,6 +86,29 @@ export class OrchestratorAgent {
     result = this.applyPublicationFilter(result)
     result = this.capAndSort(result)
     return result
+  }
+
+  private filterNonexistentFiles(
+    findings: Finding[],
+    changedFiles: string[],
+    dropped?: DroppedHallucinatedFinding[]
+  ): Finding[] {
+    const normalize = (p: string) => p.replace(/^\.\//, '').replace(/\\/g, '/')
+    // Models sometimes echo the diff's own "--- a/path" / "+++ b/path" header prefix into the
+    // file field verbatim. changedFiles (from extractChangedFiles) never carries this prefix, so
+    // also try the finding's path with a leading a/ or b/ stripped before rejecting it.
+    const stripDiffPrefix = (p: string) => p.replace(/^[ab]\//, '')
+    const changedSet = new Set(changedFiles.map(normalize))
+    return findings.filter((f) => {
+      const normalized = normalize(f.file)
+      if (changedSet.has(normalized) || changedSet.has(stripDiffPrefix(normalized))) return true
+      dropped?.push({ agent: f.agent, title: f.title, file: f.file })
+      console.error(
+        `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- references ` +
+          `${f.file}, which is not in the reviewed diff (likely a hallucinated finding)`
+      )
+      return false
+    })
   }
 
   private hallucinationCrossCheck(findings: Finding[]): Finding[] {

@@ -20,6 +20,62 @@ lineage: []
 
 ## Current Focus
 
+**Dependencies-agent hallucination fix (2026-08-03)**: user reported `validateFindings()`
+rejecting a legitimate "no findings" response (no file/line to point to) forced a retry, and on
+retry the model fabricated a plausible-but-fictional finding ("wildcard lodash in package.json:4"
+against a diff with zero package.json/lodash content) instead of correctly re-reporting empty.
+Root cause: `dependencies.ts`'s system prompt carried a concrete "lodash wildcard" example as its
+REQUIRED OUTPUT FORMAT — every other agent uses a placeholder — which the model reproduced
+near-verbatim when it had nothing real to report. Considered and rejected loosening
+`BaseAgent.parseFindings` to accept a no-file/line "empty" shape: `tests/unit/baseAgent.test.ts`
+has a deliberate existing test asserting bare `{}` must throw `ParseFailureError`, a prior fix for
+a "silent-clean-pass" bug (see 2026-07-25 entry below) — loosening it would revert a correct
+safety property, not fix the actual root cause. Implemented instead: (1) replaced the concrete
+lodash example with a placeholder matching every other agent's prompt style; (2) added
+`OrchestratorAgent.synthesize()`'s new first-stage filter, `filterNonexistentFiles`, which drops
+any finding whose `file` isn't among the diff's actual changed files (computed via the existing
+`extractChangedFiles`, threaded through from `runner.ts`) — a defense-in-depth backstop, since
+live verification showed fix (1) alone did NOT stop the model from fabricating different
+package.json-referencing findings across repeated attempts. New optional `changedFiles?: string[]`
+param on `synthesize()`, no-op when omitted (~15 existing call sites unaffected); fails open
+(skips the check) when `changedFiles` is empty/undetermined, matching this project's existing
+fail-open convention for uncertain state. Found and fixed two of my own bugs during
+implementation: `calibrate.ts` initially forgot to pass `changedFiles` into `synthesize()`
+(meaning the new filter would never activate during calibration), and the filter's `normalize()`
+didn't strip a leading `a/`/`b/` git-diff-header prefix — the model sometimes echoes the diff's
+own `--- a/path`/`+++ b/path` convention into the `file` field, which caused two genuinely real
+findings (`correctness`, `migration-safety`) to be wrongly dropped as "hallucinated" in a full
+calibration run. Fixed by trying both the normalized path and the prefix-stripped form before
+rejecting. Final calibration: 16/16 passed except `adversarial` (pre-existing, same single failure
+as the original pre-change baseline, unrelated keyword-match flakiness — not a regression).
+New calibration case `dependencies-clean` (clean-diff fixture, `expectEmpty: true`) added as a
+permanent regression guard. 5 files touched: `dependencies.ts`, `orchestrator.ts`, `runner.ts`,
+`calibration/calibrate.ts` + new fixture, plus test coverage in `orchestrator.test.ts`/
+`runner.test.ts`. 385 unit tests passing (up from 358).
+
+**Hallucination-filter visibility follow-up (2026-08-04)**: asked "do you think this is best?"
+about the dependencies-agent hallucination fix above — flagged one real gap myself before
+declaring it done: `filterNonexistentFiles` dropped findings with only a `console.error`,
+invisible to anything reading the actual `ReviewResult`. Same anti-pattern this codebase already
+caught and fixed once before for sanitizer/context redactions (2026-07-26 entry). Risky
+specifically because the filter can false-positive (as the `a/`-prefix bug above proved) — a
+future normalization gap could silently drop a real finding with zero trace anywhere the user
+looks. Fixed: `OrchestratorAgent.synthesize()`/`filterNonexistentFiles` take an optional
+`dropped?: DroppedHallucinatedFinding[]` sink param (no-op when omitted); `runner.ts` passes one
+through and surfaces it as `ReviewResult.hallucinationFilter: { droppedCount, dropped }`
+(conditional-spread, same pattern as `truncation`/`policy`). `formatJson` needed no change (dumps
+`result` verbatim). Found a second pre-existing gap while wiring the markdown formatter: its
+`findings.length === 0` early-return path skips the entire sanitizer/context/policy footer block
+— which would have silently swallowed the new note in exactly the case it matters most (a
+fabricated finding filtered down to zero real findings, e.g. the `dependencies-clean` calibration
+case). Placed the new note near the top instead, alongside the truncation warning (matching this
+project's own precedent that data-integrity warnings shouldn't be buried at the bottom) rather
+than expanding scope to fix the pre-existing footer-ordering gap for sanitizer/context/policy too.
+Added to `sarif.ts`'s run-level `properties` for parity with `context`/`policy`/`agentStatus`/
+`truncation`. `mcp/formatter.ts` carries none of this metadata today, left untouched. 392 unit
+tests passing (up from 385): `schema.ts`, `orchestrator.ts`, `runner.ts`, `cli/formatter.ts`,
+`cli/formatters/sarif.ts` + matching test files.
+
 **Calibration CI shell-default fix (2026-08-03)**: `.github/workflows/calibrate.yml`'s "Check
 Ollama availability" step is bash `if/then/fi` syntax with no `shell:` declared, so it silently
 defaulted to PowerShell on the self-hosted Windows runner and failed with a `ParserError` — the
@@ -253,7 +309,7 @@ All 5 checks verified passing locally (295/295 tests) before the workflow was ad
 - Calibration CI: self-hosted runner, continue-on-error, 10min timeout. Was silently failing on
   every run for at least a month (missing `shell: bash`, same class of bug as review.yml's
   earlier fix below) until 2026-08-03 — see progress.md's matching entry.
-- **358 unit tests** across 39 test files
+- **392 unit tests** across 39 test files
 - `src/core/parsing.ts`: `validateAndNormalizeFindings()` extracted from BaseAgent (SRP)
 - `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
 - `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable
