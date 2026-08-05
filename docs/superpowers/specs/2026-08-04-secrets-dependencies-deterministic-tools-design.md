@@ -26,6 +26,21 @@ In every case the **evidence quotes were genuine** (verbatim substrings of the r
 hallucination is entirely in classification, not fabrication from nothing. This means an
 evidence-must-exist-in-diff check (the kind of defense PR #17 added) would not catch it.
 
+**A third finding, from verifying this spec's own Section D before writing the implementation
+plan:** the existing `hallucinationCrossCheck` already downgrades any uncorroborated solo High
+finding (non-deterministic source) to Medium — confirmed by feeding the captured raw hallucinated
+responses through the real `parseFindings`/`orchestrator.synthesize()` pipeline directly (no new
+LLM calls). But this safety net is unreliable in realistic multi-agent reviews: its corroboration
+check (`file === file && |line diff| <= 5`, no requirement that the two findings are actually
+about the same issue) is fooled by a completely unrelated finding from a different agent landing
+nearby — verified directly: an unrelated `correctness` finding 3 lines away let a fabricated
+`secrets` finding survive at full `high` severity, undowngraded. Tightening this to an exact-line
+match isn't a clean fix either — an existing test
+(`orchestrator.test.ts`: "keeps critical finding when a second agent flags the same file+line
+region") deliberately relies on the ±5 window for legitimate cross-domain corroboration. This is
+addressed as a documented, deliberately-deferred limitation rather than fixed in this pass — see
+Non-Goals.
+
 **Two independent, compounding root causes**, both confirmed by direct reproduction:
 
 1. **Parsing/diagnostics bug (not itself a hallucination source).** `secrets`/`adversarial`
@@ -49,8 +64,9 @@ evidence-must-exist-in-diff check (the kind of defense PR #17 added) would not c
    domains that are actually pattern-matchable rather than judgment calls — verified directly
    against the real tools (gitleaks 8.30.1 installed and tested this session; `npm audit` already
    available via the existing `npm` install) rather than assumed from memory.
-2. Reduce (not eliminate — this is judgment work, not pattern-matching) the hallucination severity
-   for `adversarial`, whose findings can't be replaced by a deterministic tool.
+2. Reduce (not eliminate — this is judgment work, not pattern-matching, and prompt-tightening alone
+   didn't fully solve this same class of problem for `dependencies` in PR #17) the hallucination
+   *rate* for `adversarial`, whose findings can't be replaced by a deterministic tool.
 3. Fix the Stage 4 mislabeling so the "response appears truncated" diagnostic is trustworthy again
    (only fires for genuine truncation).
 4. No new silent-stderr-only gap: when a tool-integrated agent falls back to LLM-only because the
@@ -73,6 +89,14 @@ evidence-must-exist-in-diff check (the kind of defense PR #17 added) would not c
 - Auto-installing gitleaks/npm for the end user, or failing the review when a tool is missing —
   graceful LLM-only fallback with a visible degraded flag, consistent with `lizard`'s existing
   optional-tool pattern in `complexity.ts`.
+- Fixing `hallucinationCrossCheck`'s corroboration-matching precision (the ±5-line,
+  no-topical-overlap-required window documented above). A naive fix (exact-line match) breaks an
+  existing, deliberately-tested legitimate behavior (cross-domain corroboration within a "file+line
+  region"); a robust fix needs the two findings' content to actually be compared, which is a
+  meaningfully different, content-aware design problem deserving its own spec, not a quick patch
+  folded into this one. Mitigated indirectly in this spec by moving `secrets`/`dependencies` onto
+  deterministic sources (which are exempt from this downgrade path entirely via
+  `DETERMINISTIC_SOURCES`) rather than depending on the downgrade heuristic to protect them.
 
 ## Design
 
@@ -114,26 +138,32 @@ existing behavior in `complexity.ts` (both assume the tool is invoked from the r
 standard `ai-review-agent` usage pattern) — not a new assumption introduced here.
 
 If gitleaks is unavailable (`runTool` returns `null` for every file — i.e. gitleaks isn't
-installed, not just "no leaks in this diff"): fall back to the existing LLM-only path unchanged,
-and record degraded status (Section D).
+installed, not just "no leaks in this diff"): fall back to the existing (now prompt-tightened,
+Section D) LLM-only path, and record degraded status (Section E).
 
-New `src/core/tools/gitleaksParser.ts` holds the mapping logic, unit-testable against captured
-real JSON fixtures (already captured this session) without gitleaks installed in CI.
+New `src/core/gitleaksParser.ts` holds the mapping logic (flat under `src/core/`, matching the
+existing convention of `parsing.ts`/`policyFilter.ts`/`sanitizer.ts` — no `tools/` subdirectory
+exists or is warranted for two files), unit-testable against captured real JSON fixtures (already
+captured this session) without gitleaks installed in CI.
 
 ### B. `DependenciesAgent` — `npm audit` replaces LLM judgment when triggered
 
 `run()` gains a pre-check: if `extractChangedFiles(diff)` includes `package.json` or
 `package-lock.json` and `input.projectPath` is available, run `npm audit --json` from that path
-via `runTool`. Parse entries with severity ≥ `moderate` (mirrors every other agent's existing
-"only report severity >= medium" convention) into `Finding` (`source: 'npm-audit'`,
-`basis: 'VERIFIED'`). Skip the LLM call for this diff.
+via `runTool`. `npm audit`'s own severity vocabulary (`info`/`low`/`moderate`/`high`/`critical`)
+doesn't match `Finding.severity`'s (`low`/`medium`/`high`/`critical`) — map `moderate → medium`,
+`high → high`, `critical → critical`, and drop `info`/`low` (mirrors every other agent's existing
+"only report severity >= medium" convention: `npm audit`'s `moderate` is the equivalent floor).
+Parsed entries become `Finding` (`source: 'npm-audit'`, `basis: 'VERIFIED'`). Skip the LLM call for
+this diff.
 
 If the diff doesn't touch a manifest file, or `npm audit` isn't available/fails, or
 `projectPath` isn't provided (e.g. reviewing a standalone `.diff` file with no real checkout): fall
 back to the existing LLM-only path, degraded status recorded only when a manifest file was touched
 but the tool couldn't run.
 
-New `src/core/tools/npmAuditParser.ts`, same fixture-based unit-testing approach as gitleaksParser.
+New `src/core/npmAuditParser.ts` (same flat placement), same fixture-based unit-testing approach as
+`gitleaksParser.ts`.
 
 ### C. Stage 4 mislabeling fix (`base.ts` `parseFindings`)
 
@@ -147,18 +177,32 @@ property), treat it as `[parsed]` and validate normally through the existing
 through the identical schema check either way); it stops a false diagnostic and means Stage 4's
 "response appears truncated" log becomes trustworthy again, firing only for genuine truncation.
 
-### D. `adversarial`-scoped corroboration downgrade
+### D. Prompt-tightening for `adversarial.ts` and `secrets.ts`'s LLM-fallback path
 
-`OrchestratorAgent.hallucinationCrossCheck` currently downgrades a solo Critical finding (no
-second agent corroborating the same file/region) to High when confidence <60%. Add: a solo **High**
-finding specifically from `adversarial`, uncorroborated by a second agent on the same file/region,
-downgrades to Medium — regardless of confidence, deliberately *not* gated the same way as the
-Critical rule. The reproduced `adversarial` hallucinations were themselves reported at 90-95%
-confidence — gating this downgrade on confidence <60% the same way the Critical rule does would
-not have caught a single one of them. Scoped to `adversarial` only; not applied to other
-judgment-heavy agents (`correctness`, `design`, etc.) since no reproduced evidence shows they have
-this problem, and applying it speculatively risks suppressing real findings from agents that
-haven't shown it.
+No new orchestrator mechanism — verified redundant (see Problem section above: the generic
+solo-High-to-Medium downgrade already exists and fires correctly whenever a finding is genuinely
+uncorroborated). Instead, tighten both prompts with the same category of fix already applied to
+`dependencies.ts` in PR #17, targeted at the specific failure patterns reproduced this session:
+
+- **`adversarial.ts`**: add explicit guidance that "attacker"/adversarial-input framing only
+  applies when the code actually has an external, untrusted-input boundary (network request,
+  user-facing form, file upload) — not local tooling, git hooks, or CI scripts reading trusted
+  input from the calling process. Reproduced `adversarial` hallucinations specifically
+  mischaracterized a local git hook's stdin (Claude Code's own tool-call JSON) as
+  attacker-controlled. Also tighten `basis=VERIFIED` guidance to require the code path is
+  unambiguously exercised as described, not merely plausible.
+- **`secrets.ts`**: extend the existing negative-example list ("not example/placeholder values",
+  "not `process.env.X` references") with two more concrete categories matched to what was actually
+  reproduced: file/marker paths are not credentials regardless of surrounding variable names; hash
+  algorithm invocations (`sha256sum`, `shasum`, `Get-FileHash`, variables merely named
+  `hash`/`expected`/`checksum`) are not secrets.
+
+Framed honestly as a rate reduction, not a fix: PR #17 showed removing `dependencies.ts`'s one
+concrete triggering example stopped that *specific* pattern but didn't stop the agent from
+inventing new fabrications elsewhere. This is a smaller, complementary improvement to Sections A/B
+(which remain the primary, structural defense for `secrets`/`dependencies` specifically) and to
+the residual corroboration-check risk documented in Non-Goals for `adversarial`, which has no
+tool-replacement option available.
 
 ### E. Degraded-mode visibility
 
@@ -183,23 +227,28 @@ fields.
 
 ## Testing
 
-- `tests/unit/tools/gitleaksParser.test.ts` / `npmAuditParser.test.ts`: parse captured real JSON
-  (clean-diff case, leak-detected case) into `Finding[]`, verify field mapping.
-- `tests/unit/agents/secrets.test.ts` / extended `dependencies.test.ts`: mock `runTool` to return
+- `tests/unit/gitleaksParser.test.ts` / `tests/unit/npmAuditParser.test.ts` (flat, matching
+  `tests/unit/policyFilter.test.ts`'s existing convention): parse captured real JSON (clean-diff
+  case, leak-detected case) into `Finding[]`, verify field mapping.
+- Extended `tests/unit/secretsAgent.test.ts` / `tests/unit/dependenciesAgent.test.ts` (existing
+  files, confirmed at these exact paths — not `tests/unit/agents/`): mock `runTool` to return
   captured JSON — assert `provider.chat` (the LLM) is **never called** on the tool-available path;
   mock `runTool` returning `null` — assert the existing LLM path still runs and degraded status is
   recorded.
 - `tests/unit/baseAgent.test.ts`: new stage correctly wraps a bare single object, with the
   corrected (non-"truncated") log message; existing Stage 4 truncation tests unaffected.
-- `tests/unit/orchestrator.test.ts`: solo-High `adversarial` downgrade (uncorroborated → Medium;
-  corroborated → stays High); confirm this does NOT apply to a solo High from `correctness` or
-  other agents (regression guard against accidental scope creep).
+- No new `orchestrator.test.ts` cases needed for Section D — no orchestrator code changes.
 - `tests/unit/runner.test.ts` + `tests/unit/formatters/markdown.test.ts` /
   `tests/unit/formatters/sarif.test.ts`: `ReviewResult.toolAvailability` surfaces end-to-end,
   same conditional-spread pattern as sibling metadata.
 - Calibration: one new live case each for `secrets` (gitleaks installed — assert findings carry
   `source: 'gitleaks'`, not `'heuristic'`/`'llm'`, confirming the LLM path was actually skipped)
-  and `dependencies` (npm-audit triggered). No new live case needed for the LLM-fallback path —
-  it's the existing, already-calibrated agent behavior, covered by the mocked unit tests above.
+  and `dependencies` (npm-audit triggered). No new permanent `expectEmpty` calibration gate for
+  `adversarial`'s prompt-tightening — since Section D is an explicitly-acknowledged rate reduction,
+  not elimination, a hard pass/fail gate on a single sample would be flaky by the fix's own honest
+  framing, not a meaningful regression signal. Instead, verify Section D manually during
+  implementation with a multi-run spot-check (reusing this session's `repro-raw.mjs` approach)
+  against the same `review-reminders.sh`/`.ps1` content, and report the before/after rate directly
+  rather than encoding it as a CI gate.
 - Full suite re-run at the end against the existing baseline (393 tests at time of writing) plus
   the new tests added here.
