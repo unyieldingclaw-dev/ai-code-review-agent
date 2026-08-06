@@ -16,7 +16,10 @@ export class DependenciesAgent extends BaseAgent {
       (f) => f === 'package.json' || f === 'package-lock.json'
     )
     if (touchesManifest && input.projectPath) {
-      const output = await runTool('npm', ['audit', '--json'], undefined)
+      // shell:true is required for npm specifically (Node refuses to spawn .cmd/.bat files on
+      // Windows otherwise) -- safe here because these args are always this hardcoded literal
+      // array, never diff-derived content.
+      const output = await runTool('npm', ['audit', '--json'], undefined, true)
       if (output !== null) {
         this.lastToolAvailability = 'used'
         return parseNpmAuditOutput(output, this.name)
