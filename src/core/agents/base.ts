@@ -52,6 +52,18 @@ export abstract class BaseAgent {
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.findings)) {
         return this.validateFindings(parsed.findings)
       }
+      // Stage 2b: a single bare finding-shaped object (has its own `severity`, not nested under
+      // `.findings`). Nothing was truncated here -- Stage 4's "appears truncated" message would
+      // be misleading, so wrap it and log accurately instead of falling through to Stage 4.
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'severity' in parsed) {
+        const valid = this.validateFindings([parsed])
+        if (valid.length > 0) {
+          console.error(
+            `[${this.name}] response was a single object, not the required array -- auto-wrapped`
+          )
+          return valid
+        }
+      }
     } catch {
       /* fall through */
     }

@@ -57,6 +57,34 @@ describe('BaseAgent', () => {
     await expect(agent.run({ diff: 'diff' })).rejects.toThrow(ParseFailureError)
   })
 
+  it('wraps a single bare finding-shaped object without claiming truncation', async () => {
+    // The LLM returned one finding as a bare `{...}` instead of the required `[...]` array.
+    // Nothing was truncated -- Stage 4's "appears truncated" message would be misleading here.
+    const raw = JSON.stringify({
+      severity: 'high',
+      basis: 'VERIFIED',
+      file: 'a.ts',
+      line: 1,
+      title: 'T',
+      detail: 'D',
+      suggestion: 'S',
+    })
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
+    const findings = await agent.run({ diff: 'diff' })
+    expect(findings).toHaveLength(1)
+    expect(findings[0].title).toBe('T')
+    const loggedTruncated = consoleSpy.mock.calls.some((args) =>
+      String(args[0]).includes('appears truncated')
+    )
+    const loggedAutoWrapped = consoleSpy.mock.calls.some((args) =>
+      String(args[0]).includes('auto-wrapped')
+    )
+    expect(loggedTruncated).toBe(false)
+    expect(loggedAutoWrapped).toBe(true)
+    consoleSpy.mockRestore()
+  })
+
   it('parses bare JSON array', async () => {
     const raw = JSON.stringify([
       {
