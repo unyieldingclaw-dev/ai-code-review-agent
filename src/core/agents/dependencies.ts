@@ -1,9 +1,29 @@
 import { BaseAgent } from './base.js'
-import type { AgentName } from '../schema.js'
+import { runTool } from '../../utils/shell.js'
+import { extractChangedFiles } from '../policyFilter.js'
+import { parseNpmAuditOutput } from '../npmAuditParser.js'
+import type { AgentName, Finding, ReviewInput, ToolAvailability } from '../schema.js'
 
 export class DependenciesAgent extends BaseAgent {
+  public lastToolAvailability?: ToolAvailability
+
   get name(): AgentName {
     return 'dependencies'
+  }
+
+  async run(input: ReviewInput, signal?: AbortSignal): Promise<Finding[]> {
+    const touchesManifest = extractChangedFiles(input.diff).some(
+      (f) => f === 'package.json' || f === 'package-lock.json'
+    )
+    if (touchesManifest && input.projectPath) {
+      const output = await runTool('npm', ['audit', '--json'], undefined)
+      if (output !== null) {
+        this.lastToolAvailability = 'used'
+        return parseNpmAuditOutput(output, this.name)
+      }
+    }
+    if (touchesManifest) this.lastToolAvailability = 'unavailable-llm-fallback'
+    return super.run(input, signal)
   }
 
   get systemPrompt(): string {
