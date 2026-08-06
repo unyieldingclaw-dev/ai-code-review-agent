@@ -16,9 +16,67 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-03
+**Last Updated**: 2026-08-06
 
 ## ✅ Completed (Tasks 1–16)
+
+### Secrets/Dependencies Deterministic-Tool Integration — 2026-08-06
+
+- [x] Root cause (two independent, compounding causes, both empirically proven): (1)
+      `parseFindings` Stage 4 mislabeled a complete bare `{...}` object as "response appears
+      truncated"; (2) genuine LLM content hallucination in `secrets`/`adversarial`/`dependencies`,
+      reproduced 9/9 via direct `provider.chat()` calls against real Ollama.
+- [x] Fix A (Stage 4 bug): new Stage 2b in `base.ts` recognizes a single finding-shaped bare
+      object and wraps it with an accurate log message instead of the misleading truncation one.
+- [x] Fix B (secrets/dependencies): `SecretsAgent`/`DependenciesAgent` override `run()` to call
+      gitleaks/`npm audit --json` directly, skipping the LLM entirely when available — chosen over
+      augmenting the LLM with tool output since the real problem is untrustworthy LLM judgment,
+      not missing signal. `gitleaksParser.ts`/`npmAuditParser.ts` map real tool JSON to `Finding`
+      (severity vocabularies don't match either tool's own scheme, explicit mapping needed; npm
+      audit is full-tree, not diff-scoped, by design). New `ToolAvailability`/
+      `ToolAvailabilityMetadata` schema types surface degraded-mode fallback on `ReviewResult`,
+      markdown, and SARIF.
+- [x] Fix C (adversarial/secrets prompt-tightening): negative examples added to `secrets.ts`'s
+      LLM-fallback prompt (marker paths, hash invocations); a threat-boundary rule added to
+      `adversarial.ts` (attacker framing only for real external untrusted-input boundaries).
+      Explicitly framed as rate-reduction, not guaranteed — matches PR #17 precedent.
+- [x] Found and rejected a redundant orchestrator mechanism during design: the existing
+      hallucination cross-check already downgrades solo High findings from non-deterministic
+      sources (verified via a real-pipeline repro script, not assumed) — a planned new
+      adversarial-specific downgrade would have been dead code. Deeper investigation (at the
+      user's explicit request to "look deeper and verify") found a real gap in that *existing*
+      mechanism instead: an unrelated nearby finding from a different agent defeats the
+      corroboration check. Documented as a deliberately deferred Non-Goal (an exact-line-match fix
+      breaks a legitimate existing test) rather than patched in this pass.
+- [x] Honest before/after measurement (3 runs each, real diff, prompt isolated via direct
+      `provider.chat()` calls bypassing `run()`): `secrets` 3/3 → 2/3 hallucinated (real, partial
+      improvement); `adversarial` 3/3 → 3/3, **no measurable improvement** — confirmed the patched
+      prompt text was actually in the built `dist/` before concluding the model just ignores the
+      rule. Reported as-is rather than spun positively.
+- [x] Found and fixed a real Windows-only bug independent of the plan: `runTool('npm', ...)`
+      threw `ENOENT` on Windows (npm resolves to `npm.cmd`; Node hard-blocks spawning `.cmd`/`.bat`
+      files without `shell: true`, a security fix, not configurable another way) — silently broke
+      the entire npm-audit integration on Windows until live calibration surfaced it (confirmed via
+      direct `child_process.spawn` reproduction). Fixed with an explicit `shell` parameter on
+      `runTool`, defaulting to `false` (gitleaks' `--source <file>` can carry diff-derived paths
+      from an untrusted PR — enabling a shell there would reopen command injection); only the npm
+      call site opts in, since its args are always the hardcoded literal `['audit', '--json']`.
+- [x] Found and fixed two latent test-infrastructure gaps before they caused false
+      failures/regressions: pre-existing calibration cases sharing a fixture with the new
+      deterministic-tool paths needed their expected/bait keywords updated once `projectPath` was
+      added to the harness (real npm audit output doesn't mention the diff's own fabricated bait
+      text); a `runner.test.ts` mock `beforeEach` only reset the mock's resolved value, not its
+      call history, letting one test's calls bleed into another's assertions.
+- [x] Process correction: an implementer subagent was mistakenly instructed to bypass the
+      review-gate hook by writing the marker directly without a real review — caught by the
+      harness's own security-warning mechanism, verified the actual committed content was safe,
+      permanently corrected to controller-only marker-writing/committing for the rest of the
+      session.
+- [x] 427 unit tests passing (up from 393 baseline), 18/18 calibration cases passing (up from 16).
+      Files: `base.ts`, `schema.ts`, `secrets.ts`, `dependencies.ts`, `adversarial.ts`, `runner.ts`,
+      `cli/formatter.ts`, `cli/formatters/sarif.ts`, `utils/shell.ts`, new `gitleaksParser.ts`/
+      `npmAuditParser.ts`, `calibration/calibrate.ts` + new fixtures, plus matching test files. Full
+      spec at `docs/superpowers/specs/2026-08-04-secrets-dependencies-deterministic-tools-design.md`.
 
 ### Hallucination-Filter Visibility Follow-Up — 2026-08-04
 
