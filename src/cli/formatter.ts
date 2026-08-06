@@ -48,6 +48,23 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     lines.push('')
   }
 
+  const TOOL_LABELS: Record<'gitleaks' | 'npmAudit', string> = {
+    gitleaks: 'gitleaks',
+    npmAudit: 'npm audit',
+  }
+  const degradedTools = (['gitleaks', 'npmAudit'] as const).filter(
+    (t) => result.toolAvailability?.[t] === 'unavailable-llm-fallback'
+  )
+  if (degradedTools.length > 0) {
+    const names = degradedTools.map((t) => TOOL_LABELS[t]).join(', ')
+    lines.push(
+      `${useEmoji ? '🔧 ' : ''}Degraded mode: ${names} not installed — falling back to LLM-only ` +
+        `detection for the affected agent(s), which is less reliable. Install the missing tool(s) ` +
+        `for accurate results.`
+    )
+    lines.push('')
+  }
+
   if (failedAgents.length > 0) {
     lines.push(
       `${useEmoji ? '⚠️ ' : ''}${failedAgents.length}/${totalAgents} agents failed — results incomplete`
