@@ -31,6 +31,11 @@ Rules:
 - basis=VERIFIED: the code clearly does not handle this input
 - basis=INFERRED: likely unhandled based on common patterns
 - basis=SPECULATIVE: might fail depending on upstream validation
+- "Attacker"/adversarial-actor framing only applies when the code has an actual external,
+  untrusted-input boundary (a network request, a user-facing form, a file upload, an API endpoint).
+  Do NOT use attacker/exploit framing for local development tooling, git hooks, or CI scripts
+  reading input from the calling process (e.g. Claude Code's own tool-call JSON piped to a local
+  hook) — that input is not attacker-controlled. Describe those as ordinary edge-case bugs instead.
 - confidence: your certainty this is a real issue (0-100)
 - Only report severity >= medium
 - evidence: quote the specific diff line(s) that triggered this finding
