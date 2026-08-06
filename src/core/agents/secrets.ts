@@ -1,9 +1,48 @@
 import { BaseAgent } from './base.js'
-import type { AgentName } from '../schema.js'
+import { runTool } from '../../utils/shell.js'
+import { extractChangedFiles } from '../policyFilter.js'
+import { parseGitleaksOutput } from '../gitleaksParser.js'
+import { existsSync } from 'fs'
+import type { AgentName, Finding, ReviewInput, ToolAvailability } from '../schema.js'
 
 export class SecretsAgent extends BaseAgent {
+  public lastToolAvailability?: ToolAvailability
+
   get name(): AgentName {
     return 'secrets'
+  }
+
+  async run(input: ReviewInput, signal?: AbortSignal): Promise<Finding[]> {
+    const files = extractChangedFiles(input.diff).filter((f) => existsSync(f))
+    if (files.length > 0) {
+      const allFindings: Finding[] = []
+      let gitleaksRan = false
+      for (const file of files) {
+        const output = await runTool('gitleaks', [
+          'detect',
+          '--no-git',
+          '--source',
+          file,
+          '-f',
+          'json',
+          '-r',
+          '-',
+          '--exit-code',
+          '0',
+          '--no-banner',
+          '--redact',
+        ])
+        if (output === null) continue // gitleaks not installed
+        gitleaksRan = true
+        allFindings.push(...parseGitleaksOutput(output, this.name))
+      }
+      if (gitleaksRan) {
+        this.lastToolAvailability = 'used'
+        return allFindings
+      }
+    }
+    this.lastToolAvailability = 'unavailable-llm-fallback'
+    return super.run(input, signal)
   }
 
   get systemPrompt(): string {
@@ -20,6 +59,12 @@ Analyze the diff for hardcoded secrets, credentials, and sensitive values:
 Focus only on NEW lines added in the diff (lines starting with +).
 Do NOT flag commented-out code, documentation examples, or clearly fake placeholder values.
 Do NOT flag environment variable references like process.env.SECRET_KEY.
+Do NOT flag file paths, marker files, or config file locations (e.g. ".claude/.review-ok",
+"$root/config/settings.json") -- a path is not a credential regardless of nearby variable names
+like "marker" or "key".
+Do NOT flag hash algorithm invocations or their output (sha256sum, shasum, Get-FileHash,
+git diff | sha256sum, or variables merely named "hash"/"expected"/"checksum") -- computing or
+comparing a hash is not a secret.
 
 severity: "critical" for private keys or certificates
 severity: "high" for API keys, tokens, or passwords
