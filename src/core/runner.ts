@@ -13,6 +13,7 @@ import type {
   AgentStatus,
   TruncationMetadata,
   DroppedHallucinatedFinding,
+  ToolAvailabilityMetadata,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
 import { classifyAgentError } from './parsing.js'
@@ -133,6 +134,15 @@ export function scaleAgentTimeout(
   if (maxDiffLines <= 0) return baseTimeoutMs
   const ratio = Math.min(1, Math.max(0, diffLines / maxDiffLines))
   return Math.round(baseTimeoutMs * (1 + (TIMEOUT_SCALE_CAP - 1) * ratio))
+}
+
+function recordToolAvailability(agent: BaseAgent, toolAvailability: ToolAvailabilityMetadata): void {
+  if (agent instanceof SecretsAgent && agent.lastToolAvailability) {
+    toolAvailability.gitleaks = agent.lastToolAvailability
+  }
+  if (agent instanceof DependenciesAgent && agent.lastToolAvailability) {
+    toolAvailability.npmAudit = agent.lastToolAvailability
+  }
 }
 
 function shouldEarlyExit(config: ReviewConfig, allFindings: Finding[]): boolean {
@@ -283,6 +293,7 @@ export class SwarmRunner {
     baseIndex: number,
     total: number,
     agentStatus: Partial<Record<AgentName, AgentStatus>>,
+    toolAvailability: ToolAvailabilityMetadata,
     timeout: number,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<{ findings: Finding[]; earlyExitAgent?: AgentName }> {
@@ -306,6 +317,7 @@ export class SwarmRunner {
           retryDelayMs
         )
         findings.push(...agentFindings)
+        recordToolAvailability(agent, toolAvailability)
         agentStatus[agent.name] = 'ok'
         const shouldStop = shouldEarlyExit(this.config, findings)
         onProgress?.({
@@ -347,6 +359,7 @@ export class SwarmRunner {
     baseIndex: number,
     total: number,
     agentStatus: Partial<Record<AgentName, AgentStatus>>,
+    toolAvailability: ToolAvailabilityMetadata,
     timeout: number,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<Finding[]> {
@@ -372,6 +385,7 @@ export class SwarmRunner {
             retryDelayMs
           )
           findings.push(...agentFindings)
+          recordToolAvailability(agent, toolAvailability)
           agentStatus[agent.name] = 'ok'
           onProgress?.({
             phase: 'end',
@@ -468,6 +482,7 @@ export class SwarmRunner {
     let coverageGaps: CoverageGap[] = []
     let testFiles: GeneratedTestFile[] = []
     const agentStatus: Partial<Record<AgentName, AgentStatus>> = {}
+    const toolAvailability: ToolAvailabilityMetadata = {}
 
     // Context tracking — accumulate across all agents for the final metadata block
     const allFilesLoaded: string[] = []
@@ -572,6 +587,7 @@ export class SwarmRunner {
           baseIndex,
           total,
           agentStatus,
+          toolAvailability,
           effectiveTimeoutMs,
           onProgress
         )
@@ -584,6 +600,7 @@ export class SwarmRunner {
           baseIndex,
           total,
           agentStatus,
+          toolAvailability,
           effectiveTimeoutMs,
           onProgress
         )
@@ -654,6 +671,7 @@ export class SwarmRunner {
       ...(droppedHallucinated.length > 0
         ? { hallucinationFilter: { dropped: droppedHallucinated } }
         : {}),
+      ...(Object.keys(toolAvailability).length > 0 ? { toolAvailability } : {}),
     }
   }
 }

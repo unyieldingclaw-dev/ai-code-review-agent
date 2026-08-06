@@ -1,5 +1,17 @@
 // tests/unit/runner.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { runTool } from '../../src/utils/shell.js'
+
+vi.mock('../../src/utils/shell.js', () => ({
+  runTool: vi.fn(),
+}))
+const mockRunTool = vi.mocked(runTool)
+
+beforeEach(() => {
+  vi.resetAllMocks()
+  mockRunTool.mockResolvedValue(null) // default: tools not found, every existing test unaffected
+})
+
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs'
 import { join } from 'path'
 import { SwarmRunner, scaleAgentTimeout } from '../../src/core/runner.js'
@@ -755,5 +767,47 @@ describe('SwarmRunner hallucinated-file defense', () => {
         },
       ],
     })
+  })
+})
+
+describe('SwarmRunner tool-availability visibility', () => {
+  const DIFF = `diff --git a/src/core/config.ts b/src/core/config.ts
+--- a/src/core/config.ts
++++ b/src/core/config.ts
+@@ -1,1 +1,1 @@
+-a
++b`
+
+  it('surfaces gitleaks degraded-mode when it is not installed', async () => {
+    mockRunTool.mockResolvedValue(null)
+    const provider = makeProvider('[]')
+    const config = { ...DEFAULT_CONFIG, agents: ['secrets'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: DIFF })
+
+    expect(result.toolAvailability?.gitleaks).toBe('unavailable-llm-fallback')
+  })
+
+  it('surfaces gitleaks "used" when it ran, even with zero leaks', async () => {
+    mockRunTool.mockResolvedValue('[]')
+    const provider = makeProvider('[]')
+    const config = { ...DEFAULT_CONFIG, agents: ['secrets'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: DIFF })
+
+    expect(result.toolAvailability?.gitleaks).toBe('used')
+  })
+
+  it('does not include toolAvailability when secrets/dependencies did not run', async () => {
+    const provider = makeProvider('[]')
+    const config = { ...DEFAULT_CONFIG, agents: ['correctness'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: DIFF })
+
+    expect(result.toolAvailability).toBeUndefined()
+    expect(mockRunTool).not.toHaveBeenCalled()
   })
 })
