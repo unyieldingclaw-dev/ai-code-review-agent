@@ -53,7 +53,8 @@ export function parseNpmAuditOutput(json: string, agentName: AgentName): Finding
 
     const detailVia = vuln.via.find((v): v is NpmAuditVia => typeof v === 'object')
     const detail =
-      detailVia?.title ?? `Vulnerable via ${vuln.via.filter((v) => typeof v === 'string').join(', ')}`
+      detailVia?.title ??
+      `Vulnerable via ${vuln.via.filter((v) => typeof v === 'string').join(', ')}`
     const evidence = detailVia?.url ?? `Affected range: ${vuln.range}`
     const fixSuggestion =
       typeof vuln.fixAvailable === 'object'

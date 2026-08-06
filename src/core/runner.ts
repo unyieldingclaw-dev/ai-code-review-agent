@@ -136,7 +136,10 @@ export function scaleAgentTimeout(
   return Math.round(baseTimeoutMs * (1 + (TIMEOUT_SCALE_CAP - 1) * ratio))
 }
 
-function recordToolAvailability(agent: BaseAgent, toolAvailability: ToolAvailabilityMetadata): void {
+function recordToolAvailability(
+  agent: BaseAgent,
+  toolAvailability: ToolAvailabilityMetadata
+): void {
   if (agent instanceof SecretsAgent && agent.lastToolAvailability) {
     toolAvailability.gitleaks = agent.lastToolAvailability
   }

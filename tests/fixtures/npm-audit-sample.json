@@ -67,7 +67,21 @@
     }
   },
   "metadata": {
-    "vulnerabilities": { "info": 0, "low": 1, "moderate": 6, "high": 5, "critical": 2, "total": 14 },
-    "dependencies": { "prod": 156, "dev": 254, "optional": 76, "peer": 0, "peerOptional": 0, "total": 409 }
+    "vulnerabilities": {
+      "info": 0,
+      "low": 1,
+      "moderate": 6,
+      "high": 5,
+      "critical": 2,
+      "total": 14
+    },
+    "dependencies": {
+      "prod": 156,
+      "dev": 254,
+      "optional": 76,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 409
+    }
   }
 }
