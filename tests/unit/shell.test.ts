@@ -91,4 +91,32 @@ describe('runTool', () => {
       expect.objectContaining({ shell: true })
     )
   })
+
+  it('passes cwd through to spawn when provided, so tools resolve paths against the reviewed project instead of the process cwd', async () => {
+    const proc = fakeProcess()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockSpawn.mockReturnValue(proc as any)
+    const promise = runTool('npm', ['audit', '--json'], undefined, true, '/some/other/project')
+    proc.emit('close')
+    await promise
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'npm',
+      ['audit', '--json'],
+      expect.objectContaining({ cwd: '/some/other/project' })
+    )
+  })
+
+  it('defaults cwd to undefined (process cwd) when not provided', async () => {
+    const proc = fakeProcess()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockSpawn.mockReturnValue(proc as any)
+    const promise = runTool('gitleaks', ['detect'])
+    proc.emit('close')
+    await promise
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'gitleaks',
+      ['detect'],
+      expect.objectContaining({ cwd: undefined })
+    )
+  })
 })

@@ -127,4 +127,20 @@ describe('DependenciesAgent npm-audit integration', () => {
     expect(provider.chat).toHaveBeenCalledOnce()
     expect(agent.lastToolAvailability).toBe('unavailable-llm-fallback')
   })
+
+  it('passes projectPath through as cwd, so npm audit runs against the reviewed project instead of the process cwd', async () => {
+    mockRunTool.mockResolvedValue('{"vulnerabilities":{}}')
+    const provider = makeProvider('[]')
+    const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
+
+    await agent.run({ diff: MANIFEST_DIFF, projectPath: '/some/other/project' })
+
+    expect(mockRunTool).toHaveBeenCalledWith(
+      'npm',
+      ['audit', '--json'],
+      undefined,
+      true,
+      '/some/other/project'
+    )
+  })
 })

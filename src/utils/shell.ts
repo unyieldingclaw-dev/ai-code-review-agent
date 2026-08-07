@@ -9,13 +9,15 @@ export function runTool(
   cmd: string,
   args: string[],
   stdinData?: string,
-  shell = false
+  shell = false,
+  cwd?: string
 ): Promise<string | null> {
   return new Promise((resolve, reject) => {
     let stdout = ''
     const proc = spawn(cmd, args, {
       stdio: stdinData !== undefined ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'],
       shell,
+      cwd,
     })
     if (proc.stdout) {
       proc.stdout.on('data', (chunk: Buffer) => {

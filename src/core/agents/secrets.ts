@@ -3,6 +3,7 @@ import { runTool } from '../../utils/shell.js'
 import { extractChangedFiles } from '../policyFilter.js'
 import { parseGitleaksOutput } from '../gitleaksParser.js'
 import { existsSync } from 'fs'
+import { join } from 'path'
 import type { AgentName, Finding, ReviewInput, ToolAvailability } from '../schema.js'
 
 export class SecretsAgent extends BaseAgent {
@@ -13,25 +14,36 @@ export class SecretsAgent extends BaseAgent {
   }
 
   async run(input: ReviewInput, signal?: AbortSignal): Promise<Finding[]> {
-    const files = extractChangedFiles(input.diff).filter((f) => existsSync(f))
+    // WHY join with projectPath before existsSync: extractChangedFiles returns paths relative to
+    // the reviewed repo, not this process's own cwd -- when the caller points elsewhere (CLI
+    // --dir, MCP repo_path), checking existsSync(f) directly silently resolved against the wrong
+    // directory, dropping every real file and falling back to the LLM with no signal why.
+    const projectPath = input.projectPath ?? '.'
+    const files = extractChangedFiles(input.diff).filter((f) => existsSync(join(projectPath, f)))
     if (files.length > 0) {
       const allFindings: Finding[] = []
       let gitleaksRan = false
       for (const file of files) {
-        const output = await runTool('gitleaks', [
-          'detect',
-          '--no-git',
-          '--source',
-          file,
-          '-f',
-          'json',
-          '-r',
-          '-',
-          '--exit-code',
-          '0',
-          '--no-banner',
-          '--redact',
-        ])
+        const output = await runTool(
+          'gitleaks',
+          [
+            'detect',
+            '--no-git',
+            '--source',
+            file,
+            '-f',
+            'json',
+            '-r',
+            '-',
+            '--exit-code',
+            '0',
+            '--no-banner',
+            '--redact',
+          ],
+          undefined,
+          false,
+          projectPath
+        )
         if (output === null) continue // gitleaks not installed
         gitleaksRan = true
         allFindings.push(...parseGitleaksOutput(output, this.name))

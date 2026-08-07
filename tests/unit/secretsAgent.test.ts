@@ -137,7 +137,26 @@ describe('SecretsAgent gitleaks integration', () => {
 
     expect(mockRunTool).toHaveBeenCalledWith(
       'gitleaks',
-      expect.arrayContaining(['detect', '--source', 'src/core/config.ts', '--redact'])
+      expect.arrayContaining(['detect', '--source', 'src/core/config.ts', '--redact']),
+      undefined,
+      false,
+      '.'
+    )
+  })
+
+  it('passes projectPath through as cwd, so gitleaks and existsSync resolve against the reviewed project instead of the process cwd', async () => {
+    mockRunTool.mockResolvedValue('[]')
+    const provider = makeProvider('[]')
+    const agent = new SecretsAgent(provider, DEFAULT_CONFIG)
+
+    await agent.run({ diff: DIFF, projectPath: process.cwd() })
+
+    expect(mockRunTool).toHaveBeenCalledWith(
+      'gitleaks',
+      expect.any(Array),
+      undefined,
+      false,
+      process.cwd()
     )
   })
 })
