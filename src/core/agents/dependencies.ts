@@ -2,10 +2,10 @@ import { BaseAgent } from './base.js'
 import { runTool } from '../../utils/shell.js'
 import { extractChangedFiles } from '../policyFilter.js'
 import { parseNpmAuditOutput } from '../npmAuditParser.js'
-import type { AgentName, Finding, ReviewInput, ToolAvailability } from '../schema.js'
+import type { AgentName, Finding, ReviewInput } from '../schema.js'
 
 export class DependenciesAgent extends BaseAgent {
-  public lastToolAvailability?: ToolAvailability
+  readonly toolKey = 'npmAudit' as const
 
   get name(): AgentName {
     return 'dependencies'

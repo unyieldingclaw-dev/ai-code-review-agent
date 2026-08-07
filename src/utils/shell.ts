@@ -30,8 +30,8 @@ export function runTool(
       if (e.code === 'ENOENT') resolve(null)
       else reject(err)
     })
-    // Use 'close' (not 'exit') — gitleaks exits non-zero when secrets are found,
-    // but we still want to read its output.
+    // Use 'close' (not 'exit') — npm audit exits non-zero when vulnerabilities are found (and
+    // gitleaks would too without secrets.ts's --exit-code 0), but we still want to read stdout.
     proc.on('close', () => resolve(stdout.trim() || null))
     if (stdinData !== undefined && proc.stdin) {
       proc.stdin.write(stdinData)

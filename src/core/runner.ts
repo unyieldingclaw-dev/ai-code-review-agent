@@ -136,15 +136,12 @@ export function scaleAgentTimeout(
   return Math.round(baseTimeoutMs * (1 + (TIMEOUT_SCALE_CAP - 1) * ratio))
 }
 
-function recordToolAvailability(
+export function recordToolAvailability(
   agent: BaseAgent,
   toolAvailability: ToolAvailabilityMetadata
 ): void {
-  if (agent instanceof SecretsAgent && agent.lastToolAvailability) {
-    toolAvailability.gitleaks = agent.lastToolAvailability
-  }
-  if (agent instanceof DependenciesAgent && agent.lastToolAvailability) {
-    toolAvailability.npmAudit = agent.lastToolAvailability
+  if (agent.toolKey && agent.lastToolAvailability) {
+    toolAvailability[agent.toolKey] = agent.lastToolAvailability
   }
 }
 

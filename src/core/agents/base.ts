@@ -1,6 +1,12 @@
 import type { LLMProvider, Message } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
-import type { Finding, ReviewInput, AgentName } from '../schema.js'
+import type {
+  Finding,
+  ReviewInput,
+  AgentName,
+  ToolAvailability,
+  ToolAvailabilityMetadata,
+} from '../schema.js'
 import {
   validateAndNormalizeFindings,
   ParseFailureError,
@@ -9,6 +15,13 @@ import {
 } from '../parsing.js'
 
 export abstract class BaseAgent {
+  // Opt-in contract for agents that call a deterministic external tool instead of (or before
+  // falling back to) the LLM -- e.g. SecretsAgent/gitleaks, DependenciesAgent/npm-audit. Declared
+  // here, not checked via instanceof in runner.ts, so a new tool-backed agent doesn't require any
+  // runner.ts change: it just sets these two fields and the bookkeeping picks it up generically.
+  readonly toolKey?: keyof ToolAvailabilityMetadata
+  lastToolAvailability?: ToolAvailability
+
   constructor(
     protected readonly provider: LLMProvider,
     protected readonly config: ReviewConfig

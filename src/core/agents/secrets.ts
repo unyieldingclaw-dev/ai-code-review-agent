@@ -4,10 +4,10 @@ import { extractChangedFiles } from '../policyFilter.js'
 import { parseGitleaksOutput } from '../gitleaksParser.js'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import type { AgentName, Finding, ReviewInput, ToolAvailability } from '../schema.js'
+import type { AgentName, Finding, ReviewInput } from '../schema.js'
 
 export class SecretsAgent extends BaseAgent {
-  public lastToolAvailability?: ToolAvailability
+  readonly toolKey = 'gitleaks' as const
 
   get name(): AgentName {
     return 'secrets'

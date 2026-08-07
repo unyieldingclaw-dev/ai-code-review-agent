@@ -14,11 +14,17 @@ beforeEach(() => {
 
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs'
 import { join } from 'path'
-import { SwarmRunner, scaleAgentTimeout } from '../../src/core/runner.js'
+import { SwarmRunner, scaleAgentTimeout, recordToolAvailability } from '../../src/core/runner.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import { formatMarkdown } from '../../src/cli/formatter.js'
+import { BaseAgent } from '../../src/core/agents/base.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
-import type { AgentName, AgentProgressEvent, FailOnLevel } from '../../src/core/schema.js'
+import type {
+  AgentName,
+  AgentProgressEvent,
+  FailOnLevel,
+  ToolAvailabilityMetadata,
+} from '../../src/core/schema.js'
 
 const makeProvider = (response = '[]'): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
@@ -809,5 +815,47 @@ describe('SwarmRunner tool-availability visibility', () => {
 
     expect(result.toolAvailability).toBeUndefined()
     expect(mockRunTool).not.toHaveBeenCalled()
+  })
+})
+
+describe('recordToolAvailability', () => {
+  // A minimal fake agent proves runner.ts's bookkeeping is generic -- it doesn't import or
+  // instanceof-check this class, only reads the toolKey/lastToolAvailability contract declared
+  // on BaseAgent. A new tool-backed agent should be able to opt in without any runner.ts change.
+  class FakeToolAgent extends BaseAgent {
+    readonly toolKey = 'gitleaks' as const
+    lastToolAvailability = 'used' as const
+    get name(): AgentName {
+      return 'secrets'
+    }
+    get systemPrompt(): string {
+      return ''
+    }
+  }
+
+  it('records availability using the agent-declared toolKey, without any per-subclass branching', () => {
+    const agent = new FakeToolAgent({} as LLMProvider, DEFAULT_CONFIG)
+    const toolAvailability: ToolAvailabilityMetadata = {}
+
+    recordToolAvailability(agent, toolAvailability)
+
+    expect(toolAvailability).toEqual({ gitleaks: 'used' })
+  })
+
+  it('does nothing for an agent with no toolKey declared', () => {
+    class PlainAgent extends BaseAgent {
+      get name(): AgentName {
+        return 'correctness'
+      }
+      get systemPrompt(): string {
+        return ''
+      }
+    }
+    const agent = new PlainAgent({} as LLMProvider, DEFAULT_CONFIG)
+    const toolAvailability: ToolAvailabilityMetadata = {}
+
+    recordToolAvailability(agent, toolAvailability)
+
+    expect(toolAvailability).toEqual({})
   })
 })
