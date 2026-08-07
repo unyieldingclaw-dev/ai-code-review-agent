@@ -50,7 +50,11 @@ Additional rules:
       return super.run(input, signal)
     }
 
-    const lizardOutput = await runTool('lizard', files)
+    // WHY pass projectPath as cwd: files are paths relative to the reviewed project, not this
+    // process's own cwd -- without it, lizard silently resolved them against the wrong directory
+    // whenever the caller pointed elsewhere (CLI --dir, MCP repo_path). Same bug already fixed
+    // for SecretsAgent/DependenciesAgent's gitleaks/npm-audit calls.
+    const lizardOutput = await runTool('lizard', files, undefined, false, input.projectPath ?? '.')
     if (lizardOutput === null) {
       // lizard not found — LLM receives plain diff
       return super.run(input, signal)

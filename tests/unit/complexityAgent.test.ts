@@ -51,7 +51,7 @@ describe('ComplexityAgent', () => {
     const provider = makeProvider('[]')
     const agent = new ComplexityAgent(provider, DEFAULT_CONFIG)
     await agent.run({ diff: DIFF_WITH_FILE })
-    expect(mockRunTool).toHaveBeenCalledWith('lizard', ['src/app.ts'])
+    expect(mockRunTool).toHaveBeenCalledWith('lizard', ['src/app.ts'], undefined, false, '.')
     expect(provider.chat).toHaveBeenCalledOnce()
     // The LLM prompt content should include the lizard metrics
     const chatArgs = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]
@@ -90,5 +90,21 @@ describe('ComplexityAgent', () => {
     mockRunTool.mockResolvedValue(null)
     const agent = new ComplexityAgent(makeProvider('not json'), DEFAULT_CONFIG)
     await expect(agent.run({ diff: DIFF_WITH_FILE })).rejects.toThrow(ParseFailureError)
+  })
+
+  it('passes projectPath through as cwd, so lizard resolves paths against the reviewed project instead of the process cwd', async () => {
+    mockRunTool.mockResolvedValue('Function complexity: 15\n')
+    const provider = makeProvider('[]')
+    const agent = new ComplexityAgent(provider, DEFAULT_CONFIG)
+
+    await agent.run({ diff: DIFF_WITH_FILE, projectPath: '/some/other/project' })
+
+    expect(mockRunTool).toHaveBeenCalledWith(
+      'lizard',
+      ['src/app.ts'],
+      undefined,
+      false,
+      '/some/other/project'
+    )
   })
 })
