@@ -1,0 +1,10 @@
+diff --git a/package.json b/package.json
+index abc1234..def5678 100644
+--- a/package.json
++++ b/package.json
+@@ -3,6 +3,7 @@
+   "dependencies": {
+     "express": "^4.18.0",
++    "lodash": "^4.17.21"
+   }
+ }

@@ -52,4 +52,15 @@ describe('LicenseComplianceAgent', () => {
     expect(agent.systemPrompt).toMatch(/SSPL/i)
     expect(agent.systemPrompt).toMatch(/Commons Clause/i)
   })
+
+  it('required-format example uses the generic placeholder line number, not a hallucination seed', () => {
+    const agent = new LicenseComplianceAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    expect(agent.systemPrompt).not.toMatch(/"line":\s*14\b/)
+    expect(agent.systemPrompt).toMatch(/"line":\s*42\b/)
+  })
+
+  it('does not name a concrete package (e.g. MongoDB) in the SSPL explanation', () => {
+    const agent = new LicenseComplianceAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    expect(agent.systemPrompt).not.toMatch(/mongodb/i)
+  })
 })

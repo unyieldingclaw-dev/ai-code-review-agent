@@ -126,6 +126,17 @@ const CASES: CalibrationCase[] = [
     baitKeyword: 'chalk',
   },
   {
+    // Regression case for the same class of hallucination bug as dependencies-clean above:
+    // license.ts's prompt used to carry a concrete "package.json:14" line number in its REQUIRED
+    // OUTPUT FORMAT example (plus a concrete MongoDB mention in its SSPL rule text), which the
+    // model could echo back as a fabricated finding on a diff with nothing to report. This
+    // fixture only adds a permissive-licensed (MIT) package -- the agent must return nothing.
+    name: 'license-clean',
+    agentName: 'license',
+    fixtureFile: 'calibration/fixtures/license-clean.diff',
+    expectEmpty: true,
+  },
+  {
     name: 'error-handling',
     fixtureFile: 'calibration/fixtures/error-handling.diff',
     expectedKeyword: 'swallowed',
