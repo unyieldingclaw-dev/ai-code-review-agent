@@ -3,6 +3,48 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.9.0] — 2026-08-09 (deterministic-tool integration, hallucination fixes, CI hardening)
+
+### Added
+
+- `SecretsAgent`/`DependenciesAgent` now call gitleaks/`npm audit --json` directly and skip the
+  LLM entirely when the tool is available, instead of augmenting an LLM call with tool output —
+  the actual problem this fixes is untrustworthy LLM judgment on secrets/dependency findings, not
+  missing signal.
+- `ReviewResult.toolAvailability` surfaces degraded-mode (an integrated tool — gitleaks, npm
+  audit, or lizard — wasn't installed, so the agent ran without it) in the markdown report and
+  SARIF output. Previously invisible outside a console.error line.
+
+### Fixed
+
+- `dependencies.ts`'s and `license.ts`'s prompt templates carried concrete, real-looking example
+  values in their REQUIRED OUTPUT FORMAT examples instead of generic placeholders, which the
+  model would echo back as fabricated findings on diffs with nothing real to report. Both fixed
+  to match the placeholder convention every other agent already uses.
+- `OrchestratorAgent` compared raw, unnormalized `Finding.file` strings in four places
+  (`deduplicate`, `hallucinationCrossCheck`, and three branches of `crossReference`) — a model
+  sometimes echoes the diff's own `a/`/`b/` git-header prefix into a finding's `file` field, which
+  caused genuinely duplicate/corroborating findings to be treated as unrelated: missed dedup
+  merges, wrongly downgraded severities, and silently-skipped escalations. All four now compare
+  canonicalized paths.
+- Windows-only `npm` spawn failure (`ENOENT`) in `runTool` — Node refuses to spawn `.cmd`/`.bat`
+  files without `shell: true`, which silently broke the npm-audit integration on Windows until
+  live calibration surfaced it.
+- `runTool` never passed a `cwd`, so gitleaks/npm-audit/lizard always ran relative to this
+  process's own working directory instead of the reviewed project (routinely different under CLI
+  `--dir` or MCP `repo_path`).
+- A `BaseAgent.parseFindings` Stage 4 bug mislabeled a complete bare-object response as
+  "truncated" even though nothing was truncated.
+
+### Security
+
+- `.github/workflows/review.yml`'s self-hosted job (required for local Ollama access) triggered
+  on every `pull_request` with no restriction on origin — since this repo is public with forking
+  enabled, a fork's PR would run `npm ci` (and any install/postinstall script it pulls in) on the
+  physical self-hosted runner before the workflow's own logic ever executed. Added a job-level
+  guard restricting execution to PRs whose head repo is this repo; same-repo branches (including
+  Dependabot's) are unaffected.
+
 ## [1.8.0] — 2026-07-25 (structured JSON output, truncation recovery, memory-bank context sanitization)
 
 ### Fixed (2026-07-26 follow-up — remaining /code-review findings)
