@@ -44,7 +44,7 @@ lineage: []
       hallucination cross-check already downgrades solo High findings from non-deterministic
       sources (verified via a real-pipeline repro script, not assumed) — a planned new
       adversarial-specific downgrade would have been dead code. Deeper investigation (at the
-      user's explicit request to "look deeper and verify") found a real gap in that *existing*
+      user's explicit request to "look deeper and verify") found a real gap in that _existing_
       mechanism instead: an unrelated nearby finding from a different agent defeats the
       corroboration check. Documented as a deliberately deferred Non-Goal (an exact-line-match fix
       breaks a legitimate existing test) rather than patched in this pass.

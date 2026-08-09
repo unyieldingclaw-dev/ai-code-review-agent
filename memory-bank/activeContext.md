@@ -22,7 +22,7 @@ lineage: []
 
 **Secrets/dependencies deterministic-tool integration + adversarial/secrets prompt-tightening
 (2026-08-06)**: user reported `security`/`secrets`/`adversarial` agents hallucinating findings on
-*every* run against a real PR-sized diff — three fabricated "VERIFIED, 90-95% confidence" findings
+_every_ run against a real PR-sized diff — three fabricated "VERIFIED, 90-95% confidence" findings
 each citing genuine evidence text but drawing false conclusions (a marker-file path called a
 "database connection string", `sha256sum`/`shasum` output called "hardcoded API keys", a local git
 hook's trusted stdin called "attacker-controlled"). Root cause investigation found two independent,
@@ -42,13 +42,13 @@ dependencies onto deterministic tool sources exempt from that heuristic entirely
 `DependenciesAgent` now override `run()` (mirroring `ComplexityAgent`'s existing `lizard`
 pattern) to call gitleaks/`npm audit --json` directly and skip the LLM call entirely when the tool
 is available — chosen over augmenting the LLM with tool output, since the actual problem is
-untrustworthy LLM *judgment*, not missing signal. `gitleaksParser.ts`/`npmAuditParser.ts` map each
+untrustworthy LLM _judgment_, not missing signal. `gitleaksParser.ts`/`npmAuditParser.ts` map each
 tool's real JSON output (verified against gitleaks 8.30.1, installed this session, and this repo's
 own live `npm audit`) to the `Finding` schema — `Severity` vocabularies don't match
 (`info`/`low`/`moderate`/`high`/`critical` → `low`/`medium`/`high`/`critical`, explicit mapping,
 info/low dropped) and gitleaks has no severity field at all (`--redact` also means `evidence` is
 always the literal string `"REDACTED"`, never the real secret). npm audit is diff-scoped by trigger
-only (touches `package.json`/`package-lock.json`) but reports the *full* current audit tree, not a
+only (touches `package.json`/`package-lock.json`) but reports the _full_ current audit tree, not a
 diff-scoped subset — reliably parsing "which packages did this diff touch" from a lockfile diff was
 judged too fragile; matches how `npm audit` gates are used in practice. New
 `ToolAvailability`/`ToolAvailabilityMetadata` schema types surface degraded-mode (tool not

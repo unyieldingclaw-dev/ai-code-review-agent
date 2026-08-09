@@ -52,7 +52,7 @@ Non-Goals.
    valid, non-truncated single objects. This produced the "every hallucination comes with a
    truncation warning" pattern originally reported — truncation wasn't actually happening.
 2. **Content/reasoning hallucination — the real problem, independent of Bug 1.** 7/7
-   `secrets`/`adversarial` reproduction runs fabricated a finding on the *first* attempt, several
+   `secrets`/`adversarial` reproduction runs fabricated a finding on the _first_ attempt, several
    with the fully correct `{"findings": [...]}` shape (no parsing ambiguity, no truncation, Stage 2
    accepts cleanly) — proving the fabrication doesn't depend on Bug 1's shape mismatch. The
    evidence-must-exist defense from PR #17 doesn't apply either, since the cited evidence is real.
@@ -66,7 +66,7 @@ Non-Goals.
    available via the existing `npm` install) rather than assumed from memory.
 2. Reduce (not eliminate — this is judgment work, not pattern-matching, and prompt-tightening alone
    didn't fully solve this same class of problem for `dependencies` in PR #17) the hallucination
-   *rate* for `adversarial`, whose findings can't be replaced by a deterministic tool.
+   _rate_ for `adversarial`, whose findings can't be replaced by a deterministic tool.
 3. Fix the Stage 4 mislabeling so the "response appears truncated" diagnostic is trustworthy again
    (only fires for genuine truncation).
 4. No new silent-stderr-only gap: when a tool-integrated agent falls back to LLM-only because the
@@ -114,11 +114,11 @@ Verified directly this session (gitleaks 8.30.1, real invocations, not assumed):
 - `--source <file>` scanning a real on-disk file gives accurate `StartLine`/`File` matching the
   actual file content — critical, since `--pipe` mode (scanning raw diff text) reports line
   numbers relative to the piped text stream, not the real file, which would have introduced a
-  *new* confidently-wrong-line-number bug. `--source` is required, not `--pipe`.
+  _new_ confidently-wrong-line-number bug. `--source` is required, not `--pipe`.
 - Ran against the exact content that fooled the LLM 3/3 times: `[]`, correctly.
   Ran against a realistic Stripe key: correctly detected with accurate `StartLine`, `RuleID:
-  "stripe-access-token"`, `Secret`, `Entropy`.
-  AWS's own documentation placeholder key was correctly *not* flagged (gitleaks' default
+"stripe-access-token"`, `Secret`, `Entropy`.
+  AWS's own documentation placeholder key was correctly _not_ flagged (gitleaks' default
   allowlist) — better calibrated than the current LLM prompt's "not example/placeholder values"
   instruction, which didn't stop the LLM from inventing false positives on real content.
 
@@ -169,7 +169,7 @@ New `src/core/npmAuditParser.ts` (same flat placement), same fixture-based unit-
 
 New stage inserted between the existing Stage 2 (`.findings` array) and Stage 3 (balanced-bracket
 extraction): if `JSON.parse` succeeded, `parsed` is a non-array object, it doesn't have a
-`.findings` array, but it *is* itself finding-shaped (has `severity` as its own top-level
+`.findings` array, but it _is_ itself finding-shaped (has `severity` as its own top-level
 property), treat it as `[parsed]` and validate normally through the existing
 `validateFindings`. Log distinctly:
 `[${name}] response was a single object, not the required array — auto-wrapped. Raw snippet: ...`
@@ -198,7 +198,7 @@ uncorroborated). Instead, tighten both prompts with the same category of fix alr
   `hash`/`expected`/`checksum`) are not secrets.
 
 Framed honestly as a rate reduction, not a fix: PR #17 showed removing `dependencies.ts`'s one
-concrete triggering example stopped that *specific* pattern but didn't stop the agent from
+concrete triggering example stopped that _specific_ pattern but didn't stop the agent from
 inventing new fabrications elsewhere. This is a smaller, complementary improvement to Sections A/B
 (which remain the primary, structural defense for `secrets`/`dependencies` specifically) and to
 the residual corroboration-check risk documented in Non-Goals for `adversarial`, which has no

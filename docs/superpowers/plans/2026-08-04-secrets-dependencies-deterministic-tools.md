@@ -15,6 +15,7 @@
 ## Task 0: Capture and commit real tool-output fixtures
 
 **Files:**
+
 - Create: `tests/fixtures/gitleaks-clean.json`
 - Create: `tests/fixtures/gitleaks-leak-found.json`
 - Create: `tests/fixtures/npm-audit-sample.json`
@@ -136,8 +137,22 @@ Create `tests/fixtures/npm-audit-sample.json` (trimmed from a real `npm audit --
     }
   },
   "metadata": {
-    "vulnerabilities": { "info": 0, "low": 1, "moderate": 6, "high": 5, "critical": 2, "total": 14 },
-    "dependencies": { "prod": 156, "dev": 254, "optional": 76, "peer": 0, "peerOptional": 0, "total": 409 }
+    "vulnerabilities": {
+      "info": 0,
+      "low": 1,
+      "moderate": 6,
+      "high": 5,
+      "critical": 2,
+      "total": 14
+    },
+    "dependencies": {
+      "prod": 156,
+      "dev": 254,
+      "optional": 76,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 409
+    }
   }
 }
 ```
@@ -154,6 +169,7 @@ git commit -m "test: add captured real gitleaks/npm-audit output fixtures"
 ## Task 1: `gitleaksParser.ts`
 
 **Files:**
+
 - Create: `src/core/gitleaksParser.ts`
 - Test: `tests/unit/gitleaksParser.test.ts`
 
@@ -282,6 +298,7 @@ git commit -m "feat: add gitleaksParser to map gitleaks JSON output to Finding[]
 ## Task 2: `npmAuditParser.ts`
 
 **Files:**
+
 - Create: `src/core/npmAuditParser.ts`
 - Test: `tests/unit/npmAuditParser.test.ts`
 
@@ -411,7 +428,9 @@ export function parseNpmAuditOutput(json: string, agentName: AgentName): Finding
     if (!severity) continue // drops info/low
 
     const detailVia = vuln.via.find((v): v is NpmAuditVia => typeof v === 'object')
-    const detail = detailVia?.title ?? `Vulnerable via ${vuln.via.filter((v) => typeof v === 'string').join(', ')}`
+    const detail =
+      detailVia?.title ??
+      `Vulnerable via ${vuln.via.filter((v) => typeof v === 'string').join(', ')}`
     const evidence = detailVia?.url ?? `Affected range: ${vuln.range}`
     const fixSuggestion =
       typeof vuln.fixAvailable === 'object'
@@ -460,6 +479,7 @@ git commit -m "feat: add npmAuditParser to map npm audit JSON output to Finding[
 ## Task 3: Fix Stage 4 mislabeling in `base.ts`
 
 **Files:**
+
 - Modify: `src/core/agents/base.ts:36-87` (`parseFindings`)
 - Test: `tests/unit/baseAgent.test.ts`
 
@@ -508,7 +528,7 @@ Expected: FAIL — `loggedAutoWrapped` is `false` (current code logs "appears tr
 
 In `src/core/agents/base.ts`, modify `parseFindings` — insert a new stage between the existing Stage 1/2 block and Stage 3:
 
-```typescript
+````typescript
   protected parseFindings(raw: string): Finding[] {
     const cleaned = raw.replace(/```json\s*|```\s*/g, '').trim()
 
@@ -582,7 +602,7 @@ In `src/core/agents/base.ts`, modify `parseFindings` — insert a new stage betw
     console.error(`[${this.name}] parse failure. Raw snippet: ${raw.slice(0, 200)}`)
     throw new ParseFailureError(this.name, raw)
   }
-```
+````
 
 The only change is the new `// Stage 2b` block inserted inside the first `try` block, after the existing Stage 2 check. Everything else in the method is unchanged.
 
@@ -608,6 +628,7 @@ git commit -m "fix: stop mislabeling a complete single-object response as trunca
 ## Task 4: Schema additions — `ToolAvailability`
 
 **Files:**
+
 - Modify: `src/core/schema.ts`
 
 - [ ] **Step 1: Add the new types**
@@ -648,6 +669,7 @@ git commit -m "feat: add ToolAvailability schema types for degraded-mode visibil
 ## Task 5: Wire gitleaks into `SecretsAgent`
 
 **Files:**
+
 - Modify: `src/core/agents/secrets.ts`
 - Test: `tests/unit/secretsAgent.test.ts`
 
@@ -659,7 +681,7 @@ Run: read `src/core/agents/secrets.ts` and `tests/unit/secretsAgent.test.ts` in 
 
 `tests/unit/secretsAgent.test.ts` currently has no `shell.ts` mock at all. Once this task's
 implementation lands, `SecretsAgent.run()` always calls `runTool('gitleaks', ...)` first — every
-*existing* test in this file that calls `.run()` would otherwise attempt a real subprocess spawn.
+_existing_ test in this file that calls `.run()` would otherwise attempt a real subprocess spawn.
 Add the mock at the top of the file (module-level, hoisted, following the exact proven pattern
 already used in `tests/unit/complexityAgent.test.ts` for the `lizard` integration — do not invent
 a different mocking approach), with a `beforeEach` default of "tool not found" so every
@@ -863,6 +885,7 @@ Additional rules:
 ```
 
 Notes on this change:
+
 - `run()` is overridden (not just `systemPrompt`) — this is the first agent to do so besides `ComplexityAgent` (which already overrides `run()` for its `lizard` pre-check, same pattern).
 - The prompt gains the two new negative-example lines (marker paths, hash computations) — everything else in the existing prompt is unchanged.
 - `files.filter((f) => existsSync(f))` mirrors the "skip files that don't exist on disk" requirement from the spec (e.g. a deleted file in the diff, or running without a real checkout).
@@ -889,6 +912,7 @@ git commit -m "feat: SecretsAgent uses gitleaks when available, skipping the LLM
 ## Task 6: Wire npm audit into `DependenciesAgent`
 
 **Files:**
+
 - Modify: `src/core/agents/dependencies.ts`
 - Test: `tests/unit/dependenciesAgent.test.ts`
 
@@ -1081,7 +1105,7 @@ Rules:
 }
 ```
 
-Note: `runTool('npm', ['audit', '--json'], undefined)` runs from the process's current working directory (same convention as `gitleaks`/`lizard`) — `input.projectPath` is checked as the *gate* for whether to attempt the tool call at all (consistent with the spec's "or `projectPath` isn't provided... fall back" rule), not passed as a `cwd` argument, since `runTool` doesn't support a `cwd` override and every other tool integration in this codebase shares this same assumption.
+Note: `runTool('npm', ['audit', '--json'], undefined)` runs from the process's current working directory (same convention as `gitleaks`/`lizard`) — `input.projectPath` is checked as the _gate_ for whether to attempt the tool call at all (consistent with the spec's "or `projectPath` isn't provided... fall back" rule), not passed as a `cwd` argument, since `runTool` doesn't support a `cwd` override and every other tool integration in this codebase shares this same assumption.
 
 - [ ] **Step 5: Run tests to verify they pass**
 
@@ -1105,6 +1129,7 @@ git commit -m "feat: DependenciesAgent uses npm audit when the diff touches a ma
 ## Task 7: Wire `toolAvailability` collection into `runner.ts`
 
 **Files:**
+
 - Modify: `src/core/runner.ts`
 - Test: `tests/unit/runner.test.ts`
 
@@ -1228,8 +1253,8 @@ import type {
 2. Declare the accumulator next to `agentStatus` (around line 470):
 
 ```typescript
-    const agentStatus: Partial<Record<AgentName, AgentStatus>> = {}
-    const toolAvailability: ToolAvailabilityMetadata = {}
+const agentStatus: Partial<Record<AgentName, AgentStatus>> = {}
+const toolAvailability: ToolAvailabilityMetadata = {}
 ```
 
 3. Thread `toolAvailability` through both `runAgentsSequential` and `runAgentsParallel` as a new parameter, and populate it right after each agent's `run()` resolves. In `runAgentsSequential`'s signature, add the parameter:
@@ -1250,7 +1275,7 @@ import type {
 Inside the loop, right after `findings.push(...agentFindings)` and before `agentStatus[agent.name] = 'ok'`, add:
 
 ```typescript
-        recordToolAvailability(agent, toolAvailability)
+recordToolAvailability(agent, toolAvailability)
 ```
 
 Do the identical two changes (signature + call site) in `runAgentsParallel`.
@@ -1258,7 +1283,10 @@ Do the identical two changes (signature + call site) in `runAgentsParallel`.
 4. Add the small shared helper function near `scaleAgentTimeout` (module-level, not a class method, since it needs to check `instanceof` against the two concrete agent classes already imported at the top of this file):
 
 ```typescript
-function recordToolAvailability(agent: BaseAgent, toolAvailability: ToolAvailabilityMetadata): void {
+function recordToolAvailability(
+  agent: BaseAgent,
+  toolAvailability: ToolAvailabilityMetadata
+): void {
   if (agent instanceof SecretsAgent && agent.lastToolAvailability) {
     toolAvailability.gitleaks = agent.lastToolAvailability
   }
@@ -1303,6 +1331,7 @@ git commit -m "feat: surface secrets/dependencies tool-fallback status on Review
 ## Task 8: Surface `toolAvailability` in the markdown formatter
 
 **Files:**
+
 - Modify: `src/cli/formatter.ts`
 - Test: `tests/unit/formatters/markdown.test.ts`
 
@@ -1346,22 +1375,22 @@ Expected: FAIL — no `toolAvailability` handling exists yet
 In `src/cli/formatter.ts`, add a note near the top of the report, right after the existing `hallucinationFilter` block added previously (same placement rationale — a degraded-quality signal belongs near the top, not the bottom footer):
 
 ```typescript
-  const TOOL_LABELS: Record<'gitleaks' | 'npmAudit', string> = {
-    gitleaks: 'gitleaks',
-    npmAudit: 'npm audit',
-  }
-  const degradedTools = (['gitleaks', 'npmAudit'] as const).filter(
-    (t) => result.toolAvailability?.[t] === 'unavailable-llm-fallback'
+const TOOL_LABELS: Record<'gitleaks' | 'npmAudit', string> = {
+  gitleaks: 'gitleaks',
+  npmAudit: 'npm audit',
+}
+const degradedTools = (['gitleaks', 'npmAudit'] as const).filter(
+  (t) => result.toolAvailability?.[t] === 'unavailable-llm-fallback'
+)
+if (degradedTools.length > 0) {
+  const names = degradedTools.map((t) => TOOL_LABELS[t]).join(', ')
+  lines.push(
+    `${useEmoji ? '🔧 ' : ''}Degraded mode: ${names} not installed — falling back to LLM-only ` +
+      `detection for the affected agent(s), which is less reliable. Install the missing tool(s) ` +
+      `for accurate results.`
   )
-  if (degradedTools.length > 0) {
-    const names = degradedTools.map((t) => TOOL_LABELS[t]).join(', ')
-    lines.push(
-      `${useEmoji ? '🔧 ' : ''}Degraded mode: ${names} not installed — falling back to LLM-only ` +
-        `detection for the affected agent(s), which is less reliable. Install the missing tool(s) ` +
-        `for accurate results.`
-    )
-    lines.push('')
-  }
+  lines.push('')
+}
 ```
 
 Insert this block right after the existing `hallucinationFilter` block (which was inserted right after the truncation-warning block), before the `failedAgents` check.
@@ -1383,6 +1412,7 @@ git commit -m "feat: surface tool-fallback degraded mode in the markdown report"
 ## Task 9: Surface `toolAvailability` in the SARIF formatter
 
 **Files:**
+
 - Modify: `src/cli/formatters/sarif.ts`
 - Test: `tests/unit/formatters/sarif.test.ts`
 
@@ -1435,6 +1465,7 @@ git commit -m "feat: surface tool-fallback degraded mode in SARIF output"
 ## Task 10: Prompt-tightening — `adversarial.ts`
 
 **Files:**
+
 - Modify: `src/core/agents/adversarial.ts`
 
 No unit test — prompt wording is only verifiable live (see Task 12/13). This is a text-only change to the existing prompt.
@@ -1520,12 +1551,13 @@ If missing (e.g. Task 5 was executed by a different session/agent that didn't in
 ## Task 12: Calibration cases
 
 **Files:**
+
 - Modify: `calibration/calibrate.ts`
 - Create: `calibration/fixtures/secrets-gitleaks-target.ts` (a real on-disk file with a synthetic but non-functional detectable secret pattern)
 - Create: `calibration/fixtures/secrets-gitleaks.diff`
 - Modify: `.gitignore` (not needed — this file IS committed, see rationale below)
 
-**Design note on the gitleaks calibration fixture:** unlike the LLM-only calibration cases (which only need diff *text*, since the LLM reads the diff content directly), gitleaks scans real files *on disk* via `--source <file>`. The fixture file must actually exist in the repo at the path the fixture diff references. This repo's own CI likely runs gitleaks against pushes (see `gitleaks-action` in git history) — committing a realistic-looking fake secret risks tripping that scan or GitHub's push protection. Use a value that is syntactically detectable by gitleaks' generic high-entropy/pattern rules but is unambiguously a test fixture, not shaped like a real vendor key format (avoiding rule-specific patterns like `sk_live_`/`ghp_`/`AKIA` entirely sidesteps this) — instead use gitleaks' own **generic-api-key** rule, which matches a labeled `key`/`token`/`secret` assignment with sufficient entropy, using a value that is clearly a placeholder by content (repeated/structured, not real-looking).
+**Design note on the gitleaks calibration fixture:** unlike the LLM-only calibration cases (which only need diff _text_, since the LLM reads the diff content directly), gitleaks scans real files _on disk_ via `--source <file>`. The fixture file must actually exist in the repo at the path the fixture diff references. This repo's own CI likely runs gitleaks against pushes (see `gitleaks-action` in git history) — committing a realistic-looking fake secret risks tripping that scan or GitHub's push protection. Use a value that is syntactically detectable by gitleaks' generic high-entropy/pattern rules but is unambiguously a test fixture, not shaped like a real vendor key format (avoiding rule-specific patterns like `sk_live_`/`ghp_`/`AKIA` entirely sidesteps this) — instead use gitleaks' own **generic-api-key** rule, which matches a labeled `key`/`token`/`secret` assignment with sufficient entropy, using a value that is clearly a placeholder by content (repeated/structured, not real-looking).
 
 - [ ] **Step 1: Find a fixture value that gitleaks' generic rule detects but is unambiguously fake**
 
@@ -1626,7 +1658,7 @@ Rebuild first: `npm run build`
 
 Reuse the same diff content from this session's `repro.diff` (the real `review-reminders.sh`/`.ps1` content) — write a small one-off script (in the scratchpad, not the repo) that imports the freshly-built `dist/core/agents/adversarial.js` and `dist/core/agents/secrets.js`, and calls `provider.chat()` directly 3 times per agent exactly as this session's original reproduction did, capturing raw output.
 
-For `secrets` specifically, since gitleaks will now intercept `run()` before the LLM is ever called against real on-disk content, this spot-check should call `agent.systemPrompt` + `provider.chat()` directly (bypassing `run()`) to isolate and measure the *prompt's* fallback-quality improvement specifically — the gitleaks-available path is already covered by Task 5's unit tests and Task 12's calibration case.
+For `secrets` specifically, since gitleaks will now intercept `run()` before the LLM is ever called against real on-disk content, this spot-check should call `agent.systemPrompt` + `provider.chat()` directly (bypassing `run()`) to isolate and measure the _prompt's_ fallback-quality improvement specifically — the gitleaks-available path is already covered by Task 5's unit tests and Task 12's calibration case.
 
 - [ ] **Step 2: Compare against this session's original findings**
 
