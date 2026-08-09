@@ -14,6 +14,8 @@ function extractChangedFiles(diff: string): string[] {
 }
 
 export class ComplexityAgent extends BaseAgent {
+  readonly toolKey = 'lizard' as const
+
   get name(): AgentName {
     return 'complexity'
   }
@@ -50,13 +52,19 @@ Additional rules:
       return super.run(input, signal)
     }
 
-    const lizardOutput = await runTool('lizard', files)
+    // WHY pass projectPath as cwd: files are paths relative to the reviewed project, not this
+    // process's own cwd -- without it, lizard silently resolved them against the wrong directory
+    // whenever the caller pointed elsewhere (CLI --dir, MCP repo_path). Same bug already fixed
+    // for SecretsAgent/DependenciesAgent's gitleaks/npm-audit calls.
+    const lizardOutput = await runTool('lizard', files, undefined, false, input.projectPath ?? '.')
     if (lizardOutput === null) {
       // lizard not found — LLM receives plain diff
+      this.lastToolAvailability = 'unavailable-llm-fallback'
       return super.run(input, signal)
     }
 
     // lizard found — prepend metrics so LLM can focus on high-complexity functions
+    this.lastToolAvailability = 'used'
     const enhancedDiff = `=== Lizard Complexity Metrics ===\n${lizardOutput}\n\n=== Diff ===\n${input.diff}`
     return super.run({ ...input, diff: enhancedDiff }, signal)
   }

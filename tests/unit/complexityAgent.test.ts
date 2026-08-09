@@ -36,6 +36,32 @@ describe('ComplexityAgent', () => {
     expect(agent.name).toBe('complexity')
   })
 
+  it('declares toolKey lizard', () => {
+    const agent = new ComplexityAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    expect(agent.toolKey).toBe('lizard')
+  })
+
+  it('sets lastToolAvailability to "used" when lizard ran', async () => {
+    mockRunTool.mockResolvedValue('Function complexity: 15\n')
+    const agent = new ComplexityAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    await agent.run({ diff: DIFF_WITH_FILE })
+    expect(agent.lastToolAvailability).toBe('used')
+  })
+
+  it('sets lastToolAvailability to "unavailable-llm-fallback" when lizard is not installed', async () => {
+    mockRunTool.mockResolvedValue(null)
+    const agent = new ComplexityAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    await agent.run({ diff: DIFF_WITH_FILE })
+    expect(agent.lastToolAvailability).toBe('unavailable-llm-fallback')
+  })
+
+  it('leaves lastToolAvailability unset when the diff has no changed files', async () => {
+    const agent = new ComplexityAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    await agent.run({ diff: 'no file markers here' })
+    expect(agent.lastToolAvailability).toBeUndefined()
+    expect(mockRunTool).not.toHaveBeenCalled()
+  })
+
   it('falls back to LLM when lizard not installed', async () => {
     mockRunTool.mockResolvedValue(null)
     const provider = makeProvider('[]')
@@ -51,7 +77,7 @@ describe('ComplexityAgent', () => {
     const provider = makeProvider('[]')
     const agent = new ComplexityAgent(provider, DEFAULT_CONFIG)
     await agent.run({ diff: DIFF_WITH_FILE })
-    expect(mockRunTool).toHaveBeenCalledWith('lizard', ['src/app.ts'])
+    expect(mockRunTool).toHaveBeenCalledWith('lizard', ['src/app.ts'], undefined, false, '.')
     expect(provider.chat).toHaveBeenCalledOnce()
     // The LLM prompt content should include the lizard metrics
     const chatArgs = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]
@@ -90,5 +116,21 @@ describe('ComplexityAgent', () => {
     mockRunTool.mockResolvedValue(null)
     const agent = new ComplexityAgent(makeProvider('not json'), DEFAULT_CONFIG)
     await expect(agent.run({ diff: DIFF_WITH_FILE })).rejects.toThrow(ParseFailureError)
+  })
+
+  it('passes projectPath through as cwd, so lizard resolves paths against the reviewed project instead of the process cwd', async () => {
+    mockRunTool.mockResolvedValue('Function complexity: 15\n')
+    const provider = makeProvider('[]')
+    const agent = new ComplexityAgent(provider, DEFAULT_CONFIG)
+
+    await agent.run({ diff: DIFF_WITH_FILE, projectPath: '/some/other/project' })
+
+    expect(mockRunTool).toHaveBeenCalledWith(
+      'lizard',
+      ['src/app.ts'],
+      undefined,
+      false,
+      '/some/other/project'
+    )
   })
 })

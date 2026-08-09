@@ -1,0 +1,87 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@hono/node-server": {
+      "name": "@hono/node-server",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1124006,
+          "name": "@hono/node-server",
+          "dependency": "@hono/node-server",
+          "title": "Node.js Adapter for Hono: Path traversal in `serve-static` on Windows via encoded backslash (`%5C`)",
+          "url": "https://github.com/advisories/GHSA-frvp-7c67-39w9",
+          "severity": "moderate",
+          "cwe": ["CWE-22"],
+          "cvss": { "score": 5.9, "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N" },
+          "range": "<2.0.5"
+        }
+      ],
+      "effects": ["@modelcontextprotocol/sdk"],
+      "range": "<2.0.5",
+      "nodes": ["node_modules/@hono/node-server"],
+      "fixAvailable": true
+    },
+    "@modelcontextprotocol/sdk": {
+      "name": "@modelcontextprotocol/sdk",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": ["@hono/node-server"],
+      "effects": [],
+      "range": "1.25.0 - 1.29.0",
+      "nodes": ["node_modules/@modelcontextprotocol/sdk"],
+      "fixAvailable": true
+    },
+    "@vitest/coverage-v8": {
+      "name": "@vitest/coverage-v8",
+      "severity": "critical",
+      "isDirect": true,
+      "via": ["vitest"],
+      "effects": [],
+      "range": "<=3.2.5",
+      "nodes": ["node_modules/@vitest/coverage-v8"],
+      "fixAvailable": { "name": "@vitest/coverage-v8", "version": "4.1.10", "isSemVerMajor": true }
+    },
+    "body-parser": {
+      "name": "body-parser",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1123976,
+          "name": "body-parser",
+          "dependency": "body-parser",
+          "title": "body-parser vulnerable to denial of service when invalid limit value silently disables size enforcement",
+          "url": "https://github.com/advisories/GHSA-v422-hmwv-36x6",
+          "severity": "low",
+          "cwe": ["CWE-770"],
+          "cvss": { "score": 3.7, "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L" },
+          "range": ">=2.0.0 <2.3.0"
+        }
+      ],
+      "effects": [],
+      "range": "2.0.0 - 2.2.2",
+      "nodes": ["node_modules/body-parser"],
+      "fixAvailable": true
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 1,
+      "moderate": 6,
+      "high": 5,
+      "critical": 2,
+      "total": 14
+    },
+    "dependencies": {
+      "prod": 156,
+      "dev": 254,
+      "optional": 76,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 409
+    }
+  }
+}

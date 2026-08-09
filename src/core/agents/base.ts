@@ -1,6 +1,12 @@
 import type { LLMProvider, Message } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
-import type { Finding, ReviewInput, AgentName } from '../schema.js'
+import type {
+  Finding,
+  ReviewInput,
+  AgentName,
+  ToolAvailability,
+  ToolAvailabilityMetadata,
+} from '../schema.js'
 import {
   validateAndNormalizeFindings,
   ParseFailureError,
@@ -9,6 +15,13 @@ import {
 } from '../parsing.js'
 
 export abstract class BaseAgent {
+  // Opt-in contract for agents that call a deterministic external tool instead of (or before
+  // falling back to) the LLM -- e.g. SecretsAgent/gitleaks, DependenciesAgent/npm-audit. Declared
+  // here, not checked via instanceof in runner.ts, so a new tool-backed agent doesn't require any
+  // runner.ts change: it just sets these two fields and the bookkeeping picks it up generically.
+  readonly toolKey?: keyof ToolAvailabilityMetadata
+  lastToolAvailability?: ToolAvailability
+
   constructor(
     protected readonly provider: LLMProvider,
     protected readonly config: ReviewConfig
@@ -51,6 +64,18 @@ export abstract class BaseAgent {
       // Stage 2: object with .findings array
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.findings)) {
         return this.validateFindings(parsed.findings)
+      }
+      // Stage 2b: a single bare finding-shaped object (has its own `severity`, not nested under
+      // `.findings`). Nothing was truncated here -- Stage 4's "appears truncated" message would
+      // be misleading, so wrap it and log accurately instead of falling through to Stage 4.
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'severity' in parsed) {
+        const valid = this.validateFindings([parsed])
+        if (valid.length > 0) {
+          console.error(
+            `[${this.name}] response was a single object, not the required array -- auto-wrapped`
+          )
+          return valid
+        }
       }
     } catch {
       /* fall through */

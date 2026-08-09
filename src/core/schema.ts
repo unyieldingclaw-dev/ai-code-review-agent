@@ -128,6 +128,14 @@ export interface HallucinationFilterMetadata {
   dropped: DroppedHallucinatedFinding[]
 }
 
+export type ToolAvailability = 'used' | 'unavailable-llm-fallback'
+
+export interface ToolAvailabilityMetadata {
+  gitleaks?: ToolAvailability
+  npmAudit?: ToolAvailability
+  lizard?: ToolAvailability
+}
+
 export type AgentStatus = 'ok' | 'timeout' | 'parse-error' | 'error'
 
 export interface ReviewResult {
@@ -149,6 +157,7 @@ export interface ReviewResult {
   agentStatus?: Partial<Record<AgentName, AgentStatus>>
   truncation?: TruncationMetadata
   hallucinationFilter?: HallucinationFilterMetadata
+  toolAvailability?: ToolAvailabilityMetadata
 }
 
 export const SEVERITY_RANK: Record<Severity, number> = {

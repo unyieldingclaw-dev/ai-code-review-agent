@@ -171,4 +171,47 @@ describe('formatMarkdown', () => {
     const output = formatMarkdown(makeResult())
     expect(output).not.toMatch(/hallucinat/i)
   })
+
+  it('shows a degraded-mode note when a tool-integrated agent fell back to the LLM', () => {
+    const result = makeResult({
+      findings: [],
+      toolAvailability: { gitleaks: 'unavailable-llm-fallback' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toMatch(/gitleaks/i)
+    expect(output).toMatch(/not installed|fallback|degraded/i)
+  })
+
+  it('does not show a degraded-mode note when the tool was used', () => {
+    const result = makeResult({
+      findings: [],
+      toolAvailability: { gitleaks: 'used' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).not.toMatch(/degraded|fallback/i)
+  })
+
+  it('does not show a degraded-mode note when toolAvailability is absent', () => {
+    const output = formatMarkdown(makeResult())
+    expect(output).not.toMatch(/gitleaks|npm.audit|degraded/i)
+  })
+
+  it('shows a degraded-mode note mentioning lizard when it fell back to LLM-only', () => {
+    const result = makeResult({
+      findings: [],
+      toolAvailability: { lizard: 'unavailable-llm-fallback' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toMatch(/lizard/i)
+    expect(output).toMatch(/not installed|fallback|degraded/i)
+  })
+
+  it('does not show a degraded-mode note when lizard was used', () => {
+    const result = makeResult({
+      findings: [],
+      toolAvailability: { lizard: 'used' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).not.toMatch(/degraded|fallback/i)
+  })
 })

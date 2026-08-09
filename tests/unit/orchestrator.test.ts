@@ -78,6 +78,59 @@ describe('OrchestratorAgent', () => {
       expect(result[0].corroboratingAgents).toContain('correctness')
     })
 
+    it('merges findings whose file field carries a leading "a/" diff-header prefix with the unprefixed form (real captured bug)', () => {
+      // Reproduced live: error-handling's finding hallucinated an "a/" prefix into its own
+      // file field ("a/.claude/settings.json"), while secrets' finding on the SAME underlying
+      // file at the SAME line used the correct, unprefixed form (".claude/settings.json").
+      // deduplicate() built its map key from the raw, unnormalized file field, so these two
+      // representations of the same location never merged.
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [
+        finding({
+          id: 'secrets-0',
+          agent: 'secrets',
+          file: '.claude/settings.json',
+          line: 10,
+          title: 'Hardcoded token',
+        }),
+        finding({
+          id: 'error-handling-0',
+          agent: 'error-handling',
+          file: 'a/.claude/settings.json',
+          line: 10,
+          title: 'Swallowed error',
+        }),
+      ]
+      const result = orch.synthesize(findings)
+      expect(result).toHaveLength(1)
+      expect(result[0].agent).toBe('secrets')
+      expect(result[0].corroboratingAgents).toContain('error-handling')
+    })
+
+    it('merges findings whose file field carries a leading "b/" diff-header prefix with the unprefixed form', () => {
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [
+        finding({
+          id: 'security-0',
+          agent: 'security',
+          file: 'src/auth.ts',
+          line: 10,
+          title: 'SQL injection',
+        }),
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          file: 'b/src/auth.ts',
+          line: 10,
+          title: 'Null pointer',
+        }),
+      ]
+      const result = orch.synthesize(findings)
+      expect(result).toHaveLength(1)
+      expect(result[0].agent).toBe('security')
+      expect(result[0].corroboratingAgents).toContain('correctness')
+    })
+
     it('removes duplicate findings at same file:line from different agents', () => {
       const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
       const findings = [
@@ -112,6 +165,35 @@ describe('OrchestratorAgent', () => {
           agent: 'correctness',
           severity: 'medium',
           file: 'src/foo.ts',
+          line: 20,
+          title: 'Logic bug',
+        }),
+        finding({
+          id: 'coverage-0',
+          agent: 'coverage',
+          severity: 'medium',
+          file: 'src/foo.ts',
+          line: 20,
+          title: 'No test coverage',
+        }),
+      ]
+      const result = orch.synthesize(findings)
+      const corrFinding = result.find((f) => f.agent === 'correctness')
+      expect(corrFinding?.severity).toBe('high') // escalated from medium
+    })
+
+    it('escalates severity when correctness bug and coverage gap use differently-prefixed representations of the same file (real captured bug class)', () => {
+      // Same failure mode already fixed in deduplicate() and hallucinationCrossCheck: a
+      // hallucinated "a/" diff-header prefix on one finding's file field prevents crossReference's
+      // raw === comparison from recognizing the two findings share the same real file/line, so the
+      // escalation silently fails to fire.
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [
+        finding({
+          id: 'correctness-0',
+          agent: 'correctness',
+          severity: 'medium',
+          file: 'a/src/foo.ts',
           line: 20,
           title: 'Logic bug',
         }),
@@ -211,6 +293,36 @@ describe('OrchestratorAgent', () => {
       const result = orch.synthesize(findings)
       const f = result.find((r) => r.id === 'security-0')
       expect(f?.severity).toBe('critical')
+    })
+
+    it('does not downgrade severity when the only corroborating agent used a differently-prefixed file path (real captured bug)', () => {
+      // Reproduced live: secrets flagged ".claude/settings.json" at line 10, error-handling
+      // flagged the SAME underlying file/line but with a hallucinated "a/" diff-header prefix
+      // ("a/.claude/settings.json"). hallucinationCrossCheck runs before deduplicate() and
+      // compared other.file === f.file with raw, unnormalized strings, so it failed to see these
+      // as corroborating each other and solo-downgraded BOTH from high to medium -- even though
+      // deduplicate() correctly merges them afterward with a corroboratingAgents entry. A finding
+      // should not be scored as if it had zero corroboration when it demonstrably has one.
+      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const findings = [
+        finding({
+          id: 'secrets-0',
+          agent: 'secrets',
+          severity: 'high',
+          file: '.claude/settings.json',
+          line: 10,
+        }),
+        finding({
+          id: 'error-handling-0',
+          agent: 'error-handling',
+          severity: 'high',
+          file: 'a/.claude/settings.json',
+          line: 10,
+        }),
+      ]
+      const result = orch.synthesize(findings)
+      expect(result).toHaveLength(1)
+      expect(result[0].severity).toBe('high')
     })
   })
 

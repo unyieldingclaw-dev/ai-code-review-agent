@@ -48,6 +48,28 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     lines.push('')
   }
 
+  const TOOL_LABELS: Record<'gitleaks' | 'npmAudit' | 'lizard', string> = {
+    gitleaks: 'gitleaks',
+    npmAudit: 'npm audit',
+    lizard: 'lizard',
+  }
+  const degradedTools = (['gitleaks', 'npmAudit', 'lizard'] as const).filter(
+    (t) => result.toolAvailability?.[t] === 'unavailable-llm-fallback'
+  )
+  if (degradedTools.length > 0) {
+    const names = degradedTools.map((t) => TOOL_LABELS[t]).join(', ')
+    // WHY not "falling back to LLM-only": true for gitleaks/npm-audit (they replace the LLM call
+    // entirely when the tool is available) but false for lizard (ComplexityAgent always calls the
+    // LLM -- lizard only augments the prompt when present). This message covers whichever tools
+    // are degraded, so it must stay accurate under both semantics.
+    lines.push(
+      `${useEmoji ? '🔧 ' : ''}Degraded mode: ${names} not installed — the affected agent(s) ran ` +
+        `without it, which may reduce finding accuracy. Install the missing tool(s) for more ` +
+        `reliable results.`
+    )
+    lines.push('')
+  }
+
   if (failedAgents.length > 0) {
     lines.push(
       `${useEmoji ? '⚠️ ' : ''}${failedAgents.length}/${totalAgents} agents failed — results incomplete`

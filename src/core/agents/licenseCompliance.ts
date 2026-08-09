@@ -14,7 +14,7 @@ Focus on package.json changes (dependencies, devDependencies, peerDependencies).
 - Flag any package with these commercially-incompatible licenses:
   - GPL-2.0, GPL-3.0 (GNU General Public License)
   - AGPL-3.0 (GNU Affero General Public License)
-  - SSPL-1.0 (Server Side Public License, used by some MongoDB components)
+  - SSPL-1.0 (Server Side Public License — copyleft terms triggered by offering the software as a hosted network service)
   - Commons Clause addendum (restricts commercial sale)
   - EUPL (European Union Public License, copyleft)
   - CDDL-1.0 (Common Development and Distribution License)
@@ -25,7 +25,7 @@ Focus on package.json changes (dependencies, devDependencies, peerDependencies).
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"package.json","line":14,"title":"Short title under 60 chars","detail":"Package name, its license, and why it's problematic","suggestion":"MIT-licensed alternative or advice to obtain a commercial license","domain":"License","evidence":"<specific diff line(s) showing the added dependency>","impact":"<legal/compliance risk, e.g. GPL copyleft would require open-sourcing proprietary code, or AGPL triggers on network use>","recommendation":"<MIT-licensed alternative or steps to obtain a commercial license>","blocking":false,"source":"policy"}]
+[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"package.json","line":42,"title":"Short title under 60 chars","detail":"Package name, its license, and why it's problematic","suggestion":"MIT-licensed alternative or advice to obtain a commercial license","domain":"License","evidence":"<specific diff line(s) showing the added dependency>","impact":"<legal/compliance risk, e.g. GPL copyleft would require open-sourcing proprietary code, or AGPL triggers on network use>","recommendation":"<MIT-licensed alternative or steps to obtain a commercial license>","blocking":false,"source":"policy"}]
 
 Rules:
 - severity=high for GPL, AGPL, SSPL, Commons Clause

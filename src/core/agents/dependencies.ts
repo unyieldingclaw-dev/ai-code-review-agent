@@ -1,9 +1,34 @@
 import { BaseAgent } from './base.js'
-import type { AgentName } from '../schema.js'
+import { runTool } from '../../utils/shell.js'
+import { extractChangedFiles } from '../policyFilter.js'
+import { parseNpmAuditOutput } from '../npmAuditParser.js'
+import type { AgentName, Finding, ReviewInput } from '../schema.js'
 
 export class DependenciesAgent extends BaseAgent {
+  readonly toolKey = 'npmAudit' as const
+
   get name(): AgentName {
     return 'dependencies'
+  }
+
+  async run(input: ReviewInput, signal?: AbortSignal): Promise<Finding[]> {
+    const touchesManifest = extractChangedFiles(input.diff).some(
+      (f) => f === 'package.json' || f === 'package-lock.json'
+    )
+    if (touchesManifest && input.projectPath) {
+      // shell:true is required for npm specifically (Node refuses to spawn .cmd/.bat files on
+      // Windows otherwise) -- safe here because these args are always this hardcoded literal
+      // array, never diff-derived content. cwd is required too: without it, npm audit runs
+      // against whatever package.json is in this process's own cwd, not the reviewed project
+      // (CLI --dir / MCP repo_path routinely differ from process.cwd()).
+      const output = await runTool('npm', ['audit', '--json'], undefined, true, input.projectPath)
+      if (output !== null) {
+        this.lastToolAvailability = 'used'
+        return parseNpmAuditOutput(output, this.name)
+      }
+    }
+    if (touchesManifest) this.lastToolAvailability = 'unavailable-llm-fallback'
+    return super.run(input, signal)
   }
 
   get systemPrompt(): string {

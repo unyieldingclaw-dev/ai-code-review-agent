@@ -189,4 +189,17 @@ describe('formatSarif', () => {
     const sarif = JSON.parse(formatSarif(makeResult({ hallucinationFilter: { dropped: [] } })))
     expect(sarif.runs[0].properties.hallucinationFilter).toBeUndefined()
   })
+
+  it('includes toolAvailability in run-level properties when present', () => {
+    const result = makeResult({ toolAvailability: { gitleaks: 'unavailable-llm-fallback' } })
+    const sarif = JSON.parse(formatSarif(result))
+    expect(sarif.runs[0].properties.toolAvailability).toEqual({
+      gitleaks: 'unavailable-llm-fallback',
+    })
+  })
+
+  it('omits toolAvailability from run-level properties when absent', () => {
+    const sarif = JSON.parse(formatSarif(makeResult()))
+    expect(sarif.runs[0].properties.toolAvailability).toBeUndefined()
+  })
 })

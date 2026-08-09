@@ -74,10 +74,15 @@ const CASES: CalibrationCase[] = [
     baitKeyword: 'formatCurrency',
   },
   {
+    // This fixture touches package.json, so once projectPath is set below, DependenciesAgent's
+    // run() override routes it through the real npm-audit tool path instead of the LLM -- the
+    // agent no longer sees this fixture's fabricated "lodash wildcard" text at all, so the
+    // expectations here assert against real npm audit output (a known vulnerability report),
+    // not the diff's own bait content.
     name: 'dependencies',
     fixtureFile: 'calibration/fixtures/dependencies.diff',
-    expectedKeyword: 'wildcard',
-    baitKeyword: 'color-thief',
+    expectedKeyword: 'vulnerability',
+    baitKeyword: 'wildcard',
   },
   {
     // Regression case for a real hallucination bug: dependencies.ts's prompt used to carry a
@@ -121,6 +126,17 @@ const CASES: CalibrationCase[] = [
     baitKeyword: 'chalk',
   },
   {
+    // Regression case for the same class of hallucination bug as dependencies-clean above:
+    // license.ts's prompt used to carry a concrete "package.json:14" line number in its REQUIRED
+    // OUTPUT FORMAT example (plus a concrete MongoDB mention in its SSPL rule text), which the
+    // model could echo back as a fabricated finding on a diff with nothing to report. This
+    // fixture only adds a permissive-licensed (MIT) package -- the agent must return nothing.
+    name: 'license-clean',
+    agentName: 'license',
+    fixtureFile: 'calibration/fixtures/license-clean.diff',
+    expectEmpty: true,
+  },
+  {
     name: 'error-handling',
     fixtureFile: 'calibration/fixtures/error-handling.diff',
     expectedKeyword: 'swallowed',
@@ -143,6 +159,18 @@ const CASES: CalibrationCase[] = [
     fixtureFile: 'calibration/fixtures/secrets.diff',
     expectedKeyword: 'password',
     baitKeyword: 'REPLACE_WITH_REAL_KEY',
+  },
+  {
+    // SecretsAgent's run() override routes any diff whose changed file exists on disk through
+    // gitleaks instead of the LLM. gitleaksParser maps title/detail from gitleaks' own rule
+    // metadata (RuleID/Description), not fixture-specific text -- --redact means `evidence` is
+    // always the literal string "REDACTED", so the keyword must match what gitleaks itself
+    // reports for this rule, not the fixture's own "not a real secret" comment.
+    name: 'secrets-gitleaks',
+    agentName: 'secrets',
+    fixtureFile: 'calibration/fixtures/secrets-gitleaks.diff',
+    expectedKeyword: 'generic api key',
+    baitKeyword: 'AWS_SESSION_TOKEN',
   },
   {
     name: 'complexity',
@@ -221,7 +249,10 @@ async function main() {
     process.stdout.write(`\nRunning calibration: ${c.name}...\n`)
     const diff = readFileSync(c.fixtureFile, 'utf-8')
     try {
-      const rawFindings: Finding[] = await agentMap[c.agentName ?? c.name].run({ diff })
+      const rawFindings: Finding[] = await agentMap[c.agentName ?? c.name].run({
+        diff,
+        projectPath: process.cwd(),
+      })
       // Exercise the same file-existence defense runner.ts applies in real usage, so
       // calibration reflects actual end-to-end behavior, not just the raw agent's output.
       const findings = orch.synthesize(rawFindings, extractChangedFiles(diff))
