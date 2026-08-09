@@ -6,6 +6,13 @@ on:
 
 jobs:
   ai-review:
+    # WHY: this job runs on a self-hosted runner (needs local Ollama) and its early steps
+    # (checkout, `npm ci`) execute code from the PR branch before this workflow's own logic ever
+    # runs -- npm install/postinstall scripts are enough for arbitrary code execution. Skipping
+    # the whole job for fork-origin PRs (this repo takes no outside contributors) means untrusted
+    # code never touches this machine. Same-repo branches (including Dependabot's) still pass,
+    # since their head repo is this repo, not a fork.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: self-hosted # Requires Ollama on the runner
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
