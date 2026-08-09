@@ -133,6 +133,7 @@ export type ToolAvailability = 'used' | 'unavailable-llm-fallback'
 export interface ToolAvailabilityMetadata {
   gitleaks?: ToolAvailability
   npmAudit?: ToolAvailability
+  lizard?: ToolAvailability
 }
 
 export type AgentStatus = 'ok' | 'timeout' | 'parse-error' | 'error'

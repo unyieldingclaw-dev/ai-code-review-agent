@@ -14,6 +14,8 @@ function extractChangedFiles(diff: string): string[] {
 }
 
 export class ComplexityAgent extends BaseAgent {
+  readonly toolKey = 'lizard' as const
+
   get name(): AgentName {
     return 'complexity'
   }
@@ -57,10 +59,12 @@ Additional rules:
     const lizardOutput = await runTool('lizard', files, undefined, false, input.projectPath ?? '.')
     if (lizardOutput === null) {
       // lizard not found — LLM receives plain diff
+      this.lastToolAvailability = 'unavailable-llm-fallback'
       return super.run(input, signal)
     }
 
     // lizard found — prepend metrics so LLM can focus on high-complexity functions
+    this.lastToolAvailability = 'used'
     const enhancedDiff = `=== Lizard Complexity Metrics ===\n${lizardOutput}\n\n=== Diff ===\n${input.diff}`
     return super.run({ ...input, diff: enhancedDiff }, signal)
   }

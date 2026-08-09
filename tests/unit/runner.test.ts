@@ -816,6 +816,28 @@ describe('SwarmRunner tool-availability visibility', () => {
     expect(result.toolAvailability).toBeUndefined()
     expect(mockRunTool).not.toHaveBeenCalled()
   })
+
+  it('surfaces lizard degraded-mode when it is not installed', async () => {
+    mockRunTool.mockResolvedValue(null)
+    const provider = makeProvider('[]')
+    const config = { ...DEFAULT_CONFIG, agents: ['complexity'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: DIFF })
+
+    expect(result.toolAvailability?.lizard).toBe('unavailable-llm-fallback')
+  })
+
+  it('surfaces lizard "used" when it ran', async () => {
+    mockRunTool.mockResolvedValue('Function complexity: 15\n')
+    const provider = makeProvider('[]')
+    const config = { ...DEFAULT_CONFIG, agents: ['complexity'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: DIFF })
+
+    expect(result.toolAvailability?.lizard).toBe('used')
+  })
 })
 
 describe('recordToolAvailability', () => {
