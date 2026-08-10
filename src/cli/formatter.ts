@@ -48,6 +48,13 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     lines.push('')
   }
 
+  if (result.coverageGapFilter && result.coverageGapFilter.dropped.length > 0) {
+    lines.push(
+      `${useEmoji ? '🔍 ' : ''}Coverage gap filter: ${result.coverageGapFilter.dropped.length} coverage gap(s) dropped — referenced file(s) not present in the reviewed diff.`
+    )
+    lines.push('')
+  }
+
   const TOOL_LABELS: Record<'gitleaks' | 'npmAudit' | 'lizard', string> = {
     gitleaks: 'gitleaks',
     npmAudit: 'npm audit',

@@ -57,6 +57,18 @@ describe('BaseAgent', () => {
     await expect(agent.run({ diff: 'diff' })).rejects.toThrow(ParseFailureError)
   })
 
+  it('throws ParseFailureError when a non-empty .findings array has every item fail schema validation', async () => {
+    // Stage 1 (bare array) already guards against "parsed but nothing valid" by falling
+    // through instead of returning an empty array silently. Stage 2 (object with .findings)
+    // did not have the same guard -- a non-empty but entirely garbage .findings array
+    // resolved to "[], no throw" instead of surfacing the parse failure.
+    const raw = JSON.stringify({
+      findings: [{ bogus: 'garbage', missing: 'required fields' }],
+    })
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
+    await expect(agent.run({ diff: 'diff' })).rejects.toThrow(ParseFailureError)
+  })
+
   it('wraps a single bare finding-shaped object without claiming truncation', async () => {
     // The LLM returned one finding as a bare `{...}` instead of the required `[...]` array.
     // Nothing was truncated -- Stage 4's "appears truncated" message would be misleading here.

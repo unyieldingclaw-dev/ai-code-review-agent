@@ -128,6 +128,15 @@ export interface HallucinationFilterMetadata {
   dropped: DroppedHallucinatedFinding[]
 }
 
+export interface DroppedCoverageGap {
+  file: string
+  functionName: string
+}
+
+export interface CoverageGapFilterMetadata {
+  dropped: DroppedCoverageGap[]
+}
+
 export type ToolAvailability = 'used' | 'unavailable-llm-fallback'
 
 export interface ToolAvailabilityMetadata {
@@ -157,6 +166,7 @@ export interface ReviewResult {
   agentStatus?: Partial<Record<AgentName, AgentStatus>>
   truncation?: TruncationMetadata
   hallucinationFilter?: HallucinationFilterMetadata
+  coverageGapFilter?: CoverageGapFilterMetadata
   toolAvailability?: ToolAvailabilityMetadata
 }
 

@@ -63,7 +63,13 @@ export abstract class BaseAgent {
       }
       // Stage 2: object with .findings array
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.findings)) {
-        return this.validateFindings(parsed.findings)
+        const valid = this.validateFindings(parsed.findings)
+        if (valid.length > 0 || parsed.findings.length === 0) return valid
+        // All items failed schema validation — log before falling through to extraction
+        console.error(
+          `[${this.name}] stage-2: ${parsed.findings.length} item(s) failed schema validation. ` +
+            `First item keys: ${Object.keys(parsed.findings[0] ?? {}).join(', ')}`
+        )
       }
       // Stage 2b: a single bare finding-shaped object (has its own `severity`, not nested under
       // `.findings`). Nothing was truncated here -- Stage 4's "appears truncated" message would
@@ -86,7 +92,17 @@ export abstract class BaseAgent {
       const extracted = extractBalancedSpan(cleaned, '[', ']')
       if (extracted) {
         const parsed = JSON.parse(extracted)
-        if (Array.isArray(parsed)) return this.validateFindings(parsed)
+        if (Array.isArray(parsed)) {
+          const valid = this.validateFindings(parsed)
+          // Same guard as Stage 1/2: a non-empty array where nothing passed schema
+          // validation is a parse failure, not "0 findings" -- fall through to Stage 4
+          // instead of returning an empty array silently.
+          if (valid.length > 0 || parsed.length === 0) return valid
+          console.error(
+            `[${this.name}] stage-3: ${parsed.length} item(s) failed schema validation. ` +
+              `First item keys: ${Object.keys(parsed[0] ?? {}).join(', ')}`
+          )
+        }
       }
     } catch {
       /* fall through */

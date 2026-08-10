@@ -840,6 +840,144 @@ describe('SwarmRunner tool-availability visibility', () => {
   })
 })
 
+describe('SwarmRunner coverage-gap path defense (path traversal via --write-tests)', () => {
+  // WHY this matters: CoverageGap[] bypasses OrchestratorAgent.synthesize() entirely -- it never
+  // goes through filterNonexistentFiles, the defense that already protects Finding[] by dropping
+  // anything whose file isn't in the diff's real changed files. Without an equivalent filter here,
+  // a malicious or hallucinated gap.file (e.g. "../../../../etc/passwd") flows straight into
+  // TestGenAgent's deriveTestPath, which does zero path sanitization, and from there into
+  // --write-tests's writeFileSync call.
+  const DIFF = [
+    'diff --git a/src/foo.ts b/src/foo.ts',
+    '--- a/src/foo.ts',
+    '+++ b/src/foo.ts',
+    '@@ -1 +1 @@',
+    '-old',
+    '+new',
+  ].join('\n')
+
+  it('passes a coverage gap through to TestGen when its file matches the diff’s changed files', async () => {
+    const coverageResponse = JSON.stringify({
+      findings: [],
+      gaps: [
+        {
+          file: 'src/foo.ts',
+          functionName: 'foo',
+          lineStart: 1,
+          lineEnd: 2,
+          description: 'desc',
+        },
+      ],
+    })
+    let callIndex = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => {
+        callIndex++
+        // First call: coverage agent. Second call: TestGen generating the test file content.
+        if (callIndex === 1) return Promise.resolve(coverageResponse)
+        return Promise.resolve(
+          'generated test file content that is long enough to pass the min-length check'
+        )
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = { ...DEFAULT_CONFIG, agents: ['coverage', 'testgen'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: DIFF })
+    expect(result.testFiles).toHaveLength(1)
+  })
+
+  it('drops a coverage gap whose file is not in the reviewed diff before it ever reaches TestGen', async () => {
+    const coverageResponse = JSON.stringify({
+      findings: [],
+      gaps: [
+        {
+          file: '../../../../etc/passwd',
+          functionName: 'foo',
+          lineStart: 1,
+          lineEnd: 2,
+          description: 'desc',
+        },
+      ],
+    })
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue(coverageResponse),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = { ...DEFAULT_CONFIG, agents: ['coverage', 'testgen'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await runner.run({ diff: DIFF })
+
+    expect(result.testFiles).toHaveLength(0)
+    // Only the coverage agent's chat call should have happened -- TestGen must never be
+    // invoked with a gap that was already dropped.
+    expect(provider.chat).toHaveBeenCalledTimes(1)
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('dropped coverage gap'))
+    errorSpy.mockRestore()
+  })
+
+  it('surfaces a dropped coverage gap on the result, not only via console.error', async () => {
+    const coverageResponse = JSON.stringify({
+      findings: [],
+      gaps: [
+        {
+          file: '../../../../etc/passwd',
+          functionName: 'foo',
+          lineStart: 1,
+          lineEnd: 2,
+          description: 'desc',
+        },
+      ],
+    })
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue(coverageResponse),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = { ...DEFAULT_CONFIG, agents: ['coverage', 'testgen'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await runner.run({ diff: DIFF })
+
+    expect(result.coverageGapFilter).toEqual({
+      dropped: [{ file: '../../../../etc/passwd', functionName: 'foo' }],
+    })
+    errorSpy.mockRestore()
+  })
+
+  it('does not include coverageGapFilter when nothing was dropped', async () => {
+    const coverageResponse = JSON.stringify({
+      findings: [],
+      gaps: [
+        {
+          file: 'src/foo.ts',
+          functionName: 'foo',
+          lineStart: 1,
+          lineEnd: 2,
+          description: 'desc',
+        },
+      ],
+    })
+    let callIndex = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => {
+        callIndex++
+        if (callIndex === 1) return Promise.resolve(coverageResponse)
+        return Promise.resolve(
+          'generated test file content that is long enough to pass the min-length check'
+        )
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = { ...DEFAULT_CONFIG, agents: ['coverage', 'testgen'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: DIFF })
+    expect(result.coverageGapFilter).toBeUndefined()
+  })
+})
+
 describe('recordToolAvailability', () => {
   // A minimal fake agent proves runner.ts's bookkeeping is generic -- it doesn't import or
   // instanceof-check this class, only reads the toolKey/lastToolAvailability contract declared

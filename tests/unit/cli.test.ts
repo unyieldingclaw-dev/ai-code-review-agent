@@ -83,6 +83,7 @@ vi.mock('../../src/core/config.js', () => ({
 }))
 
 import { spawnSync } from 'child_process'
+import { resolve } from 'path'
 import { SwarmRunner } from '../../src/core/runner.js'
 
 const mockSpawnSync = vi.mocked(spawnSync)
@@ -392,5 +393,56 @@ describe('CLI — argument parsing and output', () => {
     await runCli([])
     const config = MockSwarmRunner.mock.calls[0][0]
     expect(config.parallel).toBe(false)
+  })
+})
+
+describe('--write-tests path containment (Layer B backstop)', () => {
+  // WHY this matters even though runner.ts's coverage-gap filter (Layer A) already drops
+  // gaps whose file isn't in the diff: Layer A can't catch a malicious testOutputDir from
+  // ai-review.config.json (e.g. "../../../.."), since deriveTestPath concatenates
+  // testOutputDir with a legitimate gap's filename with zero sanitization. This is the
+  // backstop that catches that case regardless of which layer let a bad path through.
+  it('resolveWriteTestPath returns the resolved path for a normal relative path', async () => {
+    const { resolveWriteTestPath } = await import('../../src/cli/index.js')
+    const projectPath = resolve('/home/user/myproject')
+    const result = resolveWriteTestPath(projectPath, 'ai-review-tests/foo.test.ts')
+    expect(result).toBe(resolve(projectPath, 'ai-review-tests/foo.test.ts'))
+  })
+
+  it('resolveWriteTestPath returns null for a path that escapes projectPath via traversal', async () => {
+    const { resolveWriteTestPath } = await import('../../src/cli/index.js')
+    const projectPath = resolve('/home/user/myproject')
+    const result = resolveWriteTestPath(projectPath, '../../../../../../etc/passwd')
+    expect(result).toBeNull()
+  })
+
+  it('skips writing a test file whose path resolves outside projectPath, and logs it, while still writing legitimate files', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          testFiles: [
+            {
+              path: 'ai-review-tests/foo.test.ts',
+              content: 'legit test content',
+              framework: 'vitest',
+            },
+            {
+              path: '../../../../../../etc/passwd',
+              content: 'malicious content',
+              framework: 'vitest',
+            },
+          ],
+        })
+      ),
+    }))
+    const fs = await import('fs')
+    const writeFileSyncMock = vi.mocked(fs.writeFileSync)
+
+    const { exitCode, stderr } = await runCli(['--write-tests'])
+
+    expect(exitCode).toBe(0)
+    expect(writeFileSyncMock).toHaveBeenCalledTimes(1)
+    expect(String(writeFileSyncMock.mock.calls[0][0])).toContain('foo.test.ts')
+    expect(stderr).toMatch(/outside (the )?project|escapes project|traversal/i)
   })
 })

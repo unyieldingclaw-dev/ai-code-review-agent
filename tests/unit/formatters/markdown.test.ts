@@ -172,6 +172,23 @@ describe('formatMarkdown', () => {
     expect(output).not.toMatch(/hallucinat/i)
   })
 
+  it('surfaces a coverage-gap-filter note when a gap was dropped', () => {
+    const result = makeResult({
+      findings: [],
+      coverageGapFilter: {
+        dropped: [{ file: '../../../../etc/passwd', functionName: 'foo' }],
+      },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('1')
+    expect(output).toMatch(/coverage gap/i)
+  })
+
+  it('does not show a coverage-gap-filter note when nothing was dropped', () => {
+    const output = formatMarkdown(makeResult())
+    expect(output).not.toMatch(/coverage gap/i)
+  })
+
   it('shows a degraded-mode note when a tool-integrated agent fell back to the LLM', () => {
     const result = makeResult({
       findings: [],

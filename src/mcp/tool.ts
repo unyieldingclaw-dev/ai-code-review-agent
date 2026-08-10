@@ -5,6 +5,7 @@ import { SwarmRunner } from '../core/runner.js'
 import { loadConfig } from '../core/config.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
 import { formatMcpOutput } from './formatter.js'
+import { isPathWithin } from '../core/filePath.js'
 import type { AgentName } from '../core/schema.js'
 
 // testgen writes files to disk — never run it in the MCP context.
@@ -24,8 +25,35 @@ function gitSync(cwd: string, args: string[]): string {
   return result.stdout
 }
 
+// Opt-in scoping for repo_path, which is client-supplied -- in practice populated by whatever
+// LLM/agent is calling this MCP tool from its own context, which could itself be influenced by
+// injected instructions in content it previously read (see standards/AGENTIC-SAFETY.md).
+// AI_REVIEW_ALLOWED_ROOTS is a comma-separated list of absolute paths; when set, repo_path must
+// resolve inside one of them. There's no single "correct" workspace root to hardcode (this
+// server is used across arbitrary projects), so unset means unrestricted -- fail open, matching
+// this project's established convention for missing/unconfigured state (see config.ts's
+// malformed-config fallback and orchestrator.ts's filterNonexistentFiles empty-changedFiles
+// behavior), so this doesn't break existing single-repo MCP setups that never configured it.
+function isWithinAllowedRoots(repoPath: string, allowedRoots: string[]): boolean {
+  return allowedRoots.some((root) => isPathWithin(repoPath, resolve(root)))
+}
+
 export async function runReviewTool(params: ReviewToolParams): Promise<string> {
   const repoPath = resolve(params.repo_path ?? process.cwd())
+
+  const allowedRootsEnv = process.env.AI_REVIEW_ALLOWED_ROOTS
+  if (allowedRootsEnv) {
+    const allowedRoots = allowedRootsEnv
+      .split(',')
+      .map((r) => r.trim())
+      .filter(Boolean)
+    if (!isWithinAllowedRoots(repoPath, allowedRoots)) {
+      return (
+        `## AI Code Review\n\nRefused: \`${repoPath}\` is outside the configured allowed roots ` +
+        '(AI_REVIEW_ALLOWED_ROOTS). Add it to the allowlist, or unset the variable to allow any path.'
+      )
+    }
+  }
 
   // --- Diff acquisition (staged → HEAD fallback) ---
   let diff: string

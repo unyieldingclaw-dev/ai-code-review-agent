@@ -13,6 +13,7 @@ import type {
   AgentStatus,
   TruncationMetadata,
   DroppedHallucinatedFinding,
+  DroppedCoverageGap,
   ToolAvailabilityMetadata,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
@@ -22,6 +23,7 @@ import type { ContextResult } from './contextLoader.js'
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
 import { evaluatePolicy, extractChangedFiles } from './policyFilter.js'
 import { sanitizeDiff, sanitizeText } from './sanitizer.js'
+import { normalizeFilePath, stripDiffPrefix } from './filePath.js'
 import { BreakingChangeAgent } from './agents/breakingChange.js'
 import { LicenseComplianceAgent } from './agents/licenseCompliance.js'
 import { BaseAgent } from './agents/base.js'
@@ -143,6 +145,36 @@ export function recordToolAvailability(
   if (agent.toolKey && agent.lastToolAvailability) {
     toolAvailability[agent.toolKey] = agent.lastToolAvailability
   }
+}
+
+// CoverageGap[] bypasses OrchestratorAgent.synthesize() entirely -- it's set directly from the
+// coverage agent's own output and never passed through synthesize's filterNonexistentFiles,
+// the defense that already protects Finding[] by dropping anything whose file isn't in the
+// diff's real changed files. Without an equivalent check here, a hallucinated or malicious
+// gap.file (e.g. "../../../.." via a poisoned testOutputDir, or any other out-of-diff path)
+// flows straight into TestGenAgent's deriveTestPath, which does zero path sanitization, and
+// from there into --write-tests's writeFileSync call. Shares normalizeFilePath/stripDiffPrefix
+// with orchestrator.ts's filterNonexistentFiles so both defenses treat the same a/-b/-prefix-echo
+// case identically instead of drifting apart.
+// dropped is an optional sink the caller can pass to collect gaps this filter drops, so they can
+// be surfaced in the report instead of only logged -- mirrors filterNonexistentFiles's own
+// dropped? param in orchestrator.ts; no-op to omit it.
+export function filterCoverageGaps(
+  gaps: CoverageGap[],
+  changedFiles: string[],
+  dropped?: DroppedCoverageGap[]
+): CoverageGap[] {
+  const changedSet = new Set(changedFiles.map((p) => normalizeFilePath(p)))
+  return gaps.filter((g) => {
+    const normalized = normalizeFilePath(g.file)
+    if (changedSet.has(normalized) || changedSet.has(stripDiffPrefix(normalized))) return true
+    dropped?.push({ file: g.file, functionName: g.functionName })
+    console.error(
+      `[ai-review] dropped coverage gap for "${g.file}" -- not in the reviewed diff ` +
+        `(likely a hallucinated or malicious path)`
+    )
+    return false
+  })
 }
 
 function shouldEarlyExit(config: ReviewConfig, allFindings: Finding[]): boolean {
@@ -480,6 +512,7 @@ export class SwarmRunner {
     const start = Date.now()
     const allFindings: Finding[] = []
     let coverageGaps: CoverageGap[] = []
+    const droppedCoverageGaps: DroppedCoverageGap[] = []
     let testFiles: GeneratedTestFile[] = []
     const agentStatus: Partial<Record<AgentName, AgentStatus>> = {}
     const toolAvailability: ToolAvailabilityMetadata = {}
@@ -573,7 +606,14 @@ export class SwarmRunner {
         onProgress
       )
       allFindings.push(...coverageResult.findings)
-      coverageGaps = coverageResult.gaps
+      // WHY require non-empty changedFiles: matches filterNonexistentFiles's fail-open
+      // convention in orchestrator.ts -- an empty list means extractChangedFiles couldn't
+      // confidently parse any changed files from this diff, not that the diff touches none,
+      // so filtering against it would drop every gap instead of just the illegitimate ones.
+      coverageGaps =
+        changedFiles.length > 0
+          ? filterCoverageGaps(coverageResult.gaps, changedFiles, droppedCoverageGaps)
+          : coverageResult.gaps
       if (coverageResult.earlyExit) earlyExitAgent = 'coverage'
     }
 
@@ -670,6 +710,9 @@ export class SwarmRunner {
       ...(truncationMeta.truncated ? { truncation: truncationMeta } : {}),
       ...(droppedHallucinated.length > 0
         ? { hallucinationFilter: { dropped: droppedHallucinated } }
+        : {}),
+      ...(droppedCoverageGaps.length > 0
+        ? { coverageGapFilter: { dropped: droppedCoverageGaps } }
         : {}),
       ...(Object.keys(toolAvailability).length > 0 ? { toolAvailability } : {}),
     }

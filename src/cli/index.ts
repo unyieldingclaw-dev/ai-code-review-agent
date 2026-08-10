@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url'
 import { join, resolve, dirname } from 'path'
 import { SwarmRunner } from '../core/runner.js'
 import { loadConfig } from '../core/config.js'
+import { isPathWithin } from '../core/filePath.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
 import { formatMarkdown, formatJson, formatSarif, formatGithubAnnotations } from './formatter.js'
 import type { AgentName, AgentProgressEvent } from '../core/schema.js'
@@ -229,14 +230,26 @@ program
 
         // Only write test files when --write-tests is explicitly passed
         if (options.writeTests && result.testFiles.length > 0) {
+          let written = 0
           for (const tf of result.testFiles) {
-            const outPath = join(projectPath, tf.path)
+            // Backstop against a malicious testOutputDir (config.ts applies zero validation to
+            // it) or any other way a test file's path could escape projectPath -- path.join
+            // does not clamp to projectPath, so this resolves the final path and refuses to
+            // write anything outside it instead of trusting the path as given.
+            const outPath = resolveWriteTestPath(projectPath, tf.path)
+            if (!outPath) {
+              console.error(
+                `[ai-review] Refusing to write test file outside the project directory: ${tf.path}`
+              )
+              continue
+            }
             mkdirSync(join(outPath, '..'), { recursive: true })
             writeFileSync(outPath, tf.content, 'utf-8')
+            written++
           }
           const paperclip = options.emoji !== false ? '📝' : 'Generated'
           process.stdout.write(
-            `\n${paperclip} Generated ${result.testFiles.length} test file(s) in ${config.testOutputDir}\n`
+            `\n${paperclip} Generated ${written} test file(s) in ${config.testOutputDir}\n`
           )
         } else if (options.suggestTests && result.testFiles.length > 0) {
           const lightbulb = options.emoji !== false ? '💡' : 'Note:'
@@ -296,6 +309,18 @@ program
 
 function collect(value: string, previous: string[]): string[] {
   return [...previous, value]
+}
+
+// Resolves a generated test file's path against projectPath and returns null if the result
+// would land outside it -- the backstop for --write-tests. path.join(projectPath, tf.path)
+// does not clamp to projectPath (e.g. join('/repo', '../../../etc/passwd') escapes it cleanly),
+// so a malicious testOutputDir or an unsanitized gap.file that slipped past runner.ts's
+// coverage-gap filter could otherwise write anywhere the process user can write.
+export function resolveWriteTestPath(projectPath: string, testFilePath: string): string | null {
+  const resolvedProject = resolve(projectPath)
+  const resolvedOut = resolve(join(projectPath, testFilePath))
+  if (!isPathWithin(resolvedOut, resolvedProject)) return null
+  return resolvedOut
 }
 
 function gitSync(args: string[]): string {

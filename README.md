@@ -126,6 +126,26 @@ or invoke directly:
 
 Requires Ollama running locally with `devstral:latest` pulled. The tool runs 15 agents (all except `testgen`). For generated test files, use the CLI (`ai-review-agent`).
 
+By default `review_diff` accepts a `repo_path` pointing anywhere the server process can read.
+To restrict it to specific project roots, set `AI_REVIEW_ALLOWED_ROOTS` to a comma-separated
+list of absolute paths in the server's `env`:
+
+```json
+{
+  "mcpServers": {
+    "ai-review": {
+      "command": "ai-review-mcp",
+      "args": [],
+      "env": {
+        "AI_REVIEW_ALLOWED_ROOTS": "/Users/you/projects/app-one,/Users/you/projects/app-two"
+      }
+    }
+  }
+}
+```
+
+Unset (the default), any `repo_path` is allowed — unrestricted, matching prior behavior.
+
 ## `/ai-review` in Claude Code
 
 Installing globally (`npm install -g ai-review-agent`, or via `setup.bat`/`setup.command`)
