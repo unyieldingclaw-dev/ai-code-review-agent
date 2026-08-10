@@ -50,6 +50,17 @@ describe('loadConfig', () => {
     }
   })
 
+  it('does not log an error for a valid config file', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    writeFileSync('ai-review.config.json', JSON.stringify({ model: 'qwen3:latest' }))
+    try {
+      loadConfig(process.cwd())
+      expect(errorSpy).not.toHaveBeenCalled()
+    } finally {
+      unlinkSync('ai-review.config.json')
+    }
+  })
+
   it('returns defaults when config file contains invalid JSON', () => {
     writeFileSync('ai-review.config.json', '{ not valid json }')
     try {

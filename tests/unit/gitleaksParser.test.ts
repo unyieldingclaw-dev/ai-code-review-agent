@@ -9,6 +9,13 @@ describe('parseGitleaksOutput', () => {
     expect(findings).toEqual([])
   })
 
+  it('does not log an error for a legitimately clean scan', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const raw = readFileSync('tests/fixtures/gitleaks-clean.json', 'utf-8')
+    parseGitleaksOutput(raw, 'secrets')
+    expect(errorSpy).not.toHaveBeenCalled()
+  })
+
   it('maps a real gitleaks leak to a Finding with correct field mapping', () => {
     const raw = readFileSync('tests/fixtures/gitleaks-leak-found.json', 'utf-8')
     const findings = parseGitleaksOutput(raw, 'secrets')
