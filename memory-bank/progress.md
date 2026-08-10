@@ -46,28 +46,50 @@ lineage: []
       agent worktree (`fervent-kalam-3c236c`, detached HEAD at a stale July 25 commit) was being
       picked up and run in parallel with the real suite, racing on shared absolute temp paths and
       producing spurious failures unrelated to any code change; investigated via `git worktree
-      list` before excluding rather than deleting it (may still be someone's reference).
+list` before excluding rather than deleting it (may still be someone's reference).
       Went through full `/code-review` (5 lenses + opponent check): caught and fixed one real
-      issue before commit — the `testGen.ts` structural check's first regex
-      (`/\b(describe|it|test)\s*\(/`) could false-positive-accept prose containing "it (" as a
-      parenthetical (e.g. "explain it (the reasoning) here"), defeating the check's own purpose;
-      tightened to require a quoted title immediately after the call
-      (`/\b(describe|it|test)\(\s*['"` + "`" + `]/`), verified independently by the opponent-check
-      agent against both the false-positive case and real test code. Also ran full `/change-review`
-      (9 jobs) before push: flagged 2 Low test-coverage gaps (gitleaks clean-scan and config
-      valid-merge didn't assert non-logging, unlike the equivalent npm-audit/shell.ts cases from
-      the same batch) — fixed in the immediate follow-up commit `e650a8b` per explicit user
-      instruction ("fix all found issues, new + pre existing"). Job 7 (security) ran ACR's
-      security profile (npm-installed `v1.9.0`) against the branch diff and flagged
-      `resolveWriteTestPath` (Batch 1's own path-traversal fix) as introducing path traversal —
-      independently verified false positive by reading the actual containment-check code
-      (`resolve()` + `isPathWithin()`, returns `null` on escape, caller correctly refuses to write).
-      This became the first concrete example for a separate, not-yet-scoped conversation about
-      ACR's own reliability — see "ACR reliability findings" note below.
-- [ ] Batch 3/5: dead code / config cleanup (`complexity.ts`'s duplicate `extractChangedFiles`,
-      delete `adapters/github.ts`, remove `preferredSecretsScanner`, wire up
-      `complexityThreshold` via lizard's `-C`/`-w` flags, orchestrator magic number + unused
-      constructor param, dead `ContextMetadata`)
+      issue before commit — the `testGen.ts` structural check's first regex could
+      false-positive-accept prose containing "it (" as a parenthetical (e.g. "explain it (the
+      reasoning) here"), defeating the check's own purpose; tightened to require a quoted title
+      immediately after the call, verified independently by the opponent-check agent against both
+      the false-positive case and real test code. Also ran full `/change-review` (9 jobs) before
+      push: flagged 2 Low test-coverage gaps (gitleaks clean-scan and config valid-merge didn't
+      assert non-logging, unlike the equivalent npm-audit/shell.ts cases from the same batch) —
+      fixed in the immediate follow-up commit `e650a8b` per explicit user instruction ("fix all
+      found issues, new + pre existing"). Job 7 (security) ran ACR's security profile
+      (npm-installed `v1.9.0`) against the branch diff and flagged `resolveWriteTestPath` (Batch
+      1's own path-traversal fix) as introducing path traversal — independently verified false
+      positive by reading the actual containment-check code (`resolve()` + `isPathWithin()`,
+      returns `null` on escape, caller correctly refuses to write). This became the first concrete
+      example for a separate, not-yet-scoped conversation about ACR's own reliability — see "ACR
+      reliability findings" note below.
+- [x] Batch 3/5: dead code / config cleanup.
+  - `complexity.ts` now imports the canonical `extractChangedFiles` helper instead of a local
+    reimplementation that (unlike the canonical version) didn't exclude `/dev/null` deletion
+    markers or dedupe -- added a regression test confirming deleted files no longer reach lizard.
+  - Deleted the unused GitHub PR-comment adapter and its test (270 lines total, zero live import
+    references -- confirmed via `git show` on `review.yml`'s first commit that the inline
+    `actions/github-script` implementation was there from day one, never wired up).
+  - Removed the dead `ContextMetadata` interface from `contextLoader.ts` (declared, zero
+    references).
+  - Removed `preferredSecretsScanner` from `ReviewConfig` (README/CHANGELOG documented it as
+    shipped; functionally always a no-op -- briefly read in `SecretsAgent.run()` for one day
+    (commit `ac280cc`) before being removed same-day (`1708687`) once every branch under it turned
+    out to call the identical fallback regardless of its value, then left orphaned in `config.ts`
+    for ~2 months. Would need a whole new trufflehog integration with unverified output format and
+    no evidence of demand, so removed rather than implemented).
+  - Wired up `complexityThreshold` for real: `ComplexityAgent.run()` now passes a `-C` threshold
+    flag to lizard when the config field is set (verified lizard's actual CLI flag directly rather
+    than trusting the README's stale "default: 10" claim -- lizard's own real default is 15,
+    corrected the docs to say so).
+  - Named the line-proximity magic number (copy-pasted 4x across the hallucination-corroboration
+    and cross-reference logic) as `SAME_LOCATION_LINE_PROXIMITY`.
+  - Removed `OrchestratorAgent`'s unused LLM provider constructor param (100% deterministic
+    synthesis, no LLM calls) -- required updating roughly 40 call sites across the runner,
+    calibration script, and 3 test files; removed now-dead provider-mock helpers and imports left
+    over in those test files once the arg was gone.
+  - README's config example JSON updated to match (dropped `preferredSecretsScanner`, corrected
+    `complexityThreshold`'s documented default).
 - [ ] Batch 4/5: derive `TOOL_LABELS`/MCP agent-list description from schema instead of
       hand-maintained duplicates
 - [ ] Batch 5/5: previously-approved-but-unimplemented items (semantic-embedding caching,

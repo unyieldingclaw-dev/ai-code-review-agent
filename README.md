@@ -280,8 +280,7 @@ Create `ai-review.config.json` in your project root to override defaults:
   "retryAttempts": 2,
   "retryDelayMs": 2000,
   "sanitize": true,
-  "preferredSecretsScanner": "gitleaks",
-  "complexityThreshold": 10
+  "complexityThreshold": 15
 }
 ```
 
@@ -289,8 +288,7 @@ Create `ai-review.config.json` in your project root to override defaults:
 
 **Config field notes:**
 
-- `preferredSecretsScanner`: `"gitleaks"` (default when installed) or `"trufflehog"` or `"none"` — controls which external scanner SecretsAgent prefers. Falls back to LLM-only when the tool is not found.
-- `complexityThreshold`: Cyclomatic complexity threshold for ComplexityAgent (default: `10`). Functions exceeding this value are flagged. Used when `lizard` is installed; LLM estimates when not.
+- `complexityThreshold`: Cyclomatic complexity number (CCN) threshold passed to `lizard` (`-C`) when it's installed — functions exceeding it are flagged. If omitted, `lizard`'s own default (`15`) applies. Has no effect when `lizard` isn't installed (the LLM-only fallback path uses its own prompt-described thresholds instead).
 - `agentPolicy`: Per-agent include/exclude path rules. An agent runs only when at least one changed file matches its `include` patterns; it is skipped when **all** changed files match its `exclude` patterns. Uses gitignore-style globs. Omitting a rule means the agent always runs.
 
 **`agentPolicy` example** — skip `license` on non-lockfile changes, restrict `migration-safety` to migration paths:

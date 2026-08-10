@@ -3,11 +3,6 @@ import { OrchestratorAgent } from '../../src/core/agents/orchestrator.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import type { Finding } from '../../src/core/schema.js'
 
-const makeProvider = () => ({
-  chat: vi.fn(),
-  ping: vi.fn().mockResolvedValue({ ok: true }),
-})
-
 const finding = (overrides: Partial<Finding> = {}): Finding => ({
   id: 'security-0',
   agent: 'security',
@@ -30,7 +25,7 @@ const finding = (overrides: Partial<Finding> = {}): Finding => ({
 
 describe('confidence-aware hallucination cross-check', () => {
   it('keeps solo Critical when confidence >= 60', () => {
-    const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings = [
       finding({
         id: 'security-0',
@@ -56,7 +51,7 @@ describe('confidence-aware hallucination cross-check', () => {
   })
 
   it('downgrades solo Critical to High (not Medium) when confidence < 60', () => {
-    const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings = [
       finding({
         id: 'security-0',
@@ -82,7 +77,7 @@ describe('confidence-aware hallucination cross-check', () => {
   })
 
   it('keeps Critical when corroborated, regardless of confidence', () => {
-    const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings = [
       finding({
         id: 'security-0',
@@ -108,7 +103,7 @@ describe('confidence-aware hallucination cross-check', () => {
   })
 
   it('solo High still downgrades to Medium regardless of confidence', () => {
-    const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings = [
       finding({
         id: 'security-0',

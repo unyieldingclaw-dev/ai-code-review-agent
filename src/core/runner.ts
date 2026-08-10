@@ -193,7 +193,7 @@ export class SwarmRunner {
     private readonly config: ReviewConfig,
     private readonly provider: LLMProvider
   ) {
-    this.orchestrator = new OrchestratorAgent(provider, config)
+    this.orchestrator = new OrchestratorAgent(config)
     this.testGen = new TestGenAgent(provider, config)
   }
 

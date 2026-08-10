@@ -1,4 +1,3 @@
-import type { LLMProvider } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
 import type {
   Finding,
@@ -50,11 +49,16 @@ const AGENT_PRIORITY: AgentName[] = [
   'secrets',
 ]
 
+// Findings within this many lines of each other are treated as "the same location" for
+// cross-referencing and hallucination-corroboration purposes -- close enough to plausibly
+// describe the same code, without requiring an exact line match (agents don't always agree on
+// which line within a multi-line statement/block a finding belongs to).
+const SAME_LOCATION_LINE_PROXIMITY = 5
+
 export class OrchestratorAgent {
-  constructor(
-    private readonly provider: LLMProvider,
-    private readonly config: ReviewConfig
-  ) {}
+  // No LLMProvider param -- synthesis is 100% deterministic (dedup, cross-reference, hallucination
+  // filtering), no LLM calls.
+  constructor(private readonly config: ReviewConfig) {}
 
   // changedFiles is optional so existing/other callers that don't have a diff's file list handy
   // (e.g. every existing test in this file) are unaffected -- the filter simply no-ops when
@@ -125,7 +129,7 @@ export class OrchestratorAgent {
               other.id !== f.id &&
               other.agent !== f.agent &&
               stripDiffPrefix(normalizeFilePath(other.file)) === fFile &&
-              Math.abs(other.line - f.line) <= 5
+              Math.abs(other.line - f.line) <= SAME_LOCATION_LINE_PROXIMITY
           )
           .map((other) => other.agent)
       )
@@ -200,7 +204,7 @@ export class OrchestratorAgent {
           (other) =>
             other.agent === 'coverage' &&
             stripDiffPrefix(normalizeFilePath(other.file)) === fFile &&
-            Math.abs(other.line - f.line) <= 5
+            Math.abs(other.line - f.line) <= SAME_LOCATION_LINE_PROXIMITY
         )
         if (coverageGap) {
           return {
@@ -216,7 +220,7 @@ export class OrchestratorAgent {
           (other) =>
             other.agent === 'adversarial' &&
             stripDiffPrefix(normalizeFilePath(other.file)) === fFile &&
-            Math.abs(other.line - f.line) <= 5
+            Math.abs(other.line - f.line) <= SAME_LOCATION_LINE_PROXIMITY
         )
         if (hasAdversarial) {
           return { ...f, severity: this.escalate(f.severity) }
@@ -228,7 +232,7 @@ export class OrchestratorAgent {
           (other) =>
             (other.agent === 'correctness' || other.agent === 'design') &&
             stripDiffPrefix(normalizeFilePath(other.file)) === fFile &&
-            Math.abs(other.line - f.line) <= 5
+            Math.abs(other.line - f.line) <= SAME_LOCATION_LINE_PROXIMITY
         )
         if (hasCorrectnessOrDesign) {
           return { ...f, severity: this.escalate(f.severity) }

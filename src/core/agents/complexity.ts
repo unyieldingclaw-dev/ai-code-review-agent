@@ -1,17 +1,8 @@
 import { BaseAgent } from './base.js'
 import { runTool } from '../../utils/shell.js'
+import { extractChangedFiles } from '../policyFilter.js'
 import type { AgentName } from '../schema.js'
 import type { ReviewInput, Finding } from '../schema.js'
-
-function extractChangedFiles(diff: string): string[] {
-  const files: string[] = []
-  for (const line of diff.split('\n')) {
-    if (line.startsWith('+++ b/')) {
-      files.push(line.slice(6))
-    }
-  }
-  return files
-}
 
 export class ComplexityAgent extends BaseAgent {
   readonly toolKey = 'lizard' as const
@@ -52,11 +43,19 @@ Additional rules:
       return super.run(input, signal)
     }
 
+    // WHY -C only when complexityThreshold is explicitly configured: lizard's own default (15)
+    // already matches this agent's systemPrompt description of "high" complexity -- only override
+    // it when the user opted into a custom value via ai-review.config.json.
+    const args =
+      this.config.complexityThreshold !== undefined
+        ? [...files, '-C', String(this.config.complexityThreshold)]
+        : files
+
     // WHY pass projectPath as cwd: files are paths relative to the reviewed project, not this
     // process's own cwd -- without it, lizard silently resolved them against the wrong directory
     // whenever the caller pointed elsewhere (CLI --dir, MCP repo_path). Same bug already fixed
     // for SecretsAgent/DependenciesAgent's gitleaks/npm-audit calls.
-    const lizardOutput = await runTool('lizard', files, undefined, false, input.projectPath ?? '.')
+    const lizardOutput = await runTool('lizard', args, undefined, false, input.projectPath ?? '.')
     if (lizardOutput === null) {
       // lizard not found — LLM receives plain diff
       this.lastToolAvailability = 'unavailable-llm-fallback'

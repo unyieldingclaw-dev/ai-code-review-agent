@@ -18,7 +18,6 @@ export interface ReviewConfig {
   sanitize: boolean
   contextBudgetChars: number
   contextMode?: 'static' | 'semantic'
-  preferredSecretsScanner?: 'gitleaks' | 'trufflehog' | 'none'
   complexityThreshold?: number
   failFast: boolean
   failOn: FailOnLevel

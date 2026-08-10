@@ -20,7 +20,7 @@ lineage: []
 
 ## Current Focus
 
-**Full-codebase audit + fix effort, batches 1-2 of 5 landed (2026-08-10, in progress)**: continuation
+**Full-codebase audit + fix effort, batches 1-3 of 5 landed (2026-08-10, in progress)**: continuation
 of the 2026-08-06/07 work below. Session arc: (1) implemented the 3 fixes left in the prior
 session's handoff — `license.ts`'s prompt-template hallucination bait (same bug class as
 `dependencies.ts`'s historical fix, commit `9e0bc29`: replaced a concrete `"line":14` example and
@@ -109,17 +109,23 @@ of a separate reliability problem in ACR's own LLM judgment (see progress.md's "
 findings" entry) — deliberately NOT folded into this batch; user explicitly deferred scoping it
 until all 5 batches are done. 473 unit tests passing (up from 461).
 
-**Remaining batches, not yet started**: Batch 3 (dead code / config cleanup —
-`complexity.ts` reimplements `extractChangedFiles` instead of importing the canonical
-`policyFilter.ts` version; delete unused `adapters/github.ts` + test; remove
-`preferredSecretsScanner`, wire up `complexityThreshold` via lizard's `-C`/`-w` flags; name the
-`orchestrator.ts` `<=5` line-proximity magic number copy-pasted 4x; remove `OrchestratorAgent`'s
-unused `LLMProvider` constructor param; remove dead `ContextMetadata` interface in
-`contextLoader.ts`). Batch 4 (derive `cli/formatter.ts`'s `TOOL_LABELS` and `mcp/server.ts`'s
-hardcoded agent-list description from schema/config instead of hand-maintained duplicates). Batch 5
-(previously-deferred-but-approved items: semantic-embedding-call caching in `contextLoader.ts`/
-`embedder.ts`; stop asking `complexity.ts`/`observability.ts` to generate `severity:"low"` findings
-that `applyPublicationFilter` discards anyway).
+**Batch 3 (dead code / config cleanup) — not yet committed.** `complexity.ts` now uses the
+canonical `extractChangedFiles` (excludes `/dev/null` deletions, dedupes) instead of a local
+reimplementation. Deleted the unused GitHub PR-comment adapter + its test (270 lines, confirmed
+zero live references). Removed the dead `ContextMetadata` interface. Removed the no-op
+`preferredSecretsScanner` config field; wired up `complexityThreshold` for real via lizard's `-C`
+flag (verified the flag directly rather than trusting the README's stale "default: 10" — lizard's
+real default is 15, corrected). Named the `<=5` line-proximity magic number as
+`SAME_LOCATION_LINE_PROXIMITY`. Removed `OrchestratorAgent`'s unused `LLMProvider` constructor
+param (~40 call sites updated across production code, calibration script, and 3 test files). 464
+unit tests passing (net -9 from deleting `adapters/github.test.ts`'s 9 tests, +5 new regression
+tests added: complexity.ts dev/null exclusion + `-C` threshold wiring, both directions).
+
+**Remaining batches, not yet started**: Batch 4 (derive `TOOL_LABELS`/MCP agent-list description
+from schema instead of hand-maintained duplicates). Batch 5 (previously-approved-but-unimplemented
+items: semantic-embedding-call caching in `contextLoader.ts`/`embedder.ts`; stop asking
+`complexity.ts`/`observability.ts` to generate `severity:"low"` findings that
+`applyPublicationFilter` discards anyway).
 
 ---
 
