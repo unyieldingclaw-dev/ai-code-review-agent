@@ -90,8 +90,29 @@ list` before excluding rather than deleting it (may still be someone's reference
     over in those test files once the arg was gone.
   - README's config example JSON updated to match (dropped `preferredSecretsScanner`, corrected
     `complexityThreshold`'s documented default).
-- [ ] Batch 4/5: derive `TOOL_LABELS`/MCP agent-list description from schema instead of
-      hand-maintained duplicates
+- [x] Batch 4/5: drift-prevention.
+  - `cli/formatter.ts`'s `TOOL_LABELS` used to be keyed by an independently hand-typed literal
+    union (`'gitleaks' | 'npmAudit' | 'lizard'`), and `degradedTools` re-typed the same 3 keys a
+    second time as a literal array -- two places that could silently drift apart if a new tool
+    integration were added to the schema and one site forgot to update. `TOOL_LABELS` is now typed
+    `Record<keyof ToolAvailabilityMetadata, string>` (schema.ts's own type), so adding a key to the
+    schema now forces a compile error here until a label is added; `degradedTools` derives its
+    iteration list from `Object.keys(TOOL_LABELS)` instead of a second literal array.
+  - `mcp/server.ts`'s tool description hardcoded "Uses 15 specialist agents (security,
+    performance, ... complexity)" as a separate string -- found it had already silently drifted
+    from `DEFAULT_CONFIG.agents`'s real order (same 15 agents, but `coverage` had moved position).
+    Initially just inlined the derivation directly in `server.ts`, but the architecture-review
+    lens correctly pushed back: `server.ts` has top-level side effects (connects a real stdio
+    transport on import via `await server.connect(transport)`), making it untestable without
+    triggering those effects -- so the new derivation logic itself would have shipped with zero
+    coverage, in a batch specifically about preventing silent drift. Extracted the string builder
+    into a new exported `buildToolDescription()` in `mcp/tool.ts` (the existing pure, side-effect-free
+    logic layer) instead, which `server.ts` now imports and calls. Added
+    `tests/unit/mcp/toolDescription.test.ts` as a separate file from the existing `tool.test.ts` --
+    that file globally mocks `core/config.js` (providing only `loadConfig`, not `DEFAULT_CONFIG`),
+    which would have broken `buildToolDescription`'s real `DEFAULT_CONFIG` import if tested there.
+  - 464 unit tests passing (unchanged from Batch 3 -- no new test files, `formatter.ts`'s existing
+    degraded-mode tests cover the refactored `TOOL_LABELS`/`degradedTools` logic unchanged).
 - [ ] Batch 5/5: previously-approved-but-unimplemented items (semantic-embedding caching,
       stop generating discarded low-severity findings)
 

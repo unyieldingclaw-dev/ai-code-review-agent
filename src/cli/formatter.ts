@@ -1,4 +1,4 @@
-import type { ReviewResult, Severity } from '../core/schema.js'
+import type { ReviewResult, Severity, ToolAvailabilityMetadata } from '../core/schema.js'
 export { formatSarif } from './formatters/sarif.js'
 export { formatGithubAnnotations } from './formatters/githubAnnotations.js'
 
@@ -55,12 +55,17 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     lines.push('')
   }
 
-  const TOOL_LABELS: Record<'gitleaks' | 'npmAudit' | 'lizard', string> = {
+  // WHY key off ToolAvailabilityMetadata's own keys instead of a second hand-typed literal union:
+  // this and the array below used to each independently list the same 3 tool keys, which could
+  // silently drift apart (e.g. a new tool integration added to the schema but forgotten here).
+  // Deriving the iteration list from this object's own keys means there's exactly one place that
+  // enumerates them.
+  const TOOL_LABELS: Record<keyof ToolAvailabilityMetadata, string> = {
     gitleaks: 'gitleaks',
     npmAudit: 'npm audit',
     lizard: 'lizard',
   }
-  const degradedTools = (['gitleaks', 'npmAudit', 'lizard'] as const).filter(
+  const degradedTools = (Object.keys(TOOL_LABELS) as (keyof ToolAvailabilityMetadata)[]).filter(
     (t) => result.toolAvailability?.[t] === 'unavailable-llm-fallback'
   )
   if (degradedTools.length > 0) {

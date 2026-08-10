@@ -19,7 +19,7 @@ import {
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js'
-import { runReviewTool } from './tool.js'
+import { runReviewTool, buildToolDescription } from './tool.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8')) as {
@@ -32,13 +32,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'review_diff',
-      description:
-        'Run the AI code review swarm on the current git diff. ' +
-        'Uses 15 specialist agents (security, performance, correctness, design, ' +
-        'dependencies, adversarial, integration, breaking-change, license, coverage, ' +
-        'error-handling, observability, migration-safety, secrets, complexity) ' +
-        'powered by Ollama locally — no API costs, fully offline. ' +
-        'Returns a markdown summary with full detail for critical/high findings.',
+      // WHY derive from DEFAULT_CONFIG (via tool.ts's buildToolDescription) instead of hand-typing
+      // it here: this used to be a separately hardcoded string that had already drifted from
+      // DEFAULT_CONFIG.agents's real order (both listed the same 15 agents, but "coverage" had
+      // silently moved). Deriving it means this description can no longer describe an agent list
+      // that doesn't actually run.
+      description: buildToolDescription(),
       inputSchema: {
         type: 'object',
         properties: {

@@ -2,11 +2,23 @@
 import { spawnSync } from 'child_process'
 import { resolve } from 'path'
 import { SwarmRunner } from '../core/runner.js'
-import { loadConfig } from '../core/config.js'
+import { loadConfig, DEFAULT_CONFIG } from '../core/config.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
 import { formatMcpOutput } from './formatter.js'
 import { isPathWithin } from '../core/filePath.js'
 import type { AgentName } from '../core/schema.js'
+
+// WHY here and not inline in server.ts: server.ts has top-level side effects (connects a real
+// stdio transport on import), which makes it unsafe to import from a test. This pure string
+// builder lives in tool.ts instead so it can be unit-tested without triggering those side effects.
+export function buildToolDescription(): string {
+  return (
+    'Run the AI code review swarm on the current git diff. ' +
+    `Uses ${DEFAULT_CONFIG.agents.length} specialist agents (${DEFAULT_CONFIG.agents.join(', ')}) ` +
+    'powered by Ollama locally — no API costs, fully offline. ' +
+    'Returns a markdown summary with full detail for critical/high findings.'
+  )
+}
 
 // testgen writes files to disk — never run it in the MCP context.
 // WHY: Chat tools should not write to the project without explicit user intent.

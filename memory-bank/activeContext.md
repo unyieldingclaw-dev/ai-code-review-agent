@@ -20,7 +20,7 @@ lineage: []
 
 ## Current Focus
 
-**Full-codebase audit + fix effort, batches 1-3 of 5 landed (2026-08-10, in progress)**: continuation
+**Full-codebase audit + fix effort, batches 1-4 of 5 landed (2026-08-10, in progress)**: continuation
 of the 2026-08-06/07 work below. Session arc: (1) implemented the 3 fixes left in the prior
 session's handoff — `license.ts`'s prompt-template hallucination bait (same bug class as
 `dependencies.ts`'s historical fix, commit `9e0bc29`: replaced a concrete `"line":14` example and
@@ -109,7 +109,7 @@ of a separate reliability problem in ACR's own LLM judgment (see progress.md's "
 findings" entry) — deliberately NOT folded into this batch; user explicitly deferred scoping it
 until all 5 batches are done. 473 unit tests passing (up from 461).
 
-**Batch 3 (dead code / config cleanup) — not yet committed.** `complexity.ts` now uses the
+**Batch 3 (dead code / config cleanup) — committed `f4d3430`, pushed.** `complexity.ts` now uses the
 canonical `extractChangedFiles` (excludes `/dev/null` deletions, dedupes) instead of a local
 reimplementation. Deleted the unused GitHub PR-comment adapter + its test (270 lines, confirmed
 zero live references). Removed the dead `ContextMetadata` interface. Removed the no-op
@@ -121,8 +121,21 @@ param (~40 call sites updated across production code, calibration script, and 3 
 unit tests passing (net -9 from deleting `adapters/github.test.ts`'s 9 tests, +5 new regression
 tests added: complexity.ts dev/null exclusion + `-C` threshold wiring, both directions).
 
-**Remaining batches, not yet started**: Batch 4 (derive `TOOL_LABELS`/MCP agent-list description
-from schema instead of hand-maintained duplicates). Batch 5 (previously-approved-but-unimplemented
+**Batch 4 (drift-prevention) — not yet committed.** `cli/formatter.ts`'s `TOOL_LABELS` was
+independently hand-typed against a separate literal union, and `degradedTools` re-typed the same 3
+keys a second time as a literal array — now `TOOL_LABELS` is typed `Record<keyof
+ToolAvailabilityMetadata, string>` (forces a compile error if the schema gains a key this doesn't
+label) and `degradedTools` derives from `Object.keys(TOOL_LABELS)`. `mcp/server.ts`'s tool
+description hardcoded a 15-agent list that had already silently drifted from `DEFAULT_CONFIG.agents`
+(same 15 agents, `coverage` had moved position). `server.ts` has top-level side effects (connects a
+real stdio transport on import) so it can't be safely unit-tested — extracted the derivation into a
+new exported `buildToolDescription()` in `mcp/tool.ts` (the existing side-effect-free logic layer)
+instead of inlining it in `server.ts`, so this drift-prevention batch's own new logic doesn't ship
+untested. New `tests/unit/mcp/toolDescription.test.ts` (separate file — `tool.test.ts` globally
+mocks `core/config.js` without `DEFAULT_CONFIG`, which would've broken this). 466 unit tests
+passing (up from 464).
+
+**Remaining batches, not yet started**: Batch 5 (previously-approved-but-unimplemented
 items: semantic-embedding-call caching in `contextLoader.ts`/`embedder.ts`; stop asking
 `complexity.ts`/`observability.ts` to generate `severity:"low"` findings that
 `applyPublicationFilter` discards anyway).
