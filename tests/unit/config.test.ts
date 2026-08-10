@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { loadConfig, DEFAULT_CONFIG } from '../../src/core/config.js'
 import { writeFileSync, unlinkSync } from 'fs'
 
@@ -55,6 +55,17 @@ describe('loadConfig', () => {
     try {
       const config = loadConfig(process.cwd())
       expect(config.model).toBe('devstral:latest')
+    } finally {
+      unlinkSync('ai-review.config.json')
+    }
+  })
+
+  it('logs a warning when falling back to defaults due to invalid JSON', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    writeFileSync('ai-review.config.json', '{ not valid json }')
+    try {
+      loadConfig(process.cwd())
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('ai-review.config.json'))
     } finally {
       unlinkSync('ai-review.config.json')
     }

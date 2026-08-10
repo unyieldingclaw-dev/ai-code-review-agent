@@ -106,6 +106,30 @@ describe('runTool', () => {
     )
   })
 
+  it('logs stderr when the process exits nonzero with no stdout (installed but broken)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const proc = fakeProcess()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockSpawn.mockReturnValue(proc as any)
+    const promise = runTool('gitleaks', ['detect'])
+    proc.stderr.emit('data', Buffer.from('panic: bad config\n'))
+    proc.emit('close', 1)
+    await expect(promise).resolves.toBeNull()
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('panic: bad config'))
+  })
+
+  it('does not log when the process exits nonzero but still produced stdout', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const proc = fakeProcess()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockSpawn.mockReturnValue(proc as any)
+    const promise = runTool('npm', ['audit', '--json'])
+    proc.stdout.emit('data', Buffer.from('{"vulnerabilities":{}}'))
+    proc.emit('close', 1) // npm audit exits nonzero when it finds vulnerabilities -- not a failure
+    await expect(promise).resolves.toBe('{"vulnerabilities":{}}')
+    expect(errorSpy).not.toHaveBeenCalled()
+  })
+
   it('defaults cwd to undefined (process cwd) when not provided', async () => {
     const proc = fakeProcess()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

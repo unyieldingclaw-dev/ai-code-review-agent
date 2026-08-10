@@ -39,11 +39,22 @@ export function parseNpmAuditOutput(json: string, agentName: AgentName): Finding
   let report: NpmAuditReport
   try {
     report = JSON.parse(json)
-  } catch {
+  } catch (err) {
+    // WHY log here: DependenciesAgent treats any non-null runTool output as "npm audit ran" and
+    // reports toolAvailability 'used' -- a malformed response silently mapping to [] would report
+    // "0 vulnerabilities found, tool used", a false sense of security with zero trace anywhere.
+    console.error(
+      `[npmAuditParser] failed to parse npm audit JSON output: ${(err as Error).message}`
+    )
     return []
   }
   const vulnerabilities = report.vulnerabilities
-  if (!vulnerabilities || typeof vulnerabilities !== 'object') return []
+  if (!vulnerabilities || typeof vulnerabilities !== 'object') {
+    console.error(
+      '[npmAuditParser] unexpected npm audit output shape (missing/invalid vulnerabilities key) -- treating as no findings'
+    )
+    return []
+  }
 
   const findings: Finding[] = []
   let i = 0

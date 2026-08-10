@@ -99,7 +99,10 @@ export function loadConfig(projectPath: string): ReviewConfig {
     const raw = readFileSync(configPath, 'utf-8')
     const partial = JSON.parse(raw) as Partial<ReviewConfig>
     return { ...DEFAULT_CONFIG, ...partial }
-  } catch {
+  } catch (err) {
+    console.error(
+      `[config] failed to parse ${configPath}, falling back to defaults: ${(err as Error).message}`
+    )
     return { ...DEFAULT_CONFIG }
   }
 }

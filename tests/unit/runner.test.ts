@@ -876,7 +876,7 @@ describe('SwarmRunner coverage-gap path defense (path traversal via --write-test
         // First call: coverage agent. Second call: TestGen generating the test file content.
         if (callIndex === 1) return Promise.resolve(coverageResponse)
         return Promise.resolve(
-          'generated test file content that is long enough to pass the min-length check'
+          'describe("foo", () => { it("does something", () => { /* generated test body */ }) })'
         )
       }),
       ping: vi.fn().mockResolvedValue({ ok: true }),
@@ -966,7 +966,7 @@ describe('SwarmRunner coverage-gap path defense (path traversal via --write-test
         callIndex++
         if (callIndex === 1) return Promise.resolve(coverageResponse)
         return Promise.resolve(
-          'generated test file content that is long enough to pass the min-length check'
+          'describe("foo", () => { it("does something", () => { /* generated test body */ }) })'
         )
       }),
       ping: vi.fn().mockResolvedValue({ ok: true }),

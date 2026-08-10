@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'fs'
 import { parseGitleaksOutput } from '../../src/core/gitleaksParser.js'
 
@@ -37,5 +37,19 @@ describe('parseGitleaksOutput', () => {
   it('returns an empty array when the parsed JSON is not an array', () => {
     const findings = parseGitleaksOutput('{"unexpected": "shape"}', 'secrets')
     expect(findings).toEqual([])
+  })
+
+  it('logs an error for malformed JSON instead of failing silently', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    parseGitleaksOutput('not json at all', 'secrets')
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('failed to parse gitleaks'))
+  })
+
+  it('logs an error when the parsed JSON is not an array', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    parseGitleaksOutput('{"unexpected": "shape"}', 'secrets')
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unexpected gitleaks output shape')
+    )
   })
 })

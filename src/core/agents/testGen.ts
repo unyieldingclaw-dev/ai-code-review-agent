@@ -67,6 +67,24 @@ Tests must: import the module under test, cover the happy path, cover the error/
     const content = raw.replace(/```[a-z]*\s*/gi, '').trim()
     if (!content || content.length < 50) return null
 
+    // WHY check for test-framework structure, not just length: the prompt asks for code only,
+    // but a long enough refusal or explanation ("I can't generate this because...") passes a pure
+    // length check and would get written to disk as if it were real, runnable test code. WHY
+    // require a quoted title right after the call (not just "it(" / "test(" anywhere): "it"/"test"
+    // are common English words -- prose like "explain it (the reasoning) here" matched a looser
+    // `it\s*\(` check. Every real describe/it/test call takes a quoted title as its first
+    // argument, which prose parentheticals don't.
+    const looksLikeTestCode =
+      framework === 'pytest'
+        ? /\bdef\s+test_/.test(content)
+        : /\b(describe|it|test)\(\s*['"`]/.test(content)
+    if (!looksLikeTestCode) {
+      console.error(
+        `[testGen] discarding generated content for ${sourceFile} -- doesn't look like ${framework} test code`
+      )
+      return null
+    }
+
     const testPath = this.deriveTestPath(sourceFile, framework)
     return { path: testPath, content, framework }
   }
