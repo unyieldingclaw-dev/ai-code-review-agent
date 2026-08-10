@@ -20,7 +20,7 @@ lineage: []
 
 ## Current Focus
 
-**Full-codebase audit + fix effort, batch 1 of 5 landed (2026-08-10, in progress)**: continuation
+**Full-codebase audit + fix effort, batches 1-2 of 5 landed (2026-08-10, in progress)**: continuation
 of the 2026-08-06/07 work below. Session arc: (1) implemented the 3 fixes left in the prior
 session's handoff — `license.ts`'s prompt-template hallucination bait (same bug class as
 `dependencies.ts`'s historical fix, commit `9e0bc29`: replaced a concrete `"line":14` example and
@@ -93,12 +93,23 @@ subagent review — both rounds found real issues before commit (a missed contai
 duplication between `cli/index.ts` and `mcp/tool.ts`, the coverage-gap-drop reporting gap, an
 orphaned comment left over from the `filePath.ts` extraction).
 
-**Remaining batches, not yet started**: Batch 2 (silent-failure observability — `shell.ts` discards
-stderr with no logging, conflating "tool not installed" with "tool installed but broken";
-`config.ts` silently falls back to defaults on malformed `ai-review.config.json`;
-`gitleaksParser.ts`/`npmAuditParser.ts` silently return `[]` on malformed tool JSON, a false sense
-of security specifically for the secrets scanner; `TestGenAgent`'s only safeguard against
-fabricated generated test code is a length check). Batch 3 (dead code / config cleanup —
+**Batch 2 (silent-failure observability) — committed `caa5368`/`e650a8b`, pushed.** `shell.ts` logs
+stderr when a tool exits nonzero with empty stdout (previously indistinguishable from "not
+installed", both resolved `null` silently). `config.ts` logs before falling back to defaults on
+malformed `ai-review.config.json`. `gitleaksParser.ts`/`npmAuditParser.ts` log on malformed tool
+JSON (previously silently reported "0 findings, tool used" — dangerous specifically for the
+secrets scanner). `TestGenAgent` now requires generated content to structurally look like real test
+code (quoted-title `describe(`/`it(`/`test(`, or `def test_` for pytest), not just pass a length
+threshold. Excluded a stale leftover `.claude/worktrees/**` isolated-agent checkout from
+`vitest.config.ts`'s glob — it was racing the real suite on shared temp paths. Full `/code-review` +
+`/change-review` both run before commit/push; caught and fixed one real regex false-positive-accept
+bug in the testGen safeguard itself, plus 2 Low test-coverage gaps fixed in an immediate follow-up
+per explicit instruction. `/change-review`'s ACR security job also surfaced a live, concrete example
+of a separate reliability problem in ACR's own LLM judgment (see progress.md's "ACR reliability
+findings" entry) — deliberately NOT folded into this batch; user explicitly deferred scoping it
+until all 5 batches are done. 473 unit tests passing (up from 461).
+
+**Remaining batches, not yet started**: Batch 3 (dead code / config cleanup —
 `complexity.ts` reimplements `extractChangedFiles` instead of importing the canonical
 `policyFilter.ts` version; delete unused `adapters/github.ts` + test; remove
 `preferredSecretsScanner`, wire up `complexityThreshold` via lizard's `-C`/`-w` flags; name the

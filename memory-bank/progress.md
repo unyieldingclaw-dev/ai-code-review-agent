@@ -31,8 +31,39 @@ lineage: []
       re-verified and corrected before reporting
 - [x] Batch 1/5: path traversal (`--write-tests`), `base.ts` Stage 2+3 parsing gap, MCP
       `repo_path` scoping — commit `85e3e1c`, 461 tests passing
-- [ ] Batch 2/5: silent-failure observability (`shell.ts`, `config.ts`, gitleaks/npm-audit
-      parsers, `TestGenAgent` validation)
+- [x] Batch 2/5: silent-failure observability — commits `caa5368`/`e650a8b`, pushed, 473 tests
+      passing. `shell.ts` logs stderr when a tool exits nonzero with empty stdout (distinguishes
+      "not installed" from "installed but broken", previously both resolved `null` identically).
+      `config.ts` logs before falling back to defaults on malformed `ai-review.config.json`.
+      `gitleaksParser.ts`/`npmAuditParser.ts` log on malformed tool JSON — previously silently
+      reported "0 findings, tool used", a false sense of security specifically dangerous for the
+      secrets scanner since `SecretsAgent`/`DependenciesAgent` set `toolAvailability: 'used'` on
+      any non-null output regardless of parse success. `TestGenAgent` now checks generated content
+      for actual test-framework structure (`describe(`/`it(`/`test(` with a quoted title, or
+      `def test_` for pytest), not just a length threshold — a long refusal/explanation from the
+      model would previously pass the length check and get written to disk as real tests. Also
+      excluded `.claude/worktrees/**` from `vitest.config.ts`'s test glob — a leftover isolated-
+      agent worktree (`fervent-kalam-3c236c`, detached HEAD at a stale July 25 commit) was being
+      picked up and run in parallel with the real suite, racing on shared absolute temp paths and
+      producing spurious failures unrelated to any code change; investigated via `git worktree
+      list` before excluding rather than deleting it (may still be someone's reference).
+      Went through full `/code-review` (5 lenses + opponent check): caught and fixed one real
+      issue before commit — the `testGen.ts` structural check's first regex
+      (`/\b(describe|it|test)\s*\(/`) could false-positive-accept prose containing "it (" as a
+      parenthetical (e.g. "explain it (the reasoning) here"), defeating the check's own purpose;
+      tightened to require a quoted title immediately after the call
+      (`/\b(describe|it|test)\(\s*['"` + "`" + `]/`), verified independently by the opponent-check
+      agent against both the false-positive case and real test code. Also ran full `/change-review`
+      (9 jobs) before push: flagged 2 Low test-coverage gaps (gitleaks clean-scan and config
+      valid-merge didn't assert non-logging, unlike the equivalent npm-audit/shell.ts cases from
+      the same batch) — fixed in the immediate follow-up commit `e650a8b` per explicit user
+      instruction ("fix all found issues, new + pre existing"). Job 7 (security) ran ACR's
+      security profile (npm-installed `v1.9.0`) against the branch diff and flagged
+      `resolveWriteTestPath` (Batch 1's own path-traversal fix) as introducing path traversal —
+      independently verified false positive by reading the actual containment-check code
+      (`resolve()` + `isPathWithin()`, returns `null` on escape, caller correctly refuses to write).
+      This became the first concrete example for a separate, not-yet-scoped conversation about
+      ACR's own reliability — see "ACR reliability findings" note below.
 - [ ] Batch 3/5: dead code / config cleanup (`complexity.ts`'s duplicate `extractChangedFiles`,
       delete `adapters/github.ts`, remove `preferredSecretsScanner`, wire up
       `complexityThreshold` via lizard's `-C`/`-w` flags, orchestrator magic number + unused
@@ -41,6 +72,56 @@ lineage: []
       hand-maintained duplicates
 - [ ] Batch 5/5: previously-approved-but-unimplemented items (semantic-embedding caching,
       stop generating discarded low-severity findings)
+
+### ACR reliability findings — reported 2026-08-10, NOT YET SCOPED
+
+User forwarded a consolidated report from two independent ACR runs against an identical real-world
+diff (Personal-Memory-Bank's concurrent-session-claims feature, ~8000 lines) — a dogfooding
+reliability test of this tool's own output quality, not a review of this repo. Five items, checked
+individually against this codebase rather than accepted at face value:
+
+1. **Nondeterminism across runs on identical input** (9 vs 10 findings, one run had a coverage
+   timeout + dependencies retry-exhaustion). Known, accepted category — inherent to local-LLM
+   inference reliability, already has partial mitigation (`retryAttempts`, `timeoutScalingEnabled`,
+   `agentStatus` visibility so failures are reported, not silently clean). Not a target for any
+   current or planned batch.
+2. **Item 5 (schema "nothing to report" gap) does not hold once checked.** There IS a tested clean
+   `[]` path — `dependencies-clean`/`license-clean` calibration cases (`expectEmpty: true`) confirm
+   it works when the model complies. The described "rejected nothing-here response" means the model
+   returned something other than `[]` despite the prompt saying to — model non-compliance, not a
+   schema gap. Loosening the schema to accept it was explicitly considered and rejected on
+   2026-08-03 (reverts a deliberate anti-hallucination safety property tested in
+   `tests/unit/baseAgent.test.ts`).
+3. **Item 2's specific "fabricated GPL/mongodb license finding" traces to a real, already-fixed bug**
+   — commit `a906515` (2026-08-09) removed the exact "package.json:14"+"MongoDB" bait from
+   `licenseCompliance.ts`'s prompt in response to this same pattern, shipped in npm `v1.9.0`. But it
+   was prompt-only (license has no deterministic-tool replacement, unlike dependencies' npm-audit)
+   — prompt-tightening alone is documented as NOT reliably eliminating hallucination (adversarial:
+   3/3→3/3, no measurable improvement, 2026-08-06 entry). `orchestrator.ts`'s
+   `filterNonexistentFiles` (live since 2026-08-03, agent-agnostic) should catch a finding citing a
+   file genuinely absent from the diff — if this specific finding survived to final output despite
+   that, it's either a stale-build artifact or a real regression. **Unresolved**: needs the raw
+   finding's exact file/line/text and `ai-review-agent --version` used to tell which.
+4. **Items 2, 3 ("quotes-own-disproof": findings citing evidence that directly contradicts the
+   claim, e.g. flagging a `shift`-based fix as the unbound-variable bug it fixes) and 4 (severity
+   miscalibration: "new hook added" labeled Critical/Blocking) collapse into ONE real, currently
+   unaddressed architectural gap.** Verified directly: `breakingChange.ts`'s prompt already
+   correctly scopes to real incompatibilities (removed exports, signature changes, renames) —
+   "new hook added" matches none of its 9 criteria, so the mislabel isn't a missing prompt rule,
+   it's the model not checking its own conclusion against its own stated criteria or the evidence
+   it quotes. **No existing defense checks this** — `filterNonexistentFiles` checks file existence,
+   `hallucinationCrossCheck` checks cross-agent corroboration; neither verifies reasoning against
+   evidence. Not touched by Batch 1, Batch 2, or anything currently planned.
+5. **Live first-party confirmation of the same failure mode**, caught during this session's own
+   `/change-review` Job 7: ACR's security profile (npm `v1.9.0`) flagged `resolveWriteTestPath`
+   (Batch 1's own path-traversal fix) as introducing path traversal, citing the exact containment
+   check that prevents it. Verified false positive by reading `resolve()`+`isPathWithin()` directly.
+
+**Status**: user explicitly deferred scoping this until all 5 batches of the current audit-fix
+effort are complete ("finish up Batch 2. When there is no more Batch work, then we should address
+scoping the late brought issues.") — do not start on item 4's gap (evidence-grounding
+verification) until then; it needs its own Task Contract given the size (a new verification-pass
+architecture, not a quick prompt tweak).
 
 ## ✅ Completed (Tasks 1–16)
 
