@@ -1,11 +1,18 @@
 // tests/unit/runner.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { runTool } from '../../src/utils/shell.js'
+import { embed } from '../../src/core/embedder.js'
 
 vi.mock('../../src/utils/shell.js', () => ({
   runTool: vi.fn(),
 }))
 const mockRunTool = vi.mocked(runTool)
+
+vi.mock('../../src/core/embedder.js', () => ({
+  embed: vi.fn(),
+  cosineSimilarity: vi.fn().mockReturnValue(0.5),
+}))
+const mockEmbed = vi.mocked(embed)
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -705,6 +712,66 @@ describe('SwarmRunner memory-bank context sanitization', () => {
     expect(result.sanitizer?.redactedLines).toBeGreaterThan(0)
     expect(result.sanitizer?.warnings.some((w) => w.includes('memory-bank context'))).toBe(true)
     warnSpy.mockRestore()
+  })
+})
+
+describe('SwarmRunner semantic context caching', () => {
+  const TMP = join(process.cwd(), '.test-runner-semantic-tmp')
+
+  beforeEach(() => {
+    mkdirSync(join(TMP, 'memory-bank'), { recursive: true })
+    writeFileSync(join(TMP, 'memory-bank', 'techContext.md'), 'Tech stack notes.', 'utf-8')
+    mockEmbed.mockResolvedValue([1, 0, 0])
+  })
+  afterEach(() => {
+    if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true })
+  })
+
+  it('computes the semantic embedding once per run, not once per agent', async () => {
+    // loadAgentContextSemantic takes no agentName param -- its result is identical for every
+    // agent in a run (same diff, same memory-bank files). Before caching, withContext (called
+    // once per agent) recomputed it from scratch every time: 1 diff embed + 1 embed per existing
+    // memory-bank file, repeated per agent. With only techContext.md present, one computation is
+    // exactly 2 embed() calls (diff + that file) -- with 3 agents configured, that should still be
+    // 2 total, not 6.
+    const provider = makeProvider()
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'performance', 'correctness'] as AgentName[],
+      contextMode: 'semantic' as const,
+    }
+    const runner = new SwarmRunner(config, provider)
+
+    await runner.run({ diff: 'diff', projectPath: TMP }, undefined, 'memory-bank')
+
+    expect(mockEmbed).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not permanently cache a rejected context load -- a later agent still gets a real attempt', async () => {
+    // ??= only reassigns when the cached variable is null -- a rejected promise is not null, so
+    // without an explicit reset on failure, one transient embedding error would poison every
+    // later agent in the run with the same cached rejection instead of each getting its own shot.
+    let callCount = 0
+    mockEmbed.mockImplementation(() => {
+      callCount++
+      return callCount === 1
+        ? Promise.reject(new Error('transient Ollama error'))
+        : Promise.resolve([1, 0, 0])
+    })
+    const provider = makeProvider()
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'performance'] as AgentName[],
+      contextMode: 'semantic' as const,
+      retryAttempts: 1,
+    }
+    const runner = new SwarmRunner(config, provider)
+
+    await runner.run({ diff: 'diff', projectPath: TMP }, undefined, 'memory-bank')
+
+    // If the rejection had stayed cached, the second agent's context load would never call
+    // embed() again at all -- confirms it got a fresh attempt instead of an instant cached failure.
+    expect(callCount).toBeGreaterThan(1)
   })
 })
 

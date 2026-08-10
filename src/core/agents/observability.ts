@@ -21,7 +21,6 @@ Focus on: error paths, branching logic, state mutations (writes/deletes/status c
 
 severity: "high" for error paths or service boundaries with no logging
 severity: "medium" for missing logs on state changes or branching logic
-severity: "low" for minor observability gaps in non-critical code paths
 
 Output ONLY a JSON array of findings. No prose, no explanation, no markdown fences. Empty array if no issues.
 Required format:
@@ -30,6 +29,7 @@ Required format:
 Additional rules:
 - evidence: quote the specific diff line(s) that triggered this finding
 - recommendation: write corrected code, not just a description
-- blocking: true for critical/high, false for medium/low`
+- blocking: true for critical/high, false for medium/low
+- Only report severity >= medium -- low-severity findings are discarded before publication, so generating them wastes time`
   }
 }

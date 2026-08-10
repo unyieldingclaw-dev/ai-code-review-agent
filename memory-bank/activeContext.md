@@ -20,7 +20,7 @@ lineage: []
 
 ## Current Focus
 
-**Full-codebase audit + fix effort, batches 1-4 of 5 landed (2026-08-10, in progress)**: continuation
+**Full-codebase audit + fix effort, all 5 batches landed (2026-08-10)**: continuation
 of the 2026-08-06/07 work below. Session arc: (1) implemented the 3 fixes left in the prior
 session's handoff — `license.ts`'s prompt-template hallucination bait (same bug class as
 `dependencies.ts`'s historical fix, commit `9e0bc29`: replaced a concrete `"line":14` example and
@@ -121,7 +121,7 @@ param (~40 call sites updated across production code, calibration script, and 3 
 unit tests passing (net -9 from deleting `adapters/github.test.ts`'s 9 tests, +5 new regression
 tests added: complexity.ts dev/null exclusion + `-C` threshold wiring, both directions).
 
-**Batch 4 (drift-prevention) — not yet committed.** `cli/formatter.ts`'s `TOOL_LABELS` was
+**Batch 4 (drift-prevention) — committed `e7e35a4`, pushed.** `cli/formatter.ts`'s `TOOL_LABELS` was
 independently hand-typed against a separate literal union, and `degradedTools` re-typed the same 3
 keys a second time as a literal array — now `TOOL_LABELS` is typed `Record<keyof
 ToolAvailabilityMetadata, string>` (forces a compile error if the schema gains a key this doesn't
@@ -134,6 +134,30 @@ instead of inlining it in `server.ts`, so this drift-prevention batch's own new 
 untested. New `tests/unit/mcp/toolDescription.test.ts` (separate file — `tool.test.ts` globally
 mocks `core/config.js` without `DEFAULT_CONFIG`, which would've broken this). 466 unit tests
 passing (up from 464).
+
+**Batch 5 (previously-deferred performance/waste items) — not yet committed, final batch of this
+effort.** `loadAgentContextSemantic` takes no `agentName` param — its result is identical for
+every agent in a run (same diff, same memory-bank files) — but `runner.ts`'s `withContext` closure
+called it fresh once per agent (up to ~16x), recomputing the same diff/file embeddings via Ollama
+every time for an identical result. Fixed by caching the `Promise<ContextResult>` in a `let`
+scoped to the closure, assigned via `??=` before awaiting — deduplicates concurrent calls under
+`--parallel` too, since the assignment happens synchronously before any agent's `await`. Added a
+real regression test and verified it actually catches the regression (temporarily reverted the fix,
+confirmed the test fails with 6 calls instead of 2 for a 3-agent run), not just written on faith.
+The bug-scan review lens then caught a real bug before commit: `??=` only reassigns when `null`,
+but a rejected promise isn't `null` — a single transient embedding failure would have stayed
+cached forever, poisoning every later agent/retry for the rest of the run and defeating
+`retryAttempts` for this failure mode entirely. Fixed with `.catch()` resetting the cache to
+`null` before rethrowing; added and verified a second regression test the same way. Separately:
+`complexity.ts`/`observability.ts` both instructed the model to generate
+`severity: "low"` findings that `orchestrator.ts`'s `applyPublicationFilter` unconditionally
+discards before publication — pure wasted generation time. Removed the `"low"` line from both
+prompts, added `Only report severity >= medium` matching `dependencies.ts`'s existing phrasing for
+the same class of instruction; verified no test/calibration fixture depended on a "low" finding
+from either agent first. 468 unit tests passing (up from 466).
+
+**All 5 batches of the full-codebase audit fix effort now complete.** Remaining open item: the
+"ACR reliability findings" note above — user explicitly deferred scoping it until this point.
 
 **Remaining batches, not yet started**: Batch 5 (previously-approved-but-unimplemented
 items: semantic-embedding-call caching in `contextLoader.ts`/`embedder.ts`; stop asking

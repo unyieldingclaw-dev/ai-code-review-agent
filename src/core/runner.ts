@@ -522,17 +522,35 @@ export class SwarmRunner {
     let anyTruncated = false
     let totalTokens = 0
 
+    // WHY cache here: loadAgentContextSemantic takes no agentName param -- its result depends
+    // only on projectPath/diff/ollamaUrl/contextBudgetChars, all identical across every agent in
+    // a single run(). Without caching, withContext is invoked once per agent per retry attempt
+    // (retries included) across every agent in the run, recomputing the same diff embedding and
+    // re-embedding every memory-bank file from scratch each time -- redundant Ollama calls with an
+    // identical result every time. Assigning the promise via ??= before awaiting also correctly
+    // deduplicates concurrent calls under --parallel, not just sequential ones, since the
+    // assignment happens synchronously before any agent's await.
+    let semanticContextPromise: Promise<ContextResult> | null = null
+
     // Helper: build per-agent ReviewInput with optional context prepended
     const withContext = async (agentName: AgentName): Promise<ReviewInput> => {
       if (contextMode !== 'memory-bank' || !input.projectPath) return input
       const ctx: ContextResult =
         this.config.contextMode === 'semantic'
-          ? await loadAgentContextSemantic(
+          ? await (semanticContextPromise ??= loadAgentContextSemantic(
               input.projectPath,
               input.diff,
               this.config.ollamaUrl,
               this.config.contextBudgetChars
-            )
+            ).catch((err: unknown) => {
+              // WHY reset on rejection: ??= only reassigns when the variable is null -- a
+              // rejected promise is not null, so without this it would stay cached forever,
+              // permanently failing every later agent and every retry attempt for the rest of
+              // this run with the same (possibly transient) error instead of getting a fresh
+              // attempt. Caching only pays off for a shared successful result.
+              semanticContextPromise = null
+              throw err
+            }))
           : loadAgentContext(input.projectPath, agentName, this.config.contextBudgetChars)
       if (ctx.filesLoaded.length > 0) {
         allFilesLoaded.push(...ctx.filesLoaded)

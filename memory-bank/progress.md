@@ -111,10 +111,35 @@ list` before excluding rather than deleting it (may still be someone's reference
     `tests/unit/mcp/toolDescription.test.ts` as a separate file from the existing `tool.test.ts` --
     that file globally mocks `core/config.js` (providing only `loadConfig`, not `DEFAULT_CONFIG`),
     which would have broken `buildToolDescription`'s real `DEFAULT_CONFIG` import if tested there.
-  - 464 unit tests passing (unchanged from Batch 3 -- no new test files, `formatter.ts`'s existing
-    degraded-mode tests cover the refactored `TOOL_LABELS`/`degradedTools` logic unchanged).
-- [ ] Batch 5/5: previously-approved-but-unimplemented items (semantic-embedding caching,
-      stop generating discarded low-severity findings)
+  - 466 unit tests passing (up from 464): new `tests/unit/mcp/toolDescription.test.ts`.
+- [x] Batch 5/5: previously-approved-but-unimplemented performance/waste items.
+  - `contextLoader.ts`'s `loadAgentContextSemantic` takes no `agentName` param -- its result
+    depends only on `projectPath`/`diff`/`ollamaUrl`/`contextBudgetChars`, identical across every
+    agent in one run. `runner.ts`'s `withContext` closure (called once per agent, up to ~16x)
+    recomputed it from scratch every time -- redundant Ollama embedding calls (1 diff embed + 1
+    per memory-bank file) with an identical result, every single call. Fixed by caching the
+    `Promise<ContextResult>` in a `let` scoped to the same closure, assigned via `??=` before
+    awaiting -- this correctly deduplicates concurrent calls under `--parallel` too, not just
+    sequential ones, since the assignment happens synchronously before any agent's `await`. Added
+    a real regression test (`tests/unit/runner.test.ts`, "computes the semantic embedding once per
+    run, not once per agent") -- verified it actually catches the regression by temporarily
+    reverting the fix and confirming the test fails (6 calls instead of 2 with 3 agents
+    configured), not just written-and-assumed-correct. The bug-scan review lens then caught a real
+    bug in the caching itself before commit: `??=` only reassigns when the variable is `null`, but
+    a _rejected_ promise isn't `null` -- so a single transient embedding failure would have stayed
+    cached forever, permanently failing every later agent and every retry for the rest of the run
+    with the same error, defeating `retryAttempts` entirely for this failure mode. Fixed with a
+    `.catch()` that resets the cache variable to `null` before rethrowing, so a later
+    agent/retry gets a fresh attempt instead of the poisoned cache. Added a second regression test
+    and verified the same way (confirmed it fails without the reset: both agents fail off one
+    cached rejection instead of the second getting its own attempt).
+  - `complexity.ts`/`observability.ts` both instructed the model to generate `severity: "low"`
+    findings that `orchestrator.ts`'s `applyPublicationFilter` unconditionally discards before
+    publication -- pure wasted generation time. Removed the `severity: "low"` line from both
+    prompts and added `- Only report severity >= medium` to each, matching the exact phrasing
+    convention `dependencies.ts` already established for this same class of instruction. Verified
+    no test or calibration fixture depended on a "low" finding from either agent before removing.
+  - 468 unit tests passing (up from 466).
 
 ### ACR reliability findings — reported 2026-08-10, NOT YET SCOPED
 

@@ -22,7 +22,6 @@ Analyze the diff for functions and methods with high cyclomatic complexity:
 
 severity: "high" for functions exceeding cyclomatic complexity of 15 or with 5+ levels of nesting
 severity: "medium" for functions with complexity 10-15 or 3-4 levels of nesting
-severity: "low" for long functions that could be split but are otherwise clear
 
 Output ONLY a JSON array of findings. No prose, no explanation, no markdown fences. Empty array if no issues.
 Required format:
@@ -33,7 +32,8 @@ Additional rules:
 - evidence: quote the specific function signature or nesting level that triggered this finding
 - recommendation: describe the refactoring approach briefly (1-2 sentences max) — do not write full example code
 - blocking: true for critical/high, false for medium/low
-- source: "llm" by default; "lizard" if complexity metrics from the tool are shown in the input`
+- source: "llm" by default; "lizard" if complexity metrics from the tool are shown in the input
+- Only report severity >= medium -- low-severity findings are discarded before publication, so generating them wastes time`
   }
 
   async run(input: ReviewInput, signal?: AbortSignal): Promise<Finding[]> {
