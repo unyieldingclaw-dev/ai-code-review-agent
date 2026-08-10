@@ -16,9 +16,101 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-06
+**Last Updated**: 2026-08-10
 
 ## Current Focus
+
+**Full-codebase audit + fix effort, batch 1 of 5 landed (2026-08-10, in progress)**: continuation
+of the 2026-08-06/07 work below. Session arc: (1) implemented the 3 fixes left in the prior
+session's handoff — `license.ts`'s prompt-template hallucination bait (same bug class as
+`dependencies.ts`'s historical fix, commit `9e0bc29`: replaced a concrete `"line":14` example and
+a named "MongoDB" SSPL example with generic placeholders), `complexity`/`lizard` degraded-mode
+visibility (`ToolAvailabilityMetadata`/`toolKey` wiring, with corrected wording distinguishing
+lizard's augment-not-replace semantics from gitleaks/npm-audit's replace semantics), and
+`OrchestratorAgent` file-string normalization — which grew mid-review from just `deduplicate()` to
+also cover `hallucinationCrossCheck` (was silently mis-scoring corroborated findings as solo) and
+all three `crossReference` escalation branches (was silently missing escalations), after code
+review caught both as the same bug class in different methods. (2) Merged PR #18, but only after
+fixing two things discovered blocking it: pre-existing prettier drift that had been failing CI
+since before this session started (unrelated docs/memory-bank files), and a real security gap in
+`.github/workflows/review.yml` — the self-hosted runner (`mizzo-local`, required for local Ollama
+access) triggered on every `pull_request` with no fork-origin guard; since the repo is public with
+forking enabled, `npm ci` alone (before the AI-review logic even runs) is enough for a malicious
+fork PR to get arbitrary code execution on the physical runner machine. Fixed with a job-level
+`if: github.event.pull_request.head.repo.full_name == github.repository` guard — same-repo
+branches (including Dependabot's) are unaffected, fork PRs get no automated review, which is the
+right tradeoff for a repo taking no outside contributors. Published npm `v1.9.0` (v1.8.0 had been
+tagged 2026-08-04, before all of this work, and was stale). Installed `lizard` (`pip install
+lizard`) — discovered it has a native `-C <N>`/`--warnings-only` threshold flag, relevant to a
+later decision below. (3) User requested a full read-every-line audit of `src/` (not a diff review)
+against this project's own written standards (`standards/*.md`), explicitly read-only. Ran 6
+parallel review lenses (security, performance, hallucination-risk/LLM-trust, dead code,
+documentation/logging, architecture), then independently re-verified the highest-severity claims
+myself before reporting — caught and corrected one lens's claim that didn't hold up (a `complexity
+.ts`/`policyFilter.ts` `extractChangedFiles` duplication was real, but the specific "`/dev/null`
+reaches lizard" exploit scenario didn't reproduce, since real git diff deletion headers are
+`+++ /dev/null` with no `b/` prefix, which neither implementation's `b/`-prefixed regex would ever
+match — confirmed via a real `git diff --no-index` reproduction, not assumed). Full findings: 1
+High (path traversal, see below), 7 Medium, several Low, plus 2 items already known/approved from
+a 2026-07-25 architecture review but never implemented (semantic-embedding-call redundancy,
+low-severity-finding generation waste). (4) User approved fixing everything in one contract-scoped
+effort (`.claude/contracts/active-task.json`, branch `fix/full-codebase-audit-findings`), organized
+into 5 batches. Two orphaned-config-field decisions were investigated with real git-history digging
+rather than guessed: `src/adapters/github.ts` (PR-comment/step-summary upsert logic) is being
+deleted — confirmed via `git show` on its very first commit that `review.yml` used an inline
+`actions/github-script` implementation from day one, so the adapter was never wired up even once in
+2+ months of history, not orphaned by a later refactor. `preferredSecretsScanner`/
+`complexityThreshold` (two `ReviewConfig` fields, documented in `CHANGELOG.md` as shipped but
+actually no-ops) are being split: `preferredSecretsScanner` (would need a whole new trufflehog
+integration, unverified output format, no evidence of demand) is being removed; `complexityThreshold`
+is being wired up for real, using lizard's native `-C`/`--warnings-only` flags discovered above,
+since `lizard` just landed this session and this makes it a real deterministic filter instead of
+more hardcoded prompt prose.
+
+**Batch 1 (path traversal, base.ts parsing gap, MCP scoping) — committed `85e3e1c`, pushed.**
+Verified, reproduced-not-assumed exploit chain for the High finding: `ai-review.config.json`'s
+`testOutputDir` has zero validation; `CoverageGap[]` (LLM JSON output) bypasses
+`OrchestratorAgent.synthesize()` entirely, so it never gets `Finding[]`'s existing
+changed-file-membership defense; `path.join(projectPath, tf.path)` does not clamp to `projectPath`
+(confirmed directly: `path.join('/a/b', '../../../etc/passwd')` escapes cleanly). Fixed with
+defense in depth: `runner.ts` now filters `CoverageGap[]` against the diff's real changed files
+(new `filterCoverageGaps`, mirroring `filterNonexistentFiles` including structural drop-reporting
+via a new `ReviewResult.coverageGapFilter`, matching the existing `hallucinationFilter` pattern
+exactly), and `cli/index.ts` adds a path-containment backstop (`resolveWriteTestPath`) before any
+`--write-tests` write. Extracted a shared `src/core/filePath.ts` (`normalizeFilePath`/
+`stripDiffPrefix`/`isPathWithin`) so this and the MCP fix don't independently drift — refactored
+`orchestrator.ts` to use it too. Separately: `base.ts`'s Stage 2 JSON-parsing was missing the "at
+least one item must pass schema validation" guard Stage 1 already had (a non-empty-but-all-invalid
+`.findings` array silently resolved to `[]` instead of throwing `ParseFailureError`); Stage 3 had
+the identical bug, found while fixing Stage 2 (any `.findings`-shaped object also contains a
+balanced `[...]` span, so Stage 3 would silently short-circuit before a Stage-2-only fix could ever
+matter) — both fixed. MCP `repo_path` accepted any filesystem path with no scoping (client-supplied,
+in practice populated by whatever LLM is calling the tool, an information-disclosure risk under
+this project's own `standards/AGENTIC-SAFETY.md` threat model); added opt-in
+`AI_REVIEW_ALLOWED_ROOTS` allowlist env var, fail-open (unchanged) when unset. 461 unit tests
+passing (up from 448). Went through two full rounds of independent spec-compliance + code-quality
+subagent review — both rounds found real issues before commit (a missed containment-logic
+duplication between `cli/index.ts` and `mcp/tool.ts`, the coverage-gap-drop reporting gap, an
+orphaned comment left over from the `filePath.ts` extraction).
+
+**Remaining batches, not yet started**: Batch 2 (silent-failure observability — `shell.ts` discards
+stderr with no logging, conflating "tool not installed" with "tool installed but broken";
+`config.ts` silently falls back to defaults on malformed `ai-review.config.json`;
+`gitleaksParser.ts`/`npmAuditParser.ts` silently return `[]` on malformed tool JSON, a false sense
+of security specifically for the secrets scanner; `TestGenAgent`'s only safeguard against
+fabricated generated test code is a length check). Batch 3 (dead code / config cleanup —
+`complexity.ts` reimplements `extractChangedFiles` instead of importing the canonical
+`policyFilter.ts` version; delete unused `adapters/github.ts` + test; remove
+`preferredSecretsScanner`, wire up `complexityThreshold` via lizard's `-C`/`-w` flags; name the
+`orchestrator.ts` `<=5` line-proximity magic number copy-pasted 4x; remove `OrchestratorAgent`'s
+unused `LLMProvider` constructor param; remove dead `ContextMetadata` interface in
+`contextLoader.ts`). Batch 4 (derive `cli/formatter.ts`'s `TOOL_LABELS` and `mcp/server.ts`'s
+hardcoded agent-list description from schema/config instead of hand-maintained duplicates). Batch 5
+(previously-deferred-but-approved items: semantic-embedding-call caching in `contextLoader.ts`/
+`embedder.ts`; stop asking `complexity.ts`/`observability.ts` to generate `severity:"low"` findings
+that `applyPublicationFilter` discards anyway).
+
+---
 
 **Secrets/dependencies deterministic-tool integration + adversarial/secrets prompt-tightening
 (2026-08-06)**: user reported `security`/`secrets`/`adversarial` agents hallucinating findings on

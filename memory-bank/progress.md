@@ -16,7 +16,31 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-06
+**Last Updated**: 2026-08-10
+
+## 🚧 In Progress
+
+### Full-Codebase Audit Fix Effort — started 2026-08-10, branch `fix/full-codebase-audit-findings`
+
+- [x] License/complexity/orchestrator fixes from prior handoff — merged PR #18, published npm
+      `v1.9.0`
+- [x] `review.yml` fork-origin-PR guard (self-hosted runner security gap) — merged in PR #18
+- [x] Full 6-lens `src/` audit (security, performance, hallucination-risk, dead code,
+      docs/logging, architecture) against this project's own `standards/*.md` — see
+      `activeContext.md` for full findings and the one lens claim that was independently
+      re-verified and corrected before reporting
+- [x] Batch 1/5: path traversal (`--write-tests`), `base.ts` Stage 2+3 parsing gap, MCP
+      `repo_path` scoping — commit `85e3e1c`, 461 tests passing
+- [ ] Batch 2/5: silent-failure observability (`shell.ts`, `config.ts`, gitleaks/npm-audit
+      parsers, `TestGenAgent` validation)
+- [ ] Batch 3/5: dead code / config cleanup (`complexity.ts`'s duplicate `extractChangedFiles`,
+      delete `adapters/github.ts`, remove `preferredSecretsScanner`, wire up
+      `complexityThreshold` via lizard's `-C`/`-w` flags, orchestrator magic number + unused
+      constructor param, dead `ContextMetadata`)
+- [ ] Batch 4/5: derive `TOOL_LABELS`/MCP agent-list description from schema instead of
+      hand-maintained duplicates
+- [ ] Batch 5/5: previously-approved-but-unimplemented items (semantic-embedding caching,
+      stop generating discarded low-severity findings)
 
 ## ✅ Completed (Tasks 1–16)
 
