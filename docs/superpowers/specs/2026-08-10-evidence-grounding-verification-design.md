@@ -201,9 +201,12 @@ before the user finds out.
 **Deterministic pre-filter (checked first, alongside — not instead of — the LLM call):** a small,
 explicit table of `{ claimPattern, evidencePattern }` regex pairs in `evidenceVerifier.ts`, seeded
 directly from this spec's validation cases (e.g. a claim matching `/\bnot logged\b|\bisn't
-logged\b/i` whose evidence matches `/\b(log|logger|console\.|echo)\w*\s*\(/i` is a candidate
-contradiction; similarly for "not closed"/`with`-`.close()`-`finally`, "not validated"/`if`-
-`assert`-`throw`).
+logged\b/i` whose evidence matches `/\b(log|logger|console\.\w+)\s*\(|\becho\b/i` is a candidate
+contradiction — `echo` is matched as a bare keyword rather than requiring a trailing `(`, since
+shell `echo` has no parenthesized-call form, unlike `log(...)`/`logger.x(...)`/`console.x(...)`;
+this codebase's own headline `echo "WARN: ..." >&2` example from the Problem section wouldn't
+match a `\(`-requiring version of this pattern, an inconsistency caught during implementation);
+similarly for "not closed"/`with`-`.close()`-`finally`, "not validated"/`if`-`assert`-`throw`).
 
 Unlike the first draft of this idea, **a pre-filter match does not skip the LLM call in Stage 1.**
 This codebase's own evidence snippets can carry diff context (the validation set's own

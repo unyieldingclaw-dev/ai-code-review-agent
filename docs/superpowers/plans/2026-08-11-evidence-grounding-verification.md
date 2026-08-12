@@ -236,7 +236,10 @@ describe('verifyEvidence', () => {
     const result = await verifyEvidence(makeFinding(), provider)
     expect(result.verified).toBe(true)
     expect(result.unavailable).toBe(false)
-    expect(result.preFilterAgreed).toBe(null)
+    // makeFinding()'s default evidence ("not logged" claim + an `echo` call) matches the
+    // 'not-logged' pre-filter pattern (see the 'preFilterAgreed' tests below), and the LLM's
+    // SUPPORTED verdict disagrees with what that pre-filter match implies.
+    expect(result.preFilterAgreed).toBe(false)
   })
 
   it('returns verified:false on a NOT_SUPPORTED verdict', async () => {
@@ -358,7 +361,9 @@ const PRE_FILTER_PATTERNS: PreFilterPattern[] = [
   {
     name: 'not-logged',
     claimPattern: /\bnot logged\b|\bisn't logged\b|\bno logging\b/i,
-    evidencePattern: /\b(log|logger|console\.\w+|echo)\s*\(/i,
+    // `echo` has no parenthesized-call form in shell (unlike log(...)/logger.x(...)/console.x(...)),
+    // so it's matched as a bare keyword rather than requiring a trailing "(".
+    evidencePattern: /\b(log|logger|console\.\w+)\s*\(|\becho\b/i,
   },
   {
     name: 'not-closed',
