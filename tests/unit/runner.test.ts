@@ -1086,3 +1086,62 @@ describe('recordToolAvailability', () => {
     expect(toolAvailability).toEqual({})
   })
 })
+
+describe('evidence verification', () => {
+  const evidenceFinding = () => ({
+    id: 'security-0',
+    agent: 'security' as const,
+    domain: 'Security' as const,
+    severity: 'critical' as const,
+    basis: 'VERIFIED' as const,
+    file: 'src/a.ts',
+    line: 1,
+    title: 'Test finding',
+    detail: 'Some detail',
+    evidence: 'some evidence',
+    impact: 'impact',
+    recommendation: 'fix it',
+    suggestion: 'fix it',
+    blocking: false,
+    source: 'llm' as const,
+  })
+
+  it('does not run evidence checks when verifyEvidence is false (default)', async () => {
+    const provider = makeProvider()
+    const verifierProvider: LLMProvider = { chat: vi.fn(), ping: vi.fn() }
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider, verifierProvider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.evidenceCheckFilter).toBeUndefined()
+    expect(verifierProvider.ping).not.toHaveBeenCalled()
+  })
+
+  it('does not run evidence checks when verifyEvidence is true but no verifierProvider is supplied', async () => {
+    const provider = makeProvider()
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[], verifyEvidence: true }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.evidenceCheckFilter).toBeUndefined()
+  })
+
+  it('runs evidence checks and populates evidenceCheckFilter when enabled', async () => {
+    // security agent returns one critical finding; verifier says NOT_SUPPORTED.
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue(JSON.stringify([evidenceFinding()])),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const verifierProvider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue('VERDICT: NOT_SUPPORTED — evidence contradicts the claim.'),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[], verifyEvidence: true }
+    const runner = new SwarmRunner(config, provider, verifierProvider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.evidenceCheckFilter).toBeDefined()
+    expect(result.evidenceCheckFilter?.checkedCount).toBe(1)
+    expect(result.evidenceCheckFilter?.flagged).toHaveLength(1)
+    expect(verifierProvider.chat).toHaveBeenCalledTimes(1)
+    // The main review provider and the verifier provider must stay separate instances.
+    expect(provider.chat).not.toBe(verifierProvider.chat)
+  })
+})
