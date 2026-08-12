@@ -26,6 +26,14 @@ describe('DEFAULT_CONFIG', () => {
   it('provider is ollama', () => {
     expect(DEFAULT_CONFIG.provider).toBe('ollama')
   })
+
+  it('verifyEvidence defaults to false', () => {
+    expect(DEFAULT_CONFIG.verifyEvidence).toBe(false)
+  })
+
+  it('verifierModel defaults to qwen3:latest', () => {
+    expect(DEFAULT_CONFIG.verifierModel).toBe('qwen3:latest')
+  })
 })
 
 describe('loadConfig', () => {
