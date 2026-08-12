@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { verifyEvidence } from '../../src/core/evidenceVerifier.js'
+import { verifyEvidence, runEvidenceChecks } from '../../src/core/evidenceVerifier.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
 import type { Finding } from '../../src/core/schema.js'
 
@@ -109,5 +109,86 @@ describe('verifyEvidence', () => {
       provider
     )
     expect(result.preFilterAgreed).toBe(null)
+  })
+})
+
+describe('runEvidenceChecks', () => {
+  it('returns undefined when there are no critical/high candidates', async () => {
+    const provider = makeProvider(async () => 'VERDICT: SUPPORTED — fine.')
+    const result = await runEvidenceChecks([makeFinding({ severity: 'medium' })], provider)
+    expect(result).toBeUndefined()
+    expect(provider.chat).not.toHaveBeenCalled()
+    expect(provider.ping).not.toHaveBeenCalled()
+  })
+
+  it('skips findings from DETERMINISTIC_SOURCES', async () => {
+    const provider = makeProvider(async () => 'VERDICT: SUPPORTED — fine.')
+    const result = await runEvidenceChecks(
+      [makeFinding({ severity: 'critical', source: 'gitleaks' })],
+      provider
+    )
+    expect(result).toBeUndefined()
+    expect(provider.chat).not.toHaveBeenCalled()
+  })
+
+  it('checks eligible findings and reports checkedCount/unavailableCount/flagged', async () => {
+    const provider = makeProvider(async () => 'VERDICT: NOT_SUPPORTED — contradiction found.')
+    const finding = makeFinding({ severity: 'critical' })
+    const result = await runEvidenceChecks([finding], provider)
+    expect(result).toEqual({
+      checkedCount: 1,
+      unavailableCount: 0,
+      unavailableReasons: [],
+      flagged: [
+        {
+          agent: finding.agent,
+          title: finding.title,
+          file: finding.file,
+          line: finding.line,
+          claim: `${finding.title} ${finding.detail}`,
+          evidence: finding.evidence,
+          reason: 'contradiction found.',
+          preFilterAgreed: true,
+        },
+      ],
+    })
+  })
+
+  it('does not add a SUPPORTED finding to flagged', async () => {
+    const provider = makeProvider(async () => 'VERDICT: SUPPORTED — evidence matches.')
+    const result = await runEvidenceChecks([makeFinding({ severity: 'high' })], provider)
+    expect(result?.flagged).toEqual([])
+    expect(result?.checkedCount).toBe(1)
+  })
+
+  it('checks the verifier model once up front and short-circuits every finding if unavailable', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn(),
+      ping: vi.fn().mockResolvedValue({ ok: false, error: 'Model qwen3:latest not found. Run: ollama pull qwen3:latest' }),
+    }
+    const findings = [
+      makeFinding({ severity: 'critical', id: 'a' }),
+      makeFinding({ severity: 'high', id: 'b' }),
+    ]
+    const result = await runEvidenceChecks(findings, provider)
+    expect(result).toEqual({
+      checkedCount: 2,
+      unavailableCount: 2,
+      unavailableReasons: ['Model qwen3:latest not found. Run: ollama pull qwen3:latest'],
+      flagged: [],
+    })
+    // The whole point: not one call per finding when the model just isn't there.
+    expect(provider.chat).not.toHaveBeenCalled()
+    expect(provider.ping).toHaveBeenCalledTimes(1)
+  })
+
+  it('never puts a fail-open (unavailable) result into flagged', async () => {
+    const provider = makeProvider(async () => {
+      throw new Error('timeout')
+    })
+    const result = await runEvidenceChecks([makeFinding({ severity: 'critical' })], provider)
+    expect(result?.flagged).toEqual([])
+    expect(result?.unavailableCount).toBe(1)
+    expect(result?.unavailableReasons[0]).toContain('verification unavailable')
   })
 })

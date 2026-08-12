@@ -1,5 +1,6 @@
 import type { LLMProvider, Message } from './llm/provider.js'
-import type { Finding } from './schema.js'
+import type { Finding, EvidenceCheckFinding, EvidenceCheckFilterMetadata } from './schema.js'
+import { DETERMINISTIC_SOURCES } from './agents/orchestrator.js'
 
 // Independent from config.ts's retryAttempts/retryDelayMs (2 attempts, 2000ms) -- those govern
 // full agent-generation calls, a heavier and slower request shape than this per-finding
@@ -131,5 +132,87 @@ export async function verifyEvidence(
     reason: `verification unavailable — ${lastErr?.message}`,
     preFilterAgreed: null,
     unavailable: true,
+  }
+}
+
+// Runs the up-front availability check once, then verifyEvidence for each eligible finding.
+// Only Critical/High findings from non-deterministic sources are eligible -- DETERMINISTIC_SOURCES
+// findings are tool output, not model reasoning, so there's nothing an evidence check would
+// usefully catch; it would just spend latency confirming a tool's own report matches itself.
+//
+// WHY this returns an aggregate object instead of following filterNonexistentFiles/
+// filterCoverageGaps's optional-sink-parameter pattern: those two are genuinely filters -- they
+// take an array and return a (possibly smaller) array of the same type, with the sink an optional
+// side-channel for reporting what got dropped. This function never filters or shrinks `findings`
+// at all (Stage 1 is report-only), so there's no filtered array to return -- it's computing an
+// independent summary over the input, the same shape as runner.ts's own buildSummary() (findings
+// in, aggregate object out, no sink). That's the closer precedent to follow here.
+//
+// Returns undefined when there's nothing eligible at all, so ReviewResult.evidenceCheckFilter
+// stays absent on runs where this had nothing to do (matching truncation/policy's existing
+// "only present when relevant" convention). Once it DOES run, checkedCount/unavailableCount are
+// always present even with zero flagged findings -- --format json tracking (see design spec's
+// Tracking section) depends on that ratio being computable for every run that checked anything,
+// not just runs that found something wrong.
+export async function runEvidenceChecks(
+  findings: Finding[],
+  provider: LLMProvider
+): Promise<EvidenceCheckFilterMetadata | undefined> {
+  const candidates = findings.filter(
+    (f) =>
+      (f.severity === 'critical' || f.severity === 'high') &&
+      !DETERMINISTIC_SOURCES.includes(f.source)
+  )
+  if (candidates.length === 0) return undefined
+
+  // Checked once, up front -- not discovered incrementally on the first per-finding call. If the
+  // model simply isn't pulled, looping through every finding anyway (each paying its own retry +
+  // backoff) before the run finally completes would multiply a guaranteed, unrecoverable failure
+  // across every finding for no benefit.
+  const ping = await provider.ping()
+  if (!ping.ok) {
+    const reason = ping.error ?? 'verifier model unavailable'
+    console.error(`[evidenceVerifier] verifier model unavailable: ${reason}`)
+    return {
+      checkedCount: candidates.length,
+      unavailableCount: candidates.length,
+      unavailableReasons: [reason],
+      flagged: [],
+    }
+  }
+
+  const flagged: EvidenceCheckFinding[] = []
+  const unavailableReasons = new Set<string>()
+  let unavailableCount = 0
+
+  for (const finding of candidates) {
+    const result = await verifyEvidence(finding, provider)
+    if (result.unavailable) {
+      unavailableCount++
+      unavailableReasons.add(result.reason)
+      continue
+    }
+    // flagged contains only genuine NOT_SUPPORTED verdicts -- a fail-open result never appears
+    // here (handled above), since "we couldn't check this" and "we checked this and it failed"
+    // are different report states.
+    if (!result.verified) {
+      flagged.push({
+        agent: finding.agent,
+        title: finding.title,
+        file: finding.file,
+        line: finding.line,
+        claim: `${finding.title} ${finding.detail}`,
+        evidence: finding.evidence,
+        reason: result.reason,
+        preFilterAgreed: result.preFilterAgreed,
+      })
+    }
+  }
+
+  return {
+    checkedCount: candidates.length,
+    unavailableCount,
+    unavailableReasons: [...unavailableReasons],
+    flagged,
   }
 }
