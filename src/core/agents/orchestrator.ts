@@ -9,7 +9,7 @@ import type {
 import { SEVERITY_RANK } from '../schema.js'
 import { normalizeFilePath, stripDiffPrefix } from '../filePath.js'
 
-const DETERMINISTIC_SOURCES: EvidenceSource[] = [
+export const DETERMINISTIC_SOURCES: EvidenceSource[] = [
   'gitleaks',
   'trufflehog',
   'semgrep',
