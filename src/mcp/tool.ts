@@ -86,6 +86,11 @@ export async function runReviewTool(params: ReviewToolParams): Promise<string> {
   const config = loadConfig(repoPath)
   // Remove testgen regardless of what the config file says
   config.agents = config.agents.filter((a): a is AgentName => !MCP_EXCLUDED_AGENTS.includes(a))
+  // Evidence verification adds a synchronous per-finding LLM round-trip -- not worth the latency
+  // for an interactive MCP caller waiting on the response, and Stage 1 is report-only anyway
+  // (nothing is dropped), so there's little payoff for the cost here. Force off regardless of
+  // what the project config says, mirroring the testgen exclusion above.
+  config.verifyEvidence = false
 
   // --- Run swarm ---
   const provider = new OllamaProvider(config.ollamaUrl, config.model)

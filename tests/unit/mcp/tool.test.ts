@@ -161,6 +161,40 @@ describe('runReviewTool', () => {
     })
     await runReviewTool({})
   })
+
+  it('forces verifyEvidence off regardless of config', async () => {
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'diff --git a/f.ts b/f.ts\n+line',
+    } as unknown as SpawnSyncReturns<string>)
+    const { loadConfig } = await import('../../../src/core/config.js')
+    vi.mocked(loadConfig).mockReturnValueOnce({
+      model: 'devstral:latest',
+      provider: 'ollama',
+      ollamaUrl: 'http://localhost:11434',
+      anthropicModel: '',
+      maxFindings: 15,
+      agents: ['security'],
+      contextLines: 10,
+      testOutputDir: './ai-review-tests',
+      maxDiffLines: 2000,
+      agentTimeoutMs: 60000,
+      ignorePaths: [],
+      sanitize: true,
+      verifyEvidence: true, // config says on -- MCP must still force it off
+    })
+    const { SwarmRunner } = await import('../../../src/core/runner.js')
+    const runMock = vi.fn().mockResolvedValue({
+      findings: [],
+      testFiles: [],
+      summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
+    })
+    vi.mocked(SwarmRunner).mockImplementationOnce((config: Parameters<typeof SwarmRunner>[0]) => {
+      expect(config.verifyEvidence).toBe(false)
+      return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
+    })
+    await runReviewTool({})
+  })
 })
 
 describe('repo_path allowlist (AI_REVIEW_ALLOWED_ROOTS)', () => {
