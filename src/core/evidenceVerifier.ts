@@ -1,6 +1,7 @@
 import type { LLMProvider, Message } from './llm/provider.js'
 import type { Finding, EvidenceCheckFinding, EvidenceCheckFilterMetadata } from './schema.js'
 import { DETERMINISTIC_SOURCES } from './agents/orchestrator.js'
+import { sanitizeText } from './sanitizer.js'
 
 // Independent from config.ts's retryAttempts/retryDelayMs (2 attempts, 2000ms) -- those govern
 // full agent-generation calls, a heavier and slower request shape than this per-finding
@@ -75,8 +76,19 @@ export async function verifyEvidence(
   finding: Finding,
   provider: LLMProvider
 ): Promise<VerifyEvidenceResult> {
-  const claim = `${finding.title} ${finding.detail}`
-  const evidence = finding.evidence
+  // WHY sanitize here: claim/evidence are agent-generated Finding fields, ultimately traceable
+  // to the reviewed diff -- the same untrusted-content path sanitizeDiff/sanitizeText already
+  // protect against prompt injection for elsewhere in this pipeline (runner.ts). Every LLM call
+  // before this one only ever consumed the diff directly, sanitized once at the boundary; this
+  // is the first place a *second* LLM call consumes another agent's output, so that protection
+  // doesn't automatically carry through -- it has to be reapplied here.
+  const claimResult = sanitizeText(`${finding.title} ${finding.detail}`)
+  const evidenceResult = sanitizeText(finding.evidence)
+  for (const w of [...claimResult.warnings, ...evidenceResult.warnings]) {
+    console.warn(`[evidenceVerifier] ${w} (finding "${finding.title}")`)
+  }
+  const claim = claimResult.sanitized
+  const evidence = evidenceResult.sanitized
   const matchedPattern = matchPreFilter(claim, evidence)
 
   const messages: Message[] = [
