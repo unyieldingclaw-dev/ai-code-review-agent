@@ -55,6 +55,30 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     lines.push('')
   }
 
+  if (result.evidenceCheckFilter) {
+    const { checkedCount, unavailableCount, unavailableReasons, flagged } = result.evidenceCheckFilter
+    lines.push(
+      `${useEmoji ? '🔍 ' : ''}Evidence check: ${checkedCount} finding(s) checked` +
+        (flagged.length > 0
+          ? `, ${flagged.length} flagged as possibly unsupported by their own cited evidence`
+          : ', none flagged') +
+        (unavailableCount > 0
+          ? `, ${unavailableCount} unavailable (verifier could not be reached)`
+          : '') +
+        '.'
+    )
+    if (unavailableReasons.length > 0) {
+      lines.push(`  ${unavailableReasons.join('; ')}`)
+    }
+    for (const f of flagged) {
+      lines.push(
+        `  - **${f.title}** (${f.file}:${f.line}, ${f.agent}) — ${f.reason}` +
+          (f.preFilterAgreed === true ? ' [deterministic pre-filter agreed]' : '')
+      )
+    }
+    lines.push('')
+  }
+
   // WHY key off ToolAvailabilityMetadata's own keys instead of a second hand-typed literal union:
   // this and the array below used to each independently list the same 3 tool keys, which could
   // silently drift apart (e.g. a new tool integration added to the schema but forgotten here).
