@@ -3,6 +3,20 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- `--verify-evidence` runs Critical/High findings through a separate model (`qwen3:latest` by
+  default) that checks whether each finding's own cited evidence actually supports its claim —
+  catches a hallucination class none of the existing defenses caught (a finding citing a real
+  line, in a real changed file, that says the opposite of what the line does). **Report-only in
+  this release**: flagged findings are surfaced in `ReviewResult.evidenceCheckFilter` (and in the
+  markdown/SARIF reports) but nothing is dropped from `findings` yet. Opt-in (`verifyEvidence`
+  config field, default `false`); forced off for MCP callers regardless of project config. See
+  `docs/superpowers/specs/2026-08-10-evidence-grounding-verification-design.md` for the full
+  design and validation data.
+
 ## [1.9.0] — 2026-08-09 (deterministic-tool integration, hallucination fixes, CI hardening)
 
 ### Added
