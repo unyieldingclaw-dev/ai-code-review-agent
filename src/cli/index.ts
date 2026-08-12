@@ -106,6 +106,10 @@ program
     'static'
   )
   .option('--no-emoji', 'Disable emoji in output (for CI terminals without UTF-8 support)')
+  .option(
+    '--verify-evidence',
+    'Verify Critical/High findings against their own cited evidence using a separate model (report-only in this version -- flags possibly-unsupported findings without dropping them; adds one LLM call per checked finding)'
+  )
   .action(
     async (options: {
       diff?: string
@@ -131,6 +135,7 @@ program
       contextBudget?: number
       contextMode?: string
       emoji: boolean
+      verifyEvidence?: boolean
     }) => {
       try {
         const contextMode = options.context === 'memory-bank' ? 'memory-bank' : 'none'
@@ -170,6 +175,12 @@ program
         config.failOn = options.failOn
         config.failFast = !!options.failFast
         config.parallel = !!options.parallel
+        // WHY conditional (only overrides toward true) rather than `!!options.verifyEvidence`
+        // like --parallel/--fail-fast above: this is an opt-in feature (default false), so an
+        // unconditional overwrite would silently stomp a project-config-file `true` back to
+        // false on every run that doesn't also pass the flag. --parallel/--fail-fast's
+        // unconditional pattern is pre-existing and out of scope to change here.
+        if (options.verifyEvidence) config.verifyEvidence = true
         if (options.contextBudget !== undefined) config.contextBudgetChars = options.contextBudget
         if (options.contextMode === 'semantic') config.contextMode = 'semantic'
 
@@ -185,7 +196,16 @@ program
         }
 
         const provider = new OllamaProvider(config.ollamaUrl, config.model)
-        const runner = new SwarmRunner(config, provider)
+        // Deliberately a separate OllamaProvider instance/model from the main review's --
+        // cross-model verification only works if the verifier has no memory of the original
+        // claim. See docs/superpowers/specs/2026-08-10-evidence-grounding-verification-design.md.
+        // WHY `||` not `??`: verifierModel is an optional string field -- a config file setting
+        // it to `""` should fall back to the default the same way `undefined` does, rather than
+        // constructing an OllamaProvider with an empty model name.
+        const verifierProvider = config.verifyEvidence
+          ? new OllamaProvider(config.ollamaUrl, config.verifierModel || 'qwen3:latest')
+          : undefined
+        const runner = new SwarmRunner(config, provider, verifierProvider)
 
         const reviewingLabel = options.emoji !== false ? '🔍' : 'Reviewing'
         process.stderr.write(

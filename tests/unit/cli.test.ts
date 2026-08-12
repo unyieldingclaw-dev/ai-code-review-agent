@@ -79,6 +79,8 @@ vi.mock('../../src/core/config.js', () => ({
     contextBudgetChars: 4000,
     contextMode: 'static',
     agentPolicy: {},
+    verifyEvidence: false,
+    verifierModel: 'qwen3:latest',
   })),
 }))
 
@@ -393,6 +395,28 @@ describe('CLI — argument parsing and output', () => {
     await runCli([])
     const config = MockSwarmRunner.mock.calls[0][0]
     expect(config.parallel).toBe(false)
+  })
+
+  it('--verify-evidence enables evidence verification and constructs a verifier provider', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli(['--verify-evidence'])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    const verifierProvider = MockSwarmRunner.mock.calls[0][2]
+    expect(config.verifyEvidence).toBe(true)
+    expect(verifierProvider).toBeDefined()
+  })
+
+  it('leaves verifyEvidence off and passes no verifier provider by default', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli([])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    const verifierProvider = MockSwarmRunner.mock.calls[0][2]
+    expect(config.verifyEvidence).toBe(false)
+    expect(verifierProvider).toBeUndefined()
   })
 })
 
