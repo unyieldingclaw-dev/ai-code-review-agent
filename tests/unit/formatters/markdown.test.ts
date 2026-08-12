@@ -232,3 +232,47 @@ describe('formatMarkdown', () => {
     expect(output).not.toMatch(/degraded|fallback/i)
   })
 })
+
+describe('evidenceCheckFilter', () => {
+  it('shows checked/flagged/unavailable counts', () => {
+    const result = makeResult({
+      evidenceCheckFilter: {
+        checkedCount: 3,
+        unavailableCount: 1,
+        unavailableReasons: ['verification unavailable — timeout'],
+        flagged: [
+          {
+            agent: 'security',
+            title: 'Test finding',
+            file: 'src/a.ts',
+            line: 10,
+            claim: 'Test finding claim',
+            evidence: 'some evidence',
+            reason: 'evidence contradicts the claim',
+            preFilterAgreed: true,
+          },
+        ],
+      },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('3 finding(s) checked')
+    expect(output).toContain('1 flagged')
+    expect(output).toContain('1 unavailable')
+    expect(output).toContain('evidence contradicts the claim')
+    expect(output).toContain('src/a.ts:10')
+  })
+
+  it('is omitted entirely when evidenceCheckFilter is absent', () => {
+    const output = formatMarkdown(makeResult())
+    expect(output).not.toContain('Evidence check')
+  })
+
+  it('reports zero flagged findings without listing any', () => {
+    const result = makeResult({
+      evidenceCheckFilter: { checkedCount: 2, unavailableCount: 0, unavailableReasons: [], flagged: [] },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('2 finding(s) checked')
+    expect(output).toContain('none flagged')
+  })
+})

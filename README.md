@@ -205,6 +205,9 @@ ai-review-agent --context memory-bank --context-mode semantic
 # Disable emoji for CI/CD pipelines
 ai-review-agent --no-emoji --format markdown
 
+# Verify Critical/High findings against their own evidence (requires qwen3:latest in Ollama)
+ai-review-agent --verify-evidence
+
 # Full help
 ai-review-agent --help
 ```
@@ -235,6 +238,7 @@ ai-review-agent --help
 | `--context-budget <n>`  | 4000            | Max chars of memory-bank context per agent                                                                                                                                                                                                                                                                                                                                       |
 | `--context-mode <mode>` | static          | `static` (hardcoded routing) or `semantic` (nomic-embed-text ranking)                                                                                                                                                                                                                                                                                                            |
 | `--no-emoji`            | off             | Use text labels instead of emoji (for CI without UTF-8 support)                                                                                                                                                                                                                                                                                                                  |
+| `--verify-evidence`     | off             | Verify Critical/High findings against their own cited evidence using a separate model (`qwen3:latest` by default). Report-only in this version — flags possibly-unsupported findings in the report without dropping them. Adds one LLM call per checked finding                                                                                                              |
 
 Exit code `1` when any finding meets the `--fail-on` threshold (default: `high`).
 

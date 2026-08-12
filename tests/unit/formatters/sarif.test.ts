@@ -202,4 +202,27 @@ describe('formatSarif', () => {
     const sarif = JSON.parse(formatSarif(makeResult()))
     expect(sarif.runs[0].properties.toolAvailability).toBeUndefined()
   })
+
+  it('includes evidenceCheckFilter in run properties when present', () => {
+    const result = makeResult({
+      evidenceCheckFilter: {
+        checkedCount: 1,
+        unavailableCount: 0,
+        unavailableReasons: [],
+        flagged: [],
+      },
+    })
+    const output = JSON.parse(formatSarif(result))
+    expect(output.runs[0].properties.evidenceCheckFilter).toEqual({
+      checkedCount: 1,
+      unavailableCount: 0,
+      unavailableReasons: [],
+      flagged: [],
+    })
+  })
+
+  it('omits evidenceCheckFilter from properties when absent', () => {
+    const output = JSON.parse(formatSarif(makeResult()))
+    expect(output.runs[0].properties.evidenceCheckFilter).toBeUndefined()
+  })
 })

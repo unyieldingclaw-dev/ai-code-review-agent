@@ -137,6 +137,24 @@ export interface CoverageGapFilterMetadata {
   dropped: DroppedCoverageGap[]
 }
 
+export interface EvidenceCheckFinding {
+  agent: AgentName
+  title: string
+  file: string
+  line: number
+  claim: string
+  evidence: string
+  reason: string
+  preFilterAgreed: boolean | null
+}
+
+export interface EvidenceCheckFilterMetadata {
+  checkedCount: number
+  unavailableCount: number
+  unavailableReasons: string[]
+  flagged: EvidenceCheckFinding[]
+}
+
 export type ToolAvailability = 'used' | 'unavailable-llm-fallback'
 
 export interface ToolAvailabilityMetadata {
@@ -167,6 +185,7 @@ export interface ReviewResult {
   truncation?: TruncationMetadata
   hallucinationFilter?: HallucinationFilterMetadata
   coverageGapFilter?: CoverageGapFilterMetadata
+  evidenceCheckFilter?: EvidenceCheckFilterMetadata
   toolAvailability?: ToolAvailabilityMetadata
 }
 

@@ -15,9 +15,11 @@ import type {
   DroppedHallucinatedFinding,
   DroppedCoverageGap,
   ToolAvailabilityMetadata,
+  EvidenceCheckFilterMetadata,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
 import { classifyAgentError } from './parsing.js'
+import { runEvidenceChecks } from './evidenceVerifier.js'
 import { loadAgentContext, loadAgentContextSemantic } from './contextLoader.js'
 import type { ContextResult } from './contextLoader.js'
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
@@ -189,9 +191,15 @@ export class SwarmRunner {
   private readonly orchestrator: OrchestratorAgent
   private readonly testGen: TestGenAgent
 
+  // verifierProvider is a separate, optional LLMProvider (not derived from `provider` or
+  // `config` internally) because cross-model evidence verification only works if the verifier
+  // has no memory of the original claim -- reusing `provider` would defeat that. Optional
+  // because the feature is opt-in (config.verifyEvidence, default false); callers only
+  // construct and pass a verifierProvider when the flag is on (see cli/index.ts, Task 7).
   constructor(
     private readonly config: ReviewConfig,
-    private readonly provider: LLMProvider
+    private readonly provider: LLMProvider,
+    private readonly verifierProvider?: LLMProvider
   ) {
     this.orchestrator = new OrchestratorAgent(config)
     this.testGen = new TestGenAgent(provider, config)
@@ -707,6 +715,11 @@ export class SwarmRunner {
     const droppedHallucinated: DroppedHallucinatedFinding[] = []
     const findings = this.orchestrator.synthesize(allFindings, changedFiles, droppedHallucinated)
 
+    const evidenceCheckFilter: EvidenceCheckFilterMetadata | undefined =
+      this.config.verifyEvidence && this.verifierProvider
+        ? await runEvidenceChecks(findings, this.verifierProvider)
+        : undefined
+
     return {
       findings,
       testFiles,
@@ -733,6 +746,7 @@ export class SwarmRunner {
         ? { coverageGapFilter: { dropped: droppedCoverageGaps } }
         : {}),
       ...(Object.keys(toolAvailability).length > 0 ? { toolAvailability } : {}),
+      ...(evidenceCheckFilter ? { evidenceCheckFilter } : {}),
     }
   }
 }
