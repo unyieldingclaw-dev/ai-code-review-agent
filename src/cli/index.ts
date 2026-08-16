@@ -16,6 +16,7 @@ import {
   FAIL_ON_OPTIONS,
   hasAgentFailures,
   AGENT_FAILURE_EXIT_CODE,
+  TRUNCATION_EXIT_CODE,
 } from './exitCode.js'
 import type { FailOnLevel } from './exitCode.js'
 import { resolveProfile } from '../core/profiles.js'
@@ -72,6 +73,11 @@ program
     'Stop swarm on first finding at or above --fail-on threshold (requires sequential execution -- has no effect with --parallel)'
   )
   .option(
+    '--allow-truncation',
+    'Exit 0 on a truncated-but-otherwise-clean run instead of exit code 3 -- use only if you have ' +
+      'deliberately accepted partial diff coverage for this workflow'
+  )
+  .option(
     '--parallel',
     'Run specialist agents concurrently (faster on hardware where Ollama can genuinely overlap requests; disables --fail-fast early exit). Off by default -- verify it helps on your hardware before enabling'
   )
@@ -126,6 +132,7 @@ program
       retryDelay?: number
       failOn: FailOnLevel
       failFast?: boolean
+      allowTruncation?: boolean
       parallel?: boolean
       ignore: string[]
       sanitize: boolean
@@ -309,7 +316,16 @@ program
         if (hasAgentFailures(result.agentStatus)) {
           process.exit(AGENT_FAILURE_EXIT_CODE)
         }
-        process.exit(hasBlocker ? 1 : 0)
+        if (hasBlocker) {
+          process.exit(1)
+        }
+        // Truncation ranks below a real blocker (checked above) but above "clean" -- a run that
+        // silently skipped 60% of the diff must not report exit 0 by default. --allow-truncation
+        // opts back into 0 for callers who've deliberately accepted partial coverage.
+        if (result.truncation?.truncated && !options.allowTruncation) {
+          process.exit(TRUNCATION_EXIT_CODE)
+        }
+        process.exit(0)
       } catch (err) {
         // Re-throw synthetic exits (e.g. process.exit mocks in tests) so they propagate correctly
         if (err instanceof Error && err.message.startsWith('process.exit(')) throw err

@@ -360,6 +360,78 @@ describe('CLI — argument parsing and output', () => {
     expect(exitCode).toBe(0)
   })
 
+  it('exits 1 (not 3) when a truncated run also contains a blocker finding', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          findings: [
+            {
+              id: 'f-0',
+              agent: 'security',
+              severity: 'critical',
+              basis: 'VERIFIED',
+              file: 'a.ts',
+              line: 1,
+              title: 'T',
+              detail: 'D',
+              domain: 'Security',
+              evidence: 'E',
+              impact: 'I',
+              recommendation: 'R',
+              suggestion: 'S',
+              blocking: true,
+              source: 'llm',
+              confidence: 90,
+            },
+          ],
+          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+        })
+      ),
+    }))
+    const { exitCode } = await runCli(['--fail-on', 'high'])
+    expect(exitCode).toBe(1)
+  })
+
+  it('exits 3 when truncated with no blocker finding', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          findings: [],
+          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+        })
+      ),
+    }))
+    const { exitCode } = await runCli([])
+    expect(exitCode).toBe(3)
+  })
+
+  it('exits 0 on a truncated-but-clean run when --allow-truncation is passed', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          findings: [],
+          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+        })
+      ),
+    }))
+    const { exitCode } = await runCli(['--allow-truncation'])
+    expect(exitCode).toBe(0)
+  })
+
+  it('exits 2 (not 3) when agents failed AND the run was also truncated', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          findings: [],
+          agentStatus: { security: 'ok', correctness: 'timeout' },
+          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+        })
+      ),
+    }))
+    const { exitCode } = await runCli([])
+    expect(exitCode).toBe(2)
+  })
+
   it('--timeout sets agentTimeoutMs and disables timeout scaling', async () => {
     MockSwarmRunner.mockImplementation(() => ({
       run: vi.fn().mockResolvedValue(makeResult()),
