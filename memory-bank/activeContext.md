@@ -16,9 +16,66 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-10
+**Last Updated**: 2026-08-12
 
 ## Current Focus
+
+**Evidence-grounding verification pass complete and merged (2026-08-11/12)**: closed the
+"ACR reliability findings" item 4 gap noted below — findings whose own cited evidence contradicts
+their claim, or whose severity ignores the agent's own stated criteria, had no defense checking
+reasoning against evidence (`filterNonexistentFiles` checks file existence,
+`hallucinationCrossCheck` checks cross-agent corroboration; neither verifies a claim against the
+evidence it quotes). Design spec (`docs/superpowers/specs/2026-08-10-evidence-grounding-
+verification-design.md`) and 13-task implementation plan (`docs/superpowers/plans/2026-08-11-
+evidence-grounding-verification.md`) written via `superpowers:writing-plans`, executed via
+`superpowers:subagent-driven-development` on branch `feature/evidence-grounding-verification` (git
+worktree at `.worktrees/evidence-grounding-verification`, now removed post-merge). Stage 1
+(report-only, deliberately not auto-filtering): a second, independently-configurable model
+(`verifierModel`, default `qwen3:latest`) checks whether each Critical/High finding's own cited
+evidence actually supports its claim, gated behind `--verify-evidence` (off by default, forced off
+for MCP callers), surfaced as `ReviewResult.evidenceCheckFilter` in markdown/SARIF/JSON. A
+deterministic regex pre-filter (`PRE_FILTER_PATTERNS` in `evidenceVerifier.ts`) runs alongside the
+LLM check as a second signal (`preFilterAgreed`) but never overrides or skips the LLM verdict —
+this project's diff-derived evidence snippets can carry deletion/comment context a naive text match
+can't distinguish from live code, so a pattern match alone was judged too risky to act as a veto.
+Validated against 13 unique synthetic cases (evidence-contradicts-claim + genuinely-correct
+controls): `qwen3:latest` scored 13/13, confirmed live against real Ollama via the new permanent
+`calibration/evidenceVerifierCalibration.ts` script (`npm run calibrate:evidence`), not just at
+design time. All 13 implementation tasks individually reviewed (genuine spawned `/code-review`
+passes, scaled 1-lens to full-5-lens by change significance — self-certifying a commit without an
+independent review was explicitly blocked by the harness mid-session) and committed separately
+before merge. A final holistic review (done via direct grep/read after a subagent dispatch hit an
+API spend limit) caught one real trust-boundary gap before merge: `evidenceVerifier.ts` is the
+first place in this codebase where one agent's LLM *output* (`Finding.title`/`detail`/`evidence`)
+becomes a second LLM call's *input* — the existing `sanitizeDiff`/`sanitizeText` prompt-injection
+defense was only ever applied once, at diff-ingestion, and didn't automatically carry through to
+this new second hop. Fixed by reapplying `sanitizeText()` to claim/evidence inside `verifyEvidence`
+before they reach the verifier prompt (commit `c0fe693`), with a regression test confirming
+injection strings (`SYSTEM:`, "ignore previous instructions") are stripped before the verifier
+model ever sees them. Merged into `fix/full-codebase-audit-findings` via `git merge --no-ff`
+(commit `a227cdb`).
+
+**Post-merge fix, same effort (2026-08-12)**: running the full suite from the main checkout after
+the merge (`npx vitest run`, no path arg) showed 5 failed test files / 3 failed tests — traced via
+`grep -E "FAIL|Test Files"` to paths under `.worktrees/evidence-grounding-verification/...`, not a
+real regression. The worktree (gitignored but still on disk) was being picked up by vitest's
+default test-discovery glob and run concurrently with the real suite, racing on shared absolute
+temp paths (same bug class `vitest.config.ts` already excluded `.claude/worktrees/**` for, on
+2026-08-10, but that exclusion only covered the native `EnterWorktree` tool's convention, not the
+`using-git-worktrees` skill's manual-fallback `.worktrees/**` convention actually used this
+session). Added `.worktrees/**` to the same `exclude` array; reviewed (spawned reviewer
+independently confirmed glob-anchoring correctness, re-ran the suite itself, and checked
+prettier/eslint/tsc/CI for the same exposure — none found) and committed (`a713684`). Verified: 44
+test files (43 run + 1 skipped), 500 tests (496 passing, 4 skipped), 0 unexpected failures. The
+merged-and-fixed worktree and its now-fully-merged `feature/evidence-grounding-verification` branch
+were then removed (`git worktree remove` + `git branch -d`) — nothing uncommitted was in either.
+
+`fix/full-codebase-audit-findings` is intentionally **not yet pushed** — stays local until the user
+reviews it personally, per the same reasoning as the branch's other unpushed work below (an
+unreviewed PR touching LLM-call trust boundaries and a new CLI flag isn't yet something to put in
+front of CI or other reviewers).
+
+---
 
 **Full-codebase audit + fix effort, all 5 batches landed (2026-08-10)**: continuation
 of the 2026-08-06/07 work below. Session arc: (1) implemented the 3 fixes left in the prior
@@ -570,6 +627,13 @@ All 5 checks verified passing locally (295/295 tests) before the workflow was ad
 
 ## Next Steps
 
+- **ACR reliability findings, item 3 — still unresolved**: the specific fabricated "GPL/mongodb
+  license" finding the user originally reported traces to a real, already-fixed bug (commit
+  `a906515`), but whether *that particular report* was a stale-build artifact or a live regression
+  that slipped past `filterNonexistentFiles` was never determined — needs the original finding's
+  exact file/line/text and the `ai-review-agent --version` that produced it. See `progress.md`'s
+  "ACR reliability findings" entry for full detail.
+- **`fix/full-codebase-audit-findings`**: not yet pushed/PR'd — awaiting explicit go-ahead.
 - **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new Automation token on npmjs.com and update `NPM_TOKEN` GitHub Actions secret before then.
 - **Version 1.2.0**: Ready to publish. Run `git tag v1.2.0 && git push --tags` to trigger npm release.
 - **Anthropic/Claude provider** (backlog): Alternative to Ollama using `claude-sonnet-4-6` via API.

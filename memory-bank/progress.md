@@ -16,7 +16,58 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-10
+**Last Updated**: 2026-08-12
+
+## ✅ Completed (2026-08-12)
+
+### Evidence-Grounding Verification Pass — branch `feature/evidence-grounding-verification`, merged into `fix/full-codebase-audit-findings` (`a227cdb`)
+
+Resolves item 4 of the "ACR reliability findings" entry below (the reasoning-vs-evidence gap:
+findings whose own cited evidence contradicts the claim, or whose severity ignores the agent's
+stated criteria, with no existing defense checking a claim against the evidence it quotes).
+
+- [x] Design spec + 13-task implementation plan written via `superpowers:writing-plans`; executed
+      via `superpowers:subagent-driven-development` (fresh implementer subagent per task, controller
+      runs genuine `/code-review` before every commit, implementers never commit).
+- [x] Schema (`EvidenceCheckFinding`/`EvidenceCheckFilterMetadata` on `ReviewResult`), config
+      (`verifyEvidence`/`verifierModel`, default `qwen3:latest`), `src/core/evidenceVerifier.ts`
+      (`verifyEvidence`/`runEvidenceChecks`), wired into `runner.ts` (optional third
+      `verifierProvider` param), `--verify-evidence` CLI flag, forced off for MCP callers, markdown
+      + SARIF formatter blocks, README/CHANGELOG, permanent `calibration/evidenceVerifierCalibration.ts`
+      script (`npm run calibrate:evidence`).
+- [x] Stage 1 is deliberately report-only — flags via `evidenceCheckFilter`, never drops a finding
+      from `findings`. A deterministic regex pre-filter runs as a second signal (`preFilterAgreed`)
+      alongside the LLM verdict but never overrides or skips it — diff-derived evidence can carry
+      deletion/comment context a naive text match can't distinguish from live code.
+- [x] Validated against 13 unique synthetic cases (evidence-contradicts-claim + genuinely-correct
+      controls); `qwen3:latest` scored 13/13, confirmed live twice — once during design validation,
+      once via the permanent calibration script against real Ollama.
+- [x] Final holistic review (pre-merge) caught a real trust-boundary gap: this is the first place in
+      the codebase where one agent's LLM *output* becomes a second LLM call's *input* — the existing
+      `sanitizeDiff`/`sanitizeText` defense was only ever applied once, at diff-ingestion. Fixed by
+      reapplying `sanitizeText()` to claim/evidence before they reach the verifier prompt (`c0fe693`),
+      with a regression test confirming injection strings are stripped first.
+- [x] Regex bug found by the Task 4 implementer subagent: the `not-logged` pre-filter pattern
+      required a trailing `(` after `echo`, which shell `echo` invocations never have — fixed to
+      `/\b(log|logger|console\.\w+)\s*\(|\becho\b/i`; a self-contradictory test assertion sharing the
+      same fixture was corrected alongside it; the same bug was retroactively fixed in the design
+      spec and plan documents, which had been committed with the original text.
+- [x] `??` → `||` bug in `cli/index.ts`'s `verifierModel` fallback, caught by a review lens (`??`
+      doesn't catch an empty-string config value).
+- [x] Post-merge: `npx vitest run` (no path arg) from the main checkout showed 5 failed test
+      files/3 failed tests, all traced to `.worktrees/evidence-grounding-verification/...` paths —
+      the worktree (gitignored but still on disk) was picked up by vitest's default glob and run
+      concurrently with the real suite, racing on shared absolute temp paths. `vitest.config.ts`
+      already excluded `.claude/worktrees/**` (2026-08-10, for the native `EnterWorktree` tool's
+      convention) but not `.worktrees/**` (the `using-git-worktrees` skill's manual-fallback
+      convention actually used this session). Added the missing exclude entry (`a713684`), reviewed
+      (spawned reviewer independently confirmed glob correctness, re-ran the suite itself, checked
+      prettier/eslint/tsc/CI for the same exposure — none found), verified: 44 test files (43 run +
+      1 skipped), 500 tests (496 passing, 4 skipped), 0 unexpected failures.
+- [x] Worktree (`.worktrees/evidence-grounding-verification`) and its now-fully-merged branch
+      removed post-verification — nothing uncommitted in either.
+- Branch `fix/full-codebase-audit-findings` intentionally not pushed yet — local only, pending
+  explicit go-ahead.
 
 ## 🚧 In Progress
 
@@ -141,7 +192,7 @@ list` before excluding rather than deleting it (may still be someone's reference
     no test or calibration fixture depended on a "low" finding from either agent before removing.
   - 468 unit tests passing (up from 466).
 
-### ACR reliability findings — reported 2026-08-10, NOT YET SCOPED
+### ACR reliability findings — reported 2026-08-10, items 4/5 resolved 2026-08-12, item 3 open
 
 User forwarded a consolidated report from two independent ACR runs against an identical real-world
 diff (Personal-Memory-Bank's concurrent-session-claims feature, ~8000 lines) — a dogfooding
@@ -180,16 +231,23 @@ individually against this codebase rather than accepted at face value:
    it quotes. **No existing defense checks this** — `filterNonexistentFiles` checks file existence,
    `hallucinationCrossCheck` checks cross-agent corroboration; neither verifies reasoning against
    evidence. Not touched by Batch 1, Batch 2, or anything currently planned.
+   **RESOLVED 2026-08-12** — see the "Evidence-Grounding Verification Pass" entry above.
+   `evidenceVerifier.ts` now checks each Critical/High finding's claim against its own cited
+   evidence via a second model. Scoped as Stage 1 (report-only, `--verify-evidence`, off by
+   default) rather than auto-filtering — visibility first, not yet wired to drop or downgrade
+   findings automatically.
 5. **Live first-party confirmation of the same failure mode**, caught during this session's own
    `/change-review` Job 7: ACR's security profile (npm `v1.9.0`) flagged `resolveWriteTestPath`
    (Batch 1's own path-traversal fix) as introducing path traversal, citing the exact containment
    check that prevents it. Verified false positive by reading `resolve()`+`isPathWithin()` directly.
+   **Same root cause as item 4, resolved by the same fix.**
 
-**Status**: user explicitly deferred scoping this until all 5 batches of the current audit-fix
-effort are complete ("finish up Batch 2. When there is no more Batch work, then we should address
-scoping the late brought issues.") — do not start on item 4's gap (evidence-grounding
-verification) until then; it needs its own Task Contract given the size (a new verification-pass
-architecture, not a quick prompt tweak).
+**Status**: items 1 and 2 were investigated and don't need code changes (accepted limitation /
+confirmed non-issue, respectively). Items 4 and 5 resolved 2026-08-12 via evidence-grounding
+verification (see above). **Item 3 remains open** — the specific fabricated GPL/mongodb finding
+the user originally reported was never traced to a specific run; still needs the raw finding's
+exact file/line/text and the `ai-review-agent --version` used, to tell a stale-build artifact from
+a live regression.
 
 ## ✅ Completed (Tasks 1–16)
 
