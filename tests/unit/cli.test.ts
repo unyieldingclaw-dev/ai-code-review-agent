@@ -92,6 +92,7 @@ vi.mock('../../src/core/config.js', () => ({
     agentPolicy: {},
     verifyEvidence: false,
     verifierModel: 'qwen3:latest',
+    verifyEvidenceSeverity: 'high',
   })),
 }))
 
@@ -140,24 +141,25 @@ async function runCli(
     stderrChunks.push(args.map(String).join(' ') + '\n')
   })
 
-  let exitCode = 0
-  const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number | string) => {
-    exitCode = Number(code ?? 0)
-    throw new Error(`process.exit(${code})`)
-  })
-
+  // WHY process.exitCode instead of a process.exit() spy: the CLI sets process.exitCode and
+  // returns rather than calling process.exit(), so the event loop can drain naturally instead
+  // of being torn down mid-flight (process.exit() forcing immediate termination while async
+  // handles -- e.g. fetch/AbortController cleanup -- are still settling was reproduced as the
+  // cause of a Windows-only libuv crash, "Assertion failed: !(handle->flags &
+  // UV_HANDLE_CLOSING)"). Reset before and after each run since process.exitCode is a real
+  // mutable global that would otherwise leak between tests and into vitest's own exit code.
+  process.exitCode = undefined
   try {
     const { program } = await import('../../src/cli/index.js')
     await program.parseAsync(['node', 'cli', ...args])
-  } catch (err) {
-    if (!(err instanceof Error) || !err.message.startsWith('process.exit(')) throw err
   } finally {
     stdoutSpy.mockRestore()
     stderrSpy.mockRestore()
     consoleSpy.mockRestore()
-    exitSpy.mockRestore()
   }
 
+  const exitCode = Number(process.exitCode ?? 0)
+  process.exitCode = undefined
   return { exitCode, stdout: stdoutChunks.join(''), stderr: stderrChunks.join('') }
 }
 
@@ -482,26 +484,99 @@ describe('CLI — argument parsing and output', () => {
     expect(config.parallel).toBe(false)
   })
 
-  it('--verify-evidence enables evidence verification and constructs a verifier provider', async () => {
+  it('--verify-evidence enables evidence verification and constructs a verifier provider using verifierModel, not the main review model', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    const { OllamaProvider } = await import('../../src/core/llm/ollamaProvider.js')
+    const MockOllamaProvider = vi.mocked(OllamaProvider)
+
+    await runCli(['--verify-evidence'])
+
+    const config = MockSwarmRunner.mock.calls[0][0]
+    const verifierProvider = MockSwarmRunner.mock.calls[0][2]
+    expect(config.verifyEvidence).toBe(true)
+    expect(verifierProvider).toBeDefined()
+    // Cross-model verification only works if the verifier is a genuinely separate instance/model
+    // from the main review provider (see cli/index.ts's own WHY comment on this construction) --
+    // asserting just `toBeDefined()` can't tell a correctly-wired verifier from one accidentally
+    // sharing the main review's model, since the mocked OllamaProvider returns `{}` either way.
+    expect(MockOllamaProvider).toHaveBeenCalledTimes(2)
+    const [, mainModel] = MockOllamaProvider.mock.calls[0]
+    const [, verifierModel] = MockOllamaProvider.mock.calls[1]
+    expect(mainModel).toBe('devstral:latest') // DEFAULT_CONFIG.model in this file's loadConfig mock
+    expect(verifierModel).toBe('qwen3:latest') // DEFAULT_CONFIG.verifierModel in the same mock
+    expect(verifierModel).not.toBe(mainModel)
+  })
+
+  it('falls back to qwen3:latest when config.verifierModel is an empty string', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    const { loadConfig } = await import('../../src/core/config.js')
+    vi.mocked(loadConfig).mockReturnValueOnce({
+      model: 'devstral:latest',
+      provider: 'ollama',
+      ollamaUrl: 'http://localhost:11434',
+      maxFindings: 15,
+      agents: ['security'],
+      contextLines: 10,
+      testOutputDir: './ai-review-tests',
+      maxDiffLines: 2000,
+      agentTimeoutMs: 60000,
+      ignorePaths: [],
+      sanitize: true,
+      verifyEvidence: false,
+      verifierModel: '', // config file setting it to "" should fall back to the default, not construct an empty-model provider
+    })
+    const { OllamaProvider } = await import('../../src/core/llm/ollamaProvider.js')
+    const MockOllamaProvider = vi.mocked(OllamaProvider)
+
+    await runCli(['--verify-evidence'])
+
+    const [, verifierModel] = MockOllamaProvider.mock.calls[1]
+    expect(verifierModel).toBe('qwen3:latest')
+  })
+
+  it('leaves verifyEvidence off and constructs only the main review provider by default', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    const { OllamaProvider } = await import('../../src/core/llm/ollamaProvider.js')
+    const MockOllamaProvider = vi.mocked(OllamaProvider)
+
+    await runCli([])
+
+    const config = MockSwarmRunner.mock.calls[0][0]
+    const verifierProvider = MockSwarmRunner.mock.calls[0][2]
+    expect(config.verifyEvidence).toBe(false)
+    expect(verifierProvider).toBeUndefined()
+    // No verifier provider should be constructed at all when the feature is off -- not just
+    // omitted from the SwarmRunner call.
+    expect(MockOllamaProvider).toHaveBeenCalledTimes(1)
+  })
+
+  it('--verify-evidence-severity overrides the config value when passed', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli(['--verify-evidence', '--verify-evidence-severity', 'medium'])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    expect(config.verifyEvidenceSeverity).toBe('medium')
+  })
+
+  it('leaves verifyEvidenceSeverity at the config default (high) when the flag is not passed', async () => {
     MockSwarmRunner.mockImplementation(() => ({
       run: vi.fn().mockResolvedValue(makeResult()),
     }))
     await runCli(['--verify-evidence'])
     const config = MockSwarmRunner.mock.calls[0][0]
-    const verifierProvider = MockSwarmRunner.mock.calls[0][2]
-    expect(config.verifyEvidence).toBe(true)
-    expect(verifierProvider).toBeDefined()
+    expect(config.verifyEvidenceSeverity).toBe('high')
   })
 
-  it('leaves verifyEvidence off and passes no verifier provider by default', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
-    await runCli([])
-    const config = MockSwarmRunner.mock.calls[0][0]
-    const verifierProvider = MockSwarmRunner.mock.calls[0][2]
-    expect(config.verifyEvidence).toBe(false)
-    expect(verifierProvider).toBeUndefined()
+  it('rejects an invalid --verify-evidence-severity value', async () => {
+    const { exitCode } = await runCli(['--verify-evidence-severity', 'urgent'])
+    expect(exitCode).toBe(1)
   })
 
   // WHY --max-lines 1 in these tests: the mocked diff is fixed at 2 lines ('+ added line\n-

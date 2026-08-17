@@ -35,6 +35,10 @@ describe('DEFAULT_CONFIG', () => {
     expect(DEFAULT_CONFIG.verifierModel).toBe('qwen3:latest')
   })
 
+  it('verifyEvidenceSeverity defaults to high', () => {
+    expect(DEFAULT_CONFIG.verifyEvidenceSeverity).toBe('high')
+  })
+
   it('chunk defaults to false', () => {
     expect(DEFAULT_CONFIG.chunk).toBe(false)
   })
