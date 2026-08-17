@@ -8,7 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - CLI process could crash on exit on Windows with `Assertion failed: !(handle->flags &
-  UV_HANDLE_CLOSING), file src\win\async.c, line 76` after a review completed successfully and
+UV_HANDLE_CLOSING), file src\win\async.c, line 76` after a review completed successfully and
   valid output had already been written — caused by `process.exit()` forcing immediate process
   termination while async handles (fetch/`AbortController` cleanup from `OllamaProvider`) were
   still settling. All 9 `process.exit()` call sites in `src/cli/index.ts`'s action handler now
