@@ -456,7 +456,7 @@ Expected: FAIL — both still send `format: 'json'`.
 
 - [ ] **Step 3: Implement**
 
-In `src/core/agents/base.ts`, add a new exported constant above the `BaseAgent` class. `required` matches exactly what `parsing.ts`'s `validateAndNormalizeFindings` actually requires (`severity`, `file`, `line`, `title`, `detail`, plus `evidence`/`recommendation` — the canonical field names every current agent prompt already emits; the legacy `basis`/`suggestion` alternates that function also accepts are included as optional properties but not required, since every prompt in this codebase already emits the canonical names):
+In `src/core/agents/base.ts`, add a new exported constant above the `BaseAgent` class. `required` is a stricter subset of what `parsing.ts`'s `validateAndNormalizeFindings` actually requires (`severity`, `file`, `line`, `title`, `detail`, plus `evidence`/`recommendation` — the canonical field names every current agent prompt already emits; the validator itself also accepts the legacy `basis`/`suggestion` alternates via OR-logic, but hard-requiring the canonical names here is safe and simpler than reproducing that OR logic in JSON Schema):
 
 ```ts
 // Forces Ollama's structured-output mode to actually constrain the top-level shape to an array,
