@@ -5,8 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.10.0] — 2026-08-17 (full-codebase audit fixes, evidence-grounding verification, review reliability)
+
 ### Added
 
+- `AI_REVIEW_ALLOWED_ROOTS`: opt-in, comma-separated allowlist of absolute paths the MCP server's
+  `repo_path` may point at (unset — the default — keeps prior unrestricted behavior).
+- `complexityThreshold` config field is now wired up for real — passed to `lizard` as its native
+  `-C` threshold flag when `lizard` is installed. Previously documented as shipped but silently a
+  no-op.
 - `--verify-evidence` runs Critical/High findings through a separate model (`qwen3:latest` by
   default) that checks whether each finding's own cited evidence actually supports its claim —
   catches a hallucination class none of the existing defenses caught (a finding citing a real
@@ -59,6 +66,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `package.json`/`package-lock.json` (even one not yet on disk — e.g. reviewing an unapplied patch
   that adds a manifest for the first time) is unaffected, reaching the existing
   npm-audit-then-LLM-fallback logic exactly as before.
+- `shell.ts` now logs stderr when a tool exits nonzero with empty stdout — previously
+  indistinguishable from "tool not installed," both silently resolved to `null`.
+- `config.ts` logs before falling back to defaults on a malformed `ai-review.config.json`, instead
+  of silently ignoring it.
+- `gitleaksParser.ts`/`npmAuditParser.ts` log on malformed tool JSON instead of silently reporting
+  "0 findings, tool used" — previously a false sense of security, specifically dangerous for the
+  secrets scanner.
+- `TestGenAgent` now checks generated content for actual test-framework structure (a quoted-title
+  `describe(`/`it(`/`test(`, or `def test_` for pytest) instead of just a length threshold — a
+  model refusal/explanation long enough to pass the old check would previously get written to disk
+  as if it were real tests.
+- Coverage-gap and other cross-agent finding matching used to compare raw, unnormalized `file`
+  strings — a model echoing the diff's own `a/`/`b/` header prefix into a finding's `file` field
+  could defeat deduplication, corroboration, and escalation checks. All comparisons now use
+  canonicalized paths.
+- `--context-mode semantic` recomputed the same diff/memory-bank embeddings from scratch once per
+  agent (up to ~14 redundant Ollama calls per run for an identical result) — now computed once per
+  run and reused.
+
+### Security
+
+- `--write-tests` and the MCP server's coverage-gap-derived test paths are now defended against
+  path traversal (`resolveWriteTestPath` containment check, plus a coverage-gap filter mirroring
+  the existing changed-file-membership defense already applied to regular findings).
+- The MCP server's `repo_path` accepted any filesystem path with no scoping — see
+  `AI_REVIEW_ALLOWED_ROOTS` above.
+
+### Removed
+
+- `preferredSecretsScanner` config field — documented as shipped but functionally always a no-op
+  (every code path fell back to the same default regardless of its value).
 
 ## [1.9.0] — 2026-08-09 (deterministic-tool integration, hallucination fixes, CI hardening)
 
