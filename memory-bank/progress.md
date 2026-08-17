@@ -352,10 +352,19 @@ individually against this codebase rather than accepted at face value:
 
 **Status**: items 1 and 2 were investigated and don't need code changes (accepted limitation /
 confirmed non-issue, respectively). Items 4 and 5 resolved 2026-08-12 via evidence-grounding
-verification (see above). **Item 3 remains open** — the specific fabricated GPL/mongodb finding
-the user originally reported was never traced to a specific run; still needs the raw finding's
-exact file/line/text and the `ai-review-agent --version` used, to tell a stale-build artifact from
-a live regression.
+verification (see above). **Item 3 closed 2026-08-17, unresolvable rather than fixed** — the
+specific fabricated GPL/mongodb finding the user originally reported was never traced to a
+specific run (would have needed the raw finding's exact file/line/text and the
+`ai-review-agent --version` used, to tell a stale pre-v1.9.0 build artifact from a live
+regression); the user confirmed they no longer have that data, so tracing it further isn't
+possible. Re-verified on close that both known mitigations are still in place: the exact
+"package.json:14"+"MongoDB" bait pattern remains absent from `licenseCompliance.ts`'s prompt
+(removed in `a906515`, shipped `v1.9.0`), and `filterNonexistentFiles` still runs agent-agnostically
+over the full finding set in `orchestrator.ts`'s `synthesize()` before any per-agent logic. A
+`license-clean` calibration case also guards against the bait pattern regressing. Closing without
+a traced root cause is a judgment call, not a proof of absence — if the same shape of finding
+(a license claim citing a file/package not actually in the diff) reappears in a future report, it
+should be treated as a new occurrence worth investigating fresh, not dismissed as "already handled."
 
 ## ✅ Completed (Tasks 1–16)
 
