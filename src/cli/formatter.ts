@@ -1,4 +1,4 @@
-import type { ReviewResult, Severity } from '../core/schema.js'
+import type { ReviewResult, Severity, ToolAvailabilityMetadata } from '../core/schema.js'
 export { formatSarif } from './formatters/sarif.js'
 export { formatGithubAnnotations } from './formatters/githubAnnotations.js'
 
@@ -48,12 +48,49 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     lines.push('')
   }
 
-  const TOOL_LABELS: Record<'gitleaks' | 'npmAudit' | 'lizard', string> = {
+  if (result.coverageGapFilter && result.coverageGapFilter.dropped.length > 0) {
+    lines.push(
+      `${useEmoji ? '🔍 ' : ''}Coverage gap filter: ${result.coverageGapFilter.dropped.length} coverage gap(s) dropped — referenced file(s) not present in the reviewed diff.`
+    )
+    lines.push('')
+  }
+
+  if (result.evidenceCheckFilter) {
+    const { checkedCount, unavailableCount, unavailableReasons, flagged } =
+      result.evidenceCheckFilter
+    lines.push(
+      `${useEmoji ? '🔍 ' : ''}Evidence check: ${checkedCount} finding(s) checked` +
+        (flagged.length > 0
+          ? `, ${flagged.length} flagged as possibly unsupported by their own cited evidence`
+          : ', none flagged') +
+        (unavailableCount > 0
+          ? `, ${unavailableCount} unavailable (verifier could not be reached)`
+          : '') +
+        '.'
+    )
+    if (unavailableReasons.length > 0) {
+      lines.push(`  ${unavailableReasons.join('; ')}`)
+    }
+    for (const f of flagged) {
+      lines.push(
+        `  - **${f.title}** (${f.file}:${f.line}, ${f.agent}) — ${f.reason}` +
+          (f.preFilterAgreed === true ? ' [deterministic pre-filter agreed]' : '')
+      )
+    }
+    lines.push('')
+  }
+
+  // WHY key off ToolAvailabilityMetadata's own keys instead of a second hand-typed literal union:
+  // this and the array below used to each independently list the same 3 tool keys, which could
+  // silently drift apart (e.g. a new tool integration added to the schema but forgotten here).
+  // Deriving the iteration list from this object's own keys means there's exactly one place that
+  // enumerates them.
+  const TOOL_LABELS: Record<keyof ToolAvailabilityMetadata, string> = {
     gitleaks: 'gitleaks',
     npmAudit: 'npm audit',
     lizard: 'lizard',
   }
-  const degradedTools = (['gitleaks', 'npmAudit', 'lizard'] as const).filter(
+  const degradedTools = (Object.keys(TOOL_LABELS) as (keyof ToolAvailabilityMetadata)[]).filter(
     (t) => result.toolAvailability?.[t] === 'unavailable-llm-fallback'
   )
   if (degradedTools.length > 0) {

@@ -1,4 +1,3 @@
-import type { LLMProvider } from '../llm/provider.js'
 import type { ReviewConfig } from '../config.js'
 import type {
   Finding,
@@ -8,8 +7,9 @@ import type {
   DroppedHallucinatedFinding,
 } from '../schema.js'
 import { SEVERITY_RANK } from '../schema.js'
+import { normalizeFilePath, stripDiffPrefix } from '../filePath.js'
 
-const DETERMINISTIC_SOURCES: EvidenceSource[] = [
+export const DETERMINISTIC_SOURCES: EvidenceSource[] = [
   'gitleaks',
   'trufflehog',
   'semgrep',
@@ -49,11 +49,16 @@ const AGENT_PRIORITY: AgentName[] = [
   'secrets',
 ]
 
+// Findings within this many lines of each other are treated as "the same location" for
+// cross-referencing and hallucination-corroboration purposes -- close enough to plausibly
+// describe the same code, without requiring an exact line match (agents don't always agree on
+// which line within a multi-line statement/block a finding belongs to).
+const SAME_LOCATION_LINE_PROXIMITY = 5
+
 export class OrchestratorAgent {
-  constructor(
-    private readonly provider: LLMProvider,
-    private readonly config: ReviewConfig
-  ) {}
+  // No LLMProvider param -- synthesis is 100% deterministic (dedup, cross-reference, hallucination
+  // filtering), no LLM calls.
+  constructor(private readonly config: ReviewConfig) {}
 
   // changedFiles is optional so existing/other callers that don't have a diff's file list handy
   // (e.g. every existing test in this file) are unaffected -- the filter simply no-ops when
@@ -88,33 +93,19 @@ export class OrchestratorAgent {
     return result
   }
 
-  // Models sometimes echo the diff's own "--- a/path" / "+++ b/path" header prefix into a
-  // finding's file field verbatim. These two are shared by every file-comparison call site in
-  // this class (filterNonexistentFiles, deduplicate, hallucinationCrossCheck, crossReference).
-  // Most compose them as stripDiffPrefix(normalizeFilePath(p)) to get one canonical path;
-  // filterNonexistentFiles instead tries stripDiffPrefix as a second-choice fallback candidate
-  // against a set built from normalizeFilePath alone (see its own comment below) since it's
-  // checking set membership, not building a single key.
-  private normalizeFilePath(p: string): string {
-    return p.replace(/^\.\//, '').replace(/\\/g, '/')
-  }
-
-  private stripDiffPrefix(p: string): string {
-    return p.replace(/^[ab]\//, '')
-  }
-
   private filterNonexistentFiles(
     findings: Finding[],
     changedFiles: string[],
     dropped?: DroppedHallucinatedFinding[]
   ): Finding[] {
-    // changedFiles (from extractChangedFiles) never carries an a/ or b/ prefix, so also try the
-    // finding's path with it stripped before rejecting it.
-    const changedSet = new Set(changedFiles.map((p) => this.normalizeFilePath(p)))
+    // Models sometimes echo the diff's own "--- a/path" / "+++ b/path" header prefix into a
+    // finding's file field verbatim (see filePath.ts's normalizeFilePath/stripDiffPrefix, shared
+    // with runner.ts's CoverageGap filter). changedFiles (from extractChangedFiles) never carries
+    // an a/ or b/ prefix, so also try the finding's path with it stripped before rejecting it.
+    const changedSet = new Set(changedFiles.map((p) => normalizeFilePath(p)))
     return findings.filter((f) => {
-      const normalized = this.normalizeFilePath(f.file)
-      if (changedSet.has(normalized) || changedSet.has(this.stripDiffPrefix(normalized)))
-        return true
+      const normalized = normalizeFilePath(f.file)
+      if (changedSet.has(normalized) || changedSet.has(stripDiffPrefix(normalized))) return true
       dropped?.push({ agent: f.agent, title: f.title, file: f.file })
       console.error(
         `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- references ` +
@@ -130,15 +121,15 @@ export class OrchestratorAgent {
 
     return findings.map((f) => {
       if (f.severity !== 'critical' && f.severity !== 'high') return f
-      const fFile = this.stripDiffPrefix(this.normalizeFilePath(f.file))
+      const fFile = stripDiffPrefix(normalizeFilePath(f.file))
       const corroborators = new Set(
         findings
           .filter(
             (other) =>
               other.id !== f.id &&
               other.agent !== f.agent &&
-              this.stripDiffPrefix(this.normalizeFilePath(other.file)) === fFile &&
-              Math.abs(other.line - f.line) <= 5
+              stripDiffPrefix(normalizeFilePath(other.file)) === fFile &&
+              Math.abs(other.line - f.line) <= SAME_LOCATION_LINE_PROXIMITY
           )
           .map((other) => other.agent)
       )
@@ -164,7 +155,7 @@ export class OrchestratorAgent {
     // corroboratingAgents. Same-agent findings at the same location are kept as-is.
     const byLocation = new Map<string, Finding[]>()
     for (const f of findings) {
-      const key = `${this.stripDiffPrefix(this.normalizeFilePath(f.file))}:${f.line}`
+      const key = `${stripDiffPrefix(normalizeFilePath(f.file))}:${f.line}`
       const group = byLocation.get(key) ?? []
       group.push(f)
       byLocation.set(key, group)
@@ -206,14 +197,14 @@ export class OrchestratorAgent {
 
   private crossReference(findings: Finding[]): Finding[] {
     return findings.map((f) => {
-      const fFile = this.stripDiffPrefix(this.normalizeFilePath(f.file))
+      const fFile = stripDiffPrefix(normalizeFilePath(f.file))
       // Correctness bug at same file:line as a coverage gap → escalate severity
       if (f.agent === 'correctness') {
         const coverageGap = findings.find(
           (other) =>
             other.agent === 'coverage' &&
-            this.stripDiffPrefix(this.normalizeFilePath(other.file)) === fFile &&
-            Math.abs(other.line - f.line) <= 5
+            stripDiffPrefix(normalizeFilePath(other.file)) === fFile &&
+            Math.abs(other.line - f.line) <= SAME_LOCATION_LINE_PROXIMITY
         )
         if (coverageGap) {
           return {
@@ -228,8 +219,8 @@ export class OrchestratorAgent {
         const hasAdversarial = findings.some(
           (other) =>
             other.agent === 'adversarial' &&
-            this.stripDiffPrefix(this.normalizeFilePath(other.file)) === fFile &&
-            Math.abs(other.line - f.line) <= 5
+            stripDiffPrefix(normalizeFilePath(other.file)) === fFile &&
+            Math.abs(other.line - f.line) <= SAME_LOCATION_LINE_PROXIMITY
         )
         if (hasAdversarial) {
           return { ...f, severity: this.escalate(f.severity) }
@@ -240,8 +231,8 @@ export class OrchestratorAgent {
         const hasCorrectnessOrDesign = findings.some(
           (other) =>
             (other.agent === 'correctness' || other.agent === 'design') &&
-            this.stripDiffPrefix(this.normalizeFilePath(other.file)) === fFile &&
-            Math.abs(other.line - f.line) <= 5
+            stripDiffPrefix(normalizeFilePath(other.file)) === fFile &&
+            Math.abs(other.line - f.line) <= SAME_LOCATION_LINE_PROXIMITY
         )
         if (hasCorrectnessOrDesign) {
           return { ...f, severity: this.escalate(f.severity) }

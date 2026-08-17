@@ -36,7 +36,18 @@ describe('BaseAgent', () => {
     await new TestAgent(provider, DEFAULT_CONFIG).run({ diff: 'diff content' })
     expect(provider.chat).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ format: 'json' })
+      expect.objectContaining({ format: expect.objectContaining({ type: 'array' }) })
+    )
+  })
+
+  it('sends an array-typed JSON Schema instead of the bare "json" string', async () => {
+    const provider = makeProvider('[]')
+    await new TestAgent(provider, DEFAULT_CONFIG).run({ diff: 'x' })
+    expect(provider.chat).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        format: expect.objectContaining({ type: 'array' }),
+      })
     )
   })
 
@@ -54,6 +65,18 @@ describe('BaseAgent', () => {
     // A trivially parseable but empty/garbage object must not be silently treated as
     // "0 findings, clean run" -- it's a real parse failure.
     const agent = new TestAgent(makeProvider('{}'), DEFAULT_CONFIG)
+    await expect(agent.run({ diff: 'diff' })).rejects.toThrow(ParseFailureError)
+  })
+
+  it('throws ParseFailureError when a non-empty .findings array has every item fail schema validation', async () => {
+    // Stage 1 (bare array) already guards against "parsed but nothing valid" by falling
+    // through instead of returning an empty array silently. Stage 2 (object with .findings)
+    // did not have the same guard -- a non-empty but entirely garbage .findings array
+    // resolved to "[], no throw" instead of surfacing the parse failure.
+    const raw = JSON.stringify({
+      findings: [{ bogus: 'garbage', missing: 'required fields' }],
+    })
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
     await expect(agent.run({ diff: 'diff' })).rejects.toThrow(ParseFailureError)
   })
 

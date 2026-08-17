@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { loadConfig, DEFAULT_CONFIG } from '../../src/core/config.js'
 import { writeFileSync, unlinkSync } from 'fs'
 
@@ -26,6 +26,27 @@ describe('DEFAULT_CONFIG', () => {
   it('provider is ollama', () => {
     expect(DEFAULT_CONFIG.provider).toBe('ollama')
   })
+
+  it('verifyEvidence defaults to false', () => {
+    expect(DEFAULT_CONFIG.verifyEvidence).toBe(false)
+  })
+
+  it('verifierModel defaults to qwen3:latest', () => {
+    expect(DEFAULT_CONFIG.verifierModel).toBe('qwen3:latest')
+  })
+
+  it('chunk defaults to false', () => {
+    expect(DEFAULT_CONFIG.chunk).toBe(false)
+  })
+
+  // Pins the actual default this release's fix for security/adversarial misreading .md prose as
+  // vulnerable code depends on -- the per-agent filtering mechanism itself is well covered
+  // elsewhere (tests/unit/runner.test.ts), but nothing previously asserted this specific default
+  // value exists, so a future edit could silently drop or reword it with no test failing.
+  it('security and adversarial exclude **/*.md by default', () => {
+    expect(DEFAULT_CONFIG.agentPolicy?.security?.exclude).toContain('**/*.md')
+    expect(DEFAULT_CONFIG.agentPolicy?.adversarial?.exclude).toContain('**/*.md')
+  })
 })
 
 describe('loadConfig', () => {
@@ -50,11 +71,33 @@ describe('loadConfig', () => {
     }
   })
 
+  it('does not log an error for a valid config file', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    writeFileSync('ai-review.config.json', JSON.stringify({ model: 'qwen3:latest' }))
+    try {
+      loadConfig(process.cwd())
+      expect(errorSpy).not.toHaveBeenCalled()
+    } finally {
+      unlinkSync('ai-review.config.json')
+    }
+  })
+
   it('returns defaults when config file contains invalid JSON', () => {
     writeFileSync('ai-review.config.json', '{ not valid json }')
     try {
       const config = loadConfig(process.cwd())
       expect(config.model).toBe('devstral:latest')
+    } finally {
+      unlinkSync('ai-review.config.json')
+    }
+  })
+
+  it('logs a warning when falling back to defaults due to invalid JSON', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    writeFileSync('ai-review.config.json', '{ not valid json }')
+    try {
+      loadConfig(process.cwd())
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('ai-review.config.json'))
     } finally {
       unlinkSync('ai-review.config.json')
     }

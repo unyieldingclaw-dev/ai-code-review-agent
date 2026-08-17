@@ -49,6 +49,17 @@ vi.mock('../../src/core/runner.js', () => ({
   })),
 }))
 
+// Mock chunkRunner — same pattern as SwarmRunner above (mocked module, not a spy on a real
+// export), since runChunked is a standalone function, not a class method. WHY no
+// .mockResolvedValue(makeResult()) here (unlike SwarmRunner's mock above, which wraps its
+// makeResult() call inside an extra mockImplementation lambda): calling makeResult() directly
+// inside this factory would run eagerly when the mock is registered, before the top-level
+// `const makeResult` below has initialized (vi.mock factories are hoisted above it) --
+// ReferenceError. Tests that need a resolved value set it explicitly via mockRunChunked below.
+vi.mock('../../src/core/chunkRunner.js', () => ({
+  runChunked: vi.fn(),
+}))
+
 // Mock OllamaProvider — valid URL check is bypassed by mock
 vi.mock('../../src/core/llm/ollamaProvider.js', () => ({
   OllamaProvider: vi.fn().mockImplementation(() => ({})),
@@ -79,14 +90,19 @@ vi.mock('../../src/core/config.js', () => ({
     contextBudgetChars: 4000,
     contextMode: 'static',
     agentPolicy: {},
+    verifyEvidence: false,
+    verifierModel: 'qwen3:latest',
   })),
 }))
 
 import { spawnSync } from 'child_process'
+import { resolve } from 'path'
 import { SwarmRunner } from '../../src/core/runner.js'
+import { runChunked } from '../../src/core/chunkRunner.js'
 
 const mockSpawnSync = vi.mocked(spawnSync)
 const MockSwarmRunner = vi.mocked(SwarmRunner)
+const mockRunChunked = vi.mocked(runChunked)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -357,6 +373,78 @@ describe('CLI — argument parsing and output', () => {
     expect(exitCode).toBe(0)
   })
 
+  it('exits 1 (not 3) when a truncated run also contains a blocker finding', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          findings: [
+            {
+              id: 'f-0',
+              agent: 'security',
+              severity: 'critical',
+              basis: 'VERIFIED',
+              file: 'a.ts',
+              line: 1,
+              title: 'T',
+              detail: 'D',
+              domain: 'Security',
+              evidence: 'E',
+              impact: 'I',
+              recommendation: 'R',
+              suggestion: 'S',
+              blocking: true,
+              source: 'llm',
+              confidence: 90,
+            },
+          ],
+          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+        })
+      ),
+    }))
+    const { exitCode } = await runCli(['--fail-on', 'high'])
+    expect(exitCode).toBe(1)
+  })
+
+  it('exits 3 when truncated with no blocker finding', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          findings: [],
+          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+        })
+      ),
+    }))
+    const { exitCode } = await runCli([])
+    expect(exitCode).toBe(3)
+  })
+
+  it('exits 0 on a truncated-but-clean run when --allow-truncation is passed', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          findings: [],
+          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+        })
+      ),
+    }))
+    const { exitCode } = await runCli(['--allow-truncation'])
+    expect(exitCode).toBe(0)
+  })
+
+  it('exits 2 (not 3) when agents failed AND the run was also truncated', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          findings: [],
+          agentStatus: { security: 'ok', correctness: 'timeout' },
+          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+        })
+      ),
+    }))
+    const { exitCode } = await runCli([])
+    expect(exitCode).toBe(2)
+  })
+
   it('--timeout sets agentTimeoutMs and disables timeout scaling', async () => {
     MockSwarmRunner.mockImplementation(() => ({
       run: vi.fn().mockResolvedValue(makeResult()),
@@ -392,5 +480,101 @@ describe('CLI — argument parsing and output', () => {
     await runCli([])
     const config = MockSwarmRunner.mock.calls[0][0]
     expect(config.parallel).toBe(false)
+  })
+
+  it('--verify-evidence enables evidence verification and constructs a verifier provider', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli(['--verify-evidence'])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    const verifierProvider = MockSwarmRunner.mock.calls[0][2]
+    expect(config.verifyEvidence).toBe(true)
+    expect(verifierProvider).toBeDefined()
+  })
+
+  it('leaves verifyEvidence off and passes no verifier provider by default', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli([])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    const verifierProvider = MockSwarmRunner.mock.calls[0][2]
+    expect(config.verifyEvidence).toBe(false)
+    expect(verifierProvider).toBeUndefined()
+  })
+
+  // WHY --max-lines 1 in these tests: the mocked diff is fixed at 2 lines ('+ added line\n-
+  // removed line'), so forcing maxDiffLines below that is what actually makes diffLines >
+  // config.maxDiffLines true -- without it, --chunk alone would never trigger the runChunked
+  // branch and these tests would pass trivially regardless of whether the wiring is correct.
+  it('calls runChunked instead of runner.run directly when --chunk is passed and the diff exceeds maxDiffLines', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    mockRunChunked.mockResolvedValue(makeResult())
+    const { exitCode } = await runCli(['--diff', 'x.diff', '--chunk', '--max-lines', '1'])
+    expect(exitCode).toBe(0)
+    expect(mockRunChunked).toHaveBeenCalled()
+  })
+
+  it('does not call runChunked when --chunk is not passed', async () => {
+    const runSpy = vi.fn().mockResolvedValue(makeResult())
+    MockSwarmRunner.mockImplementation(() => ({ run: runSpy }))
+    const { exitCode } = await runCli(['--diff', 'x.diff', '--max-lines', '1'])
+    expect(exitCode).toBe(0)
+    expect(mockRunChunked).not.toHaveBeenCalled()
+    expect(runSpy).toHaveBeenCalled()
+  })
+})
+
+describe('--write-tests path containment (Layer B backstop)', () => {
+  // WHY this matters even though runner.ts's coverage-gap filter (Layer A) already drops
+  // gaps whose file isn't in the diff: Layer A can't catch a malicious testOutputDir from
+  // ai-review.config.json (e.g. "../../../.."), since deriveTestPath concatenates
+  // testOutputDir with a legitimate gap's filename with zero sanitization. This is the
+  // backstop that catches that case regardless of which layer let a bad path through.
+  it('resolveWriteTestPath returns the resolved path for a normal relative path', async () => {
+    const { resolveWriteTestPath } = await import('../../src/cli/index.js')
+    const projectPath = resolve('/home/user/myproject')
+    const result = resolveWriteTestPath(projectPath, 'ai-review-tests/foo.test.ts')
+    expect(result).toBe(resolve(projectPath, 'ai-review-tests/foo.test.ts'))
+  })
+
+  it('resolveWriteTestPath returns null for a path that escapes projectPath via traversal', async () => {
+    const { resolveWriteTestPath } = await import('../../src/cli/index.js')
+    const projectPath = resolve('/home/user/myproject')
+    const result = resolveWriteTestPath(projectPath, '../../../../../../etc/passwd')
+    expect(result).toBeNull()
+  })
+
+  it('skips writing a test file whose path resolves outside projectPath, and logs it, while still writing legitimate files', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(
+        makeResult({
+          testFiles: [
+            {
+              path: 'ai-review-tests/foo.test.ts',
+              content: 'legit test content',
+              framework: 'vitest',
+            },
+            {
+              path: '../../../../../../etc/passwd',
+              content: 'malicious content',
+              framework: 'vitest',
+            },
+          ],
+        })
+      ),
+    }))
+    const fs = await import('fs')
+    const writeFileSyncMock = vi.mocked(fs.writeFileSync)
+
+    const { exitCode, stderr } = await runCli(['--write-tests'])
+
+    expect(exitCode).toBe(0)
+    expect(writeFileSyncMock).toHaveBeenCalledTimes(1)
+    expect(String(writeFileSyncMock.mock.calls[0][0])).toContain('foo.test.ts')
+    expect(stderr).toMatch(/outside (the )?project|escapes project|traversal/i)
   })
 })

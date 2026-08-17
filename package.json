@@ -1,6 +1,6 @@
 {
   "name": "ai-review-agent",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Local AI code review swarm — 15 observe-only default agents powered by Ollama, zero API costs (testgen opt-in)",
   "type": "module",
   "keywords": [
@@ -44,6 +44,8 @@
     "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run --coverage tests/unit",
     "calibrate": "tsx calibration/calibrate.ts",
+    "calibrate:evidence": "tsx calibration/evidenceVerifierCalibration.ts",
+    "diagnose:truncation": "tsx calibration/responseTruncationDiagnostic.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "test:extension": "npm --prefix vscode-extension test",

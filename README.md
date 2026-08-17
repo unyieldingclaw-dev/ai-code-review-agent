@@ -126,6 +126,26 @@ or invoke directly:
 
 Requires Ollama running locally with `devstral:latest` pulled. The tool runs 15 agents (all except `testgen`). For generated test files, use the CLI (`ai-review-agent`).
 
+By default `review_diff` accepts a `repo_path` pointing anywhere the server process can read.
+To restrict it to specific project roots, set `AI_REVIEW_ALLOWED_ROOTS` to a comma-separated
+list of absolute paths in the server's `env`:
+
+```json
+{
+  "mcpServers": {
+    "ai-review": {
+      "command": "ai-review-mcp",
+      "args": [],
+      "env": {
+        "AI_REVIEW_ALLOWED_ROOTS": "/Users/you/projects/app-one,/Users/you/projects/app-two"
+      }
+    }
+  }
+}
+```
+
+Unset (the default), any `repo_path` is allowed — unrestricted, matching prior behavior.
+
 ## `/ai-review` in Claude Code
 
 Installing globally (`npm install -g ai-review-agent`, or via `setup.bat`/`setup.command`)
@@ -185,6 +205,9 @@ ai-review-agent --context memory-bank --context-mode semantic
 # Disable emoji for CI/CD pipelines
 ai-review-agent --no-emoji --format markdown
 
+# Verify Critical/High findings against their own evidence (requires qwen3:latest in Ollama)
+ai-review-agent --verify-evidence
+
 # Full help
 ai-review-agent --help
 ```
@@ -207,6 +230,8 @@ ai-review-agent --help
 | `--retry-delay <ms>`    | 2000            | Backoff between retries                                                                                                                                                                                                                                                                                                                                                          |
 | `--fail-on <level>`     | high            | Exit 1 when severity ≥ level (`critical\|high\|medium\|any\|never`)                                                                                                                                                                                                                                                                                                              |
 | `--fail-fast`           | off             | Stop swarm on first finding at or above `--fail-on` threshold                                                                                                                                                                                                                                                                                                                    |
+| `--allow-truncation`    | off             | Exit 0 on a truncated-but-otherwise-clean run instead of exit code 3                                                                                                                                                                                                                                                                                                             |
+| `--chunk`               | off             | Instead of truncating an oversized diff, split it into multiple full-coverage passes. Multiplies LLM calls by chunk count -- verify it before enabling on a slow-hardware setup                                                                                                                                                                                                  |
 | `--parallel`            | off             | Run specialist agents concurrently. Verify it helps on your hardware first -- Ollama often serializes requests anyway and queued agents can spuriously time out. Disables `--fail-fast` early exit                                                                                                                                                                               |
 | `--ignore <glob>`       | —               | Exclude matching files (repeatable)                                                                                                                                                                                                                                                                                                                                              |
 | `--no-sanitize`         | —               | Skip prompt injection sanitization — of the diff, and also of memory-bank context when `--context memory-bank` is set. **Security:** disables prompt injection protection. Do not use with untrusted diffs (e.g., reviewing PRs from external contributors). The sanitizer warning is written to stderr — it will be silently discarded if stderr is redirected (`2>/dev/null`). |
@@ -215,8 +240,12 @@ ai-review-agent --help
 | `--context-budget <n>`  | 4000            | Max chars of memory-bank context per agent                                                                                                                                                                                                                                                                                                                                       |
 | `--context-mode <mode>` | static          | `static` (hardcoded routing) or `semantic` (nomic-embed-text ranking)                                                                                                                                                                                                                                                                                                            |
 | `--no-emoji`            | off             | Use text labels instead of emoji (for CI without UTF-8 support)                                                                                                                                                                                                                                                                                                                  |
+| `--verify-evidence`     | off             | Verify Critical/High findings against their own cited evidence using a separate model (`qwen3:latest` by default). Report-only in this version — flags possibly-unsupported findings in the report without dropping them. Adds one LLM call per checked finding                                                                                                                  |
 
-Exit code `1` when any finding meets the `--fail-on` threshold (default: `high`).
+Exit codes, in priority order: `2` if any agent failed (timeout/parse-error/error); else `1` if any
+finding meets the `--fail-on` threshold (default: `high`); else `3` if the diff was truncated
+(unless `--allow-truncation` is passed); else `0`. A genuine blocker finding always wins over "the
+run was also truncated" -- exit `3` only appears on an otherwise-clean run.
 
 ### Claude Code slash command
 
@@ -260,8 +289,7 @@ Create `ai-review.config.json` in your project root to override defaults:
   "retryAttempts": 2,
   "retryDelayMs": 2000,
   "sanitize": true,
-  "preferredSecretsScanner": "gitleaks",
-  "complexityThreshold": 10
+  "complexityThreshold": 15
 }
 ```
 
@@ -269,8 +297,7 @@ Create `ai-review.config.json` in your project root to override defaults:
 
 **Config field notes:**
 
-- `preferredSecretsScanner`: `"gitleaks"` (default when installed) or `"trufflehog"` or `"none"` — controls which external scanner SecretsAgent prefers. Falls back to LLM-only when the tool is not found.
-- `complexityThreshold`: Cyclomatic complexity threshold for ComplexityAgent (default: `10`). Functions exceeding this value are flagged. Used when `lizard` is installed; LLM estimates when not.
+- `complexityThreshold`: Cyclomatic complexity number (CCN) threshold passed to `lizard` (`-C`) when it's installed — functions exceeding it are flagged. If omitted, `lizard`'s own default (`15`) applies. Has no effect when `lizard` isn't installed (the LLM-only fallback path uses its own prompt-described thresholds instead).
 - `agentPolicy`: Per-agent include/exclude path rules. An agent runs only when at least one changed file matches its `include` patterns; it is skipped when **all** changed files match its `exclude` patterns. Uses gitignore-style globs. Omitting a rule means the agent always runs.
 
 **`agentPolicy` example** — skip `license` on non-lockfile changes, restrict `migration-safety` to migration paths:
@@ -292,6 +319,22 @@ Create `ai-review.config.json` in your project root to override defaults:
 ```
 
 Policy decisions appear in `--format json` output under `result.policy`. They are also summarized in `--format markdown` output when any agents are skipped.
+
+**Note on defaults:** `security` and `adversarial` exclude `**/*.md` by default (documentation
+files were being misread as executable code). `ai-review.config.json`'s config loading does a
+shallow merge — if you set your own `agentPolicy` for _any_ agent, it replaces the entire
+`agentPolicy` object, including these defaults. Re-specify them in your own config if you want to
+keep them:
+
+```json
+{
+  "agentPolicy": {
+    "security": { "exclude": ["**/*.md"] },
+    "adversarial": { "exclude": ["**/*.md"] },
+    "your-other-agent": { "exclude": ["some/pattern"] }
+  }
+}
+```
 
 **Optional dependencies (enhance specific agents):**
 

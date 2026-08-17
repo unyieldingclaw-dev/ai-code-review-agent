@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'fs'
 import { parseGitleaksOutput } from '../../src/core/gitleaksParser.js'
 
@@ -7,6 +7,13 @@ describe('parseGitleaksOutput', () => {
     const raw = readFileSync('tests/fixtures/gitleaks-clean.json', 'utf-8')
     const findings = parseGitleaksOutput(raw, 'secrets')
     expect(findings).toEqual([])
+  })
+
+  it('does not log an error for a legitimately clean scan', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const raw = readFileSync('tests/fixtures/gitleaks-clean.json', 'utf-8')
+    parseGitleaksOutput(raw, 'secrets')
+    expect(errorSpy).not.toHaveBeenCalled()
   })
 
   it('maps a real gitleaks leak to a Finding with correct field mapping', () => {
@@ -37,5 +44,19 @@ describe('parseGitleaksOutput', () => {
   it('returns an empty array when the parsed JSON is not an array', () => {
     const findings = parseGitleaksOutput('{"unexpected": "shape"}', 'secrets')
     expect(findings).toEqual([])
+  })
+
+  it('logs an error for malformed JSON instead of failing silently', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    parseGitleaksOutput('not json at all', 'secrets')
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('failed to parse gitleaks'))
+  })
+
+  it('logs an error when the parsed JSON is not an array', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    parseGitleaksOutput('{"unexpected": "shape"}', 'secrets')
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unexpected gitleaks output shape')
+    )
   })
 })

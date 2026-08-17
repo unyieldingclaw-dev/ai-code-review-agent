@@ -128,7 +128,34 @@ export interface HallucinationFilterMetadata {
   dropped: DroppedHallucinatedFinding[]
 }
 
-export type ToolAvailability = 'used' | 'unavailable-llm-fallback'
+export interface DroppedCoverageGap {
+  file: string
+  functionName: string
+}
+
+export interface CoverageGapFilterMetadata {
+  dropped: DroppedCoverageGap[]
+}
+
+export interface EvidenceCheckFinding {
+  agent: AgentName
+  title: string
+  file: string
+  line: number
+  claim: string
+  evidence: string
+  reason: string
+  preFilterAgreed: boolean | null
+}
+
+export interface EvidenceCheckFilterMetadata {
+  checkedCount: number
+  unavailableCount: number
+  unavailableReasons: string[]
+  flagged: EvidenceCheckFinding[]
+}
+
+export type ToolAvailability = 'used' | 'unavailable-llm-fallback' | 'not-applicable'
 
 export interface ToolAvailabilityMetadata {
   gitleaks?: ToolAvailability
@@ -154,9 +181,17 @@ export interface ReviewResult {
   }
   sanitizer?: SanitizerMetadata
   policy?: PolicyResult
+  // Sibling of PolicyResult, not a field on it: PolicyResult is only ever surfaced below when
+  // agentsSkipped is non-empty (see runner.ts), but the scenario this field covers is exactly the
+  // opposite case -- an agent that still RAN, just with some file sections removed from its own
+  // view of the diff via agentPolicy.exclude (see Task 7). Nesting inside PolicyResult would mean
+  // this field never appears in the one case it exists to report.
+  filteredFiles?: Partial<Record<AgentName, string[]>>
   agentStatus?: Partial<Record<AgentName, AgentStatus>>
   truncation?: TruncationMetadata
   hallucinationFilter?: HallucinationFilterMetadata
+  coverageGapFilter?: CoverageGapFilterMetadata
+  evidenceCheckFilter?: EvidenceCheckFilterMetadata
   toolAvailability?: ToolAvailabilityMetadata
 }
 

@@ -1,7 +1,8 @@
 // tests/unit/mcp/tool.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { runReviewTool } from '../../../src/mcp/tool.js'
 import type { SpawnSyncReturns } from 'child_process'
+import { resolve, join } from 'path'
 
 // Mock child_process so tests never shell out
 vi.mock('child_process', () => ({
@@ -159,5 +160,119 @@ describe('runReviewTool', () => {
       return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
     })
     await runReviewTool({})
+  })
+
+  it('forces verifyEvidence off regardless of config', async () => {
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'diff --git a/f.ts b/f.ts\n+line',
+    } as unknown as SpawnSyncReturns<string>)
+    const { loadConfig } = await import('../../../src/core/config.js')
+    vi.mocked(loadConfig).mockReturnValueOnce({
+      model: 'devstral:latest',
+      provider: 'ollama',
+      ollamaUrl: 'http://localhost:11434',
+      anthropicModel: '',
+      maxFindings: 15,
+      agents: ['security'],
+      contextLines: 10,
+      testOutputDir: './ai-review-tests',
+      maxDiffLines: 2000,
+      agentTimeoutMs: 60000,
+      ignorePaths: [],
+      sanitize: true,
+      verifyEvidence: true, // config says on -- MCP must still force it off
+    })
+    const { SwarmRunner } = await import('../../../src/core/runner.js')
+    const runMock = vi.fn().mockResolvedValue({
+      findings: [],
+      testFiles: [],
+      summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
+    })
+    vi.mocked(SwarmRunner).mockImplementationOnce((config: Parameters<typeof SwarmRunner>[0]) => {
+      expect(config.verifyEvidence).toBe(false)
+      return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
+    })
+    await runReviewTool({})
+  })
+
+  it('forces chunk off regardless of config -- runReviewTool never calls runChunked', async () => {
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'diff --git a/f.ts b/f.ts\n+line',
+    } as unknown as SpawnSyncReturns<string>)
+    const { loadConfig } = await import('../../../src/core/config.js')
+    vi.mocked(loadConfig).mockReturnValue({
+      agents: ['security'],
+      model: 'devstral:latest',
+      ollamaUrl: 'http://localhost:11434',
+      testOutputDir: './ai-review-tests',
+      maxDiffLines: 2000,
+      agentTimeoutMs: 60000,
+      ignorePaths: [],
+      sanitize: true,
+      chunk: true, // config says on -- MCP must still force it off
+    })
+    const { SwarmRunner } = await import('../../../src/core/runner.js')
+    const runMock = vi.fn().mockResolvedValue({
+      findings: [],
+      testFiles: [],
+      summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
+    })
+    vi.mocked(SwarmRunner).mockImplementationOnce((config: Parameters<typeof SwarmRunner>[0]) => {
+      expect(config.chunk).toBe(false)
+      return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
+    })
+    await runReviewTool({})
+  })
+})
+
+describe('repo_path allowlist (AI_REVIEW_ALLOWED_ROOTS)', () => {
+  // repo_path is client-supplied -- in practice populated by whatever LLM/agent is calling this
+  // MCP tool from its own context, which could itself be influenced by injected instructions in
+  // content it previously read (see standards/AGENTIC-SAFETY.md). Currently any path the process
+  // user can read gets diffed and summarized back into the conversation with no scoping at all.
+  const ORIGINAL_ENV = process.env.AI_REVIEW_ALLOWED_ROOTS
+
+  afterEach(() => {
+    if (ORIGINAL_ENV === undefined) delete process.env.AI_REVIEW_ALLOWED_ROOTS
+    else process.env.AI_REVIEW_ALLOWED_ROOTS = ORIGINAL_ENV
+  })
+
+  it('rejects a repo_path outside all configured allowed roots, with a clear message', async () => {
+    process.env.AI_REVIEW_ALLOWED_ROOTS = [
+      resolve('/allowed/root1'),
+      resolve('/allowed/root2'),
+    ].join(',')
+    const result = await runReviewTool({ repo_path: resolve('/not/allowed/path') })
+    expect(result).toContain('outside the configured allowed roots')
+    expect(mockSpawnSync).not.toHaveBeenCalled()
+  })
+
+  it('allows a repo_path inside a configured allowed root to proceed normally', async () => {
+    const allowedRoot = resolve('/allowed/root1')
+    process.env.AI_REVIEW_ALLOWED_ROOTS = allowedRoot
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'diff --git a/f.ts b/f.ts\n+line',
+    } as unknown as SpawnSyncReturns<string>)
+
+    const result = await runReviewTool({ repo_path: join(allowedRoot, 'sub') })
+
+    expect(result).not.toContain('outside the configured allowed roots')
+    expect(mockSpawnSync).toHaveBeenCalled()
+  })
+
+  it('proceeds for any repo_path, unchanged, when AI_REVIEW_ALLOWED_ROOTS is unset (fail open)', async () => {
+    delete process.env.AI_REVIEW_ALLOWED_ROOTS
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'diff --git a/f.ts b/f.ts\n+line',
+    } as unknown as SpawnSyncReturns<string>)
+
+    const result = await runReviewTool({ repo_path: resolve('/anywhere/at/all') })
+
+    expect(result).not.toContain('outside the configured allowed roots')
+    expect(mockSpawnSync).toHaveBeenCalled()
   })
 })

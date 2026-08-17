@@ -55,6 +55,42 @@ describe('TestGenAgent', () => {
     expect(result.testFiles).toEqual([])
   })
 
+  it('returns empty testFiles when LLM response is long but has no test-framework structure', async () => {
+    const prose =
+      'I cannot generate this test because the function signature is ambiguous and I would need more context about the expected error handling behavior before writing anything runnable here.'
+    const agent = new TestGenAgent(makeProvider(prose), DEFAULT_CONFIG)
+    const gaps: CoverageGap[] = [
+      {
+        file: 'src/util.ts',
+        functionName: 'helper',
+        lineStart: 5,
+        lineEnd: 10,
+        description: 'Helper function',
+      },
+    ]
+    const result = await agent.runWithGaps(mockInput, gaps)
+    expect(result.testFiles).toEqual([])
+  })
+
+  it('rejects prose that merely contains the words "it" or "test" followed by a parenthesis', async () => {
+    // "it" and "test" are common English words -- a refusal that happens to phrase a parenthetical
+    // this way ("explain it (the reasoning) here") must not be mistaken for a real it(...) call.
+    const prose =
+      "I can't fully cover this edge case without more context. Let me explain it (the reasoning) here: the function depends on external state that isn't visible from this diff alone, so any test I write would be guessing at behavior."
+    const agent = new TestGenAgent(makeProvider(prose), DEFAULT_CONFIG)
+    const gaps: CoverageGap[] = [
+      {
+        file: 'src/util.ts',
+        functionName: 'helper',
+        lineStart: 5,
+        lineEnd: 10,
+        description: 'Helper function',
+      },
+    ]
+    const result = await agent.runWithGaps(mockInput, gaps)
+    expect(result.testFiles).toEqual([])
+  })
+
   it('groups multiple gaps by file to minimize API calls', async () => {
     const testCode = 'describe("test", () => { it("gap1", () => {}) it("gap2", () => {}) })'
     const chat = vi.fn().mockResolvedValue(testCode)

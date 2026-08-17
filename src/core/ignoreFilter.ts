@@ -79,9 +79,17 @@ export function matchPattern(filePath: string, pattern: string): boolean {
   // Convert gitignore glob to regex
   const regexStr = normalised
     .replace(/[.+^${}()|[\]\\]/g, '\\$&') // escape regex special chars
-    .replace(/\*\*/g, '\x00') // placeholder for **
+    // `**/` (double-star immediately followed by a slash) means "zero or more directories,
+    // including none" per the gitignore spec -- e.g. `**/*.md` must match a root-level README.md,
+    // not just docs/README.md. Handled as its own placeholder BEFORE the generic `**` substitution
+    // below (which would otherwise leave the following `/` as a literal, non-optional character,
+    // making a root-level match impossible even though `.*` itself can match an empty string).
+    .replace(/\*\*\//g, '\x01') // placeholder for "**/ " (zero-or-more-dirs-or-none)
+    .replace(/\*\*/g, '\x00') // placeholder for ** not followed by / (still "anything")
     .replace(/\*/g, '[^/]*') // * = non-slash run
     .replace(/\?/g, '[^/]') // ? = one non-slash char
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x01/g, '(?:.*/)?') // **/ = zero or more directories, optionally including none
     // eslint-disable-next-line no-control-regex
     .replace(/\x00/g, '.*') // ** = anything
 

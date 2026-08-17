@@ -3,13 +3,6 @@ import { describe, it, expect } from 'vitest'
 import { OrchestratorAgent } from '../../src/core/agents/orchestrator.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import type { Finding } from '../../src/core/schema.js'
-import type { LLMProvider } from '../../src/core/llm/provider.js'
-import { vi } from 'vitest'
-
-const makeProvider = () => ({
-  chat: vi.fn(),
-  ping: vi.fn().mockResolvedValue({ ok: true }),
-})
 
 const finding = (overrides: Partial<Finding> = {}): Finding => ({
   id: 'security-0',
@@ -55,7 +48,7 @@ function makeFinding(overrides: Partial<Finding>): Finding {
 describe('OrchestratorAgent', () => {
   describe('deduplication', () => {
     it('merges duplicate findings from multiple agents into one with corroboratingAgents', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'security-0',
@@ -84,7 +77,7 @@ describe('OrchestratorAgent', () => {
       // file at the SAME line used the correct, unprefixed form (".claude/settings.json").
       // deduplicate() built its map key from the raw, unnormalized file field, so these two
       // representations of the same location never merged.
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'secrets-0',
@@ -108,7 +101,7 @@ describe('OrchestratorAgent', () => {
     })
 
     it('merges findings whose file field carries a leading "b/" diff-header prefix with the unprefixed form', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'security-0',
@@ -132,7 +125,7 @@ describe('OrchestratorAgent', () => {
     })
 
     it('removes duplicate findings at same file:line from different agents', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'security-0',
@@ -158,7 +151,7 @@ describe('OrchestratorAgent', () => {
 
   describe('severity escalation', () => {
     it('escalates severity when correctness bug has no test coverage at same location', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'correctness-0',
@@ -187,7 +180,7 @@ describe('OrchestratorAgent', () => {
       // hallucinated "a/" diff-header prefix on one finding's file field prevents crossReference's
       // raw === comparison from recognizing the two findings share the same real file/line, so the
       // escalation silently fails to fire.
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'correctness-0',
@@ -215,7 +208,7 @@ describe('OrchestratorAgent', () => {
   describe('cap', () => {
     it('limits output to maxFindings sorted by severity', () => {
       const config = { ...DEFAULT_CONFIG, maxFindings: 3 }
-      const orch = new OrchestratorAgent(makeProvider(), config)
+      const orch = new OrchestratorAgent(config)
       const findings = Array.from({ length: 10 }, (_, i) =>
         finding({
           id: `security-${i}`,
@@ -232,7 +225,7 @@ describe('OrchestratorAgent', () => {
 
   describe('hallucination cross-check', () => {
     it('downgrades solo Critical to High (not Medium) when confidence < 60', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'security-0',
@@ -257,7 +250,7 @@ describe('OrchestratorAgent', () => {
     })
 
     it('keeps critical finding when a second agent flags the same file+line region', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'security-0',
@@ -280,7 +273,7 @@ describe('OrchestratorAgent', () => {
     })
 
     it('skips cross-check when only one agent ran', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'security-0',
@@ -303,7 +296,7 @@ describe('OrchestratorAgent', () => {
       // as corroborating each other and solo-downgraded BOTH from high to medium -- even though
       // deduplicate() correctly merges them afterward with a corroboratingAgents entry. A finding
       // should not be scored as if it had zero corroboration when it demonstrably has one.
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'secrets-0',
@@ -328,7 +321,7 @@ describe('OrchestratorAgent', () => {
 
   describe('file-existence filter (hallucination defense)', () => {
     it('drops a finding whose file is not in the diff’s changed files', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({ id: 'dependencies-0', agent: 'dependencies', file: 'package.json' }),
       ]
@@ -337,21 +330,21 @@ describe('OrchestratorAgent', () => {
     })
 
     it('keeps a finding whose file is in the diff’s changed files', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [finding({ id: 'security-0', file: 'src/auth.ts' })]
       const result = orch.synthesize(findings, ['src/auth.ts', 'package.json'])
       expect(result).toHaveLength(1)
     })
 
     it('does not filter anything when changedFiles is omitted (backward compatible)', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [finding({ id: 'security-0', file: 'anything/not/real.ts' })]
       const result = orch.synthesize(findings)
       expect(result).toHaveLength(1)
     })
 
     it('matches despite a leading "./" on the finding’s file path', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [finding({ id: 'security-0', file: './src/auth.ts' })]
       const result = orch.synthesize(findings, ['src/auth.ts'])
       expect(result).toHaveLength(1)
@@ -362,7 +355,7 @@ describe('OrchestratorAgent', () => {
       // (from "--- a/path" / "+++ b/path" headers) into the file field, even though
       // extractChangedFiles always strips it. A real finding was wrongly dropped as
       // hallucinated because of this exact mismatch.
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [finding({ id: 'correctness-0', file: 'a/src/cart/calculator.ts' })]
       const result = orch.synthesize(findings, ['src/cart/calculator.ts'])
       expect(result).toHaveLength(1)
@@ -372,7 +365,7 @@ describe('OrchestratorAgent', () => {
       // An empty list means extractChangedFiles couldn't confidently parse any files from the
       // diff -- not "this diff touches zero files." Filtering against an empty set would reject
       // every finding, a worse failure mode than the one this feature defends against.
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [finding({ id: 'security-0', file: 'anything/not/real.ts' })]
       const result = orch.synthesize(findings, [])
       expect(result).toHaveLength(1)
@@ -381,7 +374,7 @@ describe('OrchestratorAgent', () => {
     it('records a dropped finding into the optional sink instead of only logging it', () => {
       // A dropped finding used to be visible only via console.error -- invisible to any caller
       // reading the ReviewResult itself. The sink lets runner.ts surface this in the report.
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({
           id: 'dependencies-0',
@@ -399,7 +392,7 @@ describe('OrchestratorAgent', () => {
     })
 
     it('does not push into the sink when nothing is dropped', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [finding({ id: 'security-0', file: 'src/auth.ts' })]
       const dropped: Array<{ agent: string; title: string; file: string }> = []
       orch.synthesize(findings, ['src/auth.ts'], dropped)
@@ -409,7 +402,7 @@ describe('OrchestratorAgent', () => {
 
   describe('publication filter', () => {
     it('excludes SPECULATIVE findings below high severity', () => {
-      const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
       const findings = [
         finding({ id: 'security-0', severity: 'medium', basis: 'SPECULATIVE' }),
         finding({ id: 'security-1', severity: 'high', basis: 'SPECULATIVE' }),
@@ -424,7 +417,7 @@ describe('OrchestratorAgent', () => {
 })
 
 describe('OrchestratorAgent.synthesize — hallucinationCrossCheck', () => {
-  const orchestrator = new OrchestratorAgent(null as unknown as LLMProvider, {
+  const orchestrator = new OrchestratorAgent({
     ...DEFAULT_CONFIG,
     maxFindings: 50,
   })
@@ -514,7 +507,7 @@ describe('OrchestratorAgent.synthesize — hallucinationCrossCheck', () => {
 
 describe('OrchestratorAgent.synthesize — crossReference breaking-change escalation', () => {
   it('escalates breaking-change severity when correctness finding is at same location', () => {
-    const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings = [
       makeFinding({
         id: 'bc-0',
@@ -539,7 +532,7 @@ describe('OrchestratorAgent.synthesize — crossReference breaking-change escala
   })
 
   it('escalates breaking-change when design finding is nearby', () => {
-    const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings = [
       makeFinding({
         id: 'bc-0',
@@ -564,7 +557,7 @@ describe('OrchestratorAgent.synthesize — crossReference breaking-change escala
   })
 
   it('does not escalate breaking-change when correctness is beyond 5-line window', () => {
-    const orch = new OrchestratorAgent(makeProvider(), DEFAULT_CONFIG)
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings = [
       makeFinding({
         id: 'bc-0',

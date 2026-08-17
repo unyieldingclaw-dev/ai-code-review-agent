@@ -172,6 +172,23 @@ describe('formatMarkdown', () => {
     expect(output).not.toMatch(/hallucinat/i)
   })
 
+  it('surfaces a coverage-gap-filter note when a gap was dropped', () => {
+    const result = makeResult({
+      findings: [],
+      coverageGapFilter: {
+        dropped: [{ file: '../../../../etc/passwd', functionName: 'foo' }],
+      },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('1')
+    expect(output).toMatch(/coverage gap/i)
+  })
+
+  it('does not show a coverage-gap-filter note when nothing was dropped', () => {
+    const output = formatMarkdown(makeResult())
+    expect(output).not.toMatch(/coverage gap/i)
+  })
+
   it('shows a degraded-mode note when a tool-integrated agent fell back to the LLM', () => {
     const result = makeResult({
       findings: [],
@@ -213,5 +230,74 @@ describe('formatMarkdown', () => {
     })
     const output = formatMarkdown(result)
     expect(output).not.toMatch(/degraded|fallback/i)
+  })
+
+  it('does not include a not-applicable tool in the degraded-tools warning', () => {
+    const result = makeResult({
+      findings: [],
+      toolAvailability: { npmAudit: 'not-applicable' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).not.toMatch(/degraded/i)
+  })
+
+  it('still warns for a genuinely unavailable tool alongside a not-applicable one', () => {
+    const result = makeResult({
+      findings: [],
+      toolAvailability: { npmAudit: 'not-applicable', gitleaks: 'unavailable-llm-fallback' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toMatch(/degraded/i)
+    expect(output).toMatch(/gitleaks/i)
+    expect(output).not.toMatch(/npm audit not installed/i)
+  })
+})
+
+describe('evidenceCheckFilter', () => {
+  it('shows checked/flagged/unavailable counts', () => {
+    const result = makeResult({
+      evidenceCheckFilter: {
+        checkedCount: 3,
+        unavailableCount: 1,
+        unavailableReasons: ['verification unavailable — timeout'],
+        flagged: [
+          {
+            agent: 'security',
+            title: 'Test finding',
+            file: 'src/a.ts',
+            line: 10,
+            claim: 'Test finding claim',
+            evidence: 'some evidence',
+            reason: 'evidence contradicts the claim',
+            preFilterAgreed: true,
+          },
+        ],
+      },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('3 finding(s) checked')
+    expect(output).toContain('1 flagged')
+    expect(output).toContain('1 unavailable')
+    expect(output).toContain('evidence contradicts the claim')
+    expect(output).toContain('src/a.ts:10')
+  })
+
+  it('is omitted entirely when evidenceCheckFilter is absent', () => {
+    const output = formatMarkdown(makeResult())
+    expect(output).not.toContain('Evidence check')
+  })
+
+  it('reports zero flagged findings without listing any', () => {
+    const result = makeResult({
+      evidenceCheckFilter: {
+        checkedCount: 2,
+        unavailableCount: 0,
+        unavailableReasons: [],
+        flagged: [],
+      },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('2 finding(s) checked')
+    expect(output).toContain('none flagged')
   })
 })

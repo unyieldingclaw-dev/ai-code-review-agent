@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'fs'
 import { parseNpmAuditOutput } from '../../src/core/npmAuditParser.js'
 
@@ -51,5 +51,25 @@ describe('parseNpmAuditOutput', () => {
   it('returns an empty array when there are zero vulnerabilities', () => {
     const findings = parseNpmAuditOutput('{"vulnerabilities":{}}', 'dependencies')
     expect(findings).toEqual([])
+  })
+
+  it('does not log when there are legitimately zero vulnerabilities', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    parseNpmAuditOutput('{"vulnerabilities":{}}', 'dependencies')
+    expect(errorSpy).not.toHaveBeenCalled()
+  })
+
+  it('logs an error for malformed JSON instead of failing silently', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    parseNpmAuditOutput('not json', 'dependencies')
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('failed to parse npm audit'))
+  })
+
+  it('logs an error when the vulnerabilities key is missing or malformed', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    parseNpmAuditOutput('{"unexpected": "shape"}', 'dependencies')
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unexpected npm audit output shape')
+    )
   })
 })

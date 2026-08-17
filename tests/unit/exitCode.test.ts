@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { shouldFail, hasAgentFailures, AGENT_FAILURE_EXIT_CODE } from '../../src/cli/exitCode.js'
+import {
+  shouldFail,
+  hasAgentFailures,
+  AGENT_FAILURE_EXIT_CODE,
+  TRUNCATION_EXIT_CODE,
+} from '../../src/cli/exitCode.js'
 
 describe('shouldFail', () => {
   it('never returns false for any severity', () => {
@@ -54,5 +59,11 @@ describe('hasAgentFailures', () => {
 describe('AGENT_FAILURE_EXIT_CODE', () => {
   it('is distinct from the severity-gate exit code (1) and the clean exit code (0)', () => {
     expect(AGENT_FAILURE_EXIT_CODE).toBe(2)
+  })
+})
+
+describe('TRUNCATION_EXIT_CODE', () => {
+  it('is distinct from agent-failure (2), severity-gate (1), and clean (0)', () => {
+    expect(TRUNCATION_EXIT_CODE).toBe(3)
   })
 })

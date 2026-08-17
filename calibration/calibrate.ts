@@ -223,7 +223,7 @@ async function main() {
     process.exit(1)
   }
 
-  const orch = new OrchestratorAgent(provider, DEFAULT_CONFIG)
+  const orch = new OrchestratorAgent(DEFAULT_CONFIG)
   const agentMap: Record<string, BaseAgent> = {
     security: new SecurityAgent(provider, DEFAULT_CONFIG),
     performance: new PerformanceAgent(provider, DEFAULT_CONFIG),

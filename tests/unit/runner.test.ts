@@ -1,11 +1,18 @@
 // tests/unit/runner.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { runTool } from '../../src/utils/shell.js'
+import { embed } from '../../src/core/embedder.js'
 
 vi.mock('../../src/utils/shell.js', () => ({
   runTool: vi.fn(),
 }))
 const mockRunTool = vi.mocked(runTool)
+
+vi.mock('../../src/core/embedder.js', () => ({
+  embed: vi.fn(),
+  cosineSimilarity: vi.fn().mockReturnValue(0.5),
+}))
+const mockEmbed = vi.mocked(embed)
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -592,6 +599,76 @@ describe('SwarmRunner', () => {
   })
 })
 
+describe('SwarmRunner per-agent diff filtering (agentPolicy.exclude)', () => {
+  it('strips only excluded file sections from an agent with an agentPolicy.exclude rule, and reports it in filteredFiles', async () => {
+    const mixedDiff =
+      `diff --git a/docs/notes.md b/docs/notes.md\n--- a/docs/notes.md\n+++ b/docs/notes.md\n@@ -1 +1 @@\n-old\n+new\n` +
+      `diff --git a/src/foo.ts b/src/foo.ts\n--- a/src/foo.ts\n+++ b/src/foo.ts\n@@ -1 +1 @@\n-old\n+new\n`
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentPolicy: { security: { exclude: ['**/*.md'] } },
+    }
+    const provider = makeProvider('[]')
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: mixedDiff })
+
+    expect(result.filteredFiles?.security).toEqual(['docs/notes.md'])
+    // security still ran (not skipped -- src/foo.ts still matched) and its prompt shouldn't
+    // contain the excluded file's diff section
+    expect(provider.chat).toHaveBeenCalledOnce()
+    const [messages] = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]
+    const userMessage = messages.find((m: { role: string }) => m.role === 'user')?.content ?? ''
+    expect(userMessage).not.toContain('docs/notes.md')
+    expect(userMessage).toContain('src/foo.ts')
+  })
+
+  it('still applies the existing whole-agent skip when ALL changed files match exclude', async () => {
+    const allMdDiff = `diff --git a/docs/notes.md b/docs/notes.md\n--- a/docs/notes.md\n+++ b/docs/notes.md\n@@ -1 +1 @@\n-old\n+new\n`
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentPolicy: { security: { exclude: ['**/*.md'] } },
+    }
+    const provider = makeProvider('[]')
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: allMdDiff })
+
+    expect(result.policy?.agentsSkipped).toContain('security')
+    expect(result.filteredFiles?.security).toBeUndefined() // never ran -- nothing to report
+    expect(provider.chat).not.toHaveBeenCalled()
+  })
+
+  it('does not duplicate a filteredFiles entry when the agent retries', async () => {
+    const mixedDiff =
+      `diff --git a/docs/notes.md b/docs/notes.md\n--- a/docs/notes.md\n+++ b/docs/notes.md\n@@ -1 +1 @@\n-old\n+new\n` +
+      `diff --git a/src/foo.ts b/src/foo.ts\n--- a/src/foo.ts\n+++ b/src/foo.ts\n@@ -1 +1 @@\n-old\n+new\n`
+    const provider: LLMProvider = {
+      chat: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('transient failure'))
+        .mockResolvedValueOnce('[]'),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentPolicy: { security: { exclude: ['**/*.md'] } },
+      retryAttempts: 2,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: mixedDiff })
+
+    // withFilteredContext runs once per retry attempt; without Set-dedup this would be
+    // ['docs/notes.md', 'docs/notes.md'] (once per attempt) instead of a single entry.
+    expect(result.filteredFiles?.security).toEqual(['docs/notes.md'])
+  })
+})
+
 describe('scaleAgentTimeout', () => {
   it('returns the base timeout unscaled for an empty diff', () => {
     expect(scaleAgentTimeout(180000, 0, 2000)).toBe(180000)
@@ -705,6 +782,66 @@ describe('SwarmRunner memory-bank context sanitization', () => {
     expect(result.sanitizer?.redactedLines).toBeGreaterThan(0)
     expect(result.sanitizer?.warnings.some((w) => w.includes('memory-bank context'))).toBe(true)
     warnSpy.mockRestore()
+  })
+})
+
+describe('SwarmRunner semantic context caching', () => {
+  const TMP = join(process.cwd(), '.test-runner-semantic-tmp')
+
+  beforeEach(() => {
+    mkdirSync(join(TMP, 'memory-bank'), { recursive: true })
+    writeFileSync(join(TMP, 'memory-bank', 'techContext.md'), 'Tech stack notes.', 'utf-8')
+    mockEmbed.mockResolvedValue([1, 0, 0])
+  })
+  afterEach(() => {
+    if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true })
+  })
+
+  it('computes the semantic embedding once per run, not once per agent', async () => {
+    // loadAgentContextSemantic takes no agentName param -- its result is identical for every
+    // agent in a run (same diff, same memory-bank files). Before caching, withContext (called
+    // once per agent) recomputed it from scratch every time: 1 diff embed + 1 embed per existing
+    // memory-bank file, repeated per agent. With only techContext.md present, one computation is
+    // exactly 2 embed() calls (diff + that file) -- with 3 agents configured, that should still be
+    // 2 total, not 6.
+    const provider = makeProvider()
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'performance', 'correctness'] as AgentName[],
+      contextMode: 'semantic' as const,
+    }
+    const runner = new SwarmRunner(config, provider)
+
+    await runner.run({ diff: 'diff', projectPath: TMP }, undefined, 'memory-bank')
+
+    expect(mockEmbed).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not permanently cache a rejected context load -- a later agent still gets a real attempt', async () => {
+    // ??= only reassigns when the cached variable is null -- a rejected promise is not null, so
+    // without an explicit reset on failure, one transient embedding error would poison every
+    // later agent in the run with the same cached rejection instead of each getting its own shot.
+    let callCount = 0
+    mockEmbed.mockImplementation(() => {
+      callCount++
+      return callCount === 1
+        ? Promise.reject(new Error('transient Ollama error'))
+        : Promise.resolve([1, 0, 0])
+    })
+    const provider = makeProvider()
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'performance'] as AgentName[],
+      contextMode: 'semantic' as const,
+      retryAttempts: 1,
+    }
+    const runner = new SwarmRunner(config, provider)
+
+    await runner.run({ diff: 'diff', projectPath: TMP }, undefined, 'memory-bank')
+
+    // If the rejection had stayed cached, the second agent's context load would never call
+    // embed() again at all -- confirms it got a fresh attempt instead of an instant cached failure.
+    expect(callCount).toBeGreaterThan(1)
   })
 })
 
@@ -840,6 +977,144 @@ describe('SwarmRunner tool-availability visibility', () => {
   })
 })
 
+describe('SwarmRunner coverage-gap path defense (path traversal via --write-tests)', () => {
+  // WHY this matters: CoverageGap[] bypasses OrchestratorAgent.synthesize() entirely -- it never
+  // goes through filterNonexistentFiles, the defense that already protects Finding[] by dropping
+  // anything whose file isn't in the diff's real changed files. Without an equivalent filter here,
+  // a malicious or hallucinated gap.file (e.g. "../../../../etc/passwd") flows straight into
+  // TestGenAgent's deriveTestPath, which does zero path sanitization, and from there into
+  // --write-tests's writeFileSync call.
+  const DIFF = [
+    'diff --git a/src/foo.ts b/src/foo.ts',
+    '--- a/src/foo.ts',
+    '+++ b/src/foo.ts',
+    '@@ -1 +1 @@',
+    '-old',
+    '+new',
+  ].join('\n')
+
+  it('passes a coverage gap through to TestGen when its file matches the diff’s changed files', async () => {
+    const coverageResponse = JSON.stringify({
+      findings: [],
+      gaps: [
+        {
+          file: 'src/foo.ts',
+          functionName: 'foo',
+          lineStart: 1,
+          lineEnd: 2,
+          description: 'desc',
+        },
+      ],
+    })
+    let callIndex = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => {
+        callIndex++
+        // First call: coverage agent. Second call: TestGen generating the test file content.
+        if (callIndex === 1) return Promise.resolve(coverageResponse)
+        return Promise.resolve(
+          'describe("foo", () => { it("does something", () => { /* generated test body */ }) })'
+        )
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = { ...DEFAULT_CONFIG, agents: ['coverage', 'testgen'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: DIFF })
+    expect(result.testFiles).toHaveLength(1)
+  })
+
+  it('drops a coverage gap whose file is not in the reviewed diff before it ever reaches TestGen', async () => {
+    const coverageResponse = JSON.stringify({
+      findings: [],
+      gaps: [
+        {
+          file: '../../../../etc/passwd',
+          functionName: 'foo',
+          lineStart: 1,
+          lineEnd: 2,
+          description: 'desc',
+        },
+      ],
+    })
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue(coverageResponse),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = { ...DEFAULT_CONFIG, agents: ['coverage', 'testgen'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await runner.run({ diff: DIFF })
+
+    expect(result.testFiles).toHaveLength(0)
+    // Only the coverage agent's chat call should have happened -- TestGen must never be
+    // invoked with a gap that was already dropped.
+    expect(provider.chat).toHaveBeenCalledTimes(1)
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('dropped coverage gap'))
+    errorSpy.mockRestore()
+  })
+
+  it('surfaces a dropped coverage gap on the result, not only via console.error', async () => {
+    const coverageResponse = JSON.stringify({
+      findings: [],
+      gaps: [
+        {
+          file: '../../../../etc/passwd',
+          functionName: 'foo',
+          lineStart: 1,
+          lineEnd: 2,
+          description: 'desc',
+        },
+      ],
+    })
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue(coverageResponse),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = { ...DEFAULT_CONFIG, agents: ['coverage', 'testgen'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await runner.run({ diff: DIFF })
+
+    expect(result.coverageGapFilter).toEqual({
+      dropped: [{ file: '../../../../etc/passwd', functionName: 'foo' }],
+    })
+    errorSpy.mockRestore()
+  })
+
+  it('does not include coverageGapFilter when nothing was dropped', async () => {
+    const coverageResponse = JSON.stringify({
+      findings: [],
+      gaps: [
+        {
+          file: 'src/foo.ts',
+          functionName: 'foo',
+          lineStart: 1,
+          lineEnd: 2,
+          description: 'desc',
+        },
+      ],
+    })
+    let callIndex = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => {
+        callIndex++
+        if (callIndex === 1) return Promise.resolve(coverageResponse)
+        return Promise.resolve(
+          'describe("foo", () => { it("does something", () => { /* generated test body */ }) })'
+        )
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = { ...DEFAULT_CONFIG, agents: ['coverage', 'testgen'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: DIFF })
+    expect(result.coverageGapFilter).toBeUndefined()
+  })
+})
+
 describe('recordToolAvailability', () => {
   // A minimal fake agent proves runner.ts's bookkeeping is generic -- it doesn't import or
   // instanceof-check this class, only reads the toolKey/lastToolAvailability contract declared
@@ -879,5 +1154,64 @@ describe('recordToolAvailability', () => {
     recordToolAvailability(agent, toolAvailability)
 
     expect(toolAvailability).toEqual({})
+  })
+})
+
+describe('evidence verification', () => {
+  const evidenceFinding = () => ({
+    id: 'security-0',
+    agent: 'security' as const,
+    domain: 'Security' as const,
+    severity: 'critical' as const,
+    basis: 'VERIFIED' as const,
+    file: 'src/a.ts',
+    line: 1,
+    title: 'Test finding',
+    detail: 'Some detail',
+    evidence: 'some evidence',
+    impact: 'impact',
+    recommendation: 'fix it',
+    suggestion: 'fix it',
+    blocking: false,
+    source: 'llm' as const,
+  })
+
+  it('does not run evidence checks when verifyEvidence is false (default)', async () => {
+    const provider = makeProvider()
+    const verifierProvider: LLMProvider = { chat: vi.fn(), ping: vi.fn() }
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider, verifierProvider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.evidenceCheckFilter).toBeUndefined()
+    expect(verifierProvider.ping).not.toHaveBeenCalled()
+  })
+
+  it('does not run evidence checks when verifyEvidence is true but no verifierProvider is supplied', async () => {
+    const provider = makeProvider()
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[], verifyEvidence: true }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.evidenceCheckFilter).toBeUndefined()
+  })
+
+  it('runs evidence checks and populates evidenceCheckFilter when enabled', async () => {
+    // security agent returns one critical finding; verifier says NOT_SUPPORTED.
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue(JSON.stringify([evidenceFinding()])),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const verifierProvider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue('VERDICT: NOT_SUPPORTED — evidence contradicts the claim.'),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[], verifyEvidence: true }
+    const runner = new SwarmRunner(config, provider, verifierProvider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.evidenceCheckFilter).toBeDefined()
+    expect(result.evidenceCheckFilter?.checkedCount).toBe(1)
+    expect(result.evidenceCheckFilter?.flagged).toHaveLength(1)
+    expect(verifierProvider.chat).toHaveBeenCalledTimes(1)
+    // The main review provider and the verifier provider must stay separate instances.
+    expect(provider.chat).not.toBe(verifierProvider.chat)
   })
 })

@@ -1,24 +1,18 @@
-// Unit tests for OrchestratorAgent — mock the LLM provider. Ollama is NOT required.
-import { describe, it, expect, vi } from 'vitest'
+// Unit tests for OrchestratorAgent -- pure synthesis, no LLM provider involved.
+import { describe, it, expect } from 'vitest'
 import { OrchestratorAgent } from '../../src/core/agents/orchestrator.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
-import type { LLMProvider } from '../../src/core/llm/provider.js'
 import type { Finding } from '../../src/core/schema.js'
-
-const makeProvider = (response: string): LLMProvider => ({
-  chat: vi.fn().mockResolvedValue(response),
-  ping: vi.fn().mockResolvedValue({ ok: true }),
-})
 
 describe('OrchestratorAgent', () => {
   it('returns empty array when synthesize() receives empty findings', () => {
-    const agent = new OrchestratorAgent(makeProvider(''), DEFAULT_CONFIG)
+    const agent = new OrchestratorAgent(DEFAULT_CONFIG)
     const result = agent.synthesize([])
     expect(result).toEqual([])
   })
 
   it('deduplicates findings at same file:line from different agents', () => {
-    const agent = new OrchestratorAgent(makeProvider(''), DEFAULT_CONFIG)
+    const agent = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings: Finding[] = [
       {
         id: 'security-0',
@@ -64,7 +58,7 @@ describe('OrchestratorAgent', () => {
   })
 
   it('filters out low-severity findings', () => {
-    const agent = new OrchestratorAgent(makeProvider(''), DEFAULT_CONFIG)
+    const agent = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings: Finding[] = [
       {
         id: 'coverage-0',
@@ -90,7 +84,7 @@ describe('OrchestratorAgent', () => {
   })
 
   it('applies confidence-aware downgrade to solo critical findings when multiple agents present', () => {
-    const agent = new OrchestratorAgent(makeProvider(''), DEFAULT_CONFIG)
+    const agent = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings: Finding[] = [
       {
         id: 'security-0',
@@ -137,7 +131,7 @@ describe('OrchestratorAgent', () => {
   })
 
   it('keeps high-confidence solo critical findings at critical', () => {
-    const agent = new OrchestratorAgent(makeProvider(''), DEFAULT_CONFIG)
+    const agent = new OrchestratorAgent(DEFAULT_CONFIG)
     const findings: Finding[] = [
       {
         id: 'security-0',

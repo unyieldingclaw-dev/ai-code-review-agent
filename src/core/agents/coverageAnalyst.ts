@@ -1,4 +1,4 @@
-import { BaseAgent } from './base.js'
+import { BaseAgent, FINDING_ARRAY_SCHEMA } from './base.js'
 import type { AgentName, CoverageGap, Finding, ReviewInput } from '../schema.js'
 import type { Message } from '../llm/provider.js'
 import {
@@ -12,6 +12,30 @@ export interface CoverageAnalystResult {
   findings: Finding[]
   gaps: CoverageGap[]
 }
+
+// coverageAnalyst's response is an object with two arrays, not a bare array -- FINDING_ARRAY_SCHEMA
+// alone doesn't fit here. `gaps.items.required` mirrors this file's own validateGaps exactly.
+const COVERAGE_RESULT_SCHEMA = {
+  type: 'object',
+  properties: {
+    findings: FINDING_ARRAY_SCHEMA,
+    gaps: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          file: { type: 'string' },
+          functionName: { type: 'string' },
+          lineStart: { type: 'integer' },
+          lineEnd: { type: 'integer' },
+          description: { type: 'string' },
+        },
+        required: ['file', 'functionName', 'lineStart', 'lineEnd', 'description'],
+      },
+    },
+  },
+  required: ['findings', 'gaps'],
+} as const
 
 export class CoverageAnalystAgent extends BaseAgent {
   get name(): AgentName {
@@ -67,7 +91,11 @@ Rules:
       { role: 'system', content: this.systemPrompt },
       { role: 'user', content: this.buildUserPrompt(input) },
     ]
-    const raw = await this.provider.chat(messages, { think: true, format: 'json', signal })
+    const raw = await this.provider.chat(messages, {
+      think: true,
+      format: COVERAGE_RESULT_SCHEMA,
+      signal,
+    })
     return this.parseCoverageResult(raw, input)
   }
 

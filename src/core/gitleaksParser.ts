@@ -20,10 +20,21 @@ export function parseGitleaksOutput(json: string, agentName: AgentName): Finding
   let leaks: unknown
   try {
     leaks = JSON.parse(json)
-  } catch {
+  } catch (err) {
+    // WHY log here: SecretsAgent treats any non-null runTool output as "gitleaks ran" and reports
+    // toolAvailability 'used' -- a malformed response silently mapping to [] would report "0
+    // secrets found, tool used", a false sense of security with zero trace anywhere.
+    console.error(
+      `[gitleaksParser] failed to parse gitleaks JSON output: ${(err as Error).message}`
+    )
     return []
   }
-  if (!Array.isArray(leaks)) return []
+  if (!Array.isArray(leaks)) {
+    console.error(
+      '[gitleaksParser] unexpected gitleaks output shape (not an array) -- treating as no findings'
+    )
+    return []
+  }
 
   return (leaks as GitleaksLeak[]).map((leak, i) => ({
     id: `${agentName}-gitleaks-${i}`,

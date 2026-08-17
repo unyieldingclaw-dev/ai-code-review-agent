@@ -13,15 +13,19 @@ import type {
   AgentStatus,
   TruncationMetadata,
   DroppedHallucinatedFinding,
+  DroppedCoverageGap,
   ToolAvailabilityMetadata,
+  EvidenceCheckFilterMetadata,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
 import { classifyAgentError } from './parsing.js'
+import { runEvidenceChecks } from './evidenceVerifier.js'
 import { loadAgentContext, loadAgentContextSemantic } from './contextLoader.js'
 import type { ContextResult } from './contextLoader.js'
 import { loadIgnorePatterns, filterDiff } from './ignoreFilter.js'
 import { evaluatePolicy, extractChangedFiles } from './policyFilter.js'
 import { sanitizeDiff, sanitizeText } from './sanitizer.js'
+import { normalizeFilePath, stripDiffPrefix } from './filePath.js'
 import { BreakingChangeAgent } from './agents/breakingChange.js'
 import { LicenseComplianceAgent } from './agents/licenseCompliance.js'
 import { BaseAgent } from './agents/base.js'
@@ -145,6 +149,36 @@ export function recordToolAvailability(
   }
 }
 
+// CoverageGap[] bypasses OrchestratorAgent.synthesize() entirely -- it's set directly from the
+// coverage agent's own output and never passed through synthesize's filterNonexistentFiles,
+// the defense that already protects Finding[] by dropping anything whose file isn't in the
+// diff's real changed files. Without an equivalent check here, a hallucinated or malicious
+// gap.file (e.g. "../../../.." via a poisoned testOutputDir, or any other out-of-diff path)
+// flows straight into TestGenAgent's deriveTestPath, which does zero path sanitization, and
+// from there into --write-tests's writeFileSync call. Shares normalizeFilePath/stripDiffPrefix
+// with orchestrator.ts's filterNonexistentFiles so both defenses treat the same a/-b/-prefix-echo
+// case identically instead of drifting apart.
+// dropped is an optional sink the caller can pass to collect gaps this filter drops, so they can
+// be surfaced in the report instead of only logged -- mirrors filterNonexistentFiles's own
+// dropped? param in orchestrator.ts; no-op to omit it.
+export function filterCoverageGaps(
+  gaps: CoverageGap[],
+  changedFiles: string[],
+  dropped?: DroppedCoverageGap[]
+): CoverageGap[] {
+  const changedSet = new Set(changedFiles.map((p) => normalizeFilePath(p)))
+  return gaps.filter((g) => {
+    const normalized = normalizeFilePath(g.file)
+    if (changedSet.has(normalized) || changedSet.has(stripDiffPrefix(normalized))) return true
+    dropped?.push({ file: g.file, functionName: g.functionName })
+    console.error(
+      `[ai-review] dropped coverage gap for "${g.file}" -- not in the reviewed diff ` +
+        `(likely a hallucinated or malicious path)`
+    )
+    return false
+  })
+}
+
 function shouldEarlyExit(config: ReviewConfig, allFindings: Finding[]): boolean {
   if (!config.failFast) return false
   const level = config.failOn ?? 'high'
@@ -157,11 +191,17 @@ export class SwarmRunner {
   private readonly orchestrator: OrchestratorAgent
   private readonly testGen: TestGenAgent
 
+  // verifierProvider is a separate, optional LLMProvider (not derived from `provider` or
+  // `config` internally) because cross-model evidence verification only works if the verifier
+  // has no memory of the original claim -- reusing `provider` would defeat that. Optional
+  // because the feature is opt-in (config.verifyEvidence, default false); callers only
+  // construct and pass a verifierProvider when the flag is on (see cli/index.ts, Task 7).
   constructor(
     private readonly config: ReviewConfig,
-    private readonly provider: LLMProvider
+    private readonly provider: LLMProvider,
+    private readonly verifierProvider?: LLMProvider
   ) {
-    this.orchestrator = new OrchestratorAgent(provider, config)
+    this.orchestrator = new OrchestratorAgent(config)
     this.testGen = new TestGenAgent(provider, config)
   }
 
@@ -480,6 +520,7 @@ export class SwarmRunner {
     const start = Date.now()
     const allFindings: Finding[] = []
     let coverageGaps: CoverageGap[] = []
+    const droppedCoverageGaps: DroppedCoverageGap[] = []
     let testFiles: GeneratedTestFile[] = []
     const agentStatus: Partial<Record<AgentName, AgentStatus>> = {}
     const toolAvailability: ToolAvailabilityMetadata = {}
@@ -489,17 +530,35 @@ export class SwarmRunner {
     let anyTruncated = false
     let totalTokens = 0
 
+    // WHY cache here: loadAgentContextSemantic takes no agentName param -- its result depends
+    // only on projectPath/diff/ollamaUrl/contextBudgetChars, all identical across every agent in
+    // a single run(). Without caching, withContext is invoked once per agent per retry attempt
+    // (retries included) across every agent in the run, recomputing the same diff embedding and
+    // re-embedding every memory-bank file from scratch each time -- redundant Ollama calls with an
+    // identical result every time. Assigning the promise via ??= before awaiting also correctly
+    // deduplicates concurrent calls under --parallel, not just sequential ones, since the
+    // assignment happens synchronously before any agent's await.
+    let semanticContextPromise: Promise<ContextResult> | null = null
+
     // Helper: build per-agent ReviewInput with optional context prepended
     const withContext = async (agentName: AgentName): Promise<ReviewInput> => {
       if (contextMode !== 'memory-bank' || !input.projectPath) return input
       const ctx: ContextResult =
         this.config.contextMode === 'semantic'
-          ? await loadAgentContextSemantic(
+          ? await (semanticContextPromise ??= loadAgentContextSemantic(
               input.projectPath,
               input.diff,
               this.config.ollamaUrl,
               this.config.contextBudgetChars
-            )
+            ).catch((err: unknown) => {
+              // WHY reset on rejection: ??= only reassigns when the variable is null -- a
+              // rejected promise is not null, so without this it would stay cached forever,
+              // permanently failing every later agent and every retry attempt for the rest of
+              // this run with the same (possibly transient) error instead of getting a fresh
+              // attempt. Caching only pays off for a shared successful result.
+              semanticContextPromise = null
+              throw err
+            }))
           : loadAgentContext(input.projectPath, agentName, this.config.contextBudgetChars)
       if (ctx.filesLoaded.length > 0) {
         allFilesLoaded.push(...ctx.filesLoaded)
@@ -551,6 +610,47 @@ export class SwarmRunner {
         : activeConfig
 
     const agents = buildAgents(policyConfig, this.provider)
+
+    // Per-agent diff-content filtering: agentPolicy.exclude already gates whole-agent skip (via
+    // evaluatePolicy above, when ALL changed files match); this additionally strips just the
+    // matching file sections from an agent's OWN diff when only SOME files match, reusing the
+    // same filterDiff() ignoreFilter.ts already uses for global --ignore filtering. Wraps
+    // withContext rather than replacing it -- context injection still happens on top of the
+    // filtered diff, unchanged.
+    //
+    // Known, accepted gap: extractChangedFiles (used both by evaluatePolicy above and by
+    // beforeFiles/afterFiles below) only recognizes `+++ b/<path>` lines, deliberately excluding
+    // /dev/null deletion markers -- correct for its other callers (hallucination-filter membership
+    // checks shouldn't treat a deleted file as "in the diff"), but it means a delete-only diff
+    // yields changedFiles: [] here too. A diff that only deletes an excluded file therefore (a)
+    // isn't caught by evaluatePolicy's whole-agent skip (still runs the agent on an effectively
+    // empty post-filter diff -- a wasted call) and (b) reports an empty before/after set below, so
+    // filteredFiles silently doesn't record that anything was stripped, even though filterDiff()
+    // itself (which parses `diff --git` headers directly, unaffected by this blind spot) did strip
+    // it. Narrow in practice (delete-only diffs are uncommon) and not fixed here -- would require
+    // either a second, deletion-aware changed-files helper or changing extractChangedFiles's
+    // existing behavior, which other callers rely on for good reason.
+    const filteredFiles: Partial<Record<AgentName, string[]>> = {}
+    const withFilteredContext = async (agentName: AgentName): Promise<ReviewInput> => {
+      const ctxInput = await withContext(agentName)
+      const rule = this.config.agentPolicy?.[agentName]
+      if (!rule?.exclude || rule.exclude.length === 0) return ctxInput
+      const beforeFiles = new Set(extractChangedFiles(ctxInput.diff))
+      const filtered = filterDiff(ctxInput.diff, {
+        excludes: rule.exclude,
+        includes: rule.include ?? [],
+      })
+      const afterFiles = new Set(extractChangedFiles(filtered))
+      const dropped = [...beforeFiles].filter((f) => !afterFiles.has(f))
+      if (dropped.length > 0) {
+        // Set-dedup: withFilteredContext is called fresh on every retry attempt (this closure is
+        // invoked once per attempt by withRetryTimeout), so without dedup a retried agent's
+        // filteredFiles entry would accumulate the same dropped paths once per attempt.
+        filteredFiles[agentName] = [...new Set([...(filteredFiles[agentName] ?? []), ...dropped])]
+      }
+      return { ...ctxInput, diff: filtered }
+    }
+
     const hasCoverage = allowedAgents.includes('coverage')
     const hasTestgen = allowedAgents.includes('testgen')
     const total = agents.length + (hasCoverage ? 1 : 0) + (hasTestgen ? 1 : 0)
@@ -565,7 +665,7 @@ export class SwarmRunner {
       const coverageResult = await this.runCoverageAgent(
         coverageAgent,
         input,
-        withContext,
+        withFilteredContext,
         total,
         index,
         agentStatus,
@@ -573,7 +673,14 @@ export class SwarmRunner {
         onProgress
       )
       allFindings.push(...coverageResult.findings)
-      coverageGaps = coverageResult.gaps
+      // WHY require non-empty changedFiles: matches filterNonexistentFiles's fail-open
+      // convention in orchestrator.ts -- an empty list means extractChangedFiles couldn't
+      // confidently parse any changed files from this diff, not that the diff touches none,
+      // so filtering against it would drop every gap instead of just the illegitimate ones.
+      coverageGaps =
+        changedFiles.length > 0
+          ? filterCoverageGaps(coverageResult.gaps, changedFiles, droppedCoverageGaps)
+          : coverageResult.gaps
       if (coverageResult.earlyExit) earlyExitAgent = 'coverage'
     }
 
@@ -583,7 +690,7 @@ export class SwarmRunner {
       if (this.config.parallel) {
         const parallelFindings = await this.runAgentsParallel(
           agents,
-          withContext,
+          withFilteredContext,
           baseIndex,
           total,
           agentStatus,
@@ -596,7 +703,7 @@ export class SwarmRunner {
       } else {
         const seqResult = await this.runAgentsSequential(
           agents,
-          withContext,
+          withFilteredContext,
           baseIndex,
           total,
           agentStatus,
@@ -619,7 +726,7 @@ export class SwarmRunner {
         try {
           const testResult = await withRetryTimeout(
             async (signal) =>
-              this.testGen.runWithGaps(await withContext('testgen'), coverageGaps, signal),
+              this.testGen.runWithGaps(await withFilteredContext('testgen'), coverageGaps, signal),
             effectiveTimeoutMs,
             'testgen',
             this.config.retryAttempts,
@@ -649,6 +756,11 @@ export class SwarmRunner {
     const droppedHallucinated: DroppedHallucinatedFinding[] = []
     const findings = this.orchestrator.synthesize(allFindings, changedFiles, droppedHallucinated)
 
+    const evidenceCheckFilter: EvidenceCheckFilterMetadata | undefined =
+      this.config.verifyEvidence && this.verifierProvider
+        ? await runEvidenceChecks(findings, this.verifierProvider)
+        : undefined
+
     return {
       findings,
       testFiles,
@@ -666,12 +778,17 @@ export class SwarmRunner {
         : {}),
       sanitizer: sanitizerMeta,
       ...(policyResult.agentsSkipped.length > 0 ? { policy: policyResult } : {}),
+      ...(Object.keys(filteredFiles).length > 0 ? { filteredFiles } : {}),
       ...(Object.keys(agentStatus).length > 0 ? { agentStatus } : {}),
       ...(truncationMeta.truncated ? { truncation: truncationMeta } : {}),
       ...(droppedHallucinated.length > 0
         ? { hallucinationFilter: { dropped: droppedHallucinated } }
         : {}),
+      ...(droppedCoverageGaps.length > 0
+        ? { coverageGapFilter: { dropped: droppedCoverageGaps } }
+        : {}),
       ...(Object.keys(toolAvailability).length > 0 ? { toolAvailability } : {}),
+      ...(evidenceCheckFilter ? { evidenceCheckFilter } : {}),
     }
   }
 }

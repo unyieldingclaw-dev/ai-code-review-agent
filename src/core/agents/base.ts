@@ -14,6 +14,39 @@ import {
   extractCompleteObjects,
 } from '../parsing.js'
 
+// Forces Ollama's structured-output mode to actually constrain the top-level shape to an array,
+// not just "valid JSON" -- format: 'json' (the bare string) let the model emit a single bare
+// object instead of the required array; verified via live testing that an explicit array-typed
+// schema fixes this (see docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md,
+// Issue 2). `required` is a stricter subset of parsing.ts's validateAndNormalizeFindings:
+// that validator accepts (basis OR evidence) and (suggestion OR recommendation), but every
+// current agent prompt already emits evidence+recommendation, so hard-requiring those two
+// here is safe and simpler than reproducing the OR logic in JSON Schema.
+export const FINDING_ARRAY_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      severity: { type: 'string' },
+      basis: { type: 'string' },
+      confidence: { type: 'integer' },
+      domain: { type: 'string' },
+      file: { type: 'string' },
+      line: { type: 'integer' },
+      lineEnd: { type: 'integer' },
+      title: { type: 'string' },
+      detail: { type: 'string' },
+      evidence: { type: 'string' },
+      impact: { type: 'string' },
+      recommendation: { type: 'string' },
+      suggestion: { type: 'string' },
+      blocking: { type: 'boolean' },
+      source: { type: 'string' },
+    },
+    required: ['severity', 'file', 'line', 'title', 'detail', 'evidence', 'recommendation'],
+  },
+} as const
+
 export abstract class BaseAgent {
   // Opt-in contract for agents that call a deterministic external tool instead of (or before
   // falling back to) the LLM -- e.g. SecretsAgent/gitleaks, DependenciesAgent/npm-audit. Declared
@@ -35,7 +68,11 @@ export abstract class BaseAgent {
       { role: 'system', content: this.systemPrompt },
       { role: 'user', content: this.buildUserPrompt(input) },
     ]
-    const raw = await this.provider.chat(messages, { think: true, format: 'json', signal })
+    const raw = await this.provider.chat(messages, {
+      think: true,
+      format: FINDING_ARRAY_SCHEMA,
+      signal,
+    })
     return this.parseFindings(raw)
   }
 
@@ -63,7 +100,13 @@ export abstract class BaseAgent {
       }
       // Stage 2: object with .findings array
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.findings)) {
-        return this.validateFindings(parsed.findings)
+        const valid = this.validateFindings(parsed.findings)
+        if (valid.length > 0 || parsed.findings.length === 0) return valid
+        // All items failed schema validation — log before falling through to extraction
+        console.error(
+          `[${this.name}] stage-2: ${parsed.findings.length} item(s) failed schema validation. ` +
+            `First item keys: ${Object.keys(parsed.findings[0] ?? {}).join(', ')}`
+        )
       }
       // Stage 2b: a single bare finding-shaped object (has its own `severity`, not nested under
       // `.findings`). Nothing was truncated here -- Stage 4's "appears truncated" message would
@@ -86,7 +129,17 @@ export abstract class BaseAgent {
       const extracted = extractBalancedSpan(cleaned, '[', ']')
       if (extracted) {
         const parsed = JSON.parse(extracted)
-        if (Array.isArray(parsed)) return this.validateFindings(parsed)
+        if (Array.isArray(parsed)) {
+          const valid = this.validateFindings(parsed)
+          // Same guard as Stage 1/2: a non-empty array where nothing passed schema
+          // validation is a parse failure, not "0 findings" -- fall through to Stage 4
+          // instead of returning an empty array silently.
+          if (valid.length > 0 || parsed.length === 0) return valid
+          console.error(
+            `[${this.name}] stage-3: ${parsed.length} item(s) failed schema validation. ` +
+              `First item keys: ${Object.keys(parsed[0] ?? {}).join(', ')}`
+          )
+        }
       }
     } catch {
       /* fall through */

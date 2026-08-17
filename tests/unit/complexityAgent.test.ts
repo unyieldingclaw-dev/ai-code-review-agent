@@ -118,6 +118,42 @@ describe('ComplexityAgent', () => {
     await expect(agent.run({ diff: DIFF_WITH_FILE })).rejects.toThrow(ParseFailureError)
   })
 
+  it('passes -C <threshold> to lizard when complexityThreshold is configured', async () => {
+    mockRunTool.mockResolvedValue('Function complexity: 15\n')
+    const config = { ...DEFAULT_CONFIG, complexityThreshold: 20 }
+    const agent = new ComplexityAgent(makeProvider('[]'), config)
+    await agent.run({ diff: DIFF_WITH_FILE })
+    expect(mockRunTool).toHaveBeenCalledWith(
+      'lizard',
+      ['src/app.ts', '-C', '20'],
+      undefined,
+      false,
+      '.'
+    )
+  })
+
+  it('does not pass -C when complexityThreshold is not configured, so lizard uses its own default', async () => {
+    mockRunTool.mockResolvedValue('Function complexity: 15\n')
+    const agent = new ComplexityAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    await agent.run({ diff: DIFF_WITH_FILE })
+    expect(mockRunTool).toHaveBeenCalledWith('lizard', ['src/app.ts'], undefined, false, '.')
+  })
+
+  it('excludes deleted files (+++ /dev/null) from the file list passed to lizard', async () => {
+    const diffWithDeletion = `diff --git a/src/old.ts b/src/old.ts
+--- a/src/old.ts
++++ /dev/null
+@@ -1,3 +0,0 @@
+-function gone() {
+-  return 1
+-}
+${DIFF_WITH_FILE}`
+    mockRunTool.mockResolvedValue('Function complexity: 15\n')
+    const agent = new ComplexityAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    await agent.run({ diff: diffWithDeletion })
+    expect(mockRunTool).toHaveBeenCalledWith('lizard', ['src/app.ts'], undefined, false, '.')
+  })
+
   it('passes projectPath through as cwd, so lizard resolves paths against the reviewed project instead of the process cwd', async () => {
     mockRunTool.mockResolvedValue('Function complexity: 15\n')
     const provider = makeProvider('[]')

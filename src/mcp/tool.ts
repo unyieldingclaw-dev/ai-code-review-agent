@@ -2,10 +2,23 @@
 import { spawnSync } from 'child_process'
 import { resolve } from 'path'
 import { SwarmRunner } from '../core/runner.js'
-import { loadConfig } from '../core/config.js'
+import { loadConfig, DEFAULT_CONFIG } from '../core/config.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
 import { formatMcpOutput } from './formatter.js'
+import { isPathWithin } from '../core/filePath.js'
 import type { AgentName } from '../core/schema.js'
+
+// WHY here and not inline in server.ts: server.ts has top-level side effects (connects a real
+// stdio transport on import), which makes it unsafe to import from a test. This pure string
+// builder lives in tool.ts instead so it can be unit-tested without triggering those side effects.
+export function buildToolDescription(): string {
+  return (
+    'Run the AI code review swarm on the current git diff. ' +
+    `Uses ${DEFAULT_CONFIG.agents.length} specialist agents (${DEFAULT_CONFIG.agents.join(', ')}) ` +
+    'powered by Ollama locally — no API costs, fully offline. ' +
+    'Returns a markdown summary with full detail for critical/high findings.'
+  )
+}
 
 // testgen writes files to disk — never run it in the MCP context.
 // WHY: Chat tools should not write to the project without explicit user intent.
@@ -24,8 +37,35 @@ function gitSync(cwd: string, args: string[]): string {
   return result.stdout
 }
 
+// Opt-in scoping for repo_path, which is client-supplied -- in practice populated by whatever
+// LLM/agent is calling this MCP tool from its own context, which could itself be influenced by
+// injected instructions in content it previously read (see standards/AGENTIC-SAFETY.md).
+// AI_REVIEW_ALLOWED_ROOTS is a comma-separated list of absolute paths; when set, repo_path must
+// resolve inside one of them. There's no single "correct" workspace root to hardcode (this
+// server is used across arbitrary projects), so unset means unrestricted -- fail open, matching
+// this project's established convention for missing/unconfigured state (see config.ts's
+// malformed-config fallback and orchestrator.ts's filterNonexistentFiles empty-changedFiles
+// behavior), so this doesn't break existing single-repo MCP setups that never configured it.
+function isWithinAllowedRoots(repoPath: string, allowedRoots: string[]): boolean {
+  return allowedRoots.some((root) => isPathWithin(repoPath, resolve(root)))
+}
+
 export async function runReviewTool(params: ReviewToolParams): Promise<string> {
   const repoPath = resolve(params.repo_path ?? process.cwd())
+
+  const allowedRootsEnv = process.env.AI_REVIEW_ALLOWED_ROOTS
+  if (allowedRootsEnv) {
+    const allowedRoots = allowedRootsEnv
+      .split(',')
+      .map((r) => r.trim())
+      .filter(Boolean)
+    if (!isWithinAllowedRoots(repoPath, allowedRoots)) {
+      return (
+        `## AI Code Review\n\nRefused: \`${repoPath}\` is outside the configured allowed roots ` +
+        '(AI_REVIEW_ALLOWED_ROOTS). Add it to the allowlist, or unset the variable to allow any path.'
+      )
+    }
+  }
 
   // --- Diff acquisition (staged → HEAD fallback) ---
   let diff: string
@@ -46,6 +86,18 @@ export async function runReviewTool(params: ReviewToolParams): Promise<string> {
   const config = loadConfig(repoPath)
   // Remove testgen regardless of what the config file says
   config.agents = config.agents.filter((a): a is AgentName => !MCP_EXCLUDED_AGENTS.includes(a))
+  // Evidence verification adds a synchronous per-finding LLM round-trip -- not worth the latency
+  // for an interactive MCP caller waiting on the response, and Stage 1 is report-only anyway
+  // (nothing is dropped), so there's little payoff for the cost here. Force off regardless of
+  // what the project config says, mirroring the testgen exclusion above.
+  config.verifyEvidence = false
+  // --chunk multiplies LLM calls by chunk count -- worse for MCP latency than verifyEvidence's
+  // single extra round-trip above, and it has its own known chunk-boundary caveat (see
+  // chunkRunner.ts). This function calls SwarmRunner.run() directly, never runChunked -- so
+  // config.chunk being left on would silently do nothing here anyway (chunkRunner.ts's own header
+  // comment documents it as read only by cli/index.ts and chunkRunner.ts itself). Force off
+  // explicitly so that's a documented decision, not a silent gap between the two entry points.
+  config.chunk = false
 
   // --- Run swarm ---
   const provider = new OllamaProvider(config.ollamaUrl, config.model)

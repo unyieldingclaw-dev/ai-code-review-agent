@@ -62,6 +62,18 @@ describe('OllamaProvider', () => {
       expect(body.stream).toBe(false)
     })
 
+    it('forwards an object-shaped format (JSON Schema) unchanged in the request body', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ message: { content: '[]' } }),
+      })
+      const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
+      const schema = { type: 'array', items: { type: 'object' } }
+      await provider.chat([{ role: 'user', content: 'x' }], { format: schema })
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(body.format).toEqual(schema)
+    })
+
     it('throws on non-ok response', async () => {
       mockFetch.mockResolvedValueOnce({ ok: false, status: 500 })
       const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')

@@ -54,13 +54,6 @@ export interface ContextResult {
   estimatedTokens: number // rough estimate: chars / 4
 }
 
-export interface ContextMetadata {
-  mode: 'none' | 'memory-bank'
-  filesLoaded: string[]
-  truncated: boolean
-  estimatedTokens: number
-}
-
 export function loadAgentContext(
   projectPath: string,
   agentName: AgentName,

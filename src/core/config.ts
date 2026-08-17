@@ -18,11 +18,17 @@ export interface ReviewConfig {
   sanitize: boolean
   contextBudgetChars: number
   contextMode?: 'static' | 'semantic'
-  preferredSecretsScanner?: 'gitleaks' | 'trufflehog' | 'none'
   complexityThreshold?: number
   failFast: boolean
   failOn: FailOnLevel
   parallel: boolean
+  // WHY opt-in, off by default: splitting an oversized diff into multiple maxDiffLines-sized
+  // passes achieves full coverage instead of silently dropping lines past the truncation point,
+  // but multiplies LLM calls by chunk count -- imposing that cost on every oversized diff by
+  // default would conflict with this project's default-path efficiency goal. Read only by
+  // cli/index.ts and chunkRunner.ts -- SwarmRunner.run() has no knowledge of this field. See
+  // docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md, Issue 1.
+  chunk: boolean
   agentPolicy?: Partial<
     Record<
       AgentName,
@@ -32,6 +38,8 @@ export interface ReviewConfig {
       }
     >
   >
+  verifyEvidence?: boolean
+  verifierModel?: string
 }
 
 export const DEFAULT_CONFIG: ReviewConfig = {
@@ -90,6 +98,35 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   // `--parallel` remains available as an explicit opt-in for hardware where it's been verified
   // to actually help.
   parallel: false,
+  chunk: false,
+  // WHY false by default: cross-model LLM verification (a separate model checks whether a
+  // finding's own cited evidence actually supports its claim) scored 13/13 on this project's
+  // validation cases -- but those cases were designed by the same person who wrote the
+  // verification prompt, with full knowledge of the failure pattern being tested for. That
+  // proves the mechanism works on the shapes tested; it does not prove the false-rejection rate
+  // is this low on messy real diffs. See the design spec's Validation and Rollout sections
+  // (docs/superpowers/specs/2026-08-10-evidence-grounding-verification-design.md) for the full
+  // caveat and the report-only Stage 1 this gates behind. Graduates to on-by-default once real
+  // `--verify-evidence` usage validates the false-rejection rate in practice, mirroring how
+  // `parallel` above only became a real option after real-scale testing, not a small trial.
+  verifyEvidence: false,
+  verifierModel: 'qwen3:latest',
+  // WHY security/adversarial specifically, not project-wide: these are the two agents verified
+  // (by reading their prompts) to have zero file-type awareness and a demonstrated real-world
+  // failure mode -- misreading a .md file's prose description of a vulnerability pattern as
+  // executable code. breaking-change/license were checked too and neither prompt references .md
+  // files at all, so there's no evidence either way for them; this stays narrowly scoped to where
+  // the bug was actually reproduced rather than guessing more broadly. Deterministic (not a
+  // prompt instruction) because this project has prior evidence prompt-tightening alone
+  // underperforms for this class of problem (secrets/dependencies/adversarial history). See
+  // docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md, Issue 3 -- including
+  // the documented config-shallow-merge caveat: a project's own agentPolicy setting for ANY agent
+  // replaces this default entirely (loadConfig does a shallow merge). Re-specify these excludes
+  // in your own ai-review.config.json if you set agentPolicy for any agent and want to keep them.
+  agentPolicy: {
+    security: { exclude: ['**/*.md'] },
+    adversarial: { exclude: ['**/*.md'] },
+  },
 }
 
 export function loadConfig(projectPath: string): ReviewConfig {
@@ -99,7 +136,10 @@ export function loadConfig(projectPath: string): ReviewConfig {
     const raw = readFileSync(configPath, 'utf-8')
     const partial = JSON.parse(raw) as Partial<ReviewConfig>
     return { ...DEFAULT_CONFIG, ...partial }
-  } catch {
+  } catch (err) {
+    console.error(
+      `[config] failed to parse ${configPath}, falling back to defaults: ${(err as Error).message}`
+    )
     return { ...DEFAULT_CONFIG }
   }
 }

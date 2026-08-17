@@ -16,7 +16,346 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-06
+**Last Updated**: 2026-08-16
+
+## ✅ Completed (2026-08-16)
+
+### Review-Reliability Fixes — merged into `fix/full-codebase-audit-findings` (`00713e8`)
+
+User forwarded 4 concrete bugs from a real `ai-review-agent --profile security --diff` run against
+a Flutter/Dart project (not the earlier "ACR reliability findings" report — a separate, fresh bug
+report): (1) silent diff truncation with no exit-code signal, (2) all 4 agents hit the
+"response appears truncated" parse-recovery path, (3) security/adversarial agents flag `.claude/
+commands/*.md` prose as vulnerable code, (4) dependencies agent assumes every project is Node.js.
+All 4 verified against real source before any design work. Design spec + 14-task plan written via
+`superpowers:writing-plans`, independently deep-reviewed (11 real issues found and fixed before the
+plan). Executing via `superpowers:subagent-driven-development` (fresh implementer subagent per
+task, two-stage spec+quality review, controller-only commits).
+
+- [x] Task 1: `TRUNCATION_EXIT_CODE = 3` in `exitCode.ts` — committed `607c9d0`.
+- [x] Task 2: CLI exit-code priority (`agent-failure(2) > blocker(1) > truncation(3) > clean(0)`),
+      `--allow-truncation` flag — committed `62847ed`.
+- [x] Task 3: `calibration/responseTruncationDiagnostic.ts`, a permanent diagnostic script — committed
+      `9a236db`. **Live result contradicted the original design hypothesis**: Issue 2's plan assumed
+      a missing `num_predict` cap was truncating responses (`format: 'json'` was already known to
+      raise truncation frequency 11x, per the 2026-07-25 entry below). Measured directly against
+      real Ollama at 2000–6777 diff lines: `done_reason` was `stop` every time, never `length` — the
+      model was choosing to stop, not hitting a token ceiling. Broadened the investigation (per
+      explicit "look deeper" instruction) across all 4 affected agents' real system prompts:
+      `format: 'json'` (the bare string) only constrains "valid JSON", not array shape — the model
+      reliably emitted a single bare object instead of the required `[...]` array (`dependencies`:
+      wrong shape entirely, would throw `ParseFailureError`; `security`/`secrets`/`adversarial`: a
+      bare object with `severity`, already correctly auto-wrapped by existing Stage 2b handling).
+      Verified fix empirically: an explicit JSON Schema for `format` (`type: 'array', items: {...}`)
+      reliably produces the correct array shape (2/2 runs). A second, separate problem also surfaced
+      and was NOT folded into scope: even with array shape fixed, the model still reported only 1 of
+      6 independently-injected, unambiguous vulnerabilities in a test diff (3/3 non-schema + 2/2
+      schema runs) — documented as an explicit Non-Goal (model under-reporting, not fixable via any
+      `ChatOptions` change) rather than guessed at.
+- [x] Design spec + plan's Tasks 4/5 rewritten around the verified schema fix
+      (`FINDING_ARRAY_SCHEMA`/`COVERAGE_RESULT_SCHEMA` constants replacing the disproven
+      `responseTokenBudget` design) — independently reviewed (solid; one wording overclaim fixed:
+      required fields are a stricter subset of `parsing.ts`'s OR-logic, not a literal mirror) and
+      committed (`435de06`).
+- [x] Also mid-plan: applied the "Capability vs Orchestration" pattern from a maintenance-mode
+      framing document to catch that the original `--chunk` design (Tasks 3-6 pre-renumbering) would
+      have touched `SwarmRunner`'s internals for a feature the bug report doesn't demonstrate is
+      broken. User pushed back on the initial recommendation to cut `--chunk` entirely ("why not 2?")
+      — redesigned instead as `chunkRunner.ts`, a thin wrapper calling `runner.run()` once per chunk
+      and merging results, entirely outside `SwarmRunner`. Plan renumbered from 16 to 14 tasks.
+- Verified `qwen3:latest` (the evidence-verifier model) was already current mid-session
+  (`ollama pull qwen3:latest`, digest `500a1f067a9f` unchanged) — unrelated side-check, not part of
+  this plan's scope.
+- [x] Tasks 4/5: `ChatOptions.format` widened to `'json' | Record<string, unknown>`;
+      `FINDING_ARRAY_SCHEMA`/`COVERAGE_RESULT_SCHEMA` wired into `base.ts`/`coverageAnalyst.ts` in
+      place of the bare `'json'` string — committed `698d3cd`/`2e8f0c5`. Live-verified end-to-end
+      through the real CLI (not just the standalone diagnostic): `agentStatus: "ok"` with no Stage
+      2b auto-wrap needed, and the run correctly caught both of two injected vulnerabilities in one
+      pass.
+- [x] Task 6: `ReviewResult.filteredFiles` (top-level, sibling of `PolicyResult`, not nested in
+      it — the case it covers is an agent that still ran, just with reduced input) — `9d649e0`.
+- [x] Task 7 (Issue 3 fix): `runner.ts`'s `withFilteredContext` wraps `withContext`, applying
+      `filterDiff()` per-agent via `agentPolicy.exclude`/`include` so an agent can run on a _subset_
+      of the diff, not just get whole-agent-skipped; new `DEFAULT_CONFIG.agentPolicy` excludes
+      `**/*.md` for `security`/`adversarial` specifically (the two agents verified to have zero
+      file-type awareness) — `1f37447`. Live-verified: a real CLI run's `filteredFiles.security`
+      correctly showed the `.md` file's diff section was stripped from the agent's own view before
+      the LLM ever saw it.
+- [x] Task 8: README documents the `agentPolicy` shallow-merge interaction (a project's own
+      `agentPolicy` for any agent replaces these new defaults entirely) — `92ec5e2`.
+- [x] Task 9: `ToolAvailability` gains `'not-applicable'` — `44a3d17`.
+- [x] Task 10 (Issue 4 fix): `dependencies.ts` skips the LLM entirely and reports
+      `'not-applicable'` when the diff doesn't touch a manifest AND no `package.json` exists on
+      disk — a diff that DOES touch one (even a brand-new one not yet on disk) still reaches the
+      existing npm-audit-then-LLM-fallback logic unchanged — `9a404bd`. Live-verified against a
+      synthetic Dart-project diff: `toolAvailability.npmAudit: "not-applicable"`, no fabricated
+      "missing manifest" finding.
+- [x] Task 11: all three formatters already handled `'not-applicable'` correctly with zero code
+      changes needed (verified by reading each, not assumed) — added regression tests only as a
+      guard against future drift — `8b8542e`.
+- [x] Tasks 12/13 (Issue 1's `--chunk`): `chunkRunner.ts` — a thin wrapper OUTSIDE `SwarmRunner`
+      that calls `runner.run()` once per `maxDiffLines`-sized chunk and merges results — plus the
+      `--chunk` CLI flag wiring `adf4ddc`/`f69fee8`. Deliberately kept outside `SwarmRunner`'s own
+      internals per the "Capability vs Orchestration" decision above.
+- [x] Task 14: full regression clean (517 tests, 0 typecheck/lint errors) plus live end-to-end
+      verification against a synthetic oversized Flutter/Dart-style diff (2278 lines, mixed `.md` + real Dart source + `pubspec.yaml`) confirming all 4 original symptoms resolved in both the
+      default (`exit 3`, loud truncation) and `--chunk` (`exit 0`, full coverage, no `truncation`
+      field) paths. CHANGELOG entry — `093b563`.
+- [x] **Final holistic branch review (post-Task-14, pre-merge)**, looking at the whole diff rather
+      than task-by-task — same discipline as the evidence-grounding-verification merge below, and
+      it paid off the same way: caught 2 real cross-task regressions no single task's own review
+      could have seen, both independently re-verified directly before fixing (not taken on faith):
+      (1) `chunkRunner.ts`'s `mergeResults` took `agentStatus` from the last chunk only — since
+      `cli/index.ts`'s exit code 2 reads `agentStatus` directly, a real agent failure in an earlier
+      chunk was silently hidden behind a later chunk's success, undermining the exact guarantee
+      `--chunk` exists to provide. Fixed: `agentStatus` now merges across all chunks (an agent is
+      `'ok'` only if every chunk that ran it said `'ok'`). (2) The new `**/*.md` default (Task 7)
+      relied on `matchPattern` compiling `**/ ` to a _non-optional_ literal slash, so it could only
+      match nested paths (`docs/README.md`), never a root-level file — the single most common
+      markdown file in any repo (`README.md`). Fixed `matchPattern` itself (`**/ ` → `(?:.*/)?`,
+      matching the documented gitignore spec exactly: "zero or more directories, including none")
+      rather than narrowing the default — this also fixes the same gap for user `--ignore`/
+      `.aiignore` patterns, not just this branch's new default. Also fixed a `Set`-dedup gap
+      (`filteredFiles` could double up entries across agent retries) and documented, but did not
+      fix, a narrower related gap (`extractChangedFiles`'s deliberate `/dev/null` exclusion — relied
+      on elsewhere for correct hallucination-filter behavior — means a delete-only diff bypasses the
+      whole-agent skip and under-reports `filteredFiles`; real but narrow, deferred rather than
+      patched same-session). 9 new regression tests. Committed `ad1373b`.
+- [x] Merged into `fix/full-codebase-audit-findings` via `git merge --no-ff` (`00713e8`); full
+      regression re-verified clean on the main checkout post-merge (526 tests, 0 typecheck errors).
+      Worktree and fully-merged `feature/review-reliability-fixes` branch removed.
+- Full detail: `docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md`,
+  `docs/superpowers/plans/2026-08-16-review-reliability-fixes.md`.
+
+## ✅ Completed (2026-08-12)
+
+### Evidence-Grounding Verification Pass — branch `feature/evidence-grounding-verification`, merged into `fix/full-codebase-audit-findings` (`a227cdb`)
+
+Resolves item 4 of the "ACR reliability findings" entry below (the reasoning-vs-evidence gap:
+findings whose own cited evidence contradicts the claim, or whose severity ignores the agent's
+stated criteria, with no existing defense checking a claim against the evidence it quotes).
+
+- [x] Design spec + 13-task implementation plan written via `superpowers:writing-plans`; executed
+      via `superpowers:subagent-driven-development` (fresh implementer subagent per task, controller
+      runs genuine `/code-review` before every commit, implementers never commit).
+- [x] Schema (`EvidenceCheckFinding`/`EvidenceCheckFilterMetadata` on `ReviewResult`), config
+      (`verifyEvidence`/`verifierModel`, default `qwen3:latest`), `src/core/evidenceVerifier.ts`
+      (`verifyEvidence`/`runEvidenceChecks`), wired into `runner.ts` (optional third
+      `verifierProvider` param), `--verify-evidence` CLI flag, forced off for MCP callers, markdown + SARIF formatter blocks, README/CHANGELOG, permanent `calibration/evidenceVerifierCalibration.ts`
+      script (`npm run calibrate:evidence`).
+- [x] Stage 1 is deliberately report-only — flags via `evidenceCheckFilter`, never drops a finding
+      from `findings`. A deterministic regex pre-filter runs as a second signal (`preFilterAgreed`)
+      alongside the LLM verdict but never overrides or skips it — diff-derived evidence can carry
+      deletion/comment context a naive text match can't distinguish from live code.
+- [x] Validated against 13 unique synthetic cases (evidence-contradicts-claim + genuinely-correct
+      controls); `qwen3:latest` scored 13/13, confirmed live twice — once during design validation,
+      once via the permanent calibration script against real Ollama.
+- [x] Final holistic review (pre-merge) caught a real trust-boundary gap: this is the first place in
+      the codebase where one agent's LLM _output_ becomes a second LLM call's _input_ — the existing
+      `sanitizeDiff`/`sanitizeText` defense was only ever applied once, at diff-ingestion. Fixed by
+      reapplying `sanitizeText()` to claim/evidence before they reach the verifier prompt (`c0fe693`),
+      with a regression test confirming injection strings are stripped first.
+- [x] Regex bug found by the Task 4 implementer subagent: the `not-logged` pre-filter pattern
+      required a trailing `(` after `echo`, which shell `echo` invocations never have — fixed to
+      `/\b(log|logger|console\.\w+)\s*\(|\becho\b/i`; a self-contradictory test assertion sharing the
+      same fixture was corrected alongside it; the same bug was retroactively fixed in the design
+      spec and plan documents, which had been committed with the original text.
+- [x] `??` → `||` bug in `cli/index.ts`'s `verifierModel` fallback, caught by a review lens (`??`
+      doesn't catch an empty-string config value).
+- [x] Post-merge: `npx vitest run` (no path arg) from the main checkout showed 5 failed test
+      files/3 failed tests, all traced to `.worktrees/evidence-grounding-verification/...` paths —
+      the worktree (gitignored but still on disk) was picked up by vitest's default glob and run
+      concurrently with the real suite, racing on shared absolute temp paths. `vitest.config.ts`
+      already excluded `.claude/worktrees/**` (2026-08-10, for the native `EnterWorktree` tool's
+      convention) but not `.worktrees/**` (the `using-git-worktrees` skill's manual-fallback
+      convention actually used this session). Added the missing exclude entry (`a713684`), reviewed
+      (spawned reviewer independently confirmed glob correctness, re-ran the suite itself, checked
+      prettier/eslint/tsc/CI for the same exposure — none found), verified: 44 test files (43 run +
+      1 skipped), 500 tests (496 passing, 4 skipped), 0 unexpected failures.
+- [x] Worktree (`.worktrees/evidence-grounding-verification`) and its now-fully-merged branch
+      removed post-verification — nothing uncommitted in either.
+- Branch `fix/full-codebase-audit-findings` intentionally not pushed yet — local only, pending
+  explicit go-ahead.
+
+## 🚧 In Progress
+
+### Full-Codebase Audit Fix Effort — started 2026-08-10, branch `fix/full-codebase-audit-findings`
+
+- [x] License/complexity/orchestrator fixes from prior handoff — merged PR #18, published npm
+      `v1.9.0`
+- [x] `review.yml` fork-origin-PR guard (self-hosted runner security gap) — merged in PR #18
+- [x] Full 6-lens `src/` audit (security, performance, hallucination-risk, dead code,
+      docs/logging, architecture) against this project's own `standards/*.md` — see
+      `activeContext.md` for full findings and the one lens claim that was independently
+      re-verified and corrected before reporting
+- [x] Batch 1/5: path traversal (`--write-tests`), `base.ts` Stage 2+3 parsing gap, MCP
+      `repo_path` scoping — commit `85e3e1c`, 461 tests passing
+- [x] Batch 2/5: silent-failure observability — commits `caa5368`/`e650a8b`, pushed, 473 tests
+      passing. `shell.ts` logs stderr when a tool exits nonzero with empty stdout (distinguishes
+      "not installed" from "installed but broken", previously both resolved `null` identically).
+      `config.ts` logs before falling back to defaults on malformed `ai-review.config.json`.
+      `gitleaksParser.ts`/`npmAuditParser.ts` log on malformed tool JSON — previously silently
+      reported "0 findings, tool used", a false sense of security specifically dangerous for the
+      secrets scanner since `SecretsAgent`/`DependenciesAgent` set `toolAvailability: 'used'` on
+      any non-null output regardless of parse success. `TestGenAgent` now checks generated content
+      for actual test-framework structure (`describe(`/`it(`/`test(` with a quoted title, or
+      `def test_` for pytest), not just a length threshold — a long refusal/explanation from the
+      model would previously pass the length check and get written to disk as real tests. Also
+      excluded `.claude/worktrees/**` from `vitest.config.ts`'s test glob — a leftover isolated-
+      agent worktree (`fervent-kalam-3c236c`, detached HEAD at a stale July 25 commit) was being
+      picked up and run in parallel with the real suite, racing on shared absolute temp paths and
+      producing spurious failures unrelated to any code change; investigated via `git worktree
+list` before excluding rather than deleting it (may still be someone's reference).
+      Went through full `/code-review` (5 lenses + opponent check): caught and fixed one real
+      issue before commit — the `testGen.ts` structural check's first regex could
+      false-positive-accept prose containing "it (" as a parenthetical (e.g. "explain it (the
+      reasoning) here"), defeating the check's own purpose; tightened to require a quoted title
+      immediately after the call, verified independently by the opponent-check agent against both
+      the false-positive case and real test code. Also ran full `/change-review` (9 jobs) before
+      push: flagged 2 Low test-coverage gaps (gitleaks clean-scan and config valid-merge didn't
+      assert non-logging, unlike the equivalent npm-audit/shell.ts cases from the same batch) —
+      fixed in the immediate follow-up commit `e650a8b` per explicit user instruction ("fix all
+      found issues, new + pre existing"). Job 7 (security) ran ACR's security profile
+      (npm-installed `v1.9.0`) against the branch diff and flagged `resolveWriteTestPath` (Batch
+      1's own path-traversal fix) as introducing path traversal — independently verified false
+      positive by reading the actual containment-check code (`resolve()` + `isPathWithin()`,
+      returns `null` on escape, caller correctly refuses to write). This became the first concrete
+      example for a separate, not-yet-scoped conversation about ACR's own reliability — see "ACR
+      reliability findings" note below.
+- [x] Batch 3/5: dead code / config cleanup.
+  - `complexity.ts` now imports the canonical `extractChangedFiles` helper instead of a local
+    reimplementation that (unlike the canonical version) didn't exclude `/dev/null` deletion
+    markers or dedupe -- added a regression test confirming deleted files no longer reach lizard.
+  - Deleted the unused GitHub PR-comment adapter and its test (270 lines total, zero live import
+    references -- confirmed via `git show` on `review.yml`'s first commit that the inline
+    `actions/github-script` implementation was there from day one, never wired up).
+  - Removed the dead `ContextMetadata` interface from `contextLoader.ts` (declared, zero
+    references).
+  - Removed `preferredSecretsScanner` from `ReviewConfig` (README/CHANGELOG documented it as
+    shipped; functionally always a no-op -- briefly read in `SecretsAgent.run()` for one day
+    (commit `ac280cc`) before being removed same-day (`1708687`) once every branch under it turned
+    out to call the identical fallback regardless of its value, then left orphaned in `config.ts`
+    for ~2 months. Would need a whole new trufflehog integration with unverified output format and
+    no evidence of demand, so removed rather than implemented).
+  - Wired up `complexityThreshold` for real: `ComplexityAgent.run()` now passes a `-C` threshold
+    flag to lizard when the config field is set (verified lizard's actual CLI flag directly rather
+    than trusting the README's stale "default: 10" claim -- lizard's own real default is 15,
+    corrected the docs to say so).
+  - Named the line-proximity magic number (copy-pasted 4x across the hallucination-corroboration
+    and cross-reference logic) as `SAME_LOCATION_LINE_PROXIMITY`.
+  - Removed `OrchestratorAgent`'s unused LLM provider constructor param (100% deterministic
+    synthesis, no LLM calls) -- required updating roughly 40 call sites across the runner,
+    calibration script, and 3 test files; removed now-dead provider-mock helpers and imports left
+    over in those test files once the arg was gone.
+  - README's config example JSON updated to match (dropped `preferredSecretsScanner`, corrected
+    `complexityThreshold`'s documented default).
+- [x] Batch 4/5: drift-prevention.
+  - `cli/formatter.ts`'s `TOOL_LABELS` used to be keyed by an independently hand-typed literal
+    union (`'gitleaks' | 'npmAudit' | 'lizard'`), and `degradedTools` re-typed the same 3 keys a
+    second time as a literal array -- two places that could silently drift apart if a new tool
+    integration were added to the schema and one site forgot to update. `TOOL_LABELS` is now typed
+    `Record<keyof ToolAvailabilityMetadata, string>` (schema.ts's own type), so adding a key to the
+    schema now forces a compile error here until a label is added; `degradedTools` derives its
+    iteration list from `Object.keys(TOOL_LABELS)` instead of a second literal array.
+  - `mcp/server.ts`'s tool description hardcoded "Uses 15 specialist agents (security,
+    performance, ... complexity)" as a separate string -- found it had already silently drifted
+    from `DEFAULT_CONFIG.agents`'s real order (same 15 agents, but `coverage` had moved position).
+    Initially just inlined the derivation directly in `server.ts`, but the architecture-review
+    lens correctly pushed back: `server.ts` has top-level side effects (connects a real stdio
+    transport on import via `await server.connect(transport)`), making it untestable without
+    triggering those effects -- so the new derivation logic itself would have shipped with zero
+    coverage, in a batch specifically about preventing silent drift. Extracted the string builder
+    into a new exported `buildToolDescription()` in `mcp/tool.ts` (the existing pure, side-effect-free
+    logic layer) instead, which `server.ts` now imports and calls. Added
+    `tests/unit/mcp/toolDescription.test.ts` as a separate file from the existing `tool.test.ts` --
+    that file globally mocks `core/config.js` (providing only `loadConfig`, not `DEFAULT_CONFIG`),
+    which would have broken `buildToolDescription`'s real `DEFAULT_CONFIG` import if tested there.
+  - 466 unit tests passing (up from 464): new `tests/unit/mcp/toolDescription.test.ts`.
+- [x] Batch 5/5: previously-approved-but-unimplemented performance/waste items.
+  - `contextLoader.ts`'s `loadAgentContextSemantic` takes no `agentName` param -- its result
+    depends only on `projectPath`/`diff`/`ollamaUrl`/`contextBudgetChars`, identical across every
+    agent in one run. `runner.ts`'s `withContext` closure (called once per agent, up to ~16x)
+    recomputed it from scratch every time -- redundant Ollama embedding calls (1 diff embed + 1
+    per memory-bank file) with an identical result, every single call. Fixed by caching the
+    `Promise<ContextResult>` in a `let` scoped to the same closure, assigned via `??=` before
+    awaiting -- this correctly deduplicates concurrent calls under `--parallel` too, not just
+    sequential ones, since the assignment happens synchronously before any agent's `await`. Added
+    a real regression test (`tests/unit/runner.test.ts`, "computes the semantic embedding once per
+    run, not once per agent") -- verified it actually catches the regression by temporarily
+    reverting the fix and confirming the test fails (6 calls instead of 2 with 3 agents
+    configured), not just written-and-assumed-correct. The bug-scan review lens then caught a real
+    bug in the caching itself before commit: `??=` only reassigns when the variable is `null`, but
+    a _rejected_ promise isn't `null` -- so a single transient embedding failure would have stayed
+    cached forever, permanently failing every later agent and every retry for the rest of the run
+    with the same error, defeating `retryAttempts` entirely for this failure mode. Fixed with a
+    `.catch()` that resets the cache variable to `null` before rethrowing, so a later
+    agent/retry gets a fresh attempt instead of the poisoned cache. Added a second regression test
+    and verified the same way (confirmed it fails without the reset: both agents fail off one
+    cached rejection instead of the second getting its own attempt).
+  - `complexity.ts`/`observability.ts` both instructed the model to generate `severity: "low"`
+    findings that `orchestrator.ts`'s `applyPublicationFilter` unconditionally discards before
+    publication -- pure wasted generation time. Removed the `severity: "low"` line from both
+    prompts and added `- Only report severity >= medium` to each, matching the exact phrasing
+    convention `dependencies.ts` already established for this same class of instruction. Verified
+    no test or calibration fixture depended on a "low" finding from either agent before removing.
+  - 468 unit tests passing (up from 466).
+
+### ACR reliability findings — reported 2026-08-10, items 4/5 resolved 2026-08-12, item 3 open
+
+User forwarded a consolidated report from two independent ACR runs against an identical real-world
+diff (Personal-Memory-Bank's concurrent-session-claims feature, ~8000 lines) — a dogfooding
+reliability test of this tool's own output quality, not a review of this repo. Five items, checked
+individually against this codebase rather than accepted at face value:
+
+1. **Nondeterminism across runs on identical input** (9 vs 10 findings, one run had a coverage
+   timeout + dependencies retry-exhaustion). Known, accepted category — inherent to local-LLM
+   inference reliability, already has partial mitigation (`retryAttempts`, `timeoutScalingEnabled`,
+   `agentStatus` visibility so failures are reported, not silently clean). Not a target for any
+   current or planned batch.
+2. **Item 5 (schema "nothing to report" gap) does not hold once checked.** There IS a tested clean
+   `[]` path — `dependencies-clean`/`license-clean` calibration cases (`expectEmpty: true`) confirm
+   it works when the model complies. The described "rejected nothing-here response" means the model
+   returned something other than `[]` despite the prompt saying to — model non-compliance, not a
+   schema gap. Loosening the schema to accept it was explicitly considered and rejected on
+   2026-08-03 (reverts a deliberate anti-hallucination safety property tested in
+   `tests/unit/baseAgent.test.ts`).
+3. **Item 2's specific "fabricated GPL/mongodb license finding" traces to a real, already-fixed bug**
+   — commit `a906515` (2026-08-09) removed the exact "package.json:14"+"MongoDB" bait from
+   `licenseCompliance.ts`'s prompt in response to this same pattern, shipped in npm `v1.9.0`. But it
+   was prompt-only (license has no deterministic-tool replacement, unlike dependencies' npm-audit)
+   — prompt-tightening alone is documented as NOT reliably eliminating hallucination (adversarial:
+   3/3→3/3, no measurable improvement, 2026-08-06 entry). `orchestrator.ts`'s
+   `filterNonexistentFiles` (live since 2026-08-03, agent-agnostic) should catch a finding citing a
+   file genuinely absent from the diff — if this specific finding survived to final output despite
+   that, it's either a stale-build artifact or a real regression. **Unresolved**: needs the raw
+   finding's exact file/line/text and `ai-review-agent --version` used to tell which.
+4. **Items 2, 3 ("quotes-own-disproof": findings citing evidence that directly contradicts the
+   claim, e.g. flagging a `shift`-based fix as the unbound-variable bug it fixes) and 4 (severity
+   miscalibration: "new hook added" labeled Critical/Blocking) collapse into ONE real, currently
+   unaddressed architectural gap.** Verified directly: `breakingChange.ts`'s prompt already
+   correctly scopes to real incompatibilities (removed exports, signature changes, renames) —
+   "new hook added" matches none of its 9 criteria, so the mislabel isn't a missing prompt rule,
+   it's the model not checking its own conclusion against its own stated criteria or the evidence
+   it quotes. **No existing defense checks this** — `filterNonexistentFiles` checks file existence,
+   `hallucinationCrossCheck` checks cross-agent corroboration; neither verifies reasoning against
+   evidence. Not touched by Batch 1, Batch 2, or anything currently planned.
+   **RESOLVED 2026-08-12** — see the "Evidence-Grounding Verification Pass" entry above.
+   `evidenceVerifier.ts` now checks each Critical/High finding's claim against its own cited
+   evidence via a second model. Scoped as Stage 1 (report-only, `--verify-evidence`, off by
+   default) rather than auto-filtering — visibility first, not yet wired to drop or downgrade
+   findings automatically.
+5. **Live first-party confirmation of the same failure mode**, caught during this session's own
+   `/change-review` Job 7: ACR's security profile (npm `v1.9.0`) flagged `resolveWriteTestPath`
+   (Batch 1's own path-traversal fix) as introducing path traversal, citing the exact containment
+   check that prevents it. Verified false positive by reading `resolve()`+`isPathWithin()` directly.
+   **Same root cause as item 4, resolved by the same fix.**
+
+**Status**: items 1 and 2 were investigated and don't need code changes (accepted limitation /
+confirmed non-issue, respectively). Items 4 and 5 resolved 2026-08-12 via evidence-grounding
+verification (see above). **Item 3 remains open** — the specific fabricated GPL/mongodb finding
+the user originally reported was never traced to a specific run; still needs the raw finding's
+exact file/line/text and the `ai-review-agent --version` used, to tell a stale-build artifact from
+a live regression.
 
 ## ✅ Completed (Tasks 1–16)
 

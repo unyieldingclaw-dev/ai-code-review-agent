@@ -3,6 +3,110 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+## [1.10.0] — 2026-08-17 (full-codebase audit fixes, evidence-grounding verification, review reliability)
+
+### Added
+
+- `AI_REVIEW_ALLOWED_ROOTS`: opt-in, comma-separated allowlist of absolute paths the MCP server's
+  `repo_path` may point at (unset — the default — keeps prior unrestricted behavior).
+- `complexityThreshold` config field is now wired up for real — passed to `lizard` as its native
+  `-C` threshold flag when `lizard` is installed. Previously documented as shipped but silently a
+  no-op.
+- `--verify-evidence` runs Critical/High findings through a separate model (`qwen3:latest` by
+  default) that checks whether each finding's own cited evidence actually supports its claim —
+  catches a hallucination class none of the existing defenses caught (a finding citing a real
+  line, in a real changed file, that says the opposite of what the line does). **Report-only in
+  this release**: flagged findings are surfaced in `ReviewResult.evidenceCheckFilter` (and in the
+  markdown/SARIF reports) but nothing is dropped from `findings` yet. Opt-in (`verifyEvidence`
+  config field, default `false`); forced off for MCP callers regardless of project config. See
+  `docs/superpowers/specs/2026-08-10-evidence-grounding-verification-design.md` for the full
+  design and validation data.
+- `--allow-truncation`: opt out of the new truncated-but-clean exit code (below) for workflows
+  that have deliberately accepted partial diff coverage.
+- `--chunk`: instead of silently truncating an oversized diff to `--max-lines`, split it into
+  multiple full-coverage passes and merge the results — full diff coverage at the cost of
+  multiplying LLM calls by chunk count. Opt-in, off by default. Implemented as a wrapper
+  (`chunkRunner.ts`) outside `SwarmRunner` — calls the existing `run()` once per chunk unchanged;
+  the merged report is re-capped and re-sorted globally by severity (`maxFindings`), not just
+  concatenated. CLI-only — not exposed via MCP (its per-chunk latency cost isn't a good fit for an
+  interactive caller). Known caveat: chunks split on line count, not file boundaries, so a finding
+  on a file whose diff section straddles a chunk boundary can be dropped as if it were a
+  hallucination rather than reported — see `chunkRunner.ts`'s own comment for detail; a real gap
+  worth understanding before relying on `--chunk` for a very large diff, not yet fixed.
+- `security`/`adversarial` now exclude `**/*.md` by default via `agentPolicy` — these two agents'
+  prompts have no file-type awareness and were misreading documentation prose (e.g. a vulnerable
+  code example inside a security writeup) as real, executable vulnerable code. Deterministic, not
+  a prompt instruction, since prompt-tightening alone has previously underperformed for this class
+  of problem. `ReviewResult.filteredFiles` reports which files were stripped from an agent's own
+  view (new — sibling of `PolicyResult`, not nested in it, since this covers an agent that still
+  ran, just with reduced input).
+- `ToolAvailability` gains a `'not-applicable'` value, for when a tool-integrated agent's LLM
+  fallback should be skipped entirely rather than run (see `dependencies` fix below).
+
+### Fixed
+
+- **Silent diff truncation had no exit-code signal.** A diff truncated to `--max-lines` produced
+  the same exit code as a genuinely complete review — CI could pass on a review that never saw
+  most of the diff. New exit code 3 (truncated-but-otherwise-clean); takes priority over
+  `--fail-on` but below the existing agent-failure (2) and real-finding (1) exit codes, so a
+  genuine blocker or agent failure is never masked by a lower-priority truncation code. Opt out
+  with `--allow-truncation`, or use the new `--chunk` (above) for full coverage instead.
+- **Every agent's structured JSON output needed truncation-recovery to parse.** Root-caused via a
+  live diagnostic script (`calibration/responseTruncationDiagnostic.ts`, new — permanent, run with
+  `npm run calibrate:truncation`): `format: 'json'` (the bare string Ollama's structured-output
+  mode accepted) only constrains "valid JSON," not the required top-level shape, so the model
+  reliably emitted a single bare object instead of an array. Not, as originally hypothesized, a
+  missing token cap — `done_reason` was `stop`, never `length`, at every diff size tested. Fixed by
+  sending an explicit JSON Schema (`format: { type: 'array' | 'object', ... }`) instead, which
+  empirically forces the correct shape. A separate, distinct problem surfaced during the same
+  investigation — the model under-reporting multiple real findings in one diff, even with the
+  shape fixed — is **not** fixed by this change; it's a model-capability limitation, not a format
+  issue, and is documented as an accepted, deliberately out-of-scope limitation rather than guessed
+  at with an unverified fix.
+- **`dependencies` assumed every project uses npm/Node.js.** On a project with no `package.json`
+  and a diff that never touches one (e.g. a Flutter/Dart project), the agent still ran its LLM
+  fallback and could fabricate a "missing manifest" style finding. Now skips the LLM entirely and
+  reports `toolAvailability.npmAudit: 'not-applicable'` in that case. A diff that DOES touch
+  `package.json`/`package-lock.json` (even one not yet on disk — e.g. reviewing an unapplied patch
+  that adds a manifest for the first time) is unaffected, reaching the existing
+  npm-audit-then-LLM-fallback logic exactly as before.
+- `shell.ts` now logs stderr when a tool exits nonzero with empty stdout — previously
+  indistinguishable from "tool not installed," both silently resolved to `null`.
+- `config.ts` logs before falling back to defaults on a malformed `ai-review.config.json`, instead
+  of silently ignoring it.
+- `gitleaksParser.ts`/`npmAuditParser.ts` log on malformed tool JSON instead of silently reporting
+  "0 findings, tool used" — previously a false sense of security, specifically dangerous for the
+  secrets scanner.
+- `TestGenAgent` now checks generated content for actual test-framework structure (a quoted-title
+  `describe(`/`it(`/`test(`, or `def test_` for pytest) instead of just a length threshold — a
+  model refusal/explanation long enough to pass the old check would previously get written to disk
+  as if it were real tests.
+- Coverage-gap and other cross-agent finding matching used to compare raw, unnormalized `file`
+  strings — a model echoing the diff's own `a/`/`b/` header prefix into a finding's `file` field
+  could defeat deduplication, corroboration, and escalation checks. All comparisons now use
+  canonicalized paths.
+- `--context-mode semantic` recomputed the same diff/memory-bank embeddings from scratch once per
+  agent (up to ~14 redundant Ollama calls per run for an identical result) — now computed once per
+  run and reused.
+
+### Security
+
+- `--write-tests` and the MCP server's coverage-gap-derived test paths are now defended against
+  path traversal (`resolveWriteTestPath` containment check, plus a coverage-gap filter mirroring
+  the existing changed-file-membership defense already applied to regular findings).
+- The MCP server's `repo_path` accepted any filesystem path with no scoping — see
+  `AI_REVIEW_ALLOWED_ROOTS` above.
+
+### Removed
+
+- `preferredSecretsScanner` config field — documented as shipped but functionally always a no-op
+  (every code path fell back to the same default regardless of its value).
+- The unused GitHub PR-comment adapter (`src/adapters/github.ts`) — confirmed via git history
+  never wired into `review.yml`, which used an inline `actions/github-script` step from its first
+  commit. Not a public API — no consumer-facing effect.
+
 ## [1.9.0] — 2026-08-09 (deterministic-tool integration, hallucination fixes, CI hardening)
 
 ### Added
