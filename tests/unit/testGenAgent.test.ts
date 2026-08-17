@@ -1,6 +1,9 @@
 // Unit tests — mock the LLM provider. Ollama is NOT required to run these.
 // TestGenAgent is opt-in (--suggest-tests or --write-tests).
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mkdtempSync, writeFileSync, rmSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { TestGenAgent } from '../../src/core/agents/testGen.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
@@ -118,5 +121,58 @@ describe('TestGenAgent', () => {
     // Should make only 1 API call for the same file
     expect(chat).toHaveBeenCalledTimes(1)
     expect(result.testFiles.length).toBe(1)
+  })
+
+  // detectFramework() picks 'pytest' from a real requirements.txt on disk (no package.json),
+  // not from the source file's own extension -- every test above uses a fake, nonexistent
+  // projectPath, which always falls through to 'vitest'. The looksLikeTestCode check has a
+  // separate pytest-specific regex (`def test_`) that was previously never exercised at all.
+  describe('pytest framework detection', () => {
+    let pytestProjectPath: string
+
+    beforeEach(() => {
+      pytestProjectPath = mkdtempSync(join(tmpdir(), 'ai-review-testgen-pytest-'))
+      writeFileSync(join(pytestProjectPath, 'requirements.txt'), 'pytest==8.0.0\n')
+    })
+
+    afterEach(() => {
+      rmSync(pytestProjectPath, { recursive: true, force: true })
+    })
+
+    it('accepts generated content matching pytest structure (def test_)', async () => {
+      const testCode = 'def test_validate_token():\n    assert validate_token("x") is True\n'
+      const agent = new TestGenAgent(makeProvider(testCode), DEFAULT_CONFIG)
+      const gaps: CoverageGap[] = [
+        {
+          file: 'src/auth.py',
+          functionName: 'validate_token',
+          lineStart: 10,
+          lineEnd: 20,
+          description: 'Validates a token',
+        },
+      ]
+      const result = await agent.runWithGaps({ ...mockInput, projectPath: pytestProjectPath }, gaps)
+      expect(result.testFiles).toHaveLength(1)
+      expect(result.testFiles[0].framework).toBe('pytest')
+      expect(result.testFiles[0].path).toMatch(/\.py$/)
+    })
+
+    it('rejects pytest-project content that has no def test_ function, even if long', async () => {
+      // A JS-style describe/it call here must NOT satisfy the pytest branch -- the framework
+      // check is a strict either/or, not "any recognized test syntax".
+      const testCode = 'describe("test", () => { it("should pass", () => {}) })'
+      const agent = new TestGenAgent(makeProvider(testCode), DEFAULT_CONFIG)
+      const gaps: CoverageGap[] = [
+        {
+          file: 'src/auth.py',
+          functionName: 'validate_token',
+          lineStart: 10,
+          lineEnd: 20,
+          description: 'Validates a token',
+        },
+      ]
+      const result = await agent.runWithGaps({ ...mockInput, projectPath: pytestProjectPath }, gaps)
+      expect(result.testFiles).toEqual([])
+    })
   })
 })
