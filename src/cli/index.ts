@@ -161,7 +161,8 @@ program
           console.error(
             `Provider "${config.provider}" is configured but not implemented. Use provider "ollama".`
           )
-          process.exit(1)
+          process.exitCode = 1
+          return
         }
 
         if (options.model) config.model = options.model
@@ -173,7 +174,8 @@ program
             config.agents = resolveProfile(options.profile)
           } catch (err) {
             console.error(err instanceof Error ? err.message : String(err))
-            process.exit(1)
+            process.exitCode = 1
+            return
           }
         }
         if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
@@ -210,7 +212,8 @@ program
         const diff = getDiff(options.diff, options.dir)
         if (!diff.trim()) {
           console.error('No diff to review. Stage changes or provide --diff.')
-          process.exit(1)
+          process.exitCode = 1
+          return
         }
 
         const provider = new OllamaProvider(config.ollamaUrl, config.model)
@@ -340,21 +343,22 @@ program
 
         const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
         if (hasAgentFailures(result.agentStatus)) {
-          process.exit(AGENT_FAILURE_EXIT_CODE)
+          process.exitCode = AGENT_FAILURE_EXIT_CODE
+          return
         }
         if (hasBlocker) {
-          process.exit(1)
+          process.exitCode = 1
+          return
         }
         // Truncation ranks below a real blocker (checked above) but above "clean" -- a run that
         // silently skipped 60% of the diff must not report exit 0 by default. --allow-truncation
         // opts back into 0 for callers who've deliberately accepted partial coverage.
         if (result.truncation?.truncated && !options.allowTruncation) {
-          process.exit(TRUNCATION_EXIT_CODE)
+          process.exitCode = TRUNCATION_EXIT_CODE
+          return
         }
-        process.exit(0)
+        process.exitCode = 0
       } catch (err) {
-        // Re-throw synthetic exits (e.g. process.exit mocks in tests) so they propagate correctly
-        if (err instanceof Error && err.message.startsWith('process.exit(')) throw err
         const msg = err instanceof Error ? err.message : String(err)
         process.stderr.write(`\nError: ${msg}\n`)
         if (
@@ -364,7 +368,7 @@ program
         ) {
           process.stderr.write(`Make sure Ollama is running: ollama serve\n`)
         }
-        process.exit(1)
+        process.exitCode = 1
       }
     }
   )
@@ -396,8 +400,10 @@ function gitSync(args: string[]): string {
 function getDiff(diffFile?: string, dir?: string): string {
   if (diffFile) {
     if (!existsSync(diffFile)) {
-      console.error(`Diff file not found: ${diffFile}`)
-      process.exit(1)
+      // WHY throw here (unlike the action handler's exitCode+return): this function returns a
+      // string, not void, so it can't itself set exitCode and stop execution -- throwing routes
+      // the failure through the caller's existing try/catch, which sets exitCode there.
+      throw new Error(`Diff file not found: ${diffFile}`)
     }
     return readFileSync(diffFile, 'utf-8')
   }
