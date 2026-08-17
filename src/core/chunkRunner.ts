@@ -4,25 +4,32 @@
 // built on top of the existing review capability, not a change to how that capability itself
 // works. See docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md, Issue 1.
 //
-// Known, accepted simplifications (documented, not fixed here -- same class of chunk-boundary
-// limitation the design spec already accepts for "a function split across a chunk boundary"):
-// chunks split on raw line count, not `diff --git` file boundaries, so a single file's diff
-// section can itself be split across two chunks. This has a real, non-cosmetic consequence,
-// caught in a pre-merge review of this exact code, worth understanding before relying on --chunk
-// for a large diff: each chunk's own OrchestratorAgent.synthesize() call computes changedFiles
-// from ONLY that chunk's content -- if a file's `diff --git`/`+++ b/` header lands in chunk N but
-// the hunk body an agent reads from continues into chunk N+1, that chunk's changedFiles won't
-// include the file, and filterNonexistentFiles will drop any genuine finding an agent reports on
-// it as "likely a hallucinated or malicious finding" -- indistinguishable in the output from an
-// actual hallucination. Not fixed here (needs either file-boundary-aware chunking or carrying a
-// running changedFiles set across chunks, both real design decisions); tracked as a real gap, not
-// waved off as cosmetic like the duplicate-findings case below. Purely diagnostic metadata
-// (toolAvailability, policy, filteredFiles, context) reflects whichever chunk ran LAST, not a true
-// merge across chunks -- acceptable for an opt-in feature, since none of it gates an exit code.
-// agentStatus is the one exception and IS merged across all chunks (see mergeAgentStatus below):
-// it feeds cli/index.ts's exit code 2, so a last-chunk-wins simplification there would let a real
-// failure in an earlier chunk go unreported by the very feature meant to guarantee complete
-// coverage. The actual review output (findings, testFiles, summary, sanitizer) IS fully merged
+// Chunks are split on `diff --git` file boundaries (splitByFileBoundary below), never mid-file --
+// fixes a real, non-cosmetic bug caught in a pre-merge review of an earlier version of this file,
+// which split on raw line count instead: each chunk's own OrchestratorAgent.synthesize() call
+// computes changedFiles from ONLY that chunk's content, so if a file's `diff --git`/`+++ b/`
+// header landed in chunk N but the hunk body an agent reads from continued into chunk N+1, that
+// chunk's changedFiles wouldn't include the file, and filterNonexistentFiles would drop any
+// genuine finding an agent reported on it as "likely a hallucinated or malicious finding" --
+// indistinguishable in the output from an actual hallucination. A single file's diff section
+// larger than maxDiffLines still becomes its own oversized chunk (SwarmRunner.run()'s existing
+// internal truncation applies within it, same as it always has for an over-max-lines diff) -- a
+// much narrower, already-handled edge case than the general boundary-split this replaces.
+//
+// Known, accepted simplification: purely diagnostic metadata (toolAvailability, policy,
+// filteredFiles, context) reflects whichever chunk ran LAST, not a true merge across chunks --
+// acceptable for an opt-in feature, since none of it gates an exit code, and losing an earlier
+// chunk's copy of it costs nothing the user-facing report still depends on.
+// agentStatus and evidenceCheckFilter are the two exceptions and ARE merged across all chunks
+// (see mergeAgentStatus/mergeEvidenceCheckFilter below): agentStatus feeds cli/index.ts's exit
+// code 2, so a last-chunk-wins simplification there would let a real failure in an earlier chunk
+// go unreported by the very feature meant to guarantee complete coverage. evidenceCheckFilter's
+// `flagged` array names specific Critical/High findings STILL IN the final report whose own cited
+// evidence may not support them -- unlike hallucinationFilter/coverageGapFilter (which only
+// explain findings already dropped, so an incomplete explanation costs nothing the report itself
+// depends on), losing an earlier chunk's flagged entries would silently under-report which of the
+// findings a reader is looking at right now might be unreliable. The actual review output
+// (findings, testFiles, summary, sanitizer) IS fully merged
 // below too, including a global severity-sort + maxFindings cap (see capAndSort) so a large diff's
 // merged report doesn't silently exceed the documented cap or order findings chunk-then-severity.
 // Cross-chunk duplicate findings are not deduped (each chunk's own OrchestratorAgent.synthesize()
@@ -37,6 +44,7 @@ import type {
   GeneratedTestFile,
   AgentName,
   AgentStatus,
+  EvidenceCheckFilterMetadata,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
 
@@ -48,26 +56,49 @@ export async function runChunked(
   onProgress?: (event: AgentProgressEvent) => void,
   contextMode: 'none' | 'memory-bank' = 'none'
 ): Promise<ReviewResult> {
-  const lines = input.diff.split('\n')
-  const diffLines = lines.length
-  const chunkCount = Math.max(1, Math.ceil(diffLines / maxDiffLines))
+  const chunks = splitByFileBoundary(input.diff, maxDiffLines)
 
   console.warn(
-    `[ai-review] Diff split into ${chunkCount} chunk(s) of up to ${maxDiffLines} lines each ` +
-      `(--chunk) -- full diff coverage, ${chunkCount}x the LLM calls.`
+    `[ai-review] Diff split into ${chunks.length} chunk(s) of up to ${maxDiffLines} lines each ` +
+      `(--chunk) -- full diff coverage, ${chunks.length}x the LLM calls.`
   )
 
   const results: ReviewResult[] = []
-  for (let i = 0; i < chunkCount; i++) {
-    const start = i * maxDiffLines
-    const end = Math.min(start + maxDiffLines, diffLines)
-    const chunkInput: ReviewInput = { ...input, diff: lines.slice(start, end).join('\n') }
+  for (const chunkDiff of chunks) {
+    const chunkInput: ReviewInput = { ...input, diff: chunkDiff }
     const result = await runner.run(chunkInput, onProgress, contextMode)
     results.push(result)
     if (result.earlyExit) break // --fail-fast should stop across chunks too, not just within one
   }
 
   return mergeResults(results, maxFindings)
+}
+
+// Splits a diff into chunks of up to maxLines each without ever splitting a single file's
+// `diff --git` section across two chunks (see the header comment above for why). Packs sections
+// greedily in order; a section larger than maxLines on its own still becomes its own chunk rather
+// than being dropped or force-split.
+export function splitByFileBoundary(diff: string, maxLines: number): string[] {
+  const sections = diff.split(/(?=^diff --git )/m).filter((s) => s.length > 0)
+  if (sections.length === 0) return ['']
+
+  const chunks: string[] = []
+  let current: string[] = []
+  let currentLines = 0
+
+  for (const section of sections) {
+    const sectionLines = section.split('\n').length
+    if (current.length > 0 && currentLines + sectionLines > maxLines) {
+      chunks.push(current.join(''))
+      current = []
+      currentLines = 0
+    }
+    current.push(section)
+    currentLines += sectionLines
+  }
+  if (current.length > 0) chunks.push(current.join(''))
+
+  return chunks
 }
 
 // Mirrors OrchestratorAgent.capAndSort exactly (severity desc, then VERIFIED > INFERRED >
@@ -104,6 +135,7 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
 
   const last = results[results.length - 1]
   const mergedAgentStatus = mergeAgentStatus(results)
+  const mergedEvidenceCheckFilter = mergeEvidenceCheckFilter(results)
   const sanitizerApplied = results.some((r) => r.sanitizer?.applied)
   const sanitizerRedacted = results.reduce((sum, r) => sum + (r.sanitizer?.redactedLines ?? 0), 0)
   const sanitizerWarnings = results.flatMap((r) => r.sanitizer?.warnings ?? [])
@@ -128,8 +160,27 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
     ...(last.hallucinationFilter ? { hallucinationFilter: last.hallucinationFilter } : {}),
     ...(last.coverageGapFilter ? { coverageGapFilter: last.coverageGapFilter } : {}),
     ...(last.toolAvailability ? { toolAvailability: last.toolAvailability } : {}),
-    ...(last.evidenceCheckFilter ? { evidenceCheckFilter: last.evidenceCheckFilter } : {}),
+    ...(mergedEvidenceCheckFilter ? { evidenceCheckFilter: mergedEvidenceCheckFilter } : {}),
     ...(last.filteredFiles ? { filteredFiles: last.filteredFiles } : {}),
+  }
+}
+
+// See the header comment above for why this field is merged (unlike hallucinationFilter/
+// coverageGapFilter, which stay last-chunk-wins): its `flagged` array names specific findings
+// still in the final report, not just an explanation of ones already dropped.
+function mergeEvidenceCheckFilter(
+  results: ReviewResult[]
+): EvidenceCheckFilterMetadata | undefined {
+  const present = results
+    .map((r) => r.evidenceCheckFilter)
+    .filter((m): m is EvidenceCheckFilterMetadata => m !== undefined)
+  if (present.length === 0) return undefined
+
+  return {
+    checkedCount: present.reduce((sum, m) => sum + m.checkedCount, 0),
+    unavailableCount: present.reduce((sum, m) => sum + m.unavailableCount, 0),
+    unavailableReasons: present.flatMap((m) => m.unavailableReasons),
+    flagged: present.flatMap((m) => m.flagged),
   }
 }
 

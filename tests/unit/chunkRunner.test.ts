@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { runChunked } from '../../src/core/chunkRunner.js'
+import { runChunked, splitByFileBoundary } from '../../src/core/chunkRunner.js'
 import type { SwarmRunner } from '../../src/core/runner.js'
 import type { ReviewResult } from '../../src/core/schema.js'
 
@@ -13,15 +13,30 @@ function makeResult(overrides: Partial<ReviewResult> = {}): ReviewResult {
   }
 }
 
+// Each file section is deliberately sized larger than maxLines (2000 in these tests) so it always
+// becomes its own chunk regardless of packing order -- keeps the orchestration tests below
+// (merge/sort/cap/earlyExit behavior) independent of splitByFileBoundary's own packing details,
+// which get their own dedicated test coverage further down.
+function makeFileDiff(path: string, bodyLines: number): string {
+  const body = Array.from({ length: bodyLines }, (_, i) => `+line ${i}`).join('\n')
+  return `diff --git a/${path} b/${path}\n${body}`
+}
+
+function makeMultiFileDiff(fileCount: number, linesPerFile = 2500): string {
+  return Array.from({ length: fileCount }, (_, i) =>
+    makeFileDiff(`file${i}.ts`, linesPerFile)
+  ).join('\n')
+}
+
 describe('runChunked', () => {
-  it('splits a diff into ceil(lines/maxDiffLines) chunks and calls run() once per chunk', async () => {
+  it('splits a diff into one chunk per file section and calls run() once per chunk', async () => {
     const runMock = vi.fn().mockResolvedValue(makeResult())
     const runner = { run: runMock } as unknown as SwarmRunner
-    const bigDiff = Array.from({ length: 5000 }, (_, i) => `line ${i}`).join('\n')
+    const diff = makeMultiFileDiff(3)
 
-    await runChunked(runner, { diff: bigDiff }, 2000, 15)
+    await runChunked(runner, { diff }, 2000, 15)
 
-    expect(runMock).toHaveBeenCalledTimes(3) // ceil(5000/2000)
+    expect(runMock).toHaveBeenCalledTimes(3)
   })
 
   it('merges findings, testFiles, and summary counts across chunks', async () => {
@@ -50,7 +65,7 @@ describe('runChunked', () => {
         })
       )
     const runner = { run: runMock } as unknown as SwarmRunner
-    const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
+    const diff = makeMultiFileDiff(2)
 
     const merged = await runChunked(runner, { diff }, 2000, 15)
 
@@ -66,7 +81,7 @@ describe('runChunked', () => {
       .mockResolvedValueOnce(makeResult({ earlyExit: { stoppedAt: 'security' } }))
       .mockResolvedValueOnce(makeResult())
     const runner = { run: runMock } as unknown as SwarmRunner
-    const diff = Array.from({ length: 5000 }, (_, i) => `line ${i}`).join('\n')
+    const diff = makeMultiFileDiff(3)
 
     await runChunked(runner, { diff }, 2000, 15)
 
@@ -76,7 +91,7 @@ describe('runChunked', () => {
   it('does not report truncation on the merged result -- full coverage was achieved', async () => {
     const runMock = vi.fn().mockResolvedValue(makeResult())
     const runner = { run: runMock } as unknown as SwarmRunner
-    const diff = Array.from({ length: 5000 }, (_, i) => `line ${i}`).join('\n')
+    const diff = makeMultiFileDiff(3)
 
     const merged = await runChunked(runner, { diff }, 2000, 15)
 
@@ -89,7 +104,7 @@ describe('runChunked', () => {
       .mockResolvedValueOnce(makeResult({ agentStatus: { security: 'timeout' } }))
       .mockResolvedValueOnce(makeResult({ agentStatus: { security: 'ok' } }))
     const runner = { run: runMock } as unknown as SwarmRunner
-    const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
+    const diff = makeMultiFileDiff(2)
 
     const merged = await runChunked(runner, { diff }, 2000, 15)
 
@@ -104,7 +119,7 @@ describe('runChunked', () => {
       .mockResolvedValueOnce(makeResult({ agentStatus: { security: 'ok', dependencies: 'ok' } }))
       .mockResolvedValueOnce(makeResult({ agentStatus: { security: 'ok', dependencies: 'ok' } }))
     const runner = { run: runMock } as unknown as SwarmRunner
-    const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
+    const diff = makeMultiFileDiff(2)
 
     const merged = await runChunked(runner, { diff }, 2000, 15)
 
@@ -128,7 +143,7 @@ describe('runChunked', () => {
       .mockResolvedValueOnce(makeResult({ findings: makeFindings(10, 'a') }))
       .mockResolvedValueOnce(makeResult({ findings: makeFindings(10, 'b') }))
     const runner = { run: runMock } as unknown as SwarmRunner
-    const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
+    const diff = makeMultiFileDiff(2)
 
     const merged = await runChunked(runner, { diff }, 2000, 15)
 
@@ -156,12 +171,110 @@ describe('runChunked', () => {
         })
       )
     const runner = { run: runMock } as unknown as SwarmRunner
-    const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
+    const diff = makeMultiFileDiff(2)
 
     const merged = await runChunked(runner, { diff }, 2000, 15)
 
     // Chunk 2's critical finding must sort ahead of chunk 1's medium finding in the final report,
     // not just appear after it because its chunk ran later.
     expect(merged.findings.map((f) => (f as { id: string }).id)).toEqual(['b', 'a'])
+  })
+
+  it('merges evidenceCheckFilter across chunks instead of only keeping the last chunk', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({
+          evidenceCheckFilter: {
+            checkedCount: 2,
+            unavailableCount: 0,
+            unavailableReasons: [],
+            flagged: [
+              {
+                agent: 'security',
+                title: 'Chunk 1 flagged finding',
+                file: 'a.ts',
+                line: 1,
+                claim: 'x',
+                evidence: 'y',
+                reason: 'z',
+                preFilterAgreed: null,
+              } as never,
+            ],
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResult({
+          evidenceCheckFilter: {
+            checkedCount: 1,
+            unavailableCount: 1,
+            unavailableReasons: ['timeout'],
+            flagged: [],
+          },
+        })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+    const diff = makeMultiFileDiff(2)
+
+    const merged = await runChunked(runner, { diff }, 2000, 15)
+
+    // A last-chunk-wins merge would silently drop chunk 1's flagged finding -- exactly the kind
+    // of possibly-unsupported finding a reader relying on --verify-evidence needs to see.
+    expect(merged.evidenceCheckFilter?.flagged).toHaveLength(1)
+    expect(merged.evidenceCheckFilter?.flagged[0].title).toBe('Chunk 1 flagged finding')
+    expect(merged.evidenceCheckFilter?.checkedCount).toBe(3)
+    expect(merged.evidenceCheckFilter?.unavailableCount).toBe(1)
+    expect(merged.evidenceCheckFilter?.unavailableReasons).toEqual(['timeout'])
+  })
+})
+
+describe('splitByFileBoundary', () => {
+  it('never splits a single file section across two chunks', () => {
+    // file0 alone (2500 lines) exceeds maxLines (2000) -- the old raw-line-count chunker would
+    // have cut it mid-file; this must keep the whole file --git header + hunk body together.
+    const diff = makeFileDiff('file0.ts', 2500)
+
+    const chunks = splitByFileBoundary(diff, 2000)
+
+    expect(chunks).toHaveLength(1)
+    expect(chunks[0]).toBe(diff)
+    // Every line of the file's own diff --git header must land in the same chunk as its body --
+    // this is the exact bug class being fixed: a header in chunk N with body spilling into N+1.
+    expect(chunks[0]).toContain('diff --git a/file0.ts b/file0.ts')
+  })
+
+  it('packs multiple small file sections into one chunk when they fit under maxLines', () => {
+    const diff = [makeFileDiff('a.ts', 500), makeFileDiff('b.ts', 500)].join('\n')
+
+    const chunks = splitByFileBoundary(diff, 2000)
+
+    expect(chunks).toHaveLength(1)
+    expect(chunks[0]).toContain('a.ts')
+    expect(chunks[0]).toContain('b.ts')
+  })
+
+  it('starts a new chunk when adding the next file section would exceed maxLines', () => {
+    const diff = [makeFileDiff('a.ts', 1500), makeFileDiff('b.ts', 1500)].join('\n')
+
+    const chunks = splitByFileBoundary(diff, 2000)
+
+    expect(chunks).toHaveLength(2)
+    expect(chunks[0]).toContain('a.ts')
+    expect(chunks[0]).not.toContain('b.ts')
+    expect(chunks[1]).toContain('b.ts')
+    expect(chunks[1]).not.toContain('a.ts')
+  })
+
+  it('returns a single chunk containing everything when the whole diff fits under maxLines', () => {
+    const diff = makeMultiFileDiff(2, 100)
+
+    const chunks = splitByFileBoundary(diff, 10000)
+
+    expect(chunks).toHaveLength(1)
+  })
+
+  it('handles an empty diff without crashing', () => {
+    expect(splitByFileBoundary('', 2000)).toEqual([''])
   })
 })

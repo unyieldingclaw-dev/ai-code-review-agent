@@ -51,6 +51,7 @@ describe('SecretsAgent', () => {
         line: 2,
         title: 'Hardcoded API key',
         detail: 'API key found in source code',
+        evidence: "const API_KEY = 'sk_live_REPLACE_WITH_REAL_KEY_DO_NOT_COMMIT'",
         suggestion: 'Move to environment variable',
       },
     ])
@@ -59,6 +60,92 @@ describe('SecretsAgent', () => {
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('secrets')
     expect(findings[0].id).toBe('secrets-0')
+  })
+
+  // Real false positive from a live report: the LLM fallback flagged a boolean UI-toggle flag
+  // (and, separately, a bare reference to it) as a "hardcoded password" purely because the
+  // identifier was named "password" -- neither line has a literal secret value. Deterministic
+  // backstop for the systemPrompt's equivalent instruction, which measured no effect on its own.
+  const makeFinding = (evidence: string, file = 'src/config.ts') => ({
+    severity: 'high',
+    basis: 'VERIFIED',
+    confidence: 90,
+    file,
+    line: 2,
+    title: 'Hardcoded password',
+    detail: 'Hardcoded password value',
+    evidence,
+    suggestion: 'Move to environment variable',
+  })
+
+  it('drops a finding whose evidence assigns a boolean, not a string literal', async () => {
+    const raw = JSON.stringify([makeFinding('bool _obscurePassword = true;')])
+    const findings = await new SecretsAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: FAKE_DIFF,
+    })
+    expect(findings).toEqual([])
+  })
+
+  it('drops a finding whose evidence is a bare reference, not an assignment', async () => {
+    const raw = JSON.stringify([makeFinding('obscureText: _obscurePassword,')])
+    const findings = await new SecretsAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: FAKE_DIFF,
+    })
+    expect(findings).toEqual([])
+  })
+
+  it('keeps a finding whose evidence assigns a quoted string literal', async () => {
+    const raw = JSON.stringify([makeFinding("password: 'hunter2'")])
+    const findings = await new SecretsAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: FAKE_DIFF,
+    })
+    expect(findings).toHaveLength(1)
+  })
+
+  it('keeps a finding whose evidence is an unquoted PEM key block', async () => {
+    const raw = JSON.stringify([makeFinding('-----BEGIN RSA PRIVATE KEY-----')])
+    const findings = await new SecretsAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: FAKE_DIFF,
+    })
+    expect(findings).toHaveLength(1)
+  })
+
+  it('keeps a finding whose evidence is an unquoted URI with embedded credentials', async () => {
+    const raw = JSON.stringify([makeFinding('postgres://admin:hunter2@db.internal:5432/prod')])
+    const findings = await new SecretsAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: FAKE_DIFF,
+    })
+    expect(findings).toHaveLength(1)
+  })
+
+  // Regression: the quote regex originally didn't require matching delimiters, so it would
+  // cross-match from the closing quote of one short token to the opening quote of an unrelated
+  // second token on the same line, misreading two short quoted fragments as one long "literal".
+  it('drops a finding whose evidence has two short quoted tokens with different delimiters', async () => {
+    const raw = JSON.stringify([makeFinding(`obscureText: 'x', label: "y", password: _flag`)])
+    const findings = await new SecretsAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: FAKE_DIFF,
+    })
+    expect(findings).toEqual([])
+  })
+
+  // Regression: config-file formats (YAML, .env, etc.) commonly assign secrets unquoted --
+  // requiring quotes universally would have silently dropped exactly the "passwords... in config
+  // files" case the systemPrompt itself asks the agent to flag.
+  it('keeps a finding whose evidence is an unquoted secret in a YAML config file', async () => {
+    const raw = JSON.stringify([makeFinding('webhook_secret: abc123XYZ456', 'config/app.yaml')])
+    const findings = await new SecretsAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: FAKE_DIFF,
+    })
+    expect(findings).toHaveLength(1)
+  })
+
+  it('keeps a finding whose evidence is an unquoted secret in a .env file', async () => {
+    const raw = JSON.stringify([makeFinding('DB_PASSWORD=hunter2', '.env')])
+    const findings = await new SecretsAgent(makeProvider(raw), DEFAULT_CONFIG).run({
+      diff: FAKE_DIFF,
+    })
+    expect(findings).toHaveLength(1)
   })
 
   it('throws ParseFailureError on LLM parse failure', async () => {
@@ -71,6 +158,14 @@ describe('SecretsAgent', () => {
     const agent = new SecretsAgent(makeProvider('[]'), DEFAULT_CONFIG)
     expect(agent.systemPrompt).toMatch(/credential/i)
     expect(agent.systemPrompt).toMatch(/secret/i)
+  })
+
+  // Regression for a real false positive: a "password"-named identifier is not itself a
+  // finding -- the LLM fallback must check what value is actually assigned to it.
+  it('system prompt instructs checking the assigned value, not just the identifier name', () => {
+    const agent = new SecretsAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    expect(agent.systemPrompt).toMatch(/value.*assigned|assigned.*value/i)
+    expect(agent.systemPrompt).toMatch(/boolean|UI-state/i)
   })
 })
 

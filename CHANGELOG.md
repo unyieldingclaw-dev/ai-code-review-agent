@@ -21,6 +21,67 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `--verify-evidence` user. So the threshold is configurable instead — default behavior is
   unchanged; a caller who wants Medium coverage opts in and accepts the added latency themselves.
 
+### Fixed
+
+- CLI process could crash on exit on Windows with `Assertion failed: !(handle->flags &
+UV_HANDLE_CLOSING), file src\win\async.c, line 76` after a review completed successfully and
+  valid output had already been written — caused by `process.exit()` forcing immediate process
+  termination while async handles (fetch/`AbortController` cleanup from `OllamaProvider`) were
+  still settling. All 9 `process.exit()` call sites in `src/cli/index.ts`'s action handler now
+  set `process.exitCode` and return instead, letting the event loop drain naturally before Node
+  exits on its own; the one call site in the synchronous `getDiff()` helper now throws instead,
+  routed through the existing catch block.
+- `secrets` agent's LLM fallback path (used when `gitleaks` is unavailable) could flag a
+  `password`/`secret`/`token`/`key`-named identifier as a hardcoded credential purely from its
+  name, even when the assigned value was a boolean, a bare variable reference, or a constructor
+  call — reported against a real Flutter/Dart password-visibility-toggle diff
+  (`bool _obscurePassword = true;`). Adding an equivalent instruction to the system prompt alone
+  measured no effect on the hallucination rate (5/10 before, 5/10 after, live-tested against real
+  Ollama). Fixed with a deterministic post-filter (`hasCredentialShapedValue`): a finding is
+  dropped unless its evidence contains a quoted string literal (matching quote delimiters, so two
+  short unrelated quoted tokens on the same line can't cross-match into one false "literal"), with
+  an exemption for PEM/certificate blocks, URI-embedded credentials, and config-file formats
+  (YAML/`.env`/etc., which commonly carry legitimately unquoted secrets) — all three would
+  otherwise be silently dropped by a naive "must be quoted" rule. Dropped findings are logged.
+- `--chunk` split an oversized diff on raw line count, so a single file's diff section could
+  itself be split across two chunks — each chunk's own `OrchestratorAgent.synthesize()` call
+  computes `changedFiles` from only that chunk's content, so a file whose header landed in one
+  chunk but whose hunk body continued into the next would have any genuine finding on it dropped
+  as "likely hallucinated." `chunkRunner.ts` now splits on `diff --git` file boundaries instead
+  (`splitByFileBoundary`), so a file's diff section is never split across chunks. A single file's
+  section larger than the chunk size still becomes its own oversized chunk (existing internal
+  truncation still applies within it, same as any over-max-lines diff).
+- `--chunk` merged `evidenceCheckFilter` (from `--verify-evidence`) last-chunk-wins — a
+  possibly-unsupported finding flagged in an earlier chunk would silently disappear from the
+  merged report if the last chunk had nothing to flag. Now merged (`checkedCount`/
+  `unavailableCount` summed, `unavailableReasons`/`flagged` concatenated) across all chunks, like
+  `agentStatus` already was.
+
+### Testing
+
+- Strengthened the CLI's verifier-model wiring test: previously only asserted a verifier provider
+  was constructed (`toBeDefined()`), which can't distinguish a correctly-wired verifier from one
+  accidentally sharing the main review's model, since the mocked `OllamaProvider` returns `{}`
+  either way. Now asserts the verifier provider's model argument specifically, including the
+  empty-string-config fallback to `qwen3:latest`.
+- Added test coverage for `TestGenAgent`'s pytest branch (`def test_` detection) — every existing
+  test used a fake `projectPath` that always fell through to the `vitest` branch, so the
+  pytest-specific regex had zero coverage.
+
+### Documentation
+
+- Added a "Known Limitations" section to README.md documenting absence-claim false positives
+  (findings like "no validation exists" that are wrong because the actual check exists elsewhere
+  in the file, outside the diff hunk shown). Three mitigations were designed and empirically
+  tested against a real reported case — post-hoc full-file re-verification (unreliable, 2/5, and
+  slow), full-file context at generation time (made the false-claim rate _worse_, 3/3 vs. a 1/3
+  baseline, even with an explicit instruction to cross-check), and deterministic
+  confidence-capping (fired on the majority of unrelated, well-grounded findings in this
+  project's own recent review history, including a Critical command-injection finding) — all
+  rejected before shipping. See
+  `docs/superpowers/specs/2026-08-17-absence-claim-investigation.md` for the full investigation
+  and validation data.
+
 ## [1.10.0] — 2026-08-17 (full-codebase audit fixes, evidence-grounding verification, review reliability)
 
 ### Added

@@ -6,6 +6,31 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import type { AgentName, Finding, ReviewInput } from '../schema.js'
 
+// A hardcoded secret must be a literal value -- a boolean, a bare identifier reference, or a
+// constructor/function call can never itself BE a secret, regardless of what the identifier is
+// named (e.g. "bool _obscurePassword = true;"). Deterministic backstop for the LLM fallback path
+// below (the gitleaks branch above needs no such backstop -- it's a real tool, not a guess):
+// verified via live measurement (calibration/fixtures/secrets-value-shape.diff, manually run 10x
+// against real Ollama before/after) that the systemPrompt's equivalent instruction alone made no
+// measurable difference to devstral's hallucination rate (5/10 before, 5/10 after) -- prompt
+// wording is kept as a cheap first layer, but this filter is what actually catches it.
+//
+// Deliberately narrow (drops only a *known* non-secret shape, not "keep only if it looks like a
+// secret"): the reverse would silently drop real credentials that are legitimately unquoted --
+// PEM/certificate blocks, URI-embedded credentials, and config-file formats (YAML/.env/etc.) all
+// commonly carry unquoted secret values. MIN_LITERAL_LENGTH excludes trivial 1-3 char quoted
+// tokens (flags/enum values) that can't plausibly be a real credential.
+const MIN_LITERAL_LENGTH = 4
+const QUOTED_STRING_LITERAL = new RegExp(`(["'\`])[^"'\`\\n]{${MIN_LITERAL_LENGTH},}\\1`)
+const PEM_OR_URI_CREDENTIAL = /-----BEGIN |:\/\/[^/\s]*:[^/\s@]*@/
+const CONFIG_FILE_EXTENSION = /\.(ya?ml|env|properties|ini|toml|conf|cfg)$/i
+
+function hasCredentialShapedValue(finding: Pick<Finding, 'evidence' | 'file'>): boolean {
+  if (PEM_OR_URI_CREDENTIAL.test(finding.evidence)) return true
+  if (CONFIG_FILE_EXTENSION.test(finding.file)) return true // unquoted secrets are normal here
+  return QUOTED_STRING_LITERAL.test(finding.evidence)
+}
+
 export class SecretsAgent extends BaseAgent {
   readonly toolKey = 'gitleaks' as const
 
@@ -54,7 +79,16 @@ export class SecretsAgent extends BaseAgent {
       }
     }
     this.lastToolAvailability = 'unavailable-llm-fallback'
-    return super.run(input, signal)
+    const findings = await super.run(input, signal)
+    return findings.filter((f) => {
+      if (hasCredentialShapedValue(f)) return true
+      console.error(
+        `[secrets] dropped finding "${f.title}" -- evidence has no credential-shaped value ` +
+          `(likely a hallucination on a name like "password"/"secret" whose actual value isn't ` +
+          `a real credential): ${JSON.stringify(f.evidence)}`
+      )
+      return false
+    })
   }
 
   get systemPrompt(): string {
@@ -77,6 +111,12 @@ like "marker" or "key".
 Do NOT flag hash algorithm invocations or their output (sha256sum, shasum, Get-FileHash,
 git diff | sha256sum, or variables merely named "hash"/"expected"/"checksum") -- computing or
 comparing a hash is not a secret.
+A variable or field NAMED "password"/"secret"/"token"/"key" is not itself a finding -- check the
+VALUE actually assigned to it. Only flag it if that value is a hardcoded credential-shaped string
+(a real-looking key, token, or password literal). Do NOT flag a boolean, a UI-state flag, a
+reference to another variable/controller/function, or an empty/placeholder value just because the
+identifier's name contains one of those words (e.g. "bool obscurePassword = true;" or
+"final _passwordCtrl = TextEditingController();" are UI state, not credentials).
 
 severity: "critical" for private keys or certificates
 severity: "high" for API keys, tokens, or passwords
