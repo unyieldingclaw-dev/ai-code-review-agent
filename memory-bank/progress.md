@@ -16,7 +16,63 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-12
+**Last Updated**: 2026-08-16
+
+## 🚧 In Progress (2026-08-16)
+
+### Review-Reliability Fixes — branch `feature/review-reliability-fixes` (worktree `.worktrees/review-reliability-fixes`, off `fix/full-codebase-audit-findings`)
+
+User forwarded 4 concrete bugs from a real `ai-review-agent --profile security --diff` run against
+a Flutter/Dart project (not the earlier "ACR reliability findings" report — a separate, fresh bug
+report): (1) silent diff truncation with no exit-code signal, (2) all 4 agents hit the
+"response appears truncated" parse-recovery path, (3) security/adversarial agents flag `.claude/
+commands/*.md` prose as vulnerable code, (4) dependencies agent assumes every project is Node.js.
+All 4 verified against real source before any design work. Design spec + 14-task plan written via
+`superpowers:writing-plans`, independently deep-reviewed (11 real issues found and fixed before the
+plan). Executing via `superpowers:subagent-driven-development` (fresh implementer subagent per
+task, two-stage spec+quality review, controller-only commits).
+
+- [x] Task 1: `TRUNCATION_EXIT_CODE = 3` in `exitCode.ts` — committed `607c9d0`.
+- [x] Task 2: CLI exit-code priority (`agent-failure(2) > blocker(1) > truncation(3) > clean(0)`),
+      `--allow-truncation` flag — committed `62847ed`.
+- [x] Task 3: `calibration/responseTruncationDiagnostic.ts`, a permanent diagnostic script — committed
+      `9a236db`. **Live result contradicted the original design hypothesis**: Issue 2's plan assumed
+      a missing `num_predict` cap was truncating responses (`format: 'json'` was already known to
+      raise truncation frequency 11x, per the 2026-07-25 entry below). Measured directly against
+      real Ollama at 2000–6777 diff lines: `done_reason` was `stop` every time, never `length` — the
+      model was choosing to stop, not hitting a token ceiling. Broadened the investigation (per
+      explicit "look deeper" instruction) across all 4 affected agents' real system prompts:
+      `format: 'json'` (the bare string) only constrains "valid JSON", not array shape — the model
+      reliably emitted a single bare object instead of the required `[...]` array (`dependencies`:
+      wrong shape entirely, would throw `ParseFailureError`; `security`/`secrets`/`adversarial`: a
+      bare object with `severity`, already correctly auto-wrapped by existing Stage 2b handling).
+      Verified fix empirically: an explicit JSON Schema for `format` (`type: 'array', items: {...}`)
+      reliably produces the correct array shape (2/2 runs). A second, separate problem also surfaced
+      and was NOT folded into scope: even with array shape fixed, the model still reported only 1 of
+      6 independently-injected, unambiguous vulnerabilities in a test diff (3/3 non-schema + 2/2
+      schema runs) — documented as an explicit Non-Goal (model under-reporting, not fixable via any
+      `ChatOptions` change) rather than guessed at.
+- [x] Design spec + plan's Tasks 4/5 rewritten around the verified schema fix
+      (`FINDING_ARRAY_SCHEMA`/`COVERAGE_RESULT_SCHEMA` constants replacing the disproven
+      `responseTokenBudget` design) — independently reviewed (solid; one wording overclaim fixed:
+      required fields are a stricter subset of `parsing.ts`'s OR-logic, not a literal mirror) and
+      committed (`435de06`).
+- [x] Also mid-plan: applied the "Capability vs Orchestration" pattern from a maintenance-mode
+      framing document to catch that the original `--chunk` design (Tasks 3-6 pre-renumbering) would
+      have touched `SwarmRunner`'s internals for a feature the bug report doesn't demonstrate is
+      broken. User pushed back on the initial recommendation to cut `--chunk` entirely ("why not 2?")
+      — redesigned instead as `chunkRunner.ts`, a thin wrapper calling `runner.run()` once per chunk
+      and merging results, entirely outside `SwarmRunner`. Plan renumbered from 16 to 14 tasks.
+- Verified `qwen3:latest` (the evidence-verifier model) was already current mid-session
+  (`ollama pull qwen3:latest`, digest `500a1f067a9f` unchanged) — unrelated side-check, not part of
+  this plan's scope.
+- **Pending**: Tasks 4 (Provider — widen `ChatOptions.format`), 5 (`FINDING_ARRAY_SCHEMA` wiring),
+  6 (schema `filteredFiles` field), 7 (per-agent `filterDiff`/`agentPolicy` defaults, issue 3), 8
+  (README doc), 9 (`ToolAvailability` `'not-applicable'`), 10 (dependencies manifest pre-check,
+  issue 4), 11 (formatter guards), 12 (`chunkRunner.ts`), 13 (CLI `--chunk` wiring), 14 (full
+  regression + live verification). Full detail:
+  `docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md`,
+  `docs/superpowers/plans/2026-08-16-review-reliability-fixes.md`.
 
 ## ✅ Completed (2026-08-12)
 
