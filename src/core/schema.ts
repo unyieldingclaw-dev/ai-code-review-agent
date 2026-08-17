@@ -181,6 +181,12 @@ export interface ReviewResult {
   }
   sanitizer?: SanitizerMetadata
   policy?: PolicyResult
+  // Sibling of PolicyResult, not a field on it: PolicyResult is only ever surfaced below when
+  // agentsSkipped is non-empty (see runner.ts), but the scenario this field covers is exactly the
+  // opposite case -- an agent that still RAN, just with some file sections removed from its own
+  // view of the diff via agentPolicy.exclude (see Task 7). Nesting inside PolicyResult would mean
+  // this field never appears in the one case it exists to report.
+  filteredFiles?: Partial<Record<AgentName, string[]>>
   agentStatus?: Partial<Record<AgentName, AgentStatus>>
   truncation?: TruncationMetadata
   hallucinationFilter?: HallucinationFilterMetadata
