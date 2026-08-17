@@ -617,6 +617,19 @@ export class SwarmRunner {
     // same filterDiff() ignoreFilter.ts already uses for global --ignore filtering. Wraps
     // withContext rather than replacing it -- context injection still happens on top of the
     // filtered diff, unchanged.
+    //
+    // Known, accepted gap: extractChangedFiles (used both by evaluatePolicy above and by
+    // beforeFiles/afterFiles below) only recognizes `+++ b/<path>` lines, deliberately excluding
+    // /dev/null deletion markers -- correct for its other callers (hallucination-filter membership
+    // checks shouldn't treat a deleted file as "in the diff"), but it means a delete-only diff
+    // yields changedFiles: [] here too. A diff that only deletes an excluded file therefore (a)
+    // isn't caught by evaluatePolicy's whole-agent skip (still runs the agent on an effectively
+    // empty post-filter diff -- a wasted call) and (b) reports an empty before/after set below, so
+    // filteredFiles silently doesn't record that anything was stripped, even though filterDiff()
+    // itself (which parses `diff --git` headers directly, unaffected by this blind spot) did strip
+    // it. Narrow in practice (delete-only diffs are uncommon) and not fixed here -- would require
+    // either a second, deletion-aware changed-files helper or changing extractChangedFiles's
+    // existing behavior, which other callers rely on for good reason.
     const filteredFiles: Partial<Record<AgentName, string[]>> = {}
     const withFilteredContext = async (agentName: AgentName): Promise<ReviewInput> => {
       const ctxInput = await withContext(agentName)
@@ -630,7 +643,10 @@ export class SwarmRunner {
       const afterFiles = new Set(extractChangedFiles(filtered))
       const dropped = [...beforeFiles].filter((f) => !afterFiles.has(f))
       if (dropped.length > 0) {
-        filteredFiles[agentName] = [...(filteredFiles[agentName] ?? []), ...dropped]
+        // Set-dedup: withFilteredContext is called fresh on every retry attempt (this closure is
+        // invoked once per attempt by withRetryTimeout), so without dedup a retried agent's
+        // filteredFiles entry would accumulate the same dropped paths once per attempt.
+        filteredFiles[agentName] = [...new Set([...(filteredFiles[agentName] ?? []), ...dropped])]
       }
       return { ...ctxInput, diff: filtered }
     }

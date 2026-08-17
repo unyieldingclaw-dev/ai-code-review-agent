@@ -30,13 +30,23 @@ describe('runChunked', () => {
       .mockResolvedValueOnce(
         makeResult({
           findings: [{ id: 'a', severity: 'high', agent: 'security' } as never],
-          summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: { security: 1 }, durationMs: 50 },
+          summary: {
+            totalFindings: 1,
+            bySeverity: { high: 1 },
+            byAgent: { security: 1 },
+            durationMs: 50,
+          },
         })
       )
       .mockResolvedValueOnce(
         makeResult({
           findings: [{ id: 'b', severity: 'medium', agent: 'security' } as never],
-          summary: { totalFindings: 1, bySeverity: { medium: 1 }, byAgent: { security: 1 }, durationMs: 60 },
+          summary: {
+            totalFindings: 1,
+            bySeverity: { medium: 1 },
+            byAgent: { security: 1 },
+            durationMs: 60,
+          },
         })
       )
     const runner = { run: runMock } as unknown as SwarmRunner
@@ -71,5 +81,33 @@ describe('runChunked', () => {
     const merged = await runChunked(runner, { diff }, 2000)
 
     expect(merged.truncation).toBeUndefined()
+  })
+
+  it('merges agentStatus across chunks -- a failure in an earlier chunk is not hidden by a later chunk succeeding', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ agentStatus: { security: 'timeout' } }))
+      .mockResolvedValueOnce(makeResult({ agentStatus: { security: 'ok' } }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+    const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
+
+    const merged = await runChunked(runner, { diff }, 2000)
+
+    // Last-chunk-wins would report 'ok' here, silently hiding chunk 1's real timeout and letting
+    // cli/index.ts's exit code 2 (hasAgentFailures) miss it entirely.
+    expect(merged.agentStatus?.security).toBe('timeout')
+  })
+
+  it('reports ok for an agent only when every chunk that ran it reported ok', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ agentStatus: { security: 'ok', dependencies: 'ok' } }))
+      .mockResolvedValueOnce(makeResult({ agentStatus: { security: 'ok', dependencies: 'ok' } }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+    const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
+
+    const merged = await runChunked(runner, { diff }, 2000)
+
+    expect(merged.agentStatus).toEqual({ security: 'ok', dependencies: 'ok' })
   })
 })

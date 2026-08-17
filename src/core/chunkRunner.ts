@@ -7,15 +7,26 @@
 // Known, accepted simplifications (documented, not fixed here -- same class of chunk-boundary
 // limitation the design spec already accepts for "a function split across a chunk boundary"):
 // chunks split on raw line count, not `diff --git` file boundaries, so a single file's diff
-// section can itself be split across two chunks. Diagnostic/observability metadata (agentStatus,
-// toolAvailability, policy, filteredFiles, context) reflects whichever chunk ran LAST, not a true
-// merge across chunks -- acceptable for an opt-in feature; the actual review output (findings,
-// testFiles, summary, sanitizer) IS fully merged below. Cross-chunk duplicate findings are not
-// deduped (each chunk's own OrchestratorAgent.synthesize() call only ever sees that chunk's own
-// findings) -- narrow in practice since chunks are non-overlapping diff content, and cosmetic (a
-// near-duplicate finding shown twice) rather than a correctness problem.
+// section can itself be split across two chunks. Purely diagnostic metadata (toolAvailability,
+// policy, filteredFiles, context) reflects whichever chunk ran LAST, not a true merge across
+// chunks -- acceptable for an opt-in feature, since none of it gates an exit code. agentStatus is
+// the one exception and IS merged across all chunks (see mergeAgentStatus below): it feeds
+// cli/index.ts's exit code 2, so a last-chunk-wins simplification there would let a real failure
+// in an earlier chunk go unreported by the very feature meant to guarantee complete coverage.
+// The actual review output (findings, testFiles, summary, sanitizer) IS fully merged below too.
+// Cross-chunk duplicate findings are not deduped (each chunk's own OrchestratorAgent.synthesize()
+// call only ever sees that chunk's own findings) -- narrow in practice since chunks are
+// non-overlapping diff content, and cosmetic (a near-duplicate finding shown twice) rather than a
+// correctness problem.
 import type { SwarmRunner } from './runner.js'
-import type { ReviewInput, ReviewResult, AgentProgressEvent, GeneratedTestFile } from './schema.js'
+import type {
+  ReviewInput,
+  ReviewResult,
+  AgentProgressEvent,
+  GeneratedTestFile,
+  AgentName,
+  AgentStatus,
+} from './schema.js'
 
 export async function runChunked(
   runner: SwarmRunner,
@@ -59,6 +70,7 @@ function mergeResults(results: ReviewResult[]): ReviewResult {
   }
 
   const last = results[results.length - 1]
+  const mergedAgentStatus = mergeAgentStatus(results)
   const sanitizerApplied = results.some((r) => r.sanitizer?.applied)
   const sanitizerRedacted = results.reduce((sum, r) => sum + (r.sanitizer?.redactedLines ?? 0), 0)
   const sanitizerWarnings = results.flatMap((r) => r.sanitizer?.warnings ?? [])
@@ -79,11 +91,31 @@ function mergeResults(results: ReviewResult[]): ReviewResult {
     // cli/index.ts's exit-code priority (chunking and truncation are mutually exclusive outcomes
     // for a given run; see Task 13).
     ...(last.policy ? { policy: last.policy } : {}),
-    ...(last.agentStatus ? { agentStatus: last.agentStatus } : {}),
+    ...(mergedAgentStatus ? { agentStatus: mergedAgentStatus } : {}),
     ...(last.hallucinationFilter ? { hallucinationFilter: last.hallucinationFilter } : {}),
     ...(last.coverageGapFilter ? { coverageGapFilter: last.coverageGapFilter } : {}),
     ...(last.toolAvailability ? { toolAvailability: last.toolAvailability } : {}),
     ...(last.evidenceCheckFilter ? { evidenceCheckFilter: last.evidenceCheckFilter } : {}),
     ...(last.filteredFiles ? { filteredFiles: last.filteredFiles } : {}),
   }
+}
+
+// A last-chunk-wins merge here would let a real failure in an earlier chunk go unreported --
+// e.g. `security` times out on chunk 1 but succeeds on chunk 2 -- because cli/index.ts's exit
+// code 2 is driven directly by this field (hasAgentFailures checks `status !== 'ok'` across it).
+// An agent's merged status is 'ok' only if every chunk that reported a status for it said 'ok';
+// otherwise it keeps the first non-'ok' status seen (which specific failure reason wins doesn't
+// change the exit-code outcome, since any non-'ok' value triggers it the same way).
+function mergeAgentStatus(
+  results: ReviewResult[]
+): Partial<Record<AgentName, AgentStatus>> | undefined {
+  const merged: Partial<Record<AgentName, AgentStatus>> = {}
+  for (const r of results) {
+    if (!r.agentStatus) continue
+    for (const [name, status] of Object.entries(r.agentStatus) as [AgentName, AgentStatus][]) {
+      const existing = merged[name]
+      if (existing === undefined || existing === 'ok') merged[name] = status
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined
 }

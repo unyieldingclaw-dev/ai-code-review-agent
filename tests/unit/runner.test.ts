@@ -640,6 +640,33 @@ describe('SwarmRunner per-agent diff filtering (agentPolicy.exclude)', () => {
     expect(result.filteredFiles?.security).toBeUndefined() // never ran -- nothing to report
     expect(provider.chat).not.toHaveBeenCalled()
   })
+
+  it('does not duplicate a filteredFiles entry when the agent retries', async () => {
+    const mixedDiff =
+      `diff --git a/docs/notes.md b/docs/notes.md\n--- a/docs/notes.md\n+++ b/docs/notes.md\n@@ -1 +1 @@\n-old\n+new\n` +
+      `diff --git a/src/foo.ts b/src/foo.ts\n--- a/src/foo.ts\n+++ b/src/foo.ts\n@@ -1 +1 @@\n-old\n+new\n`
+    const provider: LLMProvider = {
+      chat: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('transient failure'))
+        .mockResolvedValueOnce('[]'),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentPolicy: { security: { exclude: ['**/*.md'] } },
+      retryAttempts: 2,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: mixedDiff })
+
+    // withFilteredContext runs once per retry attempt; without Set-dedup this would be
+    // ['docs/notes.md', 'docs/notes.md'] (once per attempt) instead of a single entry.
+    expect(result.filteredFiles?.security).toEqual(['docs/notes.md'])
+  })
 })
 
 describe('scaleAgentTimeout', () => {
