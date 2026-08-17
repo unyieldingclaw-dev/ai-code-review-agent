@@ -155,6 +155,19 @@ describe('formatMarkdown', () => {
     expect(output).not.toContain('truncated')
   })
 
+  it('qualifies "No issues found" as partial-coverage when the diff was truncated, not an unqualified clean pass', () => {
+    // Real bug report: a 12,599-line diff truncated to 2,000 (--max-lines default) still ended in
+    // an unqualified "✅ No issues found." -- easy to misread as a clean full pass when only ~16%
+    // of the diff was actually reviewed, especially since it's the last line a reader sees.
+    const result = makeResult({
+      findings: [],
+      truncation: { truncated: true, originalLines: 12599, keptLines: 2000 },
+    })
+    const output = formatMarkdown(result)
+    expect(output).not.toMatch(/^✅ No issues found\.$/m)
+    expect(output).toContain('No issues found in the portion reviewed (2000/12599 lines')
+  })
+
   it('surfaces a hallucination-filter note when findings were dropped', () => {
     const result = makeResult({
       findings: [],
