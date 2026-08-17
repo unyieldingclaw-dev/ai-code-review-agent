@@ -31,6 +31,10 @@ UV_HANDLE_CLOSING), file src\win\async.c, line 76` after a review completed succ
   set `process.exitCode` and return instead, letting the event loop drain naturally before Node
   exits on its own; the one call site in the synchronous `getDiff()` helper now throws instead,
   routed through the existing catch block.
+- `--verify-evidence-severity`'s invalid-value CLI validation used `process.exit(1)` instead of
+  the `process.exitCode = 1; return` pattern the rest of this action handler already uses (same
+  fix as above) — caught during a follow-up review after the fact, not part of the original
+  crash's own reproduction.
 - `secrets` agent's LLM fallback path (used when `gitleaks` is unavailable) could flag a
   `password`/`secret`/`token`/`key`-named identifier as a hardcoded credential purely from its
   name, even when the assigned value was a boolean, a bare variable reference, or a constructor
