@@ -662,12 +662,15 @@ All 5 checks verified passing locally (295/295 tests) before the workflow was ad
 
 ## Next Steps
 
-- **ACR reliability findings, item 3 — still unresolved**: the specific fabricated "GPL/mongodb
-  license" finding the user originally reported traces to a real, already-fixed bug (commit
-  `a906515`), but whether _that particular report_ was a stale-build artifact or a live regression
-  that slipped past `filterNonexistentFiles` was never determined — needs the original finding's
-  exact file/line/text and the `ai-review-agent --version` that produced it. See `progress.md`'s
-  "ACR reliability findings" entry for full detail.
+- **ACR reliability findings, item 3 — closed 2026-08-17, unresolvable rather than fixed**: the
+  specific fabricated "GPL/mongodb license" finding the user originally reported was never traced
+  to a specific run (the raw finding's exact file/line/text and `ai-review-agent --version` were
+  never available); user confirmed they no longer have that data, so closed as an accepted
+  limitation rather than left open indefinitely. Both known mitigations (bait pattern removed from
+  `licenseCompliance.ts`'s prompt in `a906515`/v1.9.0, `filterNonexistentFiles` running
+  agent-agnostically) were re-verified still in place before closing. See `progress.md`'s "ACR
+  reliability findings" entry for full detail — if the same finding shape recurs, treat it as new,
+  not already-handled.
 - **`fix/full-codebase-audit-findings`**: not yet pushed/PR'd — awaiting explicit go-ahead.
 - **NPM token renewal**: `github-actions-publish` token expires Sep 8 2026 — create new Automation token on npmjs.com and update `NPM_TOKEN` GitHub Actions secret before then.
 - **Version 1.2.0**: Ready to publish. Run `git tag v1.2.0 && git push --tags` to trigger npm release.
