@@ -758,7 +758,11 @@ export class SwarmRunner {
 
     const evidenceCheckFilter: EvidenceCheckFilterMetadata | undefined =
       this.config.verifyEvidence && this.verifierProvider
-        ? await runEvidenceChecks(findings, this.verifierProvider)
+        ? await runEvidenceChecks(
+            findings,
+            this.verifierProvider,
+            this.config.verifyEvidenceSeverity
+          )
         : undefined
 
     return {

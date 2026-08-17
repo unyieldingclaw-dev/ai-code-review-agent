@@ -1,5 +1,11 @@
 import type { LLMProvider, Message } from './llm/provider.js'
-import type { Finding, EvidenceCheckFinding, EvidenceCheckFilterMetadata } from './schema.js'
+import type {
+  Finding,
+  Severity,
+  EvidenceCheckFinding,
+  EvidenceCheckFilterMetadata,
+} from './schema.js'
+import { SEVERITY_RANK, SEVERITY_OPTIONS } from './schema.js'
 import { DETERMINISTIC_SOURCES } from './agents/orchestrator.js'
 import { sanitizeText } from './sanitizer.js'
 
@@ -148,9 +154,15 @@ export async function verifyEvidence(
 }
 
 // Runs the up-front availability check once, then verifyEvidence for each eligible finding.
-// Only Critical/High findings from non-deterministic sources are eligible -- DETERMINISTIC_SOURCES
-// findings are tool output, not model reasoning, so there's nothing an evidence check would
-// usefully catch; it would just spend latency confirming a tool's own report matches itself.
+// Eligible: severity at or above `severityThreshold` (default 'high', i.e. critical+high only)
+// from non-deterministic sources -- DETERMINISTIC_SOURCES findings are tool output, not model
+// reasoning, so there's nothing an evidence check would usefully catch; it would just spend
+// latency confirming a tool's own report matches itself. The default threshold intentionally
+// excludes medium/low: lower-severity findings are typically far more numerous than
+// critical/high in a given run, so lowering the default would multiply verifier-call latency
+// well past what opting into --verify-evidence alone implies. A caller who wants deeper coverage
+// sets `verifyEvidenceSeverity` explicitly and accepts that cost themselves. See CHANGELOG.md's
+// entry for this field for the measurement that motivated keeping the default unchanged.
 //
 // WHY this returns an aggregate object instead of following filterNonexistentFiles/
 // filterCoverageGaps's optional-sink-parameter pattern: those two are genuinely filters -- they
@@ -168,11 +180,25 @@ export async function verifyEvidence(
 // not just runs that found something wrong.
 export async function runEvidenceChecks(
   findings: Finding[],
-  provider: LLMProvider
+  provider: LLMProvider,
+  severityThreshold: Severity = 'high'
 ): Promise<EvidenceCheckFilterMetadata | undefined> {
+  // WHY checked here rather than in config.ts's loadConfig: this project's config-file loading
+  // never validates individual field values (matches the pre-existing --fail-on config-file
+  // behavior) -- but unlike a bad failOn value (which only weakens a gate), an unrecognized
+  // severityThreshold makes SEVERITY_RANK[severityThreshold] undefined, so every finding fails
+  // `>= undefined` and this silently checks nothing at all while verifyEvidence: true implies
+  // it's active. Guarding at the point of use, with a logged fallback, keeps that failure loud.
+  if (!SEVERITY_OPTIONS.includes(severityThreshold)) {
+    console.error(
+      `[evidenceVerifier] invalid verifyEvidenceSeverity "${severityThreshold}" -- falling back ` +
+        `to "high". Valid values: ${SEVERITY_OPTIONS.join('|')}.`
+    )
+    severityThreshold = 'high'
+  }
   const candidates = findings.filter(
     (f) =>
-      (f.severity === 'critical' || f.severity === 'high') &&
+      SEVERITY_RANK[f.severity] >= SEVERITY_RANK[severityThreshold] &&
       !DETERMINISTIC_SOURCES.includes(f.source)
   )
   if (candidates.length === 0) return undefined

@@ -17,6 +17,7 @@ export type AgentName =
   | 'complexity'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
+export const SEVERITY_OPTIONS: Severity[] = ['critical', 'high', 'medium', 'low']
 export type Basis = 'VERIFIED' | 'INFERRED' | 'SPECULATIVE'
 export type TestFramework = 'vitest' | 'jest' | 'mocha' | 'pytest'
 

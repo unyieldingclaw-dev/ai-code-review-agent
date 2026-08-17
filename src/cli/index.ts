@@ -11,7 +11,8 @@ import { loadConfig } from '../core/config.js'
 import { isPathWithin } from '../core/filePath.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
 import { formatMarkdown, formatJson, formatSarif, formatGithubAnnotations } from './formatter.js'
-import type { AgentName, AgentProgressEvent } from '../core/schema.js'
+import type { AgentName, AgentProgressEvent, Severity } from '../core/schema.js'
+import { SEVERITY_OPTIONS } from '../core/schema.js'
 import {
   shouldFail,
   FAIL_ON_OPTIONS,
@@ -120,7 +121,13 @@ program
   .option('--no-emoji', 'Disable emoji in output (for CI terminals without UTF-8 support)')
   .option(
     '--verify-evidence',
-    'Verify Critical/High findings against their own cited evidence using a separate model (report-only in this version -- flags possibly-unsupported findings without dropping them; adds one LLM call per checked finding)'
+    'Verify findings against their own cited evidence using a separate model (report-only in this version -- flags possibly-unsupported findings without dropping them; adds one LLM call per checked finding; see --verify-evidence-severity for which findings are checked)'
+  )
+  .option(
+    '--verify-evidence-severity <level>',
+    `Minimum severity --verify-evidence checks (${SEVERITY_OPTIONS.join('|')}; default: high). ` +
+      'Lowering this catches more evidence-impact mismatches but multiplies verifier-model calls, ' +
+      'since lower-severity findings are typically far more numerous in a given run.'
   )
   .action(
     async (options: {
@@ -150,6 +157,7 @@ program
       contextMode?: string
       emoji: boolean
       verifyEvidence?: boolean
+      verifyEvidenceSeverity?: string
     }) => {
       try {
         const contextMode = options.context === 'memory-bank' ? 'memory-bank' : 'none'
@@ -201,6 +209,16 @@ program
         // false on every run that doesn't also pass the flag. --parallel/--fail-fast's
         // unconditional pattern is pre-existing and out of scope to change here.
         if (options.verifyEvidence) config.verifyEvidence = true
+        if (options.verifyEvidenceSeverity) {
+          if (!SEVERITY_OPTIONS.includes(options.verifyEvidenceSeverity as Severity)) {
+            console.error(
+              `Invalid --verify-evidence-severity value: "${options.verifyEvidenceSeverity}". ` +
+                `Use one of: ${SEVERITY_OPTIONS.join('|')}.`
+            )
+            process.exit(1)
+          }
+          config.verifyEvidenceSeverity = options.verifyEvidenceSeverity as Severity
+        }
         if (options.contextBudget !== undefined) config.contextBudgetChars = options.contextBudget
         if (options.contextMode === 'semantic') config.contextMode = 'semantic'
 
