@@ -14,6 +14,39 @@ import {
   extractCompleteObjects,
 } from '../parsing.js'
 
+// Forces Ollama's structured-output mode to actually constrain the top-level shape to an array,
+// not just "valid JSON" -- format: 'json' (the bare string) let the model emit a single bare
+// object instead of the required array; verified via live testing that an explicit array-typed
+// schema fixes this (see docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md,
+// Issue 2). `required` is a stricter subset of parsing.ts's validateAndNormalizeFindings:
+// that validator accepts (basis OR evidence) and (suggestion OR recommendation), but every
+// current agent prompt already emits evidence+recommendation, so hard-requiring those two
+// here is safe and simpler than reproducing the OR logic in JSON Schema.
+export const FINDING_ARRAY_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      severity: { type: 'string' },
+      basis: { type: 'string' },
+      confidence: { type: 'integer' },
+      domain: { type: 'string' },
+      file: { type: 'string' },
+      line: { type: 'integer' },
+      lineEnd: { type: 'integer' },
+      title: { type: 'string' },
+      detail: { type: 'string' },
+      evidence: { type: 'string' },
+      impact: { type: 'string' },
+      recommendation: { type: 'string' },
+      suggestion: { type: 'string' },
+      blocking: { type: 'boolean' },
+      source: { type: 'string' },
+    },
+    required: ['severity', 'file', 'line', 'title', 'detail', 'evidence', 'recommendation'],
+  },
+} as const
+
 export abstract class BaseAgent {
   // Opt-in contract for agents that call a deterministic external tool instead of (or before
   // falling back to) the LLM -- e.g. SecretsAgent/gitleaks, DependenciesAgent/npm-audit. Declared
@@ -35,7 +68,11 @@ export abstract class BaseAgent {
       { role: 'system', content: this.systemPrompt },
       { role: 'user', content: this.buildUserPrompt(input) },
     ]
-    const raw = await this.provider.chat(messages, { think: true, format: 'json', signal })
+    const raw = await this.provider.chat(messages, {
+      think: true,
+      format: FINDING_ARRAY_SCHEMA,
+      signal,
+    })
     return this.parseFindings(raw)
   }
 
