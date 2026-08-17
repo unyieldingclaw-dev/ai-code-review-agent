@@ -599,6 +599,49 @@ describe('SwarmRunner', () => {
   })
 })
 
+describe('SwarmRunner per-agent diff filtering (agentPolicy.exclude)', () => {
+  it('strips only excluded file sections from an agent with an agentPolicy.exclude rule, and reports it in filteredFiles', async () => {
+    const mixedDiff =
+      `diff --git a/docs/notes.md b/docs/notes.md\n--- a/docs/notes.md\n+++ b/docs/notes.md\n@@ -1 +1 @@\n-old\n+new\n` +
+      `diff --git a/src/foo.ts b/src/foo.ts\n--- a/src/foo.ts\n+++ b/src/foo.ts\n@@ -1 +1 @@\n-old\n+new\n`
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentPolicy: { security: { exclude: ['**/*.md'] } },
+    }
+    const provider = makeProvider('[]')
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: mixedDiff })
+
+    expect(result.filteredFiles?.security).toEqual(['docs/notes.md'])
+    // security still ran (not skipped -- src/foo.ts still matched) and its prompt shouldn't
+    // contain the excluded file's diff section
+    expect(provider.chat).toHaveBeenCalledOnce()
+    const [messages] = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0]
+    const userMessage = messages.find((m: { role: string }) => m.role === 'user')?.content ?? ''
+    expect(userMessage).not.toContain('docs/notes.md')
+    expect(userMessage).toContain('src/foo.ts')
+  })
+
+  it('still applies the existing whole-agent skip when ALL changed files match exclude', async () => {
+    const allMdDiff = `diff --git a/docs/notes.md b/docs/notes.md\n--- a/docs/notes.md\n+++ b/docs/notes.md\n@@ -1 +1 @@\n-old\n+new\n`
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentPolicy: { security: { exclude: ['**/*.md'] } },
+    }
+    const provider = makeProvider('[]')
+    const runner = new SwarmRunner(config, provider)
+
+    const result = await runner.run({ diff: allMdDiff })
+
+    expect(result.policy?.agentsSkipped).toContain('security')
+    expect(result.filteredFiles?.security).toBeUndefined() // never ran -- nothing to report
+    expect(provider.chat).not.toHaveBeenCalled()
+  })
+})
+
 describe('scaleAgentTimeout', () => {
   it('returns the base timeout unscaled for an empty diff', () => {
     expect(scaleAgentTimeout(180000, 0, 2000)).toBe(180000)

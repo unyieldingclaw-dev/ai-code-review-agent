@@ -610,6 +610,31 @@ export class SwarmRunner {
         : activeConfig
 
     const agents = buildAgents(policyConfig, this.provider)
+
+    // Per-agent diff-content filtering: agentPolicy.exclude already gates whole-agent skip (via
+    // evaluatePolicy above, when ALL changed files match); this additionally strips just the
+    // matching file sections from an agent's OWN diff when only SOME files match, reusing the
+    // same filterDiff() ignoreFilter.ts already uses for global --ignore filtering. Wraps
+    // withContext rather than replacing it -- context injection still happens on top of the
+    // filtered diff, unchanged.
+    const filteredFiles: Partial<Record<AgentName, string[]>> = {}
+    const withFilteredContext = async (agentName: AgentName): Promise<ReviewInput> => {
+      const ctxInput = await withContext(agentName)
+      const rule = this.config.agentPolicy?.[agentName]
+      if (!rule?.exclude || rule.exclude.length === 0) return ctxInput
+      const beforeFiles = new Set(extractChangedFiles(ctxInput.diff))
+      const filtered = filterDiff(ctxInput.diff, {
+        excludes: rule.exclude,
+        includes: rule.include ?? [],
+      })
+      const afterFiles = new Set(extractChangedFiles(filtered))
+      const dropped = [...beforeFiles].filter((f) => !afterFiles.has(f))
+      if (dropped.length > 0) {
+        filteredFiles[agentName] = [...(filteredFiles[agentName] ?? []), ...dropped]
+      }
+      return { ...ctxInput, diff: filtered }
+    }
+
     const hasCoverage = allowedAgents.includes('coverage')
     const hasTestgen = allowedAgents.includes('testgen')
     const total = agents.length + (hasCoverage ? 1 : 0) + (hasTestgen ? 1 : 0)
@@ -624,7 +649,7 @@ export class SwarmRunner {
       const coverageResult = await this.runCoverageAgent(
         coverageAgent,
         input,
-        withContext,
+        withFilteredContext,
         total,
         index,
         agentStatus,
@@ -649,7 +674,7 @@ export class SwarmRunner {
       if (this.config.parallel) {
         const parallelFindings = await this.runAgentsParallel(
           agents,
-          withContext,
+          withFilteredContext,
           baseIndex,
           total,
           agentStatus,
@@ -662,7 +687,7 @@ export class SwarmRunner {
       } else {
         const seqResult = await this.runAgentsSequential(
           agents,
-          withContext,
+          withFilteredContext,
           baseIndex,
           total,
           agentStatus,
@@ -685,7 +710,7 @@ export class SwarmRunner {
         try {
           const testResult = await withRetryTimeout(
             async (signal) =>
-              this.testGen.runWithGaps(await withContext('testgen'), coverageGaps, signal),
+              this.testGen.runWithGaps(await withFilteredContext('testgen'), coverageGaps, signal),
             effectiveTimeoutMs,
             'testgen',
             this.config.retryAttempts,
@@ -737,6 +762,7 @@ export class SwarmRunner {
         : {}),
       sanitizer: sanitizerMeta,
       ...(policyResult.agentsSkipped.length > 0 ? { policy: policyResult } : {}),
+      ...(Object.keys(filteredFiles).length > 0 ? { filteredFiles } : {}),
       ...(Object.keys(agentStatus).length > 0 ? { agentStatus } : {}),
       ...(truncationMeta.truncated ? { truncation: truncationMeta } : {}),
       ...(droppedHallucinated.length > 0
