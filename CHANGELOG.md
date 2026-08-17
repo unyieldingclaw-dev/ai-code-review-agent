@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- CLI process could crash on exit on Windows with `Assertion failed: !(handle->flags &
+  UV_HANDLE_CLOSING), file src\win\async.c, line 76` after a review completed successfully and
+  valid output had already been written — caused by `process.exit()` forcing immediate process
+  termination while async handles (fetch/`AbortController` cleanup from `OllamaProvider`) were
+  still settling. All 9 `process.exit()` call sites in `src/cli/index.ts`'s action handler now
+  set `process.exitCode` and return instead, letting the event loop drain naturally before Node
+  exits on its own; the one call site in the synchronous `getDiff()` helper now throws instead,
+  routed through the existing catch block.
+
 ## [1.10.0] — 2026-08-17 (full-codebase audit fixes, evidence-grounding verification, review reliability)
 
 ### Added
