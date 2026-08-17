@@ -155,7 +155,7 @@ export interface EvidenceCheckFilterMetadata {
   flagged: EvidenceCheckFinding[]
 }
 
-export type ToolAvailability = 'used' | 'unavailable-llm-fallback'
+export type ToolAvailability = 'used' | 'unavailable-llm-fallback' | 'not-applicable'
 
 export interface ToolAvailabilityMetadata {
   gitleaks?: ToolAvailability
