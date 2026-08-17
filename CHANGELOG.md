@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Documentation
+
+- Added a "Known Limitations" section to README.md documenting absence-claim false positives
+  (findings like "no validation exists" that are wrong because the actual check exists elsewhere
+  in the file, outside the diff hunk shown). Three mitigations were designed and empirically
+  tested against a real reported case — post-hoc full-file re-verification (unreliable, 2/5, and
+  slow), full-file context at generation time (made the false-claim rate _worse_, 3/3 vs. a 1/3
+  baseline, even with an explicit instruction to cross-check), and deterministic
+  confidence-capping (fired on the majority of unrelated, well-grounded findings in this
+  project's own recent review history, including a Critical command-injection finding) — all
+  rejected before shipping. See
+  `docs/superpowers/specs/2026-08-17-absence-claim-investigation.md` for the full investigation
+  and validation data.
+
 ## [1.10.0] — 2026-08-17 (full-codebase audit fixes, evidence-grounding verification, review reliability)
 
 ### Added

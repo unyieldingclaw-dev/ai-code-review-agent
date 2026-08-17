@@ -382,6 +382,36 @@ Each agent self-reports a `confidence` value (0–100) alongside each finding. T
 
 Confidence is shown in the markdown report next to each finding.
 
+## Known Limitations
+
+**Absence-claims can be wrong when the missing thing exists outside the diff hunk.** A finding
+shaped like "no validation exists," "field can be left empty," or "missing error handling" is
+only checking what's visible in the diff hunk it was given — if the actual check (a validator, a
+guard, error handling) exists elsewhere in the same file, untouched by the diff, the agent has no
+way to see it and can report a false positive. This was investigated directly, not assumed: three
+separate mitigations were built and tested against a real reported case (a Flutter password-reset
+form where `adversarial` claimed no empty-password validation existed, when a validator was
+present a few lines outside the diff hunk) —
+
+1. **Post-hoc re-verification** (send the full file to a second model, ask it to confirm the claim
+   against the full file): unreliable (2/5 on synthetic cases, including a dangerous false-clear
+   where the verifier confused two different functions) and slow (48–232s per call).
+2. **Full-file context at generation time** (give the agent the full file up front): made no
+   improvement on the real case — the agent still made the false claim in 3/3 test runs (worse
+   than the 1/3 baseline rate), even once explicitly instructed to cross-check absence claims
+   against the full file before reporting them. In one run it explicitly quoted the validator it
+   was given and still concluded submission wasn't blocked.
+3. **Deterministic confidence-capping** (flag absence-shaped findings by keyword and lower their
+   reported confidence, no LLM call): rejected before shipping — tested against this project's own
+   recent real findings, the keyword match fired on the majority of _unrelated, well-grounded_
+   findings (a Critical command-injection finding, IDOR, insecure deserialization), which would
+   have done more harm than the problem it targets.
+
+No reliable automated mitigation currently exists for this failure class. Treat findings from
+`adversarial` (and any other agent) that claim something is absent/missing with extra skepticism,
+and verify manually against the full file before treating one as blocking. See
+`docs/superpowers/specs/2026-08-17-absence-claim-investigation.md` for the full investigation.
+
 ## Integration Contract (PMB / MB / CI)
 
 When calling ACR from another tool (PMB's `/change-review`, a CI script, or any JSON consumer), use these stable invocation patterns:
