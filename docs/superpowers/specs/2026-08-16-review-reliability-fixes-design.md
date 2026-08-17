@@ -9,8 +9,7 @@ A live run (`ai-review-agent --profile security --diff <patch>` against a real F
 project) surfaced four independent, reproducible reliability gaps, each verified directly against
 this codebase's source (not assumed from the report):
 
-1. **Silent diff truncation.** `runner.ts:253-270` keeps only the first `maxDiffLines` (default
-   2000) lines of an oversized diff and drops the rest, with a single stderr line plus one
+1. **Silent diff truncation.** `runner.ts:253-270` keeps only the first `maxDiffLines` (default 2000) lines of an oversized diff and drops the rest, with a single stderr line plus one
    markdown-report line as the only signal. On the reproducing run, 2989 of 4989 lines (60%) were
    never analyzed. Exit code is unaffected by truncation — confirmed in `exitCode.ts`/`cli/index.ts`,
    whose only exit-code inputs are agent failures (code 2) and finding severity (code 1). A caller
@@ -36,7 +35,7 @@ this codebase's source (not assumed from the report):
    code, with one finding's own quoted "evidence" directly contradicting its claim.
 
 4. **Dependencies agent assumes a Node.js project unconditionally.** `dependencies.ts`'s `run()`
-   only gates the *deterministic* `npm audit` path on whether `package.json`/`package-lock.json`
+   only gates the _deterministic_ `npm audit` path on whether `package.json`/`package-lock.json`
    changed in the diff; when that's false it falls through unconditionally to the LLM fallback
    (`super.run()`), whose prompt is entirely npm-shaped. There is no project-type detection
    anywhere in the agent. On a Dart project with no `package.json` anywhere in the repo, this
@@ -44,7 +43,7 @@ this codebase's source (not assumed from the report):
 
 ## Goals
 
-- Fix all four without adding cost to the common case — several of these fixes should *reduce*
+- Fix all four without adding cost to the common case — several of these fixes should _reduce_
   wasted tokens/calls, not just trade one cost for another (explicit design constraint from the
   user: token + performance efficiency, without sacrificing review quality).
 - Prefer deterministic fixes over prompt-only instructions where this project already has evidence
@@ -82,7 +81,7 @@ severity-based failure is never masked by the new code either.
   `AGENT_FAILURE_EXIT_CODE = 2`.
 - `cli/index.ts`'s exit sequence gains a truncation check. **Priority order (highest first):
   agent failure (2) → blocker severity (1) → truncation (3) → clean (0).** Blocker severity
-  deliberately outranks truncation: a run that's both truncated *and* found a genuine Critical
+  deliberately outranks truncation: a run that's both truncated _and_ found a genuine Critical
   finding in the reviewed portion must still exit 1, not 3 — a CI gate keyed on exit code 1 has to
   see the real blocker. Truncation (3) only distinguishes "clean because nothing was found" from
   "clean-looking because coverage was incomplete" on runs with no severity-based failure. Agent
@@ -165,7 +164,7 @@ finding, documented as a Non-Goal below.
   `basis`/`suggestion` alternates `validateAndNormalizeFindings` also accepts). `base.ts:38`'s
   `provider.chat()` call passes `format: FINDING_ARRAY_SCHEMA` instead of `format: 'json'`.
 - `coverageAnalyst.ts` needs its own, differently-shaped schema (`{ type: 'object', properties: {
-  findings: {...}, gaps: {...} } }`, matching its `{"findings":[...],"gaps":[...]}` top-level
+findings: {...}, gaps: {...} } }`, matching its `{"findings":[...],"gaps":[...]}` top-level
   shape, which is not an array) — a second constant, not a reuse of `FINDING_ARRAY_SCHEMA`.
 - `testGen.ts`/`evidenceVerifier.ts` are unchanged, same reasoning as before (raw code output /
   single short verdict line, neither is array-shaped JSON).
@@ -194,7 +193,7 @@ once, globally, via `ignorePaths`.
 
 - `runner.ts` gains a per-agent diff-preparation step: right before an agent with a
   configured `agentPolicy[agent].exclude` runs, call `filterDiff(diff, { excludes: rule.exclude,
-  includes: rule.include ?? [] })` to produce that agent's own view of the diff, instead of relying
+includes: rule.include ?? [] })` to produce that agent's own view of the diff, instead of relying
   solely on `evaluatePolicy`'s existing whole-agent skip-if-all-match decision. The existing
   skip-if-all-match behavior is unchanged and still runs first (an agent that would see an empty
   diff after filtering is skipped entirely, saving the call rather than sending nothing).
@@ -211,13 +210,13 @@ once, globally, via `ignorePaths`.
   independent-top-level-field convention already used by `hallucinationFilter`/`coverageGapFilter`/
   `evidenceCheckFilter`. This must be a sibling of `PolicyResult`, not a field on it:
   `runner.ts:739` only spreads `policy` into the result when `policyResult.agentsSkipped.length >
-  0`, but the target scenario for this field is exactly the case where an agent is *not* skipped
+0`, but the target scenario for this field is exactly the case where an agent is _not_ skipped
   (still runs) and just has some file sections dropped from what it sees — nesting inside
   `PolicyResult` would mean this field silently never appears in the one case it exists to cover.
 - **Known limitation, accepted rather than fixed here:** `config.ts`'s `loadConfig` does a shallow
   merge (`{ ...DEFAULT_CONFIG, ...partial }`). Once `DEFAULT_CONFIG.agentPolicy` is non-empty (this
-  spec is what first populates it), a project's own `ai-review.config.json` setting *any*
-  `agentPolicy` key for *any* agent will replace the entire `agentPolicy` object, silently
+  spec is what first populates it), a project's own `ai-review.config.json` setting _any_
+  `agentPolicy` key for _any_ agent will replace the entire `agentPolicy` object, silently
   dropping the new security/adversarial `.md` defaults with no warning. This is a pre-existing
   property of shallow-merging the whole config object, not something new introduced by this spec —
   every other object/array-valued config field has the same characteristic today. Fixing config
@@ -250,7 +249,7 @@ prompt), not just quality — another net win under the stated constraint.
   and return `[]`. **This check must not fire when `touchesManifest` is true** — a diff that adds
   `package.json` for the first time (a genuine new Node project) has `touchesManifest: true` but
   `existsSync` may still be `false` if the diff hasn't been applied to disk (e.g. `--diff
-  <patch-file>` review of an unapplied patch); the existing `touchesManifest` branch already
+<patch-file>` review of an unapplied patch); the existing `touchesManifest` branch already
   handles that case correctly today (tries npm audit, falls back to LLM with
   `'unavailable-llm-fallback'` if the tool can't run) and must be left untouched. The new check
   only ever affects the case the bug report actually demonstrated: a diff that doesn't mention any
@@ -284,7 +283,7 @@ both cost and quality, no trade-off.
 - `config.ts`: `DEFAULT_CONFIG.agentPolicy` gains `security`/`adversarial` `.md` excludes. (No new
   config field for Issue 2 — the schema fix isn't a tunable value.)
 - `schema.ts`: new **top-level** `ReviewResult.filteredFiles?: Partial<Record<AgentName,
-  string[]>>` (sibling of `PolicyResult`, not nested inside it); `ToolAvailability` gains
+string[]>>` (sibling of `PolicyResult`, not nested inside it); `ToolAvailability` gains
   `'not-applicable'`.
 - `dependencies.ts`: `run()` gains a manifest-existence pre-check, guarded to `!touchesManifest`
   only.
@@ -320,7 +319,7 @@ both cost and quality, no trade-off.
   documents/exercises the shallow-merge interaction rather than leaving it undiscovered).
 - Issue 4: regression tests confirming (a) `DependenciesAgent.run()` returns `[]` without calling
   `provider.chat()` when no `package.json` exists anywhere and the diff doesn't touch one; (b) a
-  diff that *adds* `package.json` for the first time (`touchesManifest: true`, file not yet on
+  diff that _adds_ `package.json` for the first time (`touchesManifest: true`, file not yet on
   disk) still reaches the existing npm-audit-then-LLM-fallback path unaffected — the new check must
   not fire here; (c) existing behavior for actual Node projects is unchanged. `cli/formatter.ts`
   gains a test confirming `'not-applicable'` produces no degraded-tools warning.

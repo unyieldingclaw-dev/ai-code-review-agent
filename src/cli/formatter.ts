@@ -56,7 +56,8 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
   }
 
   if (result.evidenceCheckFilter) {
-    const { checkedCount, unavailableCount, unavailableReasons, flagged } = result.evidenceCheckFilter
+    const { checkedCount, unavailableCount, unavailableReasons, flagged } =
+      result.evidenceCheckFilter
     lines.push(
       `${useEmoji ? '🔍 ' : ''}Evidence check: ${checkedCount} finding(s) checked` +
         (flagged.length > 0

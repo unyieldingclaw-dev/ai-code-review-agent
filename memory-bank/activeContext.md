@@ -81,8 +81,8 @@ passes, scaled 1-lens to full-5-lens by change significance — self-certifying 
 independent review was explicitly blocked by the harness mid-session) and committed separately
 before merge. A final holistic review (done via direct grep/read after a subagent dispatch hit an
 API spend limit) caught one real trust-boundary gap before merge: `evidenceVerifier.ts` is the
-first place in this codebase where one agent's LLM *output* (`Finding.title`/`detail`/`evidence`)
-becomes a second LLM call's *input* — the existing `sanitizeDiff`/`sanitizeText` prompt-injection
+first place in this codebase where one agent's LLM _output_ (`Finding.title`/`detail`/`evidence`)
+becomes a second LLM call's _input_ — the existing `sanitizeDiff`/`sanitizeText` prompt-injection
 defense was only ever applied once, at diff-ingestion, and didn't automatically carry through to
 this new second hop. Fixed by reapplying `sanitizeText()` to claim/evidence inside `verifyEvidence`
 before they reach the verifier prompt (commit `c0fe693`), with a regression test confirming
@@ -664,7 +664,7 @@ All 5 checks verified passing locally (295/295 tests) before the workflow was ad
 
 - **ACR reliability findings, item 3 — still unresolved**: the specific fabricated "GPL/mongodb
   license" finding the user originally reported traces to a real, already-fixed bug (commit
-  `a906515`), but whether *that particular report* was a stale-build artifact or a live regression
+  `a906515`), but whether _that particular report_ was a stale-build artifact or a live regression
   that slipped past `filterNonexistentFiles` was never determined — needs the original finding's
   exact file/line/text and the `ai-review-agent --version` that produced it. See `progress.md`'s
   "ACR reliability findings" entry for full detail.

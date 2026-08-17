@@ -24,7 +24,11 @@ export class DependenciesAgent extends BaseAgent {
     // the actually-reported bug: a diff that mentions no manifest at all, in a project that never
     // had one. Root-level existsSync only, not a recursive/monorepo-aware walk -- a project with
     // only a workspace-nested package.json is a known, accepted gap (see design spec Issue 4).
-    if (!touchesManifest && input.projectPath && !existsSync(join(input.projectPath, 'package.json'))) {
+    if (
+      !touchesManifest &&
+      input.projectPath &&
+      !existsSync(join(input.projectPath, 'package.json'))
+    ) {
       this.lastToolAvailability = 'not-applicable'
       return []
     }

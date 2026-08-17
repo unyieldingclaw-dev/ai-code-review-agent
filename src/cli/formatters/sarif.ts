@@ -70,7 +70,9 @@ export function formatSarif(result: ReviewResult): string {
             ? { hallucinationFilter: result.hallucinationFilter }
             : {}),
           ...(result.toolAvailability ? { toolAvailability: result.toolAvailability } : {}),
-          ...(result.evidenceCheckFilter ? { evidenceCheckFilter: result.evidenceCheckFilter } : {}),
+          ...(result.evidenceCheckFilter
+            ? { evidenceCheckFilter: result.evidenceCheckFilter }
+            : {}),
         },
       },
     ],

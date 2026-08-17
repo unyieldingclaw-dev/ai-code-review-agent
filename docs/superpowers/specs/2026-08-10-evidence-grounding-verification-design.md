@@ -34,14 +34,14 @@ a real changed file, and still be wrong — and every current defense would let 
 
 A live, first-party example of the same failure surfaced during this project's own audit-fix work
 (2026-08-10): ACR's security profile (npm-installed `v1.9.0`) flagged `resolveWriteTestPath` — the
-function added specifically to *fix* a path-traversal bug — as introducing path traversal, citing
+function added specifically to _fix_ a path-traversal bug — as introducing path traversal, citing
 the containment check that prevents it. Confirmed false positive by reading the code directly.
 
 This is a genuinely different problem from prior hallucination work in this codebase
 (`dependencies`/`license`'s prompt-template bait removal, `secrets`/`dependencies`'s
-deterministic-tool replacement) — those addressed *fabrication from nothing* or *judgment
-unreliability on domains that are actually pattern-matchable*. This is *reasoning that doesn't
-follow from evidence the model itself quoted correctly.*
+deterministic-tool replacement) — those addressed _fabrication from nothing_ or _judgment
+unreliability on domains that are actually pattern-matchable_. This is _reasoning that doesn't
+follow from evidence the model itself quoted correctly._
 
 ## Goals
 
@@ -49,7 +49,7 @@ follow from evidence the model itself quoted correctly.*
    highest-stakes subset of findings (Critical/High — the ones that gate `--fail-on` and get
    treated as urgent), before they're published.
 2. Validate the mechanism empirically before building pipeline integration around it — this
-   project has direct precedent for prompt-only fixes *not* working (`adversarial`'s
+   project has direct precedent for prompt-only fixes _not_ working (`adversarial`'s
    prompt-tightening: 3/3 → 3/3 hallucinated, no measurable improvement) and for a
    promising-looking-at-small-scale change needing a deeper test before being trusted
    (`parallel: true`'s reversal after real-scale testing revealed the small test's assumption
@@ -79,10 +79,10 @@ follow from evidence the model itself quoted correctly.*
   response) — considered and rejected. This project's own precedent (`adversarial` prompt-tightening
   showing no improvement) is exactly why: a model defending a claim it just made in-context tends to
   rationalize rather than reverse itself.
-- A pure deterministic/regex heuristic check as the *sole* mechanism, or as one that can veto a
+- A pure deterministic/regex heuristic check as the _sole_ mechanism, or as one that can veto a
   finding without the LLM call — won't generalize, and this spec's own re-review of an earlier
   draft found a concrete way it would misfire on messy evidence (see Design, pre-filter). A narrow,
-  additive version *is* part of this spec, but strictly as a second signal that never overrides or
+  additive version _is_ part of this spec, but strictly as a second signal that never overrides or
   skips the LLM verdict in Stage 1 — see Design.
 - A persistent, built-in cross-run log file (e.g. an append-only `.ai-review/evidence-log.jsonl`).
   Considered as a way to track hallucination rate over time, but this tool doesn't own persistent
@@ -100,11 +100,11 @@ established practice of validating a prompt directly before building it into the
 **Round 1** (3 models, 8 synthetic cases modeled on the report's specific patterns — 5 evidence-
 contradicts-claim cases, 3 genuinely-correct-finding controls):
 
-| Model | Score |
-|---|---|
-| `qwen3:latest` | 8/8 |
-| `devstral:latest` (same-model baseline) | 7/8 — missed the observability case |
-| `gemma3:4b` | 3/8 — disqualified: approved 3/5 bad claims, false-rejected 2/3 good ones |
+| Model                                   | Score                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| `qwen3:latest`                          | 8/8                                                                       |
+| `devstral:latest` (same-model baseline) | 7/8 — missed the observability case                                       |
+| `gemma3:4b`                             | 3/8 — disqualified: approved 3/5 bad claims, false-rejected 2/3 good ones |
 
 **Round 2** (4 models, re-ran round 1's original 8 cases verbatim — unchanged wording, as a
 same-input consistency check — plus 5 genuinely new cases with better good/bad balance and
@@ -112,12 +112,12 @@ messier multi-line diff-style evidence instead of only clean one-liners; `gemma3
 already disqualified, `deepseek-r1:14b` and `gemma3:12b` added). 13 unique cases total across both
 rounds, not 21 — round 1's 8 and round 2's first 8 are the same cases, not independent ones:
 
-| Model | Score | Latency/call |
-|---|---|---|
-| `qwen3:latest` | 13/13 | 8.8s–55s (mostly <16s) |
-| `deepseek-r1:14b` | 13/13 | 20s–72s (reasoning model, 2-3x slower) |
-| `devstral:latest` (baseline) | 12/13 | 5-25s — **missed the same case as round 1**, not noise |
-| `gemma3:12b` | 6/13 | 3-17s — disqualified, same weakness as the 4b variant regardless of size |
+| Model                        | Score | Latency/call                                                             |
+| ---------------------------- | ----- | ------------------------------------------------------------------------ |
+| `qwen3:latest`               | 13/13 | 8.8s–55s (mostly <16s)                                                   |
+| `deepseek-r1:14b`            | 13/13 | 20s–72s (reasoning model, 2-3x slower)                                   |
+| `devstral:latest` (baseline) | 12/13 | 5-25s — **missed the same case as round 1**, not noise                   |
+| `gemma3:12b`                 | 6/13  | 3-17s — disqualified, same weakness as the 4b variant regardless of size |
 
 **Conclusion:** `qwen3:latest` got all 13 unique cases right, including getting the same 8 right
 both times they were tested (round 1's original run, then round 2's re-run of the identical
@@ -153,7 +153,7 @@ tests the same way `runner.test.ts` already mocks the main provider:
   shape and the same `"Model X not found. Run: ollama pull X"` message this check needs; there's
   nothing left to build.
 - `verifyEvidence(finding, provider): Promise<{ verified: boolean; reason: string; preFilterAgreed:
-  boolean | null }>` — the per-finding check, only called once availability is confirmed.
+boolean | null }>` — the per-finding check, only called once availability is confirmed.
 
 **Claim composition:** the `claim` sent to the verifier is `finding.title` + `finding.detail`
 concatenated (`title` alone is often too terse to judge — e.g. "Lock failure not logged" needs
@@ -162,7 +162,7 @@ concatenated (`title` alone is often too terse to judge — e.g. "Lock failure n
 agent cited, and re-deriving or truncating it here would risk checking the verifier against
 different text than what the finding actually claims to be grounded in.
 
-**Retry:** one retry (two attempts total) on *transient* network/timeout errors before failing
+**Retry:** one retry (two attempts total) on _transient_ network/timeout errors before failing
 open, with a short fixed backoff — matching `OllamaProvider`'s own retry convention for transient
 failures elsewhere in this codebase, rather than treating a single blip as a verdict. This does
 not apply to model-not-installed (below) — retrying an identical request against a model that
@@ -183,7 +183,7 @@ and returning a safe value, not `OllamaProvider.chat()`'s pattern of throwing �
 call must not trigger the agent-retry/timeout machinery upstream, since this isn't agent
 generation, it's post-processing.
 
-**Model-not-installed:** checked *once*, up front, before the runner.ts step loops over any
+**Model-not-installed:** checked _once_, up front, before the runner.ts step loops over any
 findings — not discovered incrementally on the first per-finding call. Sequential Stage 1 already
 means each Critical/High finding can take up to the validation's observed worst case (~55s for
 `qwen3:latest`); if the model simply isn't pulled, looping through every finding anyway (each
@@ -229,8 +229,8 @@ pattern agreeing with the LLM at a high rate (see Tracking, below), promoting th
 to skip-the-LLM status is a documented follow-up, not part of this implementation — the same
 staging judgment already applied to Stage 1 vs. Stage 2 of the feature as a whole.
 
-Called from a new step in `runner.ts`, *after* `orchestrator.synthesize()` produces the final
-deduped/filtered findings list, *before* `ReviewResult` is assembled — not inside
+Called from a new step in `runner.ts`, _after_ `orchestrator.synthesize()` produces the final
+deduped/filtered findings list, _before_ `ReviewResult` is assembled — not inside
 `OrchestratorAgent` itself. `OrchestratorAgent` is (as of this project's Batch 3 audit-fix work)
 explicitly 100% deterministic with no `LLMProvider` dependency; adding an LLM call there would
 undo that property, and synthesis/verification are different concerns (dedup+cross-reference vs.
@@ -258,7 +258,7 @@ Given the validation's known limitation (clean-cut synthetic cases, unmeasured r
 false-rejection rate), this ships in two stages under the same flag:
 
 - **Stage 1 (this implementation):** `--verify-evidence` runs the check and populates
-  `ReviewResult.evidenceCheckFilter` with what *would* be dropped and why — but does not remove
+  `ReviewResult.evidenceCheckFilter` with what _would_ be dropped and why — but does not remove
   anything from the published `findings`. This lets real usage validate the false-rejection rate
   with zero risk of losing a real finding.
 - **Stage 2 (follow-up, not part of this implementation):** once Stage 1 has real usage behind it,
@@ -276,23 +276,23 @@ export interface EvidenceCheckFinding {
   title: string
   file: string
   line: number
-  claim: string          // finding.title + finding.detail, concatenated — what was sent as the claim
-  evidence: string        // finding.evidence verbatim — what was sent as the evidence
-  reason: string          // the verifier's stated reason for its verdict (or the fail-open reason)
-  preFilterAgreed: boolean | null   // did the deterministic pre-filter also flag this? null if no
-                                     // pattern applied to this claim/evidence pair at all — always
-                                     // an *additional signal* alongside the LLM verdict in Stage 1,
-                                     // never the sole source of a verdict — see pre-filter, above
+  claim: string // finding.title + finding.detail, concatenated — what was sent as the claim
+  evidence: string // finding.evidence verbatim — what was sent as the evidence
+  reason: string // the verifier's stated reason for its verdict (or the fail-open reason)
+  preFilterAgreed: boolean | null // did the deterministic pre-filter also flag this? null if no
+  // pattern applied to this claim/evidence pair at all — always
+  // an *additional signal* alongside the LLM verdict in Stage 1,
+  // never the sole source of a verdict — see pre-filter, above
 }
 
 export interface EvidenceCheckFilterMetadata {
-  checkedCount: number               // total findings sent through verification this run
-  unavailableCount: number           // of checkedCount, how many fell back to fail-open (retry
-                                      // exhaustion, unparseable verdict, or model-not-installed)
-  unavailableReasons: string[]       // deduped fail-open reasons this run (e.g. the actionable
-                                      // "ollama pull <model>" message) — mirrors
-                                      // SanitizerMetadata.warnings's array-of-strings convention
-  flagged: EvidenceCheckFinding[]    // Stage 1: findings that failed verification but were kept
+  checkedCount: number // total findings sent through verification this run
+  unavailableCount: number // of checkedCount, how many fell back to fail-open (retry
+  // exhaustion, unparseable verdict, or model-not-installed)
+  unavailableReasons: string[] // deduped fail-open reasons this run (e.g. the actionable
+  // "ollama pull <model>" message) — mirrors
+  // SanitizerMetadata.warnings's array-of-strings convention
+  flagged: EvidenceCheckFinding[] // Stage 1: findings that failed verification but were kept
 }
 ```
 
@@ -319,8 +319,8 @@ that behavior exists.
 own, to track verification health and hallucination rate across runs without this tool owning any
 persistent storage (see the rejected built-in log file in Non-Goals) — a `flagged.length /
 checkedCount` ratio per run, captured by whatever the user already pipes JSON output into, is a
-complete longitudinal signal. `unavailableCount` separately surfaces verifier *reliability* (is the
-mechanism itself working this run) from verifier *findings* (`flagged`), so a spike in one isn't
+complete longitudinal signal. `unavailableCount` separately surfaces verifier _reliability_ (is the
+mechanism itself working this run) from verifier _findings_ (`flagged`), so a spike in one isn't
 misread as the other — a run where the model wasn't installed should look different from a run
 where the model ran fine and genuinely caught more hallucinations. This is also the feedback loop
 for the deterministic pre-filter above: `preFilterAgreed` on every flagged finding gives a running
@@ -392,7 +392,7 @@ that it belongs in the changelog, not just the README.
 - `mcp/tool.test.ts`: asserts `verifyEvidence: true` in project config is force-excluded when the
   config is loaded via the MCP path, mirroring the existing `testgen`-exclusion test.
 - A permanent, cleaned-up version of `verify-poc.mjs`, living in `calibration/` alongside the
-  existing agent-calibration harness but as its own script — this checks verifier *judgment*
+  existing agent-calibration harness but as its own script — this checks verifier _judgment_
   quality against real Ollama, which doesn't fit the agent-generation-oriented calibration loop
   (`calibrate.ts` calibrates what agents generate; this calibrates what the verifier judges).
   Carries forward the full 13-case set from this spec's validation as a permanent regression guard.

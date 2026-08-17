@@ -289,7 +289,12 @@ describe('evidenceCheckFilter', () => {
 
   it('reports zero flagged findings without listing any', () => {
     const result = makeResult({
-      evidenceCheckFilter: { checkedCount: 2, unavailableCount: 0, unavailableReasons: [], flagged: [] },
+      evidenceCheckFilter: {
+        checkedCount: 2,
+        unavailableCount: 0,
+        unavailableReasons: [],
+        flagged: [],
+      },
     })
     const output = formatMarkdown(result)
     expect(output).toContain('2 finding(s) checked')

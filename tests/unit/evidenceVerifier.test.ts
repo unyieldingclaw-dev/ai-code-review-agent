@@ -91,7 +91,9 @@ describe('verifyEvidence', () => {
   })
 
   it('sets preFilterAgreed:false when the pre-filter matches but the LLM disagrees', async () => {
-    const provider = makeProvider(async () => 'VERDICT: SUPPORTED — evidence genuinely lacks logging.')
+    const provider = makeProvider(
+      async () => 'VERDICT: SUPPORTED — evidence genuinely lacks logging.'
+    )
     const result = await verifyEvidence(makeFinding(), provider)
     expect(result.preFilterAgreed).toBe(false)
     // Critically: the pre-filter match never overrides the LLM's own verdict in Stage 1.
@@ -181,7 +183,10 @@ describe('runEvidenceChecks', () => {
   it('checks the verifier model once up front and short-circuits every finding if unavailable', async () => {
     const provider: LLMProvider = {
       chat: vi.fn(),
-      ping: vi.fn().mockResolvedValue({ ok: false, error: 'Model qwen3:latest not found. Run: ollama pull qwen3:latest' }),
+      ping: vi.fn().mockResolvedValue({
+        ok: false,
+        error: 'Model qwen3:latest not found. Run: ollama pull qwen3:latest',
+      }),
     }
     const findings = [
       makeFinding({ severity: 'critical', id: 'a' }),

@@ -102,7 +102,8 @@ const cases: Case[] = [
   {
     label: 'good-3-real-nested-complexity',
     title: 'Deep nesting',
-    detail: 'This function has 5+ levels of nested conditionals, making it hard to test and reason about.',
+    detail:
+      'This function has 5+ levels of nested conditionals, making it hard to test and reason about.',
     evidence:
       'if (a) {\n  if (b) {\n    if (c) {\n      if (d) {\n        if (e) {\n          doThing()\n        }\n      }\n    }\n  }\n}',
     expected: 'SUPPORTED',

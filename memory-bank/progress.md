@@ -75,7 +75,7 @@ task, two-stage spec+quality review, controller-only commits).
 - [x] Task 6: `ReviewResult.filteredFiles` (top-level, sibling of `PolicyResult`, not nested in
       it — the case it covers is an agent that still ran, just with reduced input) — `9d649e0`.
 - [x] Task 7 (Issue 3 fix): `runner.ts`'s `withFilteredContext` wraps `withContext`, applying
-      `filterDiff()` per-agent via `agentPolicy.exclude`/`include` so an agent can run on a *subset*
+      `filterDiff()` per-agent via `agentPolicy.exclude`/`include` so an agent can run on a _subset_
       of the diff, not just get whole-agent-skipped; new `DEFAULT_CONFIG.agentPolicy` excludes
       `**/*.md` for `security`/`adversarial` specifically (the two agents verified to have zero
       file-type awareness) — `1f37447`. Live-verified: a real CLI run's `filteredFiles.security`
@@ -98,8 +98,7 @@ task, two-stage spec+quality review, controller-only commits).
       `--chunk` CLI flag wiring `adf4ddc`/`f69fee8`. Deliberately kept outside `SwarmRunner`'s own
       internals per the "Capability vs Orchestration" decision above.
 - [x] Task 14: full regression clean (517 tests, 0 typecheck/lint errors) plus live end-to-end
-      verification against a synthetic oversized Flutter/Dart-style diff (2278 lines, mixed `.md`
-      + real Dart source + `pubspec.yaml`) confirming all 4 original symptoms resolved in both the
+      verification against a synthetic oversized Flutter/Dart-style diff (2278 lines, mixed `.md` + real Dart source + `pubspec.yaml`) confirming all 4 original symptoms resolved in both the
       default (`exit 3`, loud truncation) and `--chunk` (`exit 0`, full coverage, no `truncation`
       field) paths. CHANGELOG entry — `093b563`.
 - [x] **Final holistic branch review (post-Task-14, pre-merge)**, looking at the whole diff rather
@@ -111,7 +110,7 @@ task, two-stage spec+quality review, controller-only commits).
       chunk was silently hidden behind a later chunk's success, undermining the exact guarantee
       `--chunk` exists to provide. Fixed: `agentStatus` now merges across all chunks (an agent is
       `'ok'` only if every chunk that ran it said `'ok'`). (2) The new `**/*.md` default (Task 7)
-      relied on `matchPattern` compiling `**/ ` to a *non-optional* literal slash, so it could only
+      relied on `matchPattern` compiling `**/ ` to a _non-optional_ literal slash, so it could only
       match nested paths (`docs/README.md`), never a root-level file — the single most common
       markdown file in any repo (`README.md`). Fixed `matchPattern` itself (`**/ ` → `(?:.*/)?`,
       matching the documented gitignore spec exactly: "zero or more directories, including none")
@@ -142,8 +141,7 @@ stated criteria, with no existing defense checking a claim against the evidence 
 - [x] Schema (`EvidenceCheckFinding`/`EvidenceCheckFilterMetadata` on `ReviewResult`), config
       (`verifyEvidence`/`verifierModel`, default `qwen3:latest`), `src/core/evidenceVerifier.ts`
       (`verifyEvidence`/`runEvidenceChecks`), wired into `runner.ts` (optional third
-      `verifierProvider` param), `--verify-evidence` CLI flag, forced off for MCP callers, markdown
-      + SARIF formatter blocks, README/CHANGELOG, permanent `calibration/evidenceVerifierCalibration.ts`
+      `verifierProvider` param), `--verify-evidence` CLI flag, forced off for MCP callers, markdown + SARIF formatter blocks, README/CHANGELOG, permanent `calibration/evidenceVerifierCalibration.ts`
       script (`npm run calibrate:evidence`).
 - [x] Stage 1 is deliberately report-only — flags via `evidenceCheckFilter`, never drops a finding
       from `findings`. A deterministic regex pre-filter runs as a second signal (`preFilterAgreed`)
@@ -153,7 +151,7 @@ stated criteria, with no existing defense checking a claim against the evidence 
       controls); `qwen3:latest` scored 13/13, confirmed live twice — once during design validation,
       once via the permanent calibration script against real Ollama.
 - [x] Final holistic review (pre-merge) caught a real trust-boundary gap: this is the first place in
-      the codebase where one agent's LLM *output* becomes a second LLM call's *input* — the existing
+      the codebase where one agent's LLM _output_ becomes a second LLM call's _input_ — the existing
       `sanitizeDiff`/`sanitizeText` defense was only ever applied once, at diff-ingestion. Fixed by
       reapplying `sanitizeText()` to claim/evidence before they reach the verifier prompt (`c0fe693`),
       with a regression test confirming injection strings are stripped first.

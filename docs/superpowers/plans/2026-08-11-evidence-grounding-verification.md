@@ -17,11 +17,13 @@
 ## File Structure
 
 **Create:**
+
 - `src/core/evidenceVerifier.ts` — `verifyEvidence`, `runEvidenceChecks`, the deterministic pre-filter table, the validated system prompt.
 - `tests/unit/evidenceVerifier.test.ts`
 - `calibration/evidenceVerifierCalibration.ts` — permanent, cleaned-up port of the scratch validation script; regression guard for verifier judgment quality.
 
 **Modify:**
+
 - `src/core/schema.ts` — `EvidenceCheckFinding`, `EvidenceCheckFilterMetadata`, `ReviewResult.evidenceCheckFilter`.
 - `src/core/config.ts` — `verifyEvidence`, `verifierModel` on `ReviewConfig` + `DEFAULT_CONFIG`.
 - `src/core/agents/orchestrator.ts` — export `DETERMINISTIC_SOURCES` (currently module-private) so `evidenceVerifier.ts` shares the same list instead of duplicating it.
@@ -38,6 +40,7 @@
 ### Task 1: Schema — evidence-check types
 
 **Files:**
+
 - Modify: `src/core/schema.ts`
 
 - [ ] **Step 1: Add the new interfaces and wire them into `ReviewResult`**
@@ -73,9 +76,11 @@ Then add one field to `ReviewResult` (after `coverageGapFilter?: CoverageGapFilt
 - [ ] **Step 2: Verify it compiles**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx tsc --noEmit
 ```
+
 Expected: no errors (pure type addition, nothing references the new fields yet).
 
 - [ ] **Step 3: Commit**
@@ -90,6 +95,7 @@ git commit -m "feat: add EvidenceCheckFinding/EvidenceCheckFilterMetadata schema
 ### Task 2: Config — `verifyEvidence` / `verifierModel`
 
 **Files:**
+
 - Modify: `src/core/config.ts`
 - Test: `tests/unit/config.test.ts`
 
@@ -98,21 +104,23 @@ git commit -m "feat: add EvidenceCheckFinding/EvidenceCheckFilterMetadata schema
 In `tests/unit/config.test.ts`, add inside the `describe('DEFAULT_CONFIG', ...)` block:
 
 ```ts
-  it('verifyEvidence defaults to false', () => {
-    expect(DEFAULT_CONFIG.verifyEvidence).toBe(false)
-  })
+it('verifyEvidence defaults to false', () => {
+  expect(DEFAULT_CONFIG.verifyEvidence).toBe(false)
+})
 
-  it('verifierModel defaults to qwen3:latest', () => {
-    expect(DEFAULT_CONFIG.verifierModel).toBe('qwen3:latest')
-  })
+it('verifierModel defaults to qwen3:latest', () => {
+  expect(DEFAULT_CONFIG.verifierModel).toBe('qwen3:latest')
+})
 ```
 
 - [ ] **Step 2: Run it to verify it fails**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/config.test.ts
 ```
+
 Expected: FAIL — `DEFAULT_CONFIG.verifyEvidence` is `undefined`.
 
 - [ ] **Step 3: Add the fields**
@@ -139,9 +147,11 @@ Add two fields to `DEFAULT_CONFIG` (after `parallel: false,`):
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/config.test.ts
 ```
+
 Expected: PASS
 
 - [ ] **Step 5: Commit**
@@ -156,6 +166,7 @@ git commit -m "feat: add verifyEvidence/verifierModel config fields"
 ### Task 3: Export `DETERMINISTIC_SOURCES` from orchestrator.ts
 
 **Files:**
+
 - Modify: `src/core/agents/orchestrator.ts:12`
 
 - [ ] **Step 1: Add `export`**
@@ -175,9 +186,11 @@ export const DETERMINISTIC_SOURCES: EvidenceSource[] = [
 - [ ] **Step 2: Verify nothing broke**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/orchestratorAgent.test.ts tests/unit/orchestrator.test.ts
 ```
+
 Expected: PASS (pure export addition, no behavior change).
 
 - [ ] **Step 3: Commit**
@@ -192,6 +205,7 @@ git commit -m "refactor: export DETERMINISTIC_SOURCES so evidenceVerifier can sh
 ### Task 4: `evidenceVerifier.ts` — `verifyEvidence`
 
 **Files:**
+
 - Create: `src/core/evidenceVerifier.ts`
 - Test: `tests/unit/evidenceVerifier.test.ts`
 
@@ -293,7 +307,9 @@ describe('verifyEvidence', () => {
   })
 
   it('sets preFilterAgreed:false when the pre-filter matches but the LLM disagrees', async () => {
-    const provider = makeProvider(async () => 'VERDICT: SUPPORTED — evidence genuinely lacks logging.')
+    const provider = makeProvider(
+      async () => 'VERDICT: SUPPORTED — evidence genuinely lacks logging.'
+    )
     const result = await verifyEvidence(makeFinding(), provider)
     expect(result.preFilterAgreed).toBe(false)
     // Critically: the pre-filter match never overrides the LLM's own verdict in Stage 1.
@@ -318,9 +334,11 @@ describe('verifyEvidence', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/evidenceVerifier.test.ts
 ```
+
 Expected: FAIL — `src/core/evidenceVerifier.ts` does not exist yet.
 
 - [ ] **Step 3: Implement `verifyEvidence`**
@@ -460,17 +478,21 @@ export async function verifyEvidence(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/evidenceVerifier.test.ts
 ```
+
 Expected: PASS (8 tests)
 
 - [ ] **Step 5: Typecheck**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx tsc --noEmit
 ```
+
 Expected: no errors, aside from the two unused-import names — if `tsc` flags them (depends on `noUnusedLocals`), remove `EvidenceCheckFinding`/`EvidenceCheckFilterMetadata` from this step's import line and re-add them in Task 5's edit instead.
 
 - [ ] **Step 6: Commit**
@@ -485,6 +507,7 @@ git commit -m "feat: add verifyEvidence with deterministic pre-filter and retry"
 ### Task 5: `evidenceVerifier.ts` — `runEvidenceChecks`
 
 **Files:**
+
 - Modify: `src/core/evidenceVerifier.ts`
 - Test: `tests/unit/evidenceVerifier.test.ts`
 
@@ -545,7 +568,10 @@ describe('runEvidenceChecks', () => {
   it('checks the verifier model once up front and short-circuits every finding if unavailable', async () => {
     const provider: LLMProvider = {
       chat: vi.fn(),
-      ping: vi.fn().mockResolvedValue({ ok: false, error: 'Model qwen3:latest not found. Run: ollama pull qwen3:latest' }),
+      ping: vi.fn().mockResolvedValue({
+        ok: false,
+        error: 'Model qwen3:latest not found. Run: ollama pull qwen3:latest',
+      }),
     }
     const findings = [
       makeFinding({ severity: 'critical', id: 'a' }),
@@ -578,9 +604,11 @@ describe('runEvidenceChecks', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/evidenceVerifier.test.ts
 ```
+
 Expected: FAIL — `runEvidenceChecks` is not exported.
 
 - [ ] **Step 3: Implement `runEvidenceChecks`**
@@ -666,9 +694,11 @@ export async function runEvidenceChecks(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/evidenceVerifier.test.ts
 ```
+
 Expected: PASS (14 tests total)
 
 - [ ] **Step 5: Commit**
@@ -683,6 +713,7 @@ git commit -m "feat: add runEvidenceChecks orchestration with once-per-run avail
 ### Task 6: Wire into `runner.ts`
 
 **Files:**
+
 - Modify: `src/core/runner.ts`
 - Test: `tests/unit/runner.test.ts`
 
@@ -756,9 +787,11 @@ Note: `security` agent's real prompt parsing is exercised elsewhere; this test o
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/runner.test.ts -t "evidence verification"
 ```
+
 Expected: FAIL — `SwarmRunner` doesn't accept a third constructor argument yet, and `evidenceCheckFilter` is never set.
 
 - [ ] **Step 3: Wire `verifierProvider` into `SwarmRunner`**
@@ -822,17 +855,21 @@ And add one more spread entry at the end of the returned object, after `...(Obje
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/runner.test.ts
 ```
+
 Expected: PASS (all existing runner tests plus the 3 new ones — the optional constructor param means every existing `new SwarmRunner(config, provider)` call site still compiles and behaves identically).
 
 - [ ] **Step 6: Full test suite + typecheck**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx tsc --noEmit && npx vitest run
 ```
+
 Expected: all green.
 
 - [ ] **Step 7: Commit**
@@ -847,6 +884,7 @@ git commit -m "feat: wire evidence verification into SwarmRunner"
 ### Task 7: CLI — `--verify-evidence` flag
 
 **Files:**
+
 - Modify: `src/cli/index.ts`
 - Test: `tests/unit/cli.test.ts`
 
@@ -855,27 +893,27 @@ git commit -m "feat: wire evidence verification into SwarmRunner"
 Add to `tests/unit/cli.test.ts`, near the existing `--parallel` tests:
 
 ```ts
-  it('--verify-evidence enables evidence verification and constructs a verifier provider', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
-    await runCli(['--verify-evidence'])
-    const config = MockSwarmRunner.mock.calls[0][0]
-    const verifierProvider = MockSwarmRunner.mock.calls[0][2]
-    expect(config.verifyEvidence).toBe(true)
-    expect(verifierProvider).toBeDefined()
-  })
+it('--verify-evidence enables evidence verification and constructs a verifier provider', async () => {
+  MockSwarmRunner.mockImplementation(() => ({
+    run: vi.fn().mockResolvedValue(makeResult()),
+  }))
+  await runCli(['--verify-evidence'])
+  const config = MockSwarmRunner.mock.calls[0][0]
+  const verifierProvider = MockSwarmRunner.mock.calls[0][2]
+  expect(config.verifyEvidence).toBe(true)
+  expect(verifierProvider).toBeDefined()
+})
 
-  it('leaves verifyEvidence off and passes no verifier provider by default', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
-    await runCli([])
-    const config = MockSwarmRunner.mock.calls[0][0]
-    const verifierProvider = MockSwarmRunner.mock.calls[0][2]
-    expect(config.verifyEvidence).toBe(false)
-    expect(verifierProvider).toBeUndefined()
-  })
+it('leaves verifyEvidence off and passes no verifier provider by default', async () => {
+  MockSwarmRunner.mockImplementation(() => ({
+    run: vi.fn().mockResolvedValue(makeResult()),
+  }))
+  await runCli([])
+  const config = MockSwarmRunner.mock.calls[0][0]
+  const verifierProvider = MockSwarmRunner.mock.calls[0][2]
+  expect(config.verifyEvidence).toBe(false)
+  expect(verifierProvider).toBeUndefined()
+})
 ```
 
 Check this file's existing helper functions (`runCli`, `makeResult`) before adding — reuse them as-is; they already exist above the `--parallel` tests you're inserting next to.
@@ -883,9 +921,11 @@ Check this file's existing helper functions (`runCli`, `makeResult`) before addi
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/cli.test.ts -t "verify-evidence"
 ```
+
 Expected: FAIL — flag doesn't exist yet.
 
 - [ ] **Step 3: Add the flag and wire it up**
@@ -910,35 +950,37 @@ Add `verifyEvidence?: boolean` to the action handler's options type (after `emoj
 Inside the action handler, after `config.parallel = !!options.parallel`, add:
 
 ```ts
-        if (options.verifyEvidence) config.verifyEvidence = true
+if (options.verifyEvidence) config.verifyEvidence = true
 ```
 
 Change the provider/runner construction from:
 
 ```ts
-        const provider = new OllamaProvider(config.ollamaUrl, config.model)
-        const runner = new SwarmRunner(config, provider)
+const provider = new OllamaProvider(config.ollamaUrl, config.model)
+const runner = new SwarmRunner(config, provider)
 ```
 
 to:
 
 ```ts
-        const provider = new OllamaProvider(config.ollamaUrl, config.model)
-        // Deliberately a separate OllamaProvider instance/model from the main review's --
-        // cross-model verification only works if the verifier has no memory of the original
-        // claim. See docs/superpowers/specs/2026-08-10-evidence-grounding-verification-design.md.
-        const verifierProvider = config.verifyEvidence
-          ? new OllamaProvider(config.ollamaUrl, config.verifierModel ?? 'qwen3:latest')
-          : undefined
-        const runner = new SwarmRunner(config, provider, verifierProvider)
+const provider = new OllamaProvider(config.ollamaUrl, config.model)
+// Deliberately a separate OllamaProvider instance/model from the main review's --
+// cross-model verification only works if the verifier has no memory of the original
+// claim. See docs/superpowers/specs/2026-08-10-evidence-grounding-verification-design.md.
+const verifierProvider = config.verifyEvidence
+  ? new OllamaProvider(config.ollamaUrl, config.verifierModel ?? 'qwen3:latest')
+  : undefined
+const runner = new SwarmRunner(config, provider, verifierProvider)
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/cli.test.ts
 ```
+
 Expected: PASS (all existing CLI tests plus the 2 new ones)
 
 - [ ] **Step 5: Commit**
@@ -953,6 +995,7 @@ git commit -m "feat: add --verify-evidence CLI flag"
 ### Task 8: MCP — force `verifyEvidence` off
 
 **Files:**
+
 - Modify: `src/mcp/tool.ts`
 - Test: `tests/unit/mcp/tool.test.ts`
 
@@ -961,37 +1004,39 @@ git commit -m "feat: add --verify-evidence CLI flag"
 Add to `tests/unit/mcp/tool.test.ts`, near the existing `'excludes testgen from agents regardless of config'` test. First check that test's exact `loadConfig` mock shape (shown above — it's a plain object literal, not `DEFAULT_CONFIG`-spread, so add `verifyEvidence: true` to whatever mock config object this new test constructs):
 
 ```ts
-  it('forces verifyEvidence off regardless of config', async () => {
-    mockSpawnSync.mockReturnValue({
-      status: 0,
-      stdout: 'diff --git a/f.ts b/f.ts\n+line',
-    } as unknown as SpawnSyncReturns<string>)
-    const { loadConfig } = await import('../../../src/core/config.js')
-    vi.mocked(loadConfig).mockReturnValueOnce({
-      model: 'devstral:latest',
-      provider: 'ollama',
-      ollamaUrl: 'http://localhost:11434',
-      maxFindings: 15,
-      agents: ['security'],
-      testOutputDir: './ai-review-tests',
-      maxDiffLines: 2000,
-      agentTimeoutMs: 60000,
-      ignorePaths: [],
-      sanitize: true,
-      verifyEvidence: true, // config says on -- MCP must still force it off
-    } as unknown as Parameters<typeof loadConfig>[0] extends never ? never : ReturnType<typeof loadConfig>)
-    const { SwarmRunner } = await import('../../../src/core/runner.js')
-    const runMock = vi.fn().mockResolvedValue({
-      findings: [],
-      testFiles: [],
-      summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
-    })
-    vi.mocked(SwarmRunner).mockImplementationOnce((config: Parameters<typeof SwarmRunner>[0]) => {
-      expect(config.verifyEvidence).toBe(false)
-      return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
-    })
-    await runReviewTool({})
+it('forces verifyEvidence off regardless of config', async () => {
+  mockSpawnSync.mockReturnValue({
+    status: 0,
+    stdout: 'diff --git a/f.ts b/f.ts\n+line',
+  } as unknown as SpawnSyncReturns<string>)
+  const { loadConfig } = await import('../../../src/core/config.js')
+  vi.mocked(loadConfig).mockReturnValueOnce({
+    model: 'devstral:latest',
+    provider: 'ollama',
+    ollamaUrl: 'http://localhost:11434',
+    maxFindings: 15,
+    agents: ['security'],
+    testOutputDir: './ai-review-tests',
+    maxDiffLines: 2000,
+    agentTimeoutMs: 60000,
+    ignorePaths: [],
+    sanitize: true,
+    verifyEvidence: true, // config says on -- MCP must still force it off
+  } as unknown as Parameters<typeof loadConfig>[0] extends never
+    ? never
+    : ReturnType<typeof loadConfig>)
+  const { SwarmRunner } = await import('../../../src/core/runner.js')
+  const runMock = vi.fn().mockResolvedValue({
+    findings: [],
+    testFiles: [],
+    summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
   })
+  vi.mocked(SwarmRunner).mockImplementationOnce((config: Parameters<typeof SwarmRunner>[0]) => {
+    expect(config.verifyEvidence).toBe(false)
+    return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
+  })
+  await runReviewTool({})
+})
 ```
 
 The `as unknown as ... extends never ? never : ...` cast above is defensive against this file's config mock object being incomplete relative to the real `ReviewConfig` (as seen in the existing `'excludes testgen'` test at `tests/unit/mcp/tool.test.ts:138-151`, which also omits several current `ReviewConfig` fields). If that existing test already uses a simpler cast or none at all when you open the file, match its existing style instead of introducing a new casting pattern.
@@ -999,9 +1044,11 @@ The `as unknown as ... extends never ? never : ...` cast above is defensive agai
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/mcp/tool.test.ts -t "forces verifyEvidence off"
 ```
+
 Expected: FAIL — `config.verifyEvidence` is still `true`.
 
 - [ ] **Step 3: Force it off**
@@ -1009,25 +1056,27 @@ Expected: FAIL — `config.verifyEvidence` is still `true`.
 In `src/mcp/tool.ts`, after:
 
 ```ts
-  config.agents = config.agents.filter((a): a is AgentName => !MCP_EXCLUDED_AGENTS.includes(a))
+config.agents = config.agents.filter((a): a is AgentName => !MCP_EXCLUDED_AGENTS.includes(a))
 ```
 
 add:
 
 ```ts
-  // Evidence verification adds a synchronous per-finding LLM round-trip -- not worth the latency
-  // for an interactive MCP caller waiting on the response, and Stage 1 is report-only anyway
-  // (nothing is dropped), so there's little payoff for the cost here. Force off regardless of
-  // what the project config says, mirroring the testgen exclusion above.
-  config.verifyEvidence = false
+// Evidence verification adds a synchronous per-finding LLM round-trip -- not worth the latency
+// for an interactive MCP caller waiting on the response, and Stage 1 is report-only anyway
+// (nothing is dropped), so there's little payoff for the cost here. Force off regardless of
+// what the project config says, mirroring the testgen exclusion above.
+config.verifyEvidence = false
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/mcp/tool.test.ts
 ```
+
 Expected: PASS
 
 - [ ] **Step 5: Commit**
@@ -1042,6 +1091,7 @@ git commit -m "fix: force verifyEvidence off for MCP callers"
 ### Task 9: Markdown formatter block
 
 **Files:**
+
 - Modify: `src/cli/formatter.ts`
 - Test: `tests/unit/formatters/markdown.test.ts`
 
@@ -1086,7 +1136,12 @@ describe('evidenceCheckFilter', () => {
 
   it('reports zero flagged findings without listing any', () => {
     const result = makeResult({
-      evidenceCheckFilter: { checkedCount: 2, unavailableCount: 0, unavailableReasons: [], flagged: [] },
+      evidenceCheckFilter: {
+        checkedCount: 2,
+        unavailableCount: 0,
+        unavailableReasons: [],
+        flagged: [],
+      },
     })
     const output = formatMarkdown(result)
     expect(output).toContain('2 finding(s) checked')
@@ -1098,9 +1153,11 @@ describe('evidenceCheckFilter', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/formatters/markdown.test.ts -t "evidenceCheckFilter"
 ```
+
 Expected: FAIL — no such block in the output yet.
 
 - [ ] **Step 3: Add the block**
@@ -1108,37 +1165,39 @@ Expected: FAIL — no such block in the output yet.
 In `src/cli/formatter.ts`, after the `coverageGapFilter` block (right before the `TOOL_LABELS` comment), add:
 
 ```ts
-  if (result.evidenceCheckFilter) {
-    const { checkedCount, unavailableCount, unavailableReasons, flagged } = result.evidenceCheckFilter
-    lines.push(
-      `${useEmoji ? '🔍 ' : ''}Evidence check: ${checkedCount} finding(s) checked` +
-        (flagged.length > 0
-          ? `, ${flagged.length} flagged as possibly unsupported by their own cited evidence`
-          : ', none flagged') +
-        (unavailableCount > 0
-          ? `, ${unavailableCount} unavailable (verifier could not be reached)`
-          : '') +
-        '.'
-    )
-    if (unavailableReasons.length > 0) {
-      lines.push(`  ${unavailableReasons.join('; ')}`)
-    }
-    for (const f of flagged) {
-      lines.push(
-        `  - **${f.title}** (${f.file}:${f.line}, ${f.agent}) — ${f.reason}` +
-          (f.preFilterAgreed === true ? ' [deterministic pre-filter agreed]' : '')
-      )
-    }
-    lines.push('')
+if (result.evidenceCheckFilter) {
+  const { checkedCount, unavailableCount, unavailableReasons, flagged } = result.evidenceCheckFilter
+  lines.push(
+    `${useEmoji ? '🔍 ' : ''}Evidence check: ${checkedCount} finding(s) checked` +
+      (flagged.length > 0
+        ? `, ${flagged.length} flagged as possibly unsupported by their own cited evidence`
+        : ', none flagged') +
+      (unavailableCount > 0
+        ? `, ${unavailableCount} unavailable (verifier could not be reached)`
+        : '') +
+      '.'
+  )
+  if (unavailableReasons.length > 0) {
+    lines.push(`  ${unavailableReasons.join('; ')}`)
   }
+  for (const f of flagged) {
+    lines.push(
+      `  - **${f.title}** (${f.file}:${f.line}, ${f.agent}) — ${f.reason}` +
+        (f.preFilterAgreed === true ? ' [deterministic pre-filter agreed]' : '')
+    )
+  }
+  lines.push('')
+}
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/formatters/markdown.test.ts
 ```
+
 Expected: PASS
 
 - [ ] **Step 5: Commit**
@@ -1153,6 +1212,7 @@ git commit -m "feat: surface evidenceCheckFilter in markdown report"
 ### Task 10: SARIF formatter
 
 **Files:**
+
 - Modify: `src/cli/formatters/sarif.ts`
 - Test: `tests/unit/formatters/sarif.test.ts`
 
@@ -1161,36 +1221,38 @@ git commit -m "feat: surface evidenceCheckFilter in markdown report"
 Add to `tests/unit/formatters/sarif.test.ts`:
 
 ```ts
-  it('includes evidenceCheckFilter in run properties when present', () => {
-    const result = makeResult({
-      evidenceCheckFilter: {
-        checkedCount: 1,
-        unavailableCount: 0,
-        unavailableReasons: [],
-        flagged: [],
-      },
-    })
-    const output = JSON.parse(formatSarif(result))
-    expect(output.runs[0].properties.evidenceCheckFilter).toEqual({
+it('includes evidenceCheckFilter in run properties when present', () => {
+  const result = makeResult({
+    evidenceCheckFilter: {
       checkedCount: 1,
       unavailableCount: 0,
       unavailableReasons: [],
       flagged: [],
-    })
+    },
   })
+  const output = JSON.parse(formatSarif(result))
+  expect(output.runs[0].properties.evidenceCheckFilter).toEqual({
+    checkedCount: 1,
+    unavailableCount: 0,
+    unavailableReasons: [],
+    flagged: [],
+  })
+})
 
-  it('omits evidenceCheckFilter from properties when absent', () => {
-    const output = JSON.parse(formatSarif(makeResult()))
-    expect(output.runs[0].properties.evidenceCheckFilter).toBeUndefined()
-  })
+it('omits evidenceCheckFilter from properties when absent', () => {
+  const output = JSON.parse(formatSarif(makeResult()))
+  expect(output.runs[0].properties.evidenceCheckFilter).toBeUndefined()
+})
 ```
 
 - [ ] **Step 2: Run to verify it fails**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/formatters/sarif.test.ts -t "evidenceCheckFilter"
 ```
+
 Expected: FAIL — property not present.
 
 - [ ] **Step 3: Add it**
@@ -1204,9 +1266,11 @@ In `src/cli/formatters/sarif.ts`, add one entry to the `properties` object, afte
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx vitest run tests/unit/formatters/sarif.test.ts
 ```
+
 Expected: PASS
 
 - [ ] **Step 5: Commit**
@@ -1225,17 +1289,21 @@ git commit -m "feat: surface evidenceCheckFilter in SARIF output"
 - [ ] **Step 1: Run the entire suite and typecheck**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx tsc --noEmit && npx vitest run
 ```
+
 Expected: all green, zero failures, zero type errors. This is the checkpoint before touching docs — if anything here is red, stop and fix it before Task 12.
 
 - [ ] **Step 2: Lint**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npx eslint src tests
 ```
+
 Expected: 0 warnings, 0 errors (matches this project's existing zero-warnings bar — see memory-bank/progress.md).
 
 ---
@@ -1243,6 +1311,7 @@ Expected: 0 warnings, 0 errors (matches this project's existing zero-warnings ba
 ### Task 12: README + CHANGELOG
 
 **Files:**
+
 - Modify: `README.md`
 - Modify: `CHANGELOG.md`
 
@@ -1281,7 +1350,6 @@ In `CHANGELOG.md`, add a new section at the top, before `## [1.9.0]`:
   config field, default `false`); forced off for MCP callers regardless of project config. See
   `docs/superpowers/specs/2026-08-10-evidence-grounding-verification-design.md` for the full
   design and validation data.
-
 ```
 
 - [ ] **Step 4: Commit**
@@ -1296,14 +1364,17 @@ git commit -m "docs: document --verify-evidence flag"
 ### Task 13: Permanent calibration script
 
 **Files:**
+
 - Create: `calibration/evidenceVerifierCalibration.ts`
 
 - [ ] **Step 1: Check how `calibration/calibrate.ts` is invoked**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && grep -n "calibrate" package.json
 ```
+
 Note the npm script pattern (e.g. `"calibrate": "tsx calibration/calibrate.ts"`) so this new script's own `npm run` entry (Step 3) matches it exactly — same runner, same invocation style.
 
 - [ ] **Step 2: Create the script**
@@ -1390,7 +1461,8 @@ const cases: Case[] = [
   {
     label: 'bad-5-additive-change-called-breaking',
     title: 'Breaking change',
-    detail: 'This is a breaking change that will break existing callers relying on the current SessionStart behavior.',
+    detail:
+      'This is a breaking change that will break existing callers relying on the current SessionStart behavior.',
     evidence:
       '+ "SessionStart": [{"matcher": "*", "hooks": [{"type": "command", "command": "scripts/init.sh"}]}]\n(this is a new key added to a hooks config object; nothing existing was removed or modified)',
     expected: 'NOT_SUPPORTED',
@@ -1398,7 +1470,8 @@ const cases: Case[] = [
   {
     label: 'good-1-real-sql-injection',
     title: 'SQL injection',
-    detail: 'User input is concatenated directly into a SQL query without parameterization, allowing SQL injection.',
+    detail:
+      'User input is concatenated directly into a SQL query without parameterization, allowing SQL injection.',
     evidence: 'const query = "SELECT * FROM users WHERE id = " + userId',
     expected: 'SUPPORTED',
   },
@@ -1413,7 +1486,8 @@ const cases: Case[] = [
   {
     label: 'good-3-real-nested-complexity',
     title: 'Deep nesting',
-    detail: 'This function has 5+ levels of nested conditionals, making it hard to test and reason about.',
+    detail:
+      'This function has 5+ levels of nested conditionals, making it hard to test and reason about.',
     evidence:
       'if (a) {\n  if (b) {\n    if (c) {\n      if (d) {\n        if (e) {\n          doThing()\n        }\n      }\n    }\n  }\n}',
     expected: 'SUPPORTED',
@@ -1421,7 +1495,8 @@ const cases: Case[] = [
   {
     label: 'bad-6-messy-diff-context-retry-bound-exists',
     title: 'Unbounded retry loop',
-    detail: 'This retry loop has no maximum attempt limit and could loop forever if the network never recovers.',
+    detail:
+      'This retry loop has no maximum attempt limit and could loop forever if the network never recovers.',
     evidence:
       '  async function fetchWithRetry(url, maxRetries) {\n' +
       '+   for (let attempt = 0; attempt < maxRetries; attempt++) {\n' +
@@ -1438,7 +1513,8 @@ const cases: Case[] = [
   {
     label: 'bad-7-wrong-hash-algorithm-claimed',
     title: 'Weak password hashing',
-    detail: 'Passwords are hashed with a fast, insecure algorithm (MD5), making them vulnerable to brute-force attacks.',
+    detail:
+      'Passwords are hashed with a fast, insecure algorithm (MD5), making them vulnerable to brute-force attacks.',
     evidence: 'const hash = await bcrypt.hash(password, 12)',
     expected: 'NOT_SUPPORTED',
   },
@@ -1464,8 +1540,10 @@ const cases: Case[] = [
   {
     label: 'good-6-real-missing-await',
     title: 'Missing await',
-    detail: 'This async cleanup call is not awaited, so the function can return before cleanup actually completes.',
-    evidence: 'async function cleanup() { /* ... */ }\n\nfunction handler() {\n  cleanup() // missing await\n  return result\n}',
+    detail:
+      'This async cleanup call is not awaited, so the function can return before cleanup actually completes.',
+    evidence:
+      'async function cleanup() { /* ... */ }\n\nfunction handler() {\n  cleanup() // missing await\n  return result\n}',
     expected: 'SUPPORTED',
   },
 ]
@@ -1510,9 +1588,11 @@ In `package.json`, add a new script alongside the existing `"calibrate"` entry:
 - [ ] **Step 4: Run it manually against a live Ollama (not part of `npm test`)**
 
 Run:
+
 ```bash
 cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent" && npm run calibrate:evidence
 ```
+
 Expected: `qwen3:latest: 13/13` if Ollama is running locally with the model pulled. If Ollama isn't available in this environment, this step can't be verified here — note that in the task's completion and leave it for the next run where Ollama is reachable, matching this project's existing `calibrate.yml` CI convention of skipping gracefully when Ollama is unavailable.
 
 - [ ] **Step 5: Commit**

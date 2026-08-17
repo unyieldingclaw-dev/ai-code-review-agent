@@ -4,7 +4,7 @@
 
 **Goal:** Fix four independently-verified review-reliability bugs in `ai-review-agent` — silent diff truncation with no exit-code signal, agent responses not conforming to the required JSON shape, security/adversarial agents misreading documentation as code, and the dependencies agent assuming every project is Node.js — without adding token/performance cost to the default (unconfigured) path.
 
-**Architecture:** Each issue is independent and gets its own task cluster. Task order here is dependency order, not spec order: Issue 1's exit-code fix comes first (no dependencies), but its optional `--chunk` full-coverage feature is deliberately placed *last*, after Issues 3/4's schema additions exist, and is built as a thin wrapper *outside* `SwarmRunner` rather than a refactor of its internals — `SwarmRunner`'s orchestration boundary isn't demonstrated to be the problem by any of these four bugs, so nothing inside it changes for `--chunk`. Issue 2 required a live diagnostic measurement against real Ollama before its fix could be finalized — that measurement (Task 3) ruled out the originally-planned fix entirely and pointed at a different, verified root cause (a `format: 'json'` object-vs-array shape mismatch, fixed via an explicit JSON Schema in Tasks 4/5) — a real example of why that task was scoped as "diagnose before fixing" rather than guessing.
+**Architecture:** Each issue is independent and gets its own task cluster. Task order here is dependency order, not spec order: Issue 1's exit-code fix comes first (no dependencies), but its optional `--chunk` full-coverage feature is deliberately placed _last_, after Issues 3/4's schema additions exist, and is built as a thin wrapper _outside_ `SwarmRunner` rather than a refactor of its internals — `SwarmRunner`'s orchestration boundary isn't demonstrated to be the problem by any of these four bugs, so nothing inside it changes for `--chunk`. Issue 2 required a live diagnostic measurement against real Ollama before its fix could be finalized — that measurement (Task 3) ruled out the originally-planned fix entirely and pointed at a different, verified root cause (a `format: 'json'` object-vs-array shape mismatch, fixed via an explicit JSON Schema in Tasks 4/5) — a real example of why that task was scoped as "diagnose before fixing" rather than guessing.
 
 **Tech Stack:** Node/TypeScript, Ollama (local LLM), vitest.
 
@@ -15,6 +15,7 @@
 ### Task 1: Exit code — add TRUNCATION_EXIT_CODE
 
 **Files:**
+
 - Modify: `src/cli/exitCode.ts`
 - Test: `tests/unit/exitCode.test.ts`
 
@@ -76,6 +77,7 @@ git commit -m "feat: add TRUNCATION_EXIT_CODE for incomplete-coverage runs"
 ### Task 2: CLI — exit-code priority and --allow-truncation
 
 **Files:**
+
 - Modify: `src/cli/index.ts`
 - Test: `tests/unit/cli.test.ts`
 
@@ -84,6 +86,7 @@ git commit -m "feat: add TRUNCATION_EXIT_CODE for incomplete-coverage runs"
 Run: `grep -n "hasBlocker\|AGENT_FAILURE_EXIT_CODE\|process.exit" src/cli/index.ts`
 
 Confirm the block still matches:
+
 ```ts
 const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
 if (hasAgentFailures(result.agentStatus)) {
@@ -127,9 +130,9 @@ it('exits 0 on a truncated-but-clean run when --allow-truncation is passed', asy
     sanitizer: { enabled: true, applied: false, redactedLines: 0, warnings: [] },
     truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
   })
-  await expect(
-    runCli(['--diff', 'x.diff', '--allow-truncation'])
-  ).rejects.toThrow('process.exit(0)')
+  await expect(runCli(['--diff', 'x.diff', '--allow-truncation'])).rejects.toThrow(
+    'process.exit(0)'
+  )
 })
 ```
 
@@ -169,20 +172,20 @@ Add `allowTruncation?: boolean` to the `action` callback's options type, alongsi
 Replace the exit-code block at the end of the action callback:
 
 ```ts
-        const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
-        if (hasAgentFailures(result.agentStatus)) {
-          process.exit(AGENT_FAILURE_EXIT_CODE)
-        }
-        if (hasBlocker) {
-          process.exit(1)
-        }
-        // Truncation ranks below a real blocker (checked above) but above "clean" -- a run that
-        // silently skipped 60% of the diff must not report exit 0 by default. --allow-truncation
-        // opts back into 0 for callers who've deliberately accepted partial coverage.
-        if (result.truncation?.truncated && !options.allowTruncation) {
-          process.exit(TRUNCATION_EXIT_CODE)
-        }
-        process.exit(0)
+const hasBlocker = result.findings.some((f) => shouldFail(f.severity, options.failOn))
+if (hasAgentFailures(result.agentStatus)) {
+  process.exit(AGENT_FAILURE_EXIT_CODE)
+}
+if (hasBlocker) {
+  process.exit(1)
+}
+// Truncation ranks below a real blocker (checked above) but above "clean" -- a run that
+// silently skipped 60% of the diff must not report exit 0 by default. --allow-truncation
+// opts back into 0 for callers who've deliberately accepted partial coverage.
+if (result.truncation?.truncated && !options.allowTruncation) {
+  process.exit(TRUNCATION_EXIT_CODE)
+}
+process.exit(0)
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
@@ -212,6 +215,7 @@ git commit -m "feat: exit code 3 for truncated-but-clean runs, --allow-truncatio
 ### Task 3: Diagnostic script — measure response-truncation cause
 
 **Files:**
+
 - Create: `calibration/responseTruncationDiagnostic.ts`
 - Modify: `package.json` (new script entry)
 
@@ -275,7 +279,10 @@ async function main(): Promise<void> {
   const messages: Message[] = [
     { role: 'system', content: agent.systemPrompt },
     // buildUserPrompt is protected -- reconstruct its exact shape inline rather than exposing it
-    { role: 'user', content: `Review this diff and return a JSON array of findings.\n\n\`\`\`diff\n${diff}\n\`\`\`` },
+    {
+      role: 'user',
+      content: `Review this diff and return a JSON array of findings.\n\n\`\`\`diff\n${diff}\n\`\`\``,
+    },
   ]
 
   console.log(`Model: ${MODEL}`)
@@ -354,6 +361,7 @@ accepts either the string `"json"` or a full JSON Schema object) correctly produ
 investigation and measurements. This task and Task 5 implement that verified fix instead.
 
 **Files:**
+
 - Modify: `src/core/llm/provider.ts`
 - Test: `tests/unit/ollamaProvider.test.ts`
 
@@ -422,6 +430,7 @@ git commit -m "feat: widen ChatOptions.format to accept a JSON Schema object"
 ### Task 5: Findings-array JSON Schema — wire into base.ts and coverageAnalyst.ts
 
 **Files:**
+
 - Modify: `src/core/agents/base.ts`
 - Modify: `src/core/agents/coverageAnalyst.ts`
 - Test: `tests/unit/baseAgent.test.ts`, `tests/unit/coverageAnalyst.test.ts`
@@ -434,8 +443,12 @@ Add to `tests/unit/baseAgent.test.ts` (grep for an existing test asserting on `p
 it('sends an array-typed JSON Schema instead of the bare "json" string', async () => {
   const provider = makeProvider('[]') // reuse existing helper
   class TestAgent extends BaseAgent {
-    get name(): AgentName { return 'security' }
-    get systemPrompt(): string { return 'test' }
+    get name(): AgentName {
+      return 'security'
+    }
+    get systemPrompt(): string {
+      return 'test'
+    }
   }
   await new TestAgent(provider, DEFAULT_CONFIG).run({ diff: 'x' })
   expect(provider.chat).toHaveBeenCalledWith(
@@ -576,7 +589,7 @@ Expected: 0 typecheck errors, all tests pass.
 
 - [ ] **Step 7: Live sanity check**
 
-Run a real `ai-review-agent` review (via the built CLI or `npx tsx src/cli/index.ts --profile security --format json`) against a diff with 2+ genuine, unrelated findings, and confirm the JSON output is now a well-formed top-level array (not a bare object requiring Stage 2b's auto-wrap). This confirms the shape fix works end-to-end, not just in the schema constant. **This does not need to show more than one finding** — the model's tendency to under-report multiple real findings is a separate, confirmed, deliberately out-of-scope problem (see design spec, Issue 2 Non-Goals) — this step only confirms the *shape* is correct, not that recall improved.
+Run a real `ai-review-agent` review (via the built CLI or `npx tsx src/cli/index.ts --profile security --format json`) against a diff with 2+ genuine, unrelated findings, and confirm the JSON output is now a well-formed top-level array (not a bare object requiring Stage 2b's auto-wrap). This confirms the shape fix works end-to-end, not just in the schema constant. **This does not need to show more than one finding** — the model's tendency to under-report multiple real findings is a separate, confirmed, deliberately out-of-scope problem (see design spec, Issue 2 Non-Goals) — this step only confirms the _shape_ is correct, not that recall improved.
 
 - [ ] **Step 8: Commit**
 
@@ -603,6 +616,7 @@ EOF
 ### Task 6: Schema — top-level filteredFiles field
 
 **Files:**
+
 - Modify: `src/core/schema.ts`
 
 - [ ] **Step 1: Implement**
@@ -643,6 +657,7 @@ git commit -m "feat: add ReviewResult.filteredFiles (top-level, sibling of Polic
 ### Task 7: Runner — per-agent filterDiff() call site, agentPolicy defaults
 
 **Files:**
+
 - Modify: `src/core/runner.ts`
 - Modify: `src/core/config.ts`
 - Test: `tests/unit/runner.test.ts`
@@ -677,8 +692,7 @@ it('strips only excluded file sections from an agent with an agentPolicy.exclude
 })
 
 it('still applies the existing whole-agent skip when ALL changed files match exclude', async () => {
-  const allMdDiff =
-    `diff --git a/docs/notes.md b/docs/notes.md\n--- a/docs/notes.md\n+++ b/docs/notes.md\n@@ -1 +1 @@\n-old\n+new\n`
+  const allMdDiff = `diff --git a/docs/notes.md b/docs/notes.md\n--- a/docs/notes.md\n+++ b/docs/notes.md\n@@ -1 +1 @@\n-old\n+new\n`
   const config = {
     ...DEFAULT_CONFIG,
     agents: ['security'] as AgentName[],
@@ -705,29 +719,32 @@ Expected: FAIL — `agentPolicy.exclude` currently only affects whole-agent skip
 In `src/core/runner.ts`, `run()` builds one shared `agents` array and passes `withContext` to `runCoverageAgent`/`runAgentsParallel`/`runAgentsSequential`/`testGen.runWithGaps`. Add per-agent diff filtering by wrapping `withContext`. Right after the `const agents = buildAgents(policyConfig, this.provider)` line, add:
 
 ```ts
-    // Per-agent diff-content filtering: agentPolicy.exclude already gates whole-agent skip (via
-    // evaluatePolicy above, when ALL changed files match); this additionally strips just the
-    // matching file sections from an agent's OWN diff when only SOME files match, reusing the
-    // same filterDiff() ignoreFilter.ts already uses for global --ignore filtering. Wraps
-    // withContext rather than replacing it -- context injection still happens on top of the
-    // filtered diff, unchanged.
-    const filteredFiles: Partial<Record<AgentName, string[]>> = {}
-    const withFilteredContext = async (agentName: AgentName): Promise<ReviewInput> => {
-      const ctxInput = await withContext(agentName)
-      const rule = this.config.agentPolicy?.[agentName]
-      if (!rule?.exclude || rule.exclude.length === 0) return ctxInput
-      const beforeFiles = new Set(extractChangedFiles(ctxInput.diff))
-      const filtered = filterDiff(ctxInput.diff, { excludes: rule.exclude, includes: rule.include ?? [] })
-      const afterFiles = new Set(extractChangedFiles(filtered))
-      const dropped = [...beforeFiles].filter((f) => !afterFiles.has(f))
-      if (dropped.length > 0) {
-        filteredFiles[agentName] = [...(filteredFiles[agentName] ?? []), ...dropped]
-      }
-      return { ...ctxInput, diff: filtered }
-    }
+// Per-agent diff-content filtering: agentPolicy.exclude already gates whole-agent skip (via
+// evaluatePolicy above, when ALL changed files match); this additionally strips just the
+// matching file sections from an agent's OWN diff when only SOME files match, reusing the
+// same filterDiff() ignoreFilter.ts already uses for global --ignore filtering. Wraps
+// withContext rather than replacing it -- context injection still happens on top of the
+// filtered diff, unchanged.
+const filteredFiles: Partial<Record<AgentName, string[]>> = {}
+const withFilteredContext = async (agentName: AgentName): Promise<ReviewInput> => {
+  const ctxInput = await withContext(agentName)
+  const rule = this.config.agentPolicy?.[agentName]
+  if (!rule?.exclude || rule.exclude.length === 0) return ctxInput
+  const beforeFiles = new Set(extractChangedFiles(ctxInput.diff))
+  const filtered = filterDiff(ctxInput.diff, {
+    excludes: rule.exclude,
+    includes: rule.include ?? [],
+  })
+  const afterFiles = new Set(extractChangedFiles(filtered))
+  const dropped = [...beforeFiles].filter((f) => !afterFiles.has(f))
+  if (dropped.length > 0) {
+    filteredFiles[agentName] = [...(filteredFiles[agentName] ?? []), ...dropped]
+  }
+  return { ...ctxInput, diff: filtered }
+}
 ```
 
-Replace every `withContext` call *at the four call sites below it* (`runCoverageAgent`, `runAgentsParallel`, `runAgentsSequential`, `this.testGen.runWithGaps(await withContext('testgen'), ...)`) with `withFilteredContext`. `withContext` itself, defined earlier in `run()`, is unchanged.
+Replace every `withContext` call _at the four call sites below it_ (`runCoverageAgent`, `runAgentsParallel`, `runAgentsSequential`, `this.testGen.runWithGaps(await withContext('testgen'), ...)`) with `withFilteredContext`. `withContext` itself, defined earlier in `run()`, is unchanged.
 
 Add to the final returned object in `run()`, alongside the other conditional spreads:
 
@@ -778,16 +795,17 @@ git commit -m "feat: per-agent diff filtering via agentPolicy.exclude, default .
 ### Task 8: README — document the agentPolicy shallow-merge interaction
 
 **Files:**
+
 - Modify: `README.md`
 
 - [ ] **Step 1: Add documentation**
 
 In `README.md`, find the section documenting `agentPolicy` (grep `agentPolicy`) and add:
 
-```markdown
+````markdown
 **Note on defaults:** `security` and `adversarial` exclude `**/*.md` by default (documentation
 files were being misread as executable code). `ai-review.config.json`'s config loading does a
-shallow merge — if you set your own `agentPolicy` for *any* agent, it replaces the entire
+shallow merge — if you set your own `agentPolicy` for _any_ agent, it replaces the entire
 `agentPolicy` object, including these defaults. Re-specify them in your own config if you want to
 keep them:
 
@@ -800,20 +818,23 @@ keep them:
   }
 }
 ```
-```
+````
+
+````
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add README.md
 git commit -m "docs: document agentPolicy shallow-merge interaction with new security/adversarial defaults"
-```
+````
 
 ---
 
 ### Task 9: Schema — ToolAvailability 'not-applicable'
 
 **Files:**
+
 - Modify: `src/core/schema.ts`
 
 - [ ] **Step 1: Implement**
@@ -841,6 +862,7 @@ git commit -m "feat: add 'not-applicable' to ToolAvailability union"
 ### Task 10: Dependencies agent — manifest-existence pre-check
 
 **Files:**
+
 - Modify: `src/core/agents/dependencies.ts`
 - Test: `tests/unit/dependenciesAgent.test.ts`
 
@@ -849,39 +871,39 @@ git commit -m "feat: add 'not-applicable' to ToolAvailability union"
 Add to `tests/unit/dependenciesAgent.test.ts`, inside the existing `describe('DependenciesAgent npm-audit integration', ...)` block:
 
 ```ts
-  it('skips the LLM entirely when the diff does not touch a manifest AND no package.json exists in projectPath', async () => {
-    const provider = makeProvider('[]')
-    const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
+it('skips the LLM entirely when the diff does not touch a manifest AND no package.json exists in projectPath', async () => {
+  const provider = makeProvider('[]')
+  const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
 
-    const findings = await agent.run({ diff: NON_MANIFEST_DIFF, projectPath: '/no/such/project' })
+  const findings = await agent.run({ diff: NON_MANIFEST_DIFF, projectPath: '/no/such/project' })
 
-    expect(findings).toEqual([])
-    expect(provider.chat).not.toHaveBeenCalled()
-    expect(mockRunTool).not.toHaveBeenCalled()
-    expect(agent.lastToolAvailability).toBe('not-applicable')
-  })
+  expect(findings).toEqual([])
+  expect(provider.chat).not.toHaveBeenCalled()
+  expect(mockRunTool).not.toHaveBeenCalled()
+  expect(agent.lastToolAvailability).toBe('not-applicable')
+})
 
-  it('still runs the LLM fallback when the diff does not touch a manifest but package.json DOES exist (e.g. this repo itself)', async () => {
-    const provider = makeProvider('[]')
-    const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
+it('still runs the LLM fallback when the diff does not touch a manifest but package.json DOES exist (e.g. this repo itself)', async () => {
+  const provider = makeProvider('[]')
+  const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
 
-    // projectPath: '.' resolves to the real repo root during `npm test`, which has package.json
-    await agent.run({ diff: NON_MANIFEST_DIFF, projectPath: '.' })
+  // projectPath: '.' resolves to the real repo root during `npm test`, which has package.json
+  await agent.run({ diff: NON_MANIFEST_DIFF, projectPath: '.' })
 
-    expect(provider.chat).toHaveBeenCalledOnce()
-  })
+  expect(provider.chat).toHaveBeenCalledOnce()
+})
 
-  it('does NOT skip when touchesManifest is true, even if package.json is not yet on disk (new project)', async () => {
-    mockRunTool.mockResolvedValue(null) // npm audit unavailable -- e.g. patch not applied to disk
-    const provider = makeProvider('[]')
-    const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
+it('does NOT skip when touchesManifest is true, even if package.json is not yet on disk (new project)', async () => {
+  mockRunTool.mockResolvedValue(null) // npm audit unavailable -- e.g. patch not applied to disk
+  const provider = makeProvider('[]')
+  const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
 
-    await agent.run({ diff: MANIFEST_DIFF, projectPath: '/brand/new/project/not/on/disk' })
+  await agent.run({ diff: MANIFEST_DIFF, projectPath: '/brand/new/project/not/on/disk' })
 
-    // Falls through to the existing touchesManifest branch, not the new skip -- still calls the LLM
-    expect(provider.chat).toHaveBeenCalledOnce()
-    expect(agent.lastToolAvailability).toBe('unavailable-llm-fallback')
-  })
+  // Falls through to the existing touchesManifest branch, not the new skip -- still calls the LLM
+  expect(provider.chat).toHaveBeenCalledOnce()
+  expect(agent.lastToolAvailability).toBe('unavailable-llm-fallback')
+})
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -955,6 +977,7 @@ git commit -m "fix: skip dependencies LLM fallback when no package.json exists a
 ### Task 11: Formatters — exclude 'not-applicable' from degraded-tools warnings
 
 **Files:**
+
 - Modify: `src/cli/formatter.ts`
 - Modify: `src/cli/formatters/sarif.ts`
 - Modify: `src/cli/formatters/githubAnnotations.ts` (check first — see Step 1)
@@ -1020,25 +1043,26 @@ git commit -m "test: guard degraded-tools warning against future not-applicable 
 ### Task 12: Chunk-splitting wrapper — outside SwarmRunner
 
 **Files:**
+
 - Create: `src/core/chunkRunner.ts`
 - Modify: `src/core/config.ts`
 - Test: `tests/unit/chunkRunner.test.ts`
 
-**Why this lives outside `SwarmRunner` rather than as a change to `run()`'s internals:** none of the four bugs this plan fixes demonstrate that `SwarmRunner`'s orchestration boundary itself is the problem. `SwarmRunner.run()` is a working, existing capability (review one diff, fully). `--chunk` is new orchestration built *on top of* that capability — calling it multiple times and merging results — not a change to how it works internally. This task deliberately comes after Tasks 6 and 9 (which added `filteredFiles` and `'not-applicable'` to `ReviewResult`/`ToolAvailability`) so the merge logic below can reference those fields without a forward dependency.
+**Why this lives outside `SwarmRunner` rather than as a change to `run()`'s internals:** none of the four bugs this plan fixes demonstrate that `SwarmRunner`'s orchestration boundary itself is the problem. `SwarmRunner.run()` is a working, existing capability (review one diff, fully). `--chunk` is new orchestration built _on top of_ that capability — calling it multiple times and merging results — not a change to how it works internally. This task deliberately comes after Tasks 6 and 9 (which added `filteredFiles` and `'not-applicable'` to `ReviewResult`/`ToolAvailability`) so the merge logic below can reference those fields without a forward dependency.
 
 - [ ] **Step 1: Add the config field**
 
 In `src/core/config.ts`, add to `ReviewConfig` (after `parallel: boolean`) — this field is read only by `cli/index.ts` and the new `chunkRunner.ts`; `SwarmRunner` itself never reads it:
 
 ```ts
-  parallel: boolean
-  // WHY opt-in, off by default: splitting an oversized diff into multiple maxDiffLines-sized
-  // passes achieves full coverage instead of silently dropping lines past the truncation point,
-  // but multiplies LLM calls by chunk count -- imposing that cost on every oversized diff by
-  // default would conflict with this project's default-path efficiency goal. Read only by
-  // cli/index.ts and chunkRunner.ts -- SwarmRunner.run() has no knowledge of this field. See
-  // docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md, Issue 1.
-  chunk: boolean
+parallel: boolean
+// WHY opt-in, off by default: splitting an oversized diff into multiple maxDiffLines-sized
+// passes achieves full coverage instead of silently dropping lines past the truncation point,
+// but multiplies LLM calls by chunk count -- imposing that cost on every oversized diff by
+// default would conflict with this project's default-path efficiency goal. Read only by
+// cli/index.ts and chunkRunner.ts -- SwarmRunner.run() has no knowledge of this field. See
+// docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md, Issue 1.
+chunk: boolean
 ```
 
 Add to `DEFAULT_CONFIG` (after `parallel: false,`):
@@ -1085,13 +1109,23 @@ describe('runChunked', () => {
       .mockResolvedValueOnce(
         makeResult({
           findings: [{ id: 'a', severity: 'high', agent: 'security' } as never],
-          summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: { security: 1 }, durationMs: 50 },
+          summary: {
+            totalFindings: 1,
+            bySeverity: { high: 1 },
+            byAgent: { security: 1 },
+            durationMs: 50,
+          },
         })
       )
       .mockResolvedValueOnce(
         makeResult({
           findings: [{ id: 'b', severity: 'medium', agent: 'security' } as never],
-          summary: { totalFindings: 1, bySeverity: { medium: 1 }, byAgent: { security: 1 }, durationMs: 60 },
+          summary: {
+            totalFindings: 1,
+            bySeverity: { medium: 1 },
+            byAgent: { security: 1 },
+            durationMs: 60,
+          },
         })
       )
     const runner = { run: runMock } as unknown as SwarmRunner
@@ -1253,6 +1287,7 @@ git commit -m "feat: add runChunked -- --chunk support as a wrapper outside Swar
 ### Task 13: CLI — wire --chunk flag
 
 **Files:**
+
 - Modify: `src/cli/index.ts`
 - Test: `tests/unit/cli.test.ts`
 
@@ -1260,7 +1295,9 @@ git commit -m "feat: add runChunked -- --chunk support as a wrapper outside Swar
 
 ```ts
 it('calls runChunked instead of runner.run directly when --chunk is passed', async () => {
-  const runChunkedSpy = vi.spyOn(chunkRunnerModule, 'runChunked').mockResolvedValue(makeCleanResult())
+  const runChunkedSpy = vi
+    .spyOn(chunkRunnerModule, 'runChunked')
+    .mockResolvedValue(makeCleanResult())
   await expect(runCli(['--diff', 'x.diff', '--chunk'])).rejects.toThrow('process.exit(0)')
   expect(runChunkedSpy).toHaveBeenCalled()
 })
@@ -1304,27 +1341,31 @@ Add the option near `--max-lines`:
 Add `chunk?: boolean` to the action callback's options type, and:
 
 ```ts
-        if (options.chunk) config.chunk = true
+if (options.chunk) config.chunk = true
 ```
 
 Replace the existing `const result = await runner.run(...)` call with a conditional:
 
 ```ts
-        const diffLines = diff.split('\n').length
-        const result =
-          config.chunk && diffLines > config.maxDiffLines
-            ? await runChunked(
-                runner,
-                { diff, projectPath },
-                config.maxDiffLines,
-                (event: AgentProgressEvent) => { /* same progress callback body as below */ },
-                contextMode
-              )
-            : await runner.run(
-                { diff, projectPath },
-                (event: AgentProgressEvent) => { /* existing progress callback body, unchanged */ },
-                contextMode
-              )
+const diffLines = diff.split('\n').length
+const result =
+  config.chunk && diffLines > config.maxDiffLines
+    ? await runChunked(
+        runner,
+        { diff, projectPath },
+        config.maxDiffLines,
+        (event: AgentProgressEvent) => {
+          /* same progress callback body as below */
+        },
+        contextMode
+      )
+    : await runner.run(
+        { diff, projectPath },
+        (event: AgentProgressEvent) => {
+          /* existing progress callback body, unchanged */
+        },
+        contextMode
+      )
 ```
 
 (Factor the existing inline progress-callback function out into a named local function first, e.g. `const onProgress = (event: AgentProgressEvent) => { ... }` using the exact body already in `run()`'s current call, then pass `onProgress` to both branches above — avoids duplicating that callback body.)
@@ -1366,6 +1407,7 @@ Expected: 0 typecheck errors, 0 lint warnings, all tests pass.
 Reproduce the original bug report as closely as possible: run `ai-review-agent --profile security --diff <patch>` against a real non-Node (e.g. Flutter/Dart) project with an oversized, mixed-content diff (some `.md`, some real source).
 
 Confirm all four original symptoms are gone:
+
 1. Diff truncation is either loud (exit code 3, or exit 1 if a real blocker is also present) or, with `--chunk`, fully covered.
 2. `--format json` output is a well-formed array (Stage 2b's auto-wrap for a bare object should no longer be needed — Task 5's live sanity check already confirmed this once; this is the end-to-end confirmation). Note: the model may still only report one of several real findings in the diff — that's the separate, documented, out-of-scope under-reporting finding, not a regression from this fix.
 3. No finding cites a `.md` file as vulnerable code from `security`/`adversarial`.
