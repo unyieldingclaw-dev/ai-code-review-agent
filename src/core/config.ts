@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import type { AgentName, FailOnLevel } from './schema.js'
+import type { AgentName, FailOnLevel, Severity } from './schema.js'
 
 export interface ReviewConfig {
   model: string
@@ -40,6 +40,14 @@ export interface ReviewConfig {
   >
   verifyEvidence?: boolean
   verifierModel?: string
+  // Minimum severity runEvidenceChecks will check. Default 'high' (critical+high only) keeps the
+  // original design's scoping (docs/superpowers/specs/2026-08-10-evidence-grounding-verification-
+  // design.md's Non-Goals: no evidence lower-severity findings cause comparable real-world harm,
+  // and checking every finding scales latency with total finding count instead of what's actually
+  // at stake). Configurable rather than hardcoded so a caller who wants deeper coverage can opt in
+  // and accept that added cost themselves, without it changing for everyone else -- see
+  // CHANGELOG.md's entry for this field for the measurement behind keeping the default unchanged.
+  verifyEvidenceSeverity?: Severity
 }
 
 export const DEFAULT_CONFIG: ReviewConfig = {
@@ -111,6 +119,7 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   // `parallel` above only became a real option after real-scale testing, not a small trial.
   verifyEvidence: false,
   verifierModel: 'qwen3:latest',
+  verifyEvidenceSeverity: 'high',
   // WHY security/adversarial specifically, not project-wide: these are the two agents verified
   // (by reading their prompts) to have zero file-type awareness and a demonstrated real-world
   // failure mode -- misreading a .md file's prose description of a vulnerability pattern as
