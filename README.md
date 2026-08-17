@@ -319,6 +319,22 @@ Create `ai-review.config.json` in your project root to override defaults:
 
 Policy decisions appear in `--format json` output under `result.policy`. They are also summarized in `--format markdown` output when any agents are skipped.
 
+**Note on defaults:** `security` and `adversarial` exclude `**/*.md` by default (documentation
+files were being misread as executable code). `ai-review.config.json`'s config loading does a
+shallow merge — if you set your own `agentPolicy` for *any* agent, it replaces the entire
+`agentPolicy` object, including these defaults. Re-specify them in your own config if you want to
+keep them:
+
+```json
+{
+  "agentPolicy": {
+    "security": { "exclude": ["**/*.md"] },
+    "adversarial": { "exclude": ["**/*.md"] },
+    "your-other-agent": { "exclude": ["some/pattern"] }
+  }
+}
+```
+
 **Optional dependencies (enhance specific agents):**
 
 - **[gitleaks](https://github.com/gitleaks/gitleaks)** or **[trufflehog](https://github.com/trufflesecurity/trufflehog)** — improves SecretsAgent accuracy. Falls back to LLM-only if neither is installed.
