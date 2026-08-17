@@ -28,7 +28,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `--chunk`: instead of silently truncating an oversized diff to `--max-lines`, split it into
   multiple full-coverage passes and merge the results — full diff coverage at the cost of
   multiplying LLM calls by chunk count. Opt-in, off by default. Implemented as a wrapper
-  (`chunkRunner.ts`) outside `SwarmRunner` — calls the existing `run()` once per chunk unchanged.
+  (`chunkRunner.ts`) outside `SwarmRunner` — calls the existing `run()` once per chunk unchanged;
+  the merged report is re-capped and re-sorted globally by severity (`maxFindings`), not just
+  concatenated. CLI-only — not exposed via MCP (its per-chunk latency cost isn't a good fit for an
+  interactive caller). Known caveat: chunks split on line count, not file boundaries, so a finding
+  on a file whose diff section straddles a chunk boundary can be dropped as if it were a
+  hallucination rather than reported — see `chunkRunner.ts`'s own comment for detail; a real gap
+  worth understanding before relying on `--chunk` for a very large diff, not yet fixed.
 - `security`/`adversarial` now exclude `**/*.md` by default via `agentPolicy` — these two agents'
   prompts have no file-type awareness and were misreading documentation prose (e.g. a vulnerable
   code example inside a security writeup) as real, executable vulnerable code. Deterministic, not
@@ -97,6 +103,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `preferredSecretsScanner` config field — documented as shipped but functionally always a no-op
   (every code path fell back to the same default regardless of its value).
+- The unused GitHub PR-comment adapter (`src/adapters/github.ts`) — confirmed via git history
+  never wired into `review.yml`, which used an inline `actions/github-script` step from its first
+  commit. Not a public API — no consumer-facing effect.
 
 ## [1.9.0] — 2026-08-09 (deterministic-tool integration, hallucination fixes, CI hardening)
 

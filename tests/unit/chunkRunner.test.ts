@@ -19,7 +19,7 @@ describe('runChunked', () => {
     const runner = { run: runMock } as unknown as SwarmRunner
     const bigDiff = Array.from({ length: 5000 }, (_, i) => `line ${i}`).join('\n')
 
-    await runChunked(runner, { diff: bigDiff }, 2000)
+    await runChunked(runner, { diff: bigDiff }, 2000, 15)
 
     expect(runMock).toHaveBeenCalledTimes(3) // ceil(5000/2000)
   })
@@ -52,7 +52,7 @@ describe('runChunked', () => {
     const runner = { run: runMock } as unknown as SwarmRunner
     const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
 
-    const merged = await runChunked(runner, { diff }, 2000)
+    const merged = await runChunked(runner, { diff }, 2000, 15)
 
     expect(merged.findings).toHaveLength(2)
     expect(merged.summary.totalFindings).toBe(2)
@@ -68,7 +68,7 @@ describe('runChunked', () => {
     const runner = { run: runMock } as unknown as SwarmRunner
     const diff = Array.from({ length: 5000 }, (_, i) => `line ${i}`).join('\n')
 
-    await runChunked(runner, { diff }, 2000)
+    await runChunked(runner, { diff }, 2000, 15)
 
     expect(runMock).toHaveBeenCalledTimes(1) // stopped after the first chunk's earlyExit
   })
@@ -78,7 +78,7 @@ describe('runChunked', () => {
     const runner = { run: runMock } as unknown as SwarmRunner
     const diff = Array.from({ length: 5000 }, (_, i) => `line ${i}`).join('\n')
 
-    const merged = await runChunked(runner, { diff }, 2000)
+    const merged = await runChunked(runner, { diff }, 2000, 15)
 
     expect(merged.truncation).toBeUndefined()
   })
@@ -91,7 +91,7 @@ describe('runChunked', () => {
     const runner = { run: runMock } as unknown as SwarmRunner
     const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
 
-    const merged = await runChunked(runner, { diff }, 2000)
+    const merged = await runChunked(runner, { diff }, 2000, 15)
 
     // Last-chunk-wins would report 'ok' here, silently hiding chunk 1's real timeout and letting
     // cli/index.ts's exit code 2 (hasAgentFailures) miss it entirely.
@@ -106,8 +106,62 @@ describe('runChunked', () => {
     const runner = { run: runMock } as unknown as SwarmRunner
     const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
 
-    const merged = await runChunked(runner, { diff }, 2000)
+    const merged = await runChunked(runner, { diff }, 2000, 15)
 
     expect(merged.agentStatus).toEqual({ security: 'ok', dependencies: 'ok' })
+  })
+
+  it('caps merged findings at maxFindings instead of returning chunkCount x maxFindings', async () => {
+    const makeFindings = (n: number, prefix: string) =>
+      Array.from(
+        { length: n },
+        (_, i) =>
+          ({
+            id: `${prefix}${i}`,
+            severity: 'medium',
+            basis: 'VERIFIED',
+            agent: 'security',
+          }) as never
+      )
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ findings: makeFindings(10, 'a') }))
+      .mockResolvedValueOnce(makeResult({ findings: makeFindings(10, 'b') }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+    const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
+
+    const merged = await runChunked(runner, { diff }, 2000, 15)
+
+    // A plain flatMap would report 20 -- every other code path in this project caps at
+    // maxFindings, and --chunk should not be the one exception.
+    expect(merged.findings).toHaveLength(15)
+    expect(merged.summary.totalFindings).toBe(15)
+  })
+
+  it('sorts merged findings globally by severity, not chunk-then-severity', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({
+          findings: [
+            { id: 'a', severity: 'medium', basis: 'VERIFIED', agent: 'security' } as never,
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResult({
+          findings: [
+            { id: 'b', severity: 'critical', basis: 'VERIFIED', agent: 'security' } as never,
+          ],
+        })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+    const diff = Array.from({ length: 3000 }, (_, i) => `line ${i}`).join('\n')
+
+    const merged = await runChunked(runner, { diff }, 2000, 15)
+
+    // Chunk 2's critical finding must sort ahead of chunk 1's medium finding in the final report,
+    // not just appear after it because its chunk ran later.
+    expect(merged.findings.map((f) => (f as { id: string }).id)).toEqual(['b', 'a'])
   })
 })

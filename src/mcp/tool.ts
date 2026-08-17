@@ -91,6 +91,13 @@ export async function runReviewTool(params: ReviewToolParams): Promise<string> {
   // (nothing is dropped), so there's little payoff for the cost here. Force off regardless of
   // what the project config says, mirroring the testgen exclusion above.
   config.verifyEvidence = false
+  // --chunk multiplies LLM calls by chunk count -- worse for MCP latency than verifyEvidence's
+  // single extra round-trip above, and it has its own known chunk-boundary caveat (see
+  // chunkRunner.ts). This function calls SwarmRunner.run() directly, never runChunked -- so
+  // config.chunk being left on would silently do nothing here anyway (chunkRunner.ts's own header
+  // comment documents it as read only by cli/index.ts and chunkRunner.ts itself). Force off
+  // explicitly so that's a documented decision, not a silent gap between the two entry points.
+  config.chunk = false
 
   // --- Run swarm ---
   const provider = new OllamaProvider(config.ollamaUrl, config.model)

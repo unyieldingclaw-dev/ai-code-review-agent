@@ -195,6 +195,36 @@ describe('runReviewTool', () => {
     })
     await runReviewTool({})
   })
+
+  it('forces chunk off regardless of config -- runReviewTool never calls runChunked', async () => {
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'diff --git a/f.ts b/f.ts\n+line',
+    } as unknown as SpawnSyncReturns<string>)
+    const { loadConfig } = await import('../../../src/core/config.js')
+    vi.mocked(loadConfig).mockReturnValue({
+      agents: ['security'],
+      model: 'devstral:latest',
+      ollamaUrl: 'http://localhost:11434',
+      testOutputDir: './ai-review-tests',
+      maxDiffLines: 2000,
+      agentTimeoutMs: 60000,
+      ignorePaths: [],
+      sanitize: true,
+      chunk: true, // config says on -- MCP must still force it off
+    })
+    const { SwarmRunner } = await import('../../../src/core/runner.js')
+    const runMock = vi.fn().mockResolvedValue({
+      findings: [],
+      testFiles: [],
+      summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
+    })
+    vi.mocked(SwarmRunner).mockImplementationOnce((config: Parameters<typeof SwarmRunner>[0]) => {
+      expect(config.chunk).toBe(false)
+      return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
+    })
+    await runReviewTool({})
+  })
 })
 
 describe('repo_path allowlist (AI_REVIEW_ALLOWED_ROOTS)', () => {

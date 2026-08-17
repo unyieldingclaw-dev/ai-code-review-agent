@@ -34,6 +34,19 @@ describe('DEFAULT_CONFIG', () => {
   it('verifierModel defaults to qwen3:latest', () => {
     expect(DEFAULT_CONFIG.verifierModel).toBe('qwen3:latest')
   })
+
+  it('chunk defaults to false', () => {
+    expect(DEFAULT_CONFIG.chunk).toBe(false)
+  })
+
+  // Pins the actual default this release's fix for security/adversarial misreading .md prose as
+  // vulnerable code depends on -- the per-agent filtering mechanism itself is well covered
+  // elsewhere (tests/unit/runner.test.ts), but nothing previously asserted this specific default
+  // value exists, so a future edit could silently drop or reword it with no test failing.
+  it('security and adversarial exclude **/*.md by default', () => {
+    expect(DEFAULT_CONFIG.agentPolicy?.security?.exclude).toContain('**/*.md')
+    expect(DEFAULT_CONFIG.agentPolicy?.adversarial?.exclude).toContain('**/*.md')
+  })
 })
 
 describe('loadConfig', () => {

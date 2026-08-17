@@ -7,17 +7,28 @@
 // Known, accepted simplifications (documented, not fixed here -- same class of chunk-boundary
 // limitation the design spec already accepts for "a function split across a chunk boundary"):
 // chunks split on raw line count, not `diff --git` file boundaries, so a single file's diff
-// section can itself be split across two chunks. Purely diagnostic metadata (toolAvailability,
-// policy, filteredFiles, context) reflects whichever chunk ran LAST, not a true merge across
-// chunks -- acceptable for an opt-in feature, since none of it gates an exit code. agentStatus is
-// the one exception and IS merged across all chunks (see mergeAgentStatus below): it feeds
-// cli/index.ts's exit code 2, so a last-chunk-wins simplification there would let a real failure
-// in an earlier chunk go unreported by the very feature meant to guarantee complete coverage.
-// The actual review output (findings, testFiles, summary, sanitizer) IS fully merged below too.
+// section can itself be split across two chunks. This has a real, non-cosmetic consequence,
+// caught in a pre-merge review of this exact code, worth understanding before relying on --chunk
+// for a large diff: each chunk's own OrchestratorAgent.synthesize() call computes changedFiles
+// from ONLY that chunk's content -- if a file's `diff --git`/`+++ b/` header lands in chunk N but
+// the hunk body an agent reads from continues into chunk N+1, that chunk's changedFiles won't
+// include the file, and filterNonexistentFiles will drop any genuine finding an agent reports on
+// it as "likely a hallucinated or malicious finding" -- indistinguishable in the output from an
+// actual hallucination. Not fixed here (needs either file-boundary-aware chunking or carrying a
+// running changedFiles set across chunks, both real design decisions); tracked as a real gap, not
+// waved off as cosmetic like the duplicate-findings case below. Purely diagnostic metadata
+// (toolAvailability, policy, filteredFiles, context) reflects whichever chunk ran LAST, not a true
+// merge across chunks -- acceptable for an opt-in feature, since none of it gates an exit code.
+// agentStatus is the one exception and IS merged across all chunks (see mergeAgentStatus below):
+// it feeds cli/index.ts's exit code 2, so a last-chunk-wins simplification there would let a real
+// failure in an earlier chunk go unreported by the very feature meant to guarantee complete
+// coverage. The actual review output (findings, testFiles, summary, sanitizer) IS fully merged
+// below too, including a global severity-sort + maxFindings cap (see capAndSort) so a large diff's
+// merged report doesn't silently exceed the documented cap or order findings chunk-then-severity.
 // Cross-chunk duplicate findings are not deduped (each chunk's own OrchestratorAgent.synthesize()
 // call only ever sees that chunk's own findings) -- narrow in practice since chunks are
-// non-overlapping diff content, and cosmetic (a near-duplicate finding shown twice) rather than a
-// correctness problem.
+// non-overlapping diff content, and genuinely cosmetic (a near-duplicate finding shown twice)
+// rather than a correctness problem, unlike the boundary-drop issue above.
 import type { SwarmRunner } from './runner.js'
 import type {
   ReviewInput,
@@ -27,11 +38,13 @@ import type {
   AgentName,
   AgentStatus,
 } from './schema.js'
+import { SEVERITY_RANK } from './schema.js'
 
 export async function runChunked(
   runner: SwarmRunner,
   input: ReviewInput,
   maxDiffLines: number,
+  maxFindings: number,
   onProgress?: (event: AgentProgressEvent) => void,
   contextMode: 'none' | 'memory-bank' = 'none'
 ): Promise<ReviewResult> {
@@ -54,11 +67,31 @@ export async function runChunked(
     if (result.earlyExit) break // --fail-fast should stop across chunks too, not just within one
   }
 
-  return mergeResults(results)
+  return mergeResults(results, maxFindings)
 }
 
-function mergeResults(results: ReviewResult[]): ReviewResult {
-  const findings = results.flatMap((r) => r.findings)
+// Mirrors OrchestratorAgent.capAndSort exactly (severity desc, then VERIFIED > INFERRED >
+// SPECULATIVE) -- each chunk's own OrchestratorAgent already capped/sorted WITHIN that chunk, but
+// merging N already-capped-at-maxFindings lists via a plain flatMap (as this function used to)
+// both re-exceeds maxFindings (up to chunkCount x maxFindings in the final report) and orders
+// findings chunk-then-severity instead of globally by severity, breaking an invariant every other
+// code path in this project maintains.
+function capAndSort(findings: ReviewResult['findings'], maxFindings: number) {
+  return [...findings]
+    .sort((a, b) => {
+      const sevDiff = SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]
+      if (sevDiff !== 0) return sevDiff
+      const basisOrder = { VERIFIED: 2, INFERRED: 1, SPECULATIVE: 0 }
+      return basisOrder[b.basis] - basisOrder[a.basis]
+    })
+    .slice(0, maxFindings)
+}
+
+function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResult {
+  const findings = capAndSort(
+    results.flatMap((r) => r.findings),
+    maxFindings
+  )
   const testFiles: GeneratedTestFile[] = results.flatMap((r) => r.testFiles)
   const durationMs = results.reduce((sum, r) => sum + r.summary.durationMs, 0)
 

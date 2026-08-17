@@ -270,6 +270,7 @@ program
                 runner,
                 { diff, projectPath },
                 config.maxDiffLines,
+                config.maxFindings,
                 onProgress,
                 contextMode
               )
