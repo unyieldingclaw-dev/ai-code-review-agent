@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `--verify-evidence-severity <level>` (`verifyEvidenceSeverity` config field, default `high`):
+  minimum severity `--verify-evidence` checks. Investigated as the fix for a reported
+  evidence-impact-mismatch finding ("Function 'lower' lacks input validation" against a bash
+  script's `printf | tr` pipeline, which can't actually error on empty input) — `verifyEvidence`
+  already catches this correctly when checked directly (confirmed live: `verified=false`, correct
+  reasoning), but the finding is Medium severity, and `runEvidenceChecks` only ever checked
+  Critical/High. Before lowering that default, checked severity counts across 9 real review runs
+  from this session (`sqa-run1–7`, `cr-security1–3`): 26 Medium findings vs. 6 Critical/High
+  combined. That sample is small and this-session-specific, not a claim about the project's
+  history at large, but it was enough to show a blanket default change would multiply
+  verifier-call latency well beyond a small proportional increase for every existing
+  `--verify-evidence` user. So the threshold is configurable instead — default behavior is
+  unchanged; a caller who wants Medium coverage opts in and accepts the added latency themselves.
+
 ## [1.10.0] — 2026-08-17 (full-codebase audit fixes, evidence-grounding verification, review reliability)
 
 ### Added

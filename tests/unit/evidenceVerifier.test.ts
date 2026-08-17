@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { verifyEvidence, runEvidenceChecks } from '../../src/core/evidenceVerifier.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
-import type { Finding } from '../../src/core/schema.js'
+import type { Finding, Severity } from '../../src/core/schema.js'
 
 function makeFinding(overrides: Partial<Finding> = {}): Finding {
   return {
@@ -212,5 +212,44 @@ describe('runEvidenceChecks', () => {
     expect(result?.flagged).toEqual([])
     expect(result?.unavailableCount).toBe(1)
     expect(result?.unavailableReasons[0]).toContain('verification unavailable')
+  })
+
+  it('still excludes medium findings when no threshold is passed (default stays high)', async () => {
+    const provider = makeProvider(async () => 'VERDICT: SUPPORTED — fine.')
+    const result = await runEvidenceChecks([makeFinding({ severity: 'medium' })], provider)
+    expect(result).toBeUndefined()
+    expect(provider.chat).not.toHaveBeenCalled()
+  })
+
+  it('includes medium findings when severityThreshold is explicitly lowered to medium', async () => {
+    const provider = makeProvider(async () => 'VERDICT: SUPPORTED — fine.')
+    const result = await runEvidenceChecks(
+      [makeFinding({ severity: 'medium' })],
+      provider,
+      'medium'
+    )
+    expect(result?.checkedCount).toBe(1)
+    expect(provider.chat).toHaveBeenCalledTimes(1)
+  })
+
+  it('still excludes low findings when severityThreshold is medium', async () => {
+    const provider = makeProvider(async () => 'VERDICT: SUPPORTED — fine.')
+    const result = await runEvidenceChecks([makeFinding({ severity: 'low' })], provider, 'medium')
+    expect(result).toBeUndefined()
+    expect(provider.chat).not.toHaveBeenCalled()
+  })
+
+  it('falls back to high (not silently checking zero findings) on an invalid severityThreshold from a bad config file value', async () => {
+    const provider = makeProvider(async () => 'VERDICT: SUPPORTED — fine.')
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const result = await runEvidenceChecks(
+      [makeFinding({ severity: 'critical' })],
+      provider,
+      'urgent' as unknown as Severity
+    )
+    expect(result?.checkedCount).toBe(1)
+    expect(provider.chat).toHaveBeenCalledTimes(1)
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('invalid verifyEvidenceSeverity'))
+    errorSpy.mockRestore()
   })
 })

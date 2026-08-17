@@ -1214,4 +1214,34 @@ describe('evidence verification', () => {
     // The main review provider and the verifier provider must stay separate instances.
     expect(provider.chat).not.toBe(verifierProvider.chat)
   })
+
+  it('skips a medium finding by default, but checks it when verifyEvidenceSeverity is medium', async () => {
+    const mediumFinding = { ...evidenceFinding(), severity: 'medium' as const }
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue(JSON.stringify([mediumFinding])),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const verifierProvider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue('VERDICT: SUPPORTED — fine.'),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+
+    const defaultConfig = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      verifyEvidence: true,
+    }
+    const defaultResult = await new SwarmRunner(defaultConfig, provider, verifierProvider).run({
+      diff: 'diff',
+    })
+    expect(defaultResult.evidenceCheckFilter).toBeUndefined()
+    expect(verifierProvider.chat).not.toHaveBeenCalled()
+
+    const loweredConfig = { ...defaultConfig, verifyEvidenceSeverity: 'medium' as const }
+    const loweredResult = await new SwarmRunner(loweredConfig, provider, verifierProvider).run({
+      diff: 'diff',
+    })
+    expect(loweredResult.evidenceCheckFilter?.checkedCount).toBe(1)
+    expect(verifierProvider.chat).toHaveBeenCalledTimes(1)
+  })
 })

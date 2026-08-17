@@ -92,6 +92,7 @@ vi.mock('../../src/core/config.js', () => ({
     agentPolicy: {},
     verifyEvidence: false,
     verifierModel: 'qwen3:latest',
+    verifyEvidenceSeverity: 'high',
   })),
 }))
 
@@ -502,6 +503,29 @@ describe('CLI — argument parsing and output', () => {
     const verifierProvider = MockSwarmRunner.mock.calls[0][2]
     expect(config.verifyEvidence).toBe(false)
     expect(verifierProvider).toBeUndefined()
+  })
+
+  it('--verify-evidence-severity overrides the config value when passed', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli(['--verify-evidence', '--verify-evidence-severity', 'medium'])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    expect(config.verifyEvidenceSeverity).toBe('medium')
+  })
+
+  it('leaves verifyEvidenceSeverity at the config default (high) when the flag is not passed', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    await runCli(['--verify-evidence'])
+    const config = MockSwarmRunner.mock.calls[0][0]
+    expect(config.verifyEvidenceSeverity).toBe('high')
+  })
+
+  it('rejects an invalid --verify-evidence-severity value', async () => {
+    const { exitCode } = await runCli(['--verify-evidence-severity', 'urgent'])
+    expect(exitCode).toBe(1)
   })
 
   // WHY --max-lines 1 in these tests: the mocked diff is fixed at 2 lines ('+ added line\n-
