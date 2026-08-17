@@ -22,6 +22,13 @@ export interface ReviewConfig {
   failFast: boolean
   failOn: FailOnLevel
   parallel: boolean
+  // WHY opt-in, off by default: splitting an oversized diff into multiple maxDiffLines-sized
+  // passes achieves full coverage instead of silently dropping lines past the truncation point,
+  // but multiplies LLM calls by chunk count -- imposing that cost on every oversized diff by
+  // default would conflict with this project's default-path efficiency goal. Read only by
+  // cli/index.ts and chunkRunner.ts -- SwarmRunner.run() has no knowledge of this field. See
+  // docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md, Issue 1.
+  chunk: boolean
   agentPolicy?: Partial<
     Record<
       AgentName,
@@ -91,6 +98,7 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   // `--parallel` remains available as an explicit opt-in for hardware where it's been verified
   // to actually help.
   parallel: false,
+  chunk: false,
   // WHY false by default: cross-model LLM verification (a separate model checks whether a
   // finding's own cited evidence actually supports its claim) scored 13/13 on this project's
   // validation cases -- but those cases were designed by the same person who wrote the
