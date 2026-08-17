@@ -16,9 +16,48 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-16
+**Last Updated**: 2026-08-17
 
 ## Current Focus
+
+**v1.10.0 shipped (2026-08-17)**: the review-reliability-fixes and evidence-grounding-verification
+work below, plus the 5-batch full-codebase audit fixes, had accumulated locally since 2026-08-09/16
+without ever being published. Bundled and shipped as one release: `CHANGELOG.md` completed for the
+previously-undocumented audit work, version bumped, merged into `main` via PR #20, tagged, published
+to npm (`npm view ai-review-agent version` confirmed `1.10.0`). Real-world investigation followed,
+triggered by a live bug report ("ai-review-agent (ACR) reliability issues — observed on
+side-quest-atlas") run against `C:\Users\Mizzo\Claude\Side-Quest-Atlas` (separate project, same
+machine) — 5 issues reported, cross-referenced against the just-shipped fixes: Issue 4 (dependencies
+wrong-stack assumption) directly confirmed fixed live (`toolAvailability.npmAudit: "not-applicable"`
+on the real Flutter/Dart project). Issue 1's reported timeout symptom was first "reproduced" but
+traced to testing against a stale globally-installed v1.8.0 binary (`npm publish` never auto-updates
+already-installed global packages) — once corrected to v1.10.0 via `npm update -g ai-review-agent`,
+did not reproduce on the closest-matching real diffs from the report (`dangerous-commands.sh`,
+~130-line password-toggle, ~250-line edit-visit commits) — 25s/159s runs, all agents `ok`, well
+under the reported 202s/5-minute thresholds. **New finding, discovered along the way, not in the
+original report**: a genuine Windows-only libuv crash (`Assertion failed: !(handle->flags &
+UV_HANDLE_CLOSING), file src\win\async.c, line 76`) reproduced 2/2 on the correct v1.10.0 binary
+right after a review completed successfully with valid output already written — root-caused (and
+confirmed via a minimal standalone repro) to `process.exit()` forcing immediate termination while
+async handles (fetch/`AbortController` cleanup in `OllamaProvider`) were still settling. Fixed: all
+9 `process.exit()` call sites in `src/cli/index.ts`'s action handler converted to
+`process.exitCode = N; return`; the one call site in the synchronous `getDiff()` helper now throws
+instead. Verified via the same repro (2/2 clean after the fix) plus full regression (531/531 tests).
+Went through full `/code-review` (5 lenses) + `/change-review` (9 jobs, ACR security scan) before
+push — ACR itself raised 3 findings against this diff, all confirmed false positives on inspection
+(misread a deleted line, flagged the fix itself as a "regression," flagged an untouched pre-existing
+call site) — a live, concrete instance of the diff-misreading/absence-claims reliability class the
+broader investigation is still tracking (see Issue 2/3 below). PR #21, not yet merged. Remaining
+open items from the original bug report, not yet started: Issue 2 (absence-claims lacking full-file
+context — needs a design decision), Issue 3 (secrets agent value-shape check — has a concrete fix),
+Issue 5 (evidence-impact mismatch — needs a scope decision on extending `--verify-evidence`); plus 4
+deferred `/change-review` findings from the v1.10.0 gate (chunk-boundary file-split
+hallucination-drop, `evidenceCheckFilter` last-chunk-wins under `--chunk`, verifier-model wiring test
+weakness, `testGen` pytest-branch coverage gap); plus one older still-open item, "ACR reliability
+findings" #3 below (fabricated GPL/mongodb license finding — likely permanently unresolvable, the
+original finding's exact file/line/text was never captured).
+
+---
 
 **Review-reliability fixes complete and merged (2026-08-16)**: fixed 4 real bugs reported from an
 actual `ai-review-agent --profile security --diff` run against a Flutter/Dart project — silent
