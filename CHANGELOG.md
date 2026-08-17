@@ -27,6 +27,30 @@ UV_HANDLE_CLOSING), file src\win\async.c, line 76` after a review completed succ
   an exemption for PEM/certificate blocks, URI-embedded credentials, and config-file formats
   (YAML/`.env`/etc., which commonly carry legitimately unquoted secrets) — all three would
   otherwise be silently dropped by a naive "must be quoted" rule. Dropped findings are logged.
+- `--chunk` split an oversized diff on raw line count, so a single file's diff section could
+  itself be split across two chunks — each chunk's own `OrchestratorAgent.synthesize()` call
+  computes `changedFiles` from only that chunk's content, so a file whose header landed in one
+  chunk but whose hunk body continued into the next would have any genuine finding on it dropped
+  as "likely hallucinated." `chunkRunner.ts` now splits on `diff --git` file boundaries instead
+  (`splitByFileBoundary`), so a file's diff section is never split across chunks. A single file's
+  section larger than the chunk size still becomes its own oversized chunk (existing internal
+  truncation still applies within it, same as any over-max-lines diff).
+- `--chunk` merged `evidenceCheckFilter` (from `--verify-evidence`) last-chunk-wins — a
+  possibly-unsupported finding flagged in an earlier chunk would silently disappear from the
+  merged report if the last chunk had nothing to flag. Now merged (`checkedCount`/
+  `unavailableCount` summed, `unavailableReasons`/`flagged` concatenated) across all chunks, like
+  `agentStatus` already was.
+
+### Testing
+
+- Strengthened the CLI's verifier-model wiring test: previously only asserted a verifier provider
+  was constructed (`toBeDefined()`), which can't distinguish a correctly-wired verifier from one
+  accidentally sharing the main review's model, since the mocked `OllamaProvider` returns `{}`
+  either way. Now asserts the verifier provider's model argument specifically, including the
+  empty-string-config fallback to `qwen3:latest`.
+- Added test coverage for `TestGenAgent`'s pytest branch (`def test_` detection) — every existing
+  test used a fake `projectPath` that always fell through to the `vitest` branch, so the
+  pytest-specific regex had zero coverage.
 
 ## [1.10.0] — 2026-08-17 (full-codebase audit fixes, evidence-grounding verification, review reliability)
 

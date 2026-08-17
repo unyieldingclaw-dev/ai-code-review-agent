@@ -483,26 +483,76 @@ describe('CLI — argument parsing and output', () => {
     expect(config.parallel).toBe(false)
   })
 
-  it('--verify-evidence enables evidence verification and constructs a verifier provider', async () => {
+  it('--verify-evidence enables evidence verification and constructs a verifier provider using verifierModel, not the main review model', async () => {
     MockSwarmRunner.mockImplementation(() => ({
       run: vi.fn().mockResolvedValue(makeResult()),
     }))
+    const { OllamaProvider } = await import('../../src/core/llm/ollamaProvider.js')
+    const MockOllamaProvider = vi.mocked(OllamaProvider)
+
     await runCli(['--verify-evidence'])
+
     const config = MockSwarmRunner.mock.calls[0][0]
     const verifierProvider = MockSwarmRunner.mock.calls[0][2]
     expect(config.verifyEvidence).toBe(true)
     expect(verifierProvider).toBeDefined()
+    // Cross-model verification only works if the verifier is a genuinely separate instance/model
+    // from the main review provider (see cli/index.ts's own WHY comment on this construction) --
+    // asserting just `toBeDefined()` can't tell a correctly-wired verifier from one accidentally
+    // sharing the main review's model, since the mocked OllamaProvider returns `{}` either way.
+    expect(MockOllamaProvider).toHaveBeenCalledTimes(2)
+    const [, mainModel] = MockOllamaProvider.mock.calls[0]
+    const [, verifierModel] = MockOllamaProvider.mock.calls[1]
+    expect(mainModel).toBe('devstral:latest') // DEFAULT_CONFIG.model in this file's loadConfig mock
+    expect(verifierModel).toBe('qwen3:latest') // DEFAULT_CONFIG.verifierModel in the same mock
+    expect(verifierModel).not.toBe(mainModel)
   })
 
-  it('leaves verifyEvidence off and passes no verifier provider by default', async () => {
+  it('falls back to qwen3:latest when config.verifierModel is an empty string', async () => {
     MockSwarmRunner.mockImplementation(() => ({
       run: vi.fn().mockResolvedValue(makeResult()),
     }))
+    const { loadConfig } = await import('../../src/core/config.js')
+    vi.mocked(loadConfig).mockReturnValueOnce({
+      model: 'devstral:latest',
+      provider: 'ollama',
+      ollamaUrl: 'http://localhost:11434',
+      maxFindings: 15,
+      agents: ['security'],
+      contextLines: 10,
+      testOutputDir: './ai-review-tests',
+      maxDiffLines: 2000,
+      agentTimeoutMs: 60000,
+      ignorePaths: [],
+      sanitize: true,
+      verifyEvidence: false,
+      verifierModel: '', // config file setting it to "" should fall back to the default, not construct an empty-model provider
+    })
+    const { OllamaProvider } = await import('../../src/core/llm/ollamaProvider.js')
+    const MockOllamaProvider = vi.mocked(OllamaProvider)
+
+    await runCli(['--verify-evidence'])
+
+    const [, verifierModel] = MockOllamaProvider.mock.calls[1]
+    expect(verifierModel).toBe('qwen3:latest')
+  })
+
+  it('leaves verifyEvidence off and constructs only the main review provider by default', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    const { OllamaProvider } = await import('../../src/core/llm/ollamaProvider.js')
+    const MockOllamaProvider = vi.mocked(OllamaProvider)
+
     await runCli([])
+
     const config = MockSwarmRunner.mock.calls[0][0]
     const verifierProvider = MockSwarmRunner.mock.calls[0][2]
     expect(config.verifyEvidence).toBe(false)
     expect(verifierProvider).toBeUndefined()
+    // No verifier provider should be constructed at all when the feature is off -- not just
+    // omitted from the SwarmRunner call.
+    expect(MockOllamaProvider).toHaveBeenCalledTimes(1)
   })
 
   // WHY --max-lines 1 in these tests: the mocked diff is fixed at 2 lines ('+ added line\n-
