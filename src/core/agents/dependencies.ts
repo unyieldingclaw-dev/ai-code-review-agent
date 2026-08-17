@@ -1,3 +1,5 @@
+import { existsSync } from 'fs'
+import { join } from 'path'
 import { BaseAgent } from './base.js'
 import { runTool } from '../../utils/shell.js'
 import { extractChangedFiles } from '../policyFilter.js'
@@ -15,6 +17,17 @@ export class DependenciesAgent extends BaseAgent {
     const touchesManifest = extractChangedFiles(input.diff).some(
       (f) => f === 'package.json' || f === 'package-lock.json'
     )
+    // Guarded to !touchesManifest specifically: a diff that DOES touch package.json (e.g. adding
+    // one for the first time) must still reach the existing npm-audit-then-LLM-fallback branch
+    // below unchanged, even if package.json isn't on disk yet (e.g. reviewing an unapplied
+    // --diff patch) -- that's the correct, already-working case. This check only ever fires for
+    // the actually-reported bug: a diff that mentions no manifest at all, in a project that never
+    // had one. Root-level existsSync only, not a recursive/monorepo-aware walk -- a project with
+    // only a workspace-nested package.json is a known, accepted gap (see design spec Issue 4).
+    if (!touchesManifest && input.projectPath && !existsSync(join(input.projectPath, 'package.json'))) {
+      this.lastToolAvailability = 'not-applicable'
+      return []
+    }
     if (touchesManifest && input.projectPath) {
       // shell:true is required for npm specifically (Node refuses to spawn .cmd/.bat files on
       // Windows otherwise) -- safe here because these args are always this hardcoded literal

@@ -55,7 +55,18 @@ describe('CoverageAnalystAgent', () => {
     await new CoverageAnalystAgent(provider, DEFAULT_CONFIG).runForCoverage({ diff: 'diff' })
     expect(provider.chat).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ format: 'json' })
+      expect.objectContaining({ format: expect.objectContaining({ type: 'object' }) })
+    )
+  })
+
+  it('sends an object-typed JSON Schema (findings + gaps), not the bare "json" string', async () => {
+    const provider = makeProvider('{"findings":[],"gaps":[]}')
+    await new CoverageAnalystAgent(provider, DEFAULT_CONFIG).runForCoverage({ diff: 'x' })
+    expect(provider.chat).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        format: expect.objectContaining({ type: 'object' }),
+      })
     )
   })
 

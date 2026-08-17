@@ -45,6 +45,7 @@
     "test:coverage": "vitest run --coverage tests/unit",
     "calibrate": "tsx calibration/calibrate.ts",
     "calibrate:evidence": "tsx calibration/evidenceVerifierCalibration.ts",
+    "diagnose:truncation": "tsx calibration/responseTruncationDiagnostic.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "test:extension": "npm --prefix vscode-extension test",

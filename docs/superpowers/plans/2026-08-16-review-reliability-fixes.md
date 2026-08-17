@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fix four independently-verified review-reliability bugs in `ai-review-agent` — silent diff truncation with no exit-code signal, unbounded response truncation on every agent call, security/adversarial agents misreading documentation as code, and the dependencies agent assuming every project is Node.js — without adding token/performance cost to the default (unconfigured) path.
+**Goal:** Fix four independently-verified review-reliability bugs in `ai-review-agent` — silent diff truncation with no exit-code signal, agent responses not conforming to the required JSON shape, security/adversarial agents misreading documentation as code, and the dependencies agent assuming every project is Node.js — without adding token/performance cost to the default (unconfigured) path.
 
-**Architecture:** Each issue is independent and gets its own task cluster. Task order here is dependency order, not spec order: Issue 1's exit-code fix comes first (no dependencies), but its optional `--chunk` full-coverage feature is deliberately placed *last*, after Issues 3/4's schema additions exist, and is built as a thin wrapper *outside* `SwarmRunner` rather than a refactor of its internals — `SwarmRunner`'s orchestration boundary isn't demonstrated to be the problem by any of these four bugs, so nothing inside it changes for `--chunk`. Issue 2 (response truncation) requires a live diagnostic measurement against real Ollama before its fix can be finalized — that measurement happens in its own task, and the following task's code carries the measured value forward explicitly.
+**Architecture:** Each issue is independent and gets its own task cluster. Task order here is dependency order, not spec order: Issue 1's exit-code fix comes first (no dependencies), but its optional `--chunk` full-coverage feature is deliberately placed *last*, after Issues 3/4's schema additions exist, and is built as a thin wrapper *outside* `SwarmRunner` rather than a refactor of its internals — `SwarmRunner`'s orchestration boundary isn't demonstrated to be the problem by any of these four bugs, so nothing inside it changes for `--chunk`. Issue 2 required a live diagnostic measurement against real Ollama before its fix could be finalized — that measurement (Task 3) ruled out the originally-planned fix entirely and pointed at a different, verified root cause (a `format: 'json'` object-vs-array shape mismatch, fixed via an explicit JSON Schema in Tasks 4/5) — a real example of why that task was scoped as "diagnose before fixing" rather than guessing.
 
 **Tech Stack:** Node/TypeScript, Ollama (local LLM), vitest.
 
@@ -215,7 +215,7 @@ git commit -m "feat: exit code 3 for truncated-but-clean runs, --allow-truncatio
 - Create: `calibration/responseTruncationDiagnostic.ts`
 - Modify: `package.json` (new script entry)
 
-This task's "expected output" is a genuine live measurement, not a predictable pass/fail — that's the point (see design spec, Issue 2). Task 5 carries the measured numbers forward.
+This task's "expected output" is a genuine live measurement, not a predictable pass/fail — that's the point (see design spec, Issue 2). **Note (added after this task executed):** the live measurement ruled out the original `num_predict` hypothesis entirely (`done_reason` was `stop`, never `length`) and pointed at a different root cause (a `format: 'json'` object-vs-array shape mismatch) — Tasks 4/5 were revised accordingly. See the design spec's Issue 2 section and this task's actual commit message for the full investigation.
 
 - [ ] **Step 1: Write the diagnostic script**
 
@@ -317,7 +317,7 @@ Produce a realistic large diff (e.g. `git -C <some large repo> diff HEAD~20 > /t
 
 Run: `npm run diagnose:truncation /tmp/large.diff`
 
-**Record the actual output** — `prompt_eval_count`, `eval_count`, `done_reason` — in the commit message for this task (Step 5). This is the real measurement Task 5's `responseTokenBudget` default is based on.
+**Record the actual output** — `prompt_eval_count`, `eval_count`, `done_reason` — in the commit message for this task (Step 5). This measurement is what determines whether Task 5 should proceed as originally planned or needs revision — do not skip straight to implementing a fix without this data.
 
 - [ ] **Step 4: Confirm typecheck is clean**
 
@@ -341,11 +341,20 @@ EOF
 
 ---
 
-### Task 4: Provider — add numPredict to ChatOptions
+### Task 4: Provider — widen ChatOptions.format to accept a JSON Schema
+
+**Revised after Task 3's live investigation.** The original hypothesis (missing `num_predict`)
+was tested and ruled out — `done_reason` was `stop`, never `length`, at every diff size tested,
+including the realistic 2000-line size. What was actually confirmed live: `format: 'json'` (the
+bare string) only constrains "valid JSON," not "an array of N objects" — the model reliably emits
+a single bare object instead of the required array. Tested directly: sending the identical request
+with an explicit JSON Schema (`format: { type: 'array', items: {...} }` — Ollama's `format` field
+accepts either the string `"json"` or a full JSON Schema object) correctly produced an array. See
+`docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md`, Issue 2, for the full
+investigation and measurements. This task and Task 5 implement that verified fix instead.
 
 **Files:**
 - Modify: `src/core/llm/provider.ts`
-- Modify: `src/core/llm/ollamaProvider.ts`
 - Test: `tests/unit/ollamaProvider.test.ts`
 
 - [ ] **Step 1: Write the failing test**
@@ -353,66 +362,48 @@ EOF
 Add to `tests/unit/ollamaProvider.test.ts` (grep for an existing test asserting on the request body sent to `fetch`, e.g. for `format: 'json'`, and match its mocking pattern):
 
 ```ts
-it('sends num_predict in the request body when numPredict is set', async () => {
+it('forwards an object-shaped format (JSON Schema) unchanged in the request body', async () => {
   const fetchMock = vi.mocked(global.fetch)
   fetchMock.mockResolvedValueOnce(
     new Response(JSON.stringify({ message: { content: '[]' } }), { status: 200 })
   )
   const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
-  await provider.chat([{ role: 'user', content: 'x' }], { numPredict: 4096 })
+  const schema = { type: 'array', items: { type: 'object' } }
+  await provider.chat([{ role: 'user', content: 'x' }], { format: schema })
 
   const [, requestInit] = fetchMock.mock.calls[0]
   const body = JSON.parse(requestInit!.body as string)
-  expect(body.options).toEqual({ num_predict: 4096 })
-})
-
-it('omits options entirely when numPredict is not set', async () => {
-  const fetchMock = vi.mocked(global.fetch)
-  fetchMock.mockResolvedValueOnce(
-    new Response(JSON.stringify({ message: { content: '[]' } }), { status: 200 })
-  )
-  const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
-  await provider.chat([{ role: 'user', content: 'x' }])
-
-  const [, requestInit] = fetchMock.mock.calls[0]
-  const body = JSON.parse(requestInit!.body as string)
-  expect(body.options).toBeUndefined()
+  expect(body.format).toEqual(schema)
 })
 ```
+
+(The existing test for `format: 'json'` string mode should already pass unchanged — this is an additive type widening, not a behavior change to the string case. Confirm that existing test still passes too.)
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run tests/unit/ollamaProvider.test.ts`
-Expected: FAIL — `numPredict` isn't a recognized `ChatOptions` field, request body never includes `options`.
+Expected: FAIL — TypeScript rejects passing an object to `format` (type error), or the test doesn't compile.
 
 - [ ] **Step 3: Implement**
 
-In `src/core/llm/provider.ts`, add to `ChatOptions`:
+In `src/core/llm/provider.ts`, widen `ChatOptions.format`:
 
 ```ts
 export interface ChatOptions {
   think?: boolean
-  format?: 'json'
-  /** Ollama's response-length cap. Omitted (not sent) when unset -- see Ollama's own default. */
-  numPredict?: number
+  // Ollama's structured-output mode: the string "json" only constrains "valid JSON" (any shape);
+  // a full JSON Schema object additionally constrains the actual structure (e.g. top-level array
+  // vs. object) -- see base.ts's FINDING_ARRAY_SCHEMA for why this matters. Both are forwarded
+  // to Ollama unchanged; OllamaProvider itself doesn't need to know which one it's carrying.
+  format?: 'json' | Record<string, unknown>
   /** Ignored when `signal` is also provided — OllamaProvider prefers the caller's signal. */
   timeout?: number
   signal?: AbortSignal
 }
 ```
 
-In `src/core/llm/ollamaProvider.ts`, update the request body construction inside `chat()`:
-
-```ts
-      body: JSON.stringify({
-        model: this.model,
-        stream: false,
-        ...(options.think && this.supportsThinking() ? { think: true } : {}),
-        ...(options.format ? { format: options.format } : {}),
-        ...(options.numPredict !== undefined ? { options: { num_predict: options.numPredict } } : {}),
-        messages,
-      }),
-```
+No change needed in `src/core/llm/ollamaProvider.ts` — its request body already does
+`...(options.format ? { format: options.format } : {})`, which forwards either shape unchanged.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -422,16 +413,15 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/core/llm/provider.ts src/core/llm/ollamaProvider.ts tests/unit/ollamaProvider.test.ts
-git commit -m "feat: add ChatOptions.numPredict, wired into Ollama request options.num_predict"
+git add src/core/llm/provider.ts tests/unit/ollamaProvider.test.ts
+git commit -m "feat: widen ChatOptions.format to accept a JSON Schema object"
 ```
 
 ---
 
-### Task 5: Config — responseTokenBudget, wire into base.ts and coverageAnalyst.ts
+### Task 5: Findings-array JSON Schema — wire into base.ts and coverageAnalyst.ts
 
 **Files:**
-- Modify: `src/core/config.ts`
 - Modify: `src/core/agents/base.ts`
 - Modify: `src/core/agents/coverageAnalyst.ts`
 - Test: `tests/unit/baseAgent.test.ts`, `tests/unit/coverageAnalyst.test.ts`
@@ -441,55 +431,69 @@ git commit -m "feat: add ChatOptions.numPredict, wired into Ollama request optio
 Add to `tests/unit/baseAgent.test.ts` (grep for an existing test asserting on `provider.chat`'s call arguments to match style):
 
 ```ts
-it('passes numPredict from config.responseTokenBudget into provider.chat', async () => {
+it('sends an array-typed JSON Schema instead of the bare "json" string', async () => {
   const provider = makeProvider('[]') // reuse existing helper
-  const config = { ...DEFAULT_CONFIG, responseTokenBudget: 4096 }
   class TestAgent extends BaseAgent {
     get name(): AgentName { return 'security' }
     get systemPrompt(): string { return 'test' }
   }
-  await new TestAgent(provider, config).run({ diff: 'x' })
+  await new TestAgent(provider, DEFAULT_CONFIG).run({ diff: 'x' })
   expect(provider.chat).toHaveBeenCalledWith(
     expect.anything(),
-    expect.objectContaining({ numPredict: 4096 })
+    expect.objectContaining({
+      format: expect.objectContaining({ type: 'array' }),
+    })
   )
 })
 ```
 
-Add the analogous test to `tests/unit/coverageAnalyst.test.ts` for `runForCoverage`.
+Add the analogous test to `tests/unit/coverageAnalyst.test.ts` for `runForCoverage`, asserting `format: expect.objectContaining({ type: 'object' })` (the `{findings, gaps}` shape, not an array).
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run tests/unit/baseAgent.test.ts tests/unit/coverageAnalyst.test.ts`
-Expected: FAIL — `numPredict` is never passed.
+Expected: FAIL — both still send `format: 'json'`.
 
 - [ ] **Step 3: Implement**
 
-In `src/core/config.ts`, add to `ReviewConfig` (after `verifierModel?: string`):
+In `src/core/agents/base.ts`, add a new exported constant above the `BaseAgent` class. `required` is a stricter subset of what `parsing.ts`'s `validateAndNormalizeFindings` actually requires (`severity`, `file`, `line`, `title`, `detail`, plus `evidence`/`recommendation` — the canonical field names every current agent prompt already emits; the validator itself also accepts the legacy `basis`/`suggestion` alternates via OR-logic, but hard-requiring the canonical names here is safe and simpler than reproducing that OR logic in JSON Schema):
 
 ```ts
-  verifierModel?: string
-  // Ollama's num_predict cap for JSON-findings agent calls (base.ts, coverageAnalyst.ts only --
-  // NOT testGen.ts, which outputs raw code, or evidenceVerifier.ts, which sends a single short
-  // verdict line). Value measured via calibration/responseTruncationDiagnostic.ts -- see Task 3's
-  // commit message for the actual recorded numbers this default is based on. Undefined means "no
-  // cap sent" (Ollama's own default applies), matching how every other ChatOptions field already
-  // omits itself when unset.
-  responseTokenBudget?: number
+// Forces Ollama's structured-output mode to actually constrain the top-level shape to an array,
+// not just "valid JSON" -- format: 'json' (the bare string) let the model emit a single bare
+// object instead of the required array; verified via live testing that an explicit array-typed
+// schema fixes this (see docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md,
+// Issue 2). `required` is a stricter subset of parsing.ts's validateAndNormalizeFindings:
+// that validator accepts (basis OR evidence) and (suggestion OR recommendation), but every
+// current agent prompt already emits evidence+recommendation, so hard-requiring those two
+// here is safe and simpler than reproducing the OR logic in JSON Schema.
+export const FINDING_ARRAY_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      severity: { type: 'string' },
+      basis: { type: 'string' },
+      confidence: { type: 'integer' },
+      domain: { type: 'string' },
+      file: { type: 'string' },
+      line: { type: 'integer' },
+      lineEnd: { type: 'integer' },
+      title: { type: 'string' },
+      detail: { type: 'string' },
+      evidence: { type: 'string' },
+      impact: { type: 'string' },
+      recommendation: { type: 'string' },
+      suggestion: { type: 'string' },
+      blocking: { type: 'boolean' },
+      source: { type: 'string' },
+    },
+    required: ['severity', 'file', 'line', 'title', 'detail', 'evidence', 'recommendation'],
+  },
+} as const
 ```
 
-Add to `DEFAULT_CONFIG` (after `verifierModel: 'qwen3:latest',`):
-
-```ts
-  verifierModel: 'qwen3:latest',
-  // 4096 is a starting value pending live measurement -- see the note immediately below before
-  // committing this task.
-  responseTokenBudget: 4096,
-```
-
-**Before committing this task**, replace `4096` with whatever `calibration/responseTruncationDiagnostic.ts` actually measured in Task 3 — if `eval_count` was hitting a cap well below 4096, use a higher number sized to comfortably clear that cap; if the prompt itself was consuming most of the 32k context (Task 3's second diagnostic branch), consult the design spec's Issue 2 section for the response-headroom-reservation approach instead of a flat cap, and adjust this task's implementation accordingly before proceeding.
-
-In `src/core/agents/base.ts`, update the `run()` method's `provider.chat` call:
+Update `run()`'s `provider.chat` call:
 
 ```ts
   async run(input: ReviewInput, signal?: AbortSignal): Promise<Finding[]> {
@@ -499,15 +503,44 @@ In `src/core/agents/base.ts`, update the `run()` method's `provider.chat` call:
     ]
     const raw = await this.provider.chat(messages, {
       think: true,
-      format: 'json',
-      numPredict: this.config.responseTokenBudget,
+      format: FINDING_ARRAY_SCHEMA,
       signal,
     })
     return this.parseFindings(raw)
   }
 ```
 
-In `src/core/agents/coverageAnalyst.ts`, update `runForCoverage`'s `provider.chat` call identically:
+In `src/core/agents/coverageAnalyst.ts`, import `FINDING_ARRAY_SCHEMA` from `./base.js` and add a second schema constant matching its `{findings, gaps}` object shape (mirrors `validateGaps`'s required fields exactly):
+
+```ts
+import { BaseAgent, FINDING_ARRAY_SCHEMA } from './base.js'
+
+// coverageAnalyst's response is an object with two arrays, not a bare array -- FINDING_ARRAY_SCHEMA
+// alone doesn't fit here. `gaps.items.required` mirrors this file's own validateGaps exactly.
+const COVERAGE_RESULT_SCHEMA = {
+  type: 'object',
+  properties: {
+    findings: FINDING_ARRAY_SCHEMA,
+    gaps: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          file: { type: 'string' },
+          functionName: { type: 'string' },
+          lineStart: { type: 'integer' },
+          lineEnd: { type: 'integer' },
+          description: { type: 'string' },
+        },
+        required: ['file', 'functionName', 'lineStart', 'lineEnd', 'description'],
+      },
+    },
+  },
+  required: ['findings', 'gaps'],
+} as const
+```
+
+Update `runForCoverage`'s `provider.chat` call:
 
 ```ts
   async runForCoverage(input: ReviewInput, signal?: AbortSignal): Promise<CoverageAnalystResult> {
@@ -517,8 +550,7 @@ In `src/core/agents/coverageAnalyst.ts`, update `runForCoverage`'s `provider.cha
     ]
     const raw = await this.provider.chat(messages, {
       think: true,
-      format: 'json',
-      numPredict: this.config.responseTokenBudget,
+      format: COVERAGE_RESULT_SCHEMA,
       signal,
     })
     return this.parseCoverageResult(raw, input)
@@ -533,7 +565,9 @@ Expected: PASS
 - [ ] **Step 5: Confirm testGen.ts and evidenceVerifier.ts are unchanged**
 
 Run: `git diff src/core/agents/testGen.ts src/core/evidenceVerifier.ts`
-Expected: empty output (no changes to either file).
+Expected: empty output (no changes to either file) — neither is array/object-of-findings shaped
+(testGen outputs raw code; evidenceVerifier sends a single short verdict line), so neither needs
+this fix.
 
 - [ ] **Step 6: Run full regression**
 
@@ -542,13 +576,26 @@ Expected: 0 typecheck errors, all tests pass.
 
 - [ ] **Step 7: Live sanity check**
 
-Run: `npm run diagnose:truncation /tmp/large.diff` again (same diff as Task 3) with the new default active — confirm `done_reason` is no longer `length`, or that the response now completes a full findings array in `--format json` output from a real `ai-review-agent` run against the same diff.
+Run a real `ai-review-agent` review (via the built CLI or `npx tsx src/cli/index.ts --profile security --format json`) against a diff with 2+ genuine, unrelated findings, and confirm the JSON output is now a well-formed top-level array (not a bare object requiring Stage 2b's auto-wrap). This confirms the shape fix works end-to-end, not just in the schema constant. **This does not need to show more than one finding** — the model's tendency to under-report multiple real findings is a separate, confirmed, deliberately out-of-scope problem (see design spec, Issue 2 Non-Goals) — this step only confirms the *shape* is correct, not that recall improved.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/core/config.ts src/core/agents/base.ts src/core/agents/coverageAnalyst.ts tests/unit/baseAgent.test.ts tests/unit/coverageAnalyst.test.ts
-git commit -m "feat: wire responseTokenBudget into base.ts/coverageAnalyst.ts LLM calls"
+git add src/core/agents/base.ts src/core/agents/coverageAnalyst.ts tests/unit/baseAgent.test.ts tests/unit/coverageAnalyst.test.ts
+git commit -m "$(cat <<'EOF'
+feat: constrain agent JSON output to the required shape via explicit schema
+
+Replaces the bare format: 'json' string (which only constrains "valid
+JSON", not array-vs-object shape) with an explicit JSON Schema for
+base.ts (array of findings) and coverageAnalyst.ts ({findings, gaps}
+object) -- verified live against real Ollama to fix the object-vs-array
+mismatch that was causing every agent's response to need Stage 2b's
+auto-wrap recovery. Does not address a separate, confirmed finding from
+the same investigation (the model under-reporting multiple real issues
+in one diff) -- that's a distinct, deliberately out-of-scope problem,
+documented in the design spec's Issue 2 Non-Goals.
+EOF
+)"
 ```
 
 ---
@@ -1320,7 +1367,7 @@ Reproduce the original bug report as closely as possible: run `ai-review-agent -
 
 Confirm all four original symptoms are gone:
 1. Diff truncation is either loud (exit code 3, or exit 1 if a real blocker is also present) or, with `--chunk`, fully covered.
-2. `--format json` output shows no `"response appears truncated"` stderr lines (or far fewer — Task 5's live sanity check already covered this once; this is the end-to-end confirmation).
+2. `--format json` output is a well-formed array (Stage 2b's auto-wrap for a bare object should no longer be needed — Task 5's live sanity check already confirmed this once; this is the end-to-end confirmation). Note: the model may still only report one of several real findings in the diff — that's the separate, documented, out-of-scope under-reporting finding, not a regression from this fix.
 3. No finding cites a `.md` file as vulnerable code from `security`/`adversarial`.
 4. No "missing package.json" finding on the Dart project; `toolAvailability.npmAudit` (if present in `--format json` output) reads `"not-applicable"`.
 
@@ -1339,5 +1386,5 @@ git commit -m "docs: changelog entry for review reliability fixes"
 
 ## Post-Plan Notes
 
-- Task 3/5's exact `responseTokenBudget` value depends on a live measurement that cannot be known until the plan is executed — this is intentional (see design spec Issue 2), not an oversight. Whoever executes Task 3 must actually run the diagnostic and carry the real numbers into Task 5, not skip straight to a guessed default.
+- Task 3's live diagnostic (executed) ruled out the plan's original Issue 2 hypothesis (`num_predict`) entirely and found a different, verified root cause (a `format: 'json'` object-vs-array shape mismatch) — Tasks 4/5 were revised around that finding rather than the original `responseTokenBudget` design. A second, separate finding (the model under-reporting multiple real findings even with the shape fixed) was deliberately left unaddressed — see the design spec's Issue 2 Non-Goals. This is a real example of why Task 3 was scoped as "diagnose before fixing" rather than skipping straight to implementation.
 - `--chunk`'s agentStatus/toolAvailability "last-chunk-wins" simplification (Task 12) is a deliberate, documented scope reduction, made deliberately simpler by keeping the feature outside `SwarmRunner` entirely (Tasks 12/13) rather than refactoring its internals — no orchestration-boundary changes anywhere in this plan. Revisit only if real `--chunk` usage shows it causing confusion in practice.

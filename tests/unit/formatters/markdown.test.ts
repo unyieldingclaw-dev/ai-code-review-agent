@@ -231,6 +231,26 @@ describe('formatMarkdown', () => {
     const output = formatMarkdown(result)
     expect(output).not.toMatch(/degraded|fallback/i)
   })
+
+  it('does not include a not-applicable tool in the degraded-tools warning', () => {
+    const result = makeResult({
+      findings: [],
+      toolAvailability: { npmAudit: 'not-applicable' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).not.toMatch(/degraded/i)
+  })
+
+  it('still warns for a genuinely unavailable tool alongside a not-applicable one', () => {
+    const result = makeResult({
+      findings: [],
+      toolAvailability: { npmAudit: 'not-applicable', gitleaks: 'unavailable-llm-fallback' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toMatch(/degraded/i)
+    expect(output).toMatch(/gitleaks/i)
+    expect(output).not.toMatch(/npm audit not installed/i)
+  })
 })
 
 describe('evidenceCheckFilter', () => {

@@ -22,6 +22,13 @@ export interface ReviewConfig {
   failFast: boolean
   failOn: FailOnLevel
   parallel: boolean
+  // WHY opt-in, off by default: splitting an oversized diff into multiple maxDiffLines-sized
+  // passes achieves full coverage instead of silently dropping lines past the truncation point,
+  // but multiplies LLM calls by chunk count -- imposing that cost on every oversized diff by
+  // default would conflict with this project's default-path efficiency goal. Read only by
+  // cli/index.ts and chunkRunner.ts -- SwarmRunner.run() has no knowledge of this field. See
+  // docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md, Issue 1.
+  chunk: boolean
   agentPolicy?: Partial<
     Record<
       AgentName,
@@ -91,6 +98,7 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   // `--parallel` remains available as an explicit opt-in for hardware where it's been verified
   // to actually help.
   parallel: false,
+  chunk: false,
   // WHY false by default: cross-model LLM verification (a separate model checks whether a
   // finding's own cited evidence actually supports its claim) scored 13/13 on this project's
   // validation cases -- but those cases were designed by the same person who wrote the
@@ -103,6 +111,22 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   // `parallel` above only became a real option after real-scale testing, not a small trial.
   verifyEvidence: false,
   verifierModel: 'qwen3:latest',
+  // WHY security/adversarial specifically, not project-wide: these are the two agents verified
+  // (by reading their prompts) to have zero file-type awareness and a demonstrated real-world
+  // failure mode -- misreading a .md file's prose description of a vulnerability pattern as
+  // executable code. breaking-change/license were checked too and neither prompt references .md
+  // files at all, so there's no evidence either way for them; this stays narrowly scoped to where
+  // the bug was actually reproduced rather than guessing more broadly. Deterministic (not a
+  // prompt instruction) because this project has prior evidence prompt-tightening alone
+  // underperforms for this class of problem (secrets/dependencies/adversarial history). See
+  // docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md, Issue 3 -- including
+  // the documented config-shallow-merge caveat: a project's own agentPolicy setting for ANY agent
+  // replaces this default entirely (loadConfig does a shallow merge). Re-specify these excludes
+  // in your own ai-review.config.json if you set agentPolicy for any agent and want to keep them.
+  agentPolicy: {
+    security: { exclude: ['**/*.md'] },
+    adversarial: { exclude: ['**/*.md'] },
+  },
 }
 
 export function loadConfig(projectPath: string): ReviewConfig {

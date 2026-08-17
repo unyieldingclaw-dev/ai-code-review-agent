@@ -6,6 +6,7 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { join, resolve, dirname } from 'path'
 import { SwarmRunner } from '../core/runner.js'
+import { runChunked } from '../core/chunkRunner.js'
 import { loadConfig } from '../core/config.js'
 import { isPathWithin } from '../core/filePath.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
@@ -16,6 +17,7 @@ import {
   FAIL_ON_OPTIONS,
   hasAgentFailures,
   AGENT_FAILURE_EXIT_CODE,
+  TRUNCATION_EXIT_CODE,
 } from './exitCode.js'
 import type { FailOnLevel } from './exitCode.js'
 import { resolveProfile } from '../core/profiles.js'
@@ -51,6 +53,11 @@ program
   .option('--out <path>', 'Write output to file instead of stdout')
   .option('--max-lines <n>', 'Truncate diff to this many lines (default: 2000)', parseInt)
   .option(
+    '--chunk',
+    'Instead of truncating an oversized diff, split it into multiple full-coverage passes ' +
+      '(multiplies LLM calls by chunk count -- off by default)'
+  )
+  .option(
     '--timeout <ms>',
     'Per-agent timeout in milliseconds (default: 180000, scaled up to 2x for large diffs unless set explicitly here)',
     parseInt
@@ -70,6 +77,11 @@ program
   .option(
     '--fail-fast',
     'Stop swarm on first finding at or above --fail-on threshold (requires sequential execution -- has no effect with --parallel)'
+  )
+  .option(
+    '--allow-truncation',
+    'Exit 0 on a truncated-but-otherwise-clean run instead of exit code 3 -- use only if you have ' +
+      'deliberately accepted partial diff coverage for this workflow'
   )
   .option(
     '--parallel',
@@ -121,11 +133,13 @@ program
       format: 'markdown' | 'json' | 'sarif' | 'github-annotations'
       out?: string
       maxLines?: number
+      chunk?: boolean
       timeout?: number
       retryAttempts?: number
       retryDelay?: number
       failOn: FailOnLevel
       failFast?: boolean
+      allowTruncation?: boolean
       parallel?: boolean
       ignore: string[]
       sanitize: boolean
@@ -163,6 +177,10 @@ program
           }
         }
         if (options.maxLines !== undefined) config.maxDiffLines = options.maxLines
+        // WHY conditional (only overrides toward true), same rationale as --verify-evidence
+        // below: --chunk is opt-in (default false), so an unconditional overwrite would stomp
+        // a project-config-file `true` back to false on every run that doesn't pass the flag.
+        if (options.chunk) config.chunk = true
         if (options.timeout !== undefined) {
           config.agentTimeoutMs = options.timeout
           config.timeoutScalingEnabled = false
@@ -212,36 +230,50 @@ program
           `\n${reviewingLabel} Running ai-review-agent with ${config.agents.length} agents...\n\n`
         )
 
-        const result = await runner.run(
-          { diff, projectPath },
-          (event: AgentProgressEvent) => {
-            if (event.phase === 'start') {
-              process.stderr.write(`[${event.index}/${event.total}] ${event.name}  starting…\n`)
-            } else {
-              const elapsed = `${Math.round((event.elapsedMs ?? 0) / 1000)}s`
-              const count = event.findings?.length ?? 0
-              let summary = `${count} finding${count !== 1 ? 's' : ''}`
-              if (count > 0 && event.findings) {
-                const bySev: Record<string, number> = {}
-                for (const f of event.findings) bySev[f.severity] = (bySev[f.severity] ?? 0) + 1
-                const parts = (['critical', 'high', 'medium', 'low'] as const)
-                  .filter((s) => bySev[s])
-                  .map((s) => `${bySev[s]} ${s}`)
-                summary += ` (${parts.join(', ')})`
-              }
-              process.stderr.write(
-                `[${event.index}/${event.total}] ${event.name}   ${elapsed} — ${summary}\n`
-              )
-              if (event.earlyExit) {
-                const bolt = options.emoji !== false ? '⚡ ' : ''
-                process.stderr.write(
-                  `${bolt}Fail-fast: stopping swarm after ${event.name} (threshold met)\n`
-                )
-              }
+        const onProgress = (event: AgentProgressEvent) => {
+          if (event.phase === 'start') {
+            process.stderr.write(`[${event.index}/${event.total}] ${event.name}  starting…\n`)
+          } else {
+            const elapsed = `${Math.round((event.elapsedMs ?? 0) / 1000)}s`
+            const count = event.findings?.length ?? 0
+            let summary = `${count} finding${count !== 1 ? 's' : ''}`
+            if (count > 0 && event.findings) {
+              const bySev: Record<string, number> = {}
+              for (const f of event.findings) bySev[f.severity] = (bySev[f.severity] ?? 0) + 1
+              const parts = (['critical', 'high', 'medium', 'low'] as const)
+                .filter((s) => bySev[s])
+                .map((s) => `${bySev[s]} ${s}`)
+              summary += ` (${parts.join(', ')})`
             }
-          },
-          contextMode
-        )
+            process.stderr.write(
+              `[${event.index}/${event.total}] ${event.name}   ${elapsed} — ${summary}\n`
+            )
+            if (event.earlyExit) {
+              const bolt = options.emoji !== false ? '⚡ ' : ''
+              process.stderr.write(
+                `${bolt}Fail-fast: stopping swarm after ${event.name} (threshold met)\n`
+              )
+            }
+          }
+        }
+
+        // WHY diffLines is computed from `diff` (the full, untruncated diff returned by
+        // getDiff()) rather than some post-truncation variable: cli/index.ts never truncates
+        // the diff itself -- truncation happens inside SwarmRunner.run(). `diff` is the only
+        // diff variable in scope here, so this check is exactly "does the raw diff exceed the
+        // configured limit" -- the same condition SwarmRunner.run() will independently apply
+        // if the --chunk branch below is skipped.
+        const diffLines = diff.split('\n').length
+        const result =
+          config.chunk && diffLines > config.maxDiffLines
+            ? await runChunked(
+                runner,
+                { diff, projectPath },
+                config.maxDiffLines,
+                onProgress,
+                contextMode
+              )
+            : await runner.run({ diff, projectPath }, onProgress, contextMode)
 
         // Stamp integration metadata so callers can parse the contract version
         result.schemaVersion = 'ai-review-agent/v1'
@@ -309,7 +341,16 @@ program
         if (hasAgentFailures(result.agentStatus)) {
           process.exit(AGENT_FAILURE_EXIT_CODE)
         }
-        process.exit(hasBlocker ? 1 : 0)
+        if (hasBlocker) {
+          process.exit(1)
+        }
+        // Truncation ranks below a real blocker (checked above) but above "clean" -- a run that
+        // silently skipped 60% of the diff must not report exit 0 by default. --allow-truncation
+        // opts back into 0 for callers who've deliberately accepted partial coverage.
+        if (result.truncation?.truncated && !options.allowTruncation) {
+          process.exit(TRUNCATION_EXIT_CODE)
+        }
+        process.exit(0)
       } catch (err) {
         // Re-throw synthetic exits (e.g. process.exit mocks in tests) so they propagate correctly
         if (err instanceof Error && err.message.startsWith('process.exit(')) throw err

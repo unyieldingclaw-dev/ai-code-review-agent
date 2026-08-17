@@ -143,4 +143,38 @@ describe('DependenciesAgent npm-audit integration', () => {
       '/some/other/project'
     )
   })
+
+  it('skips the LLM entirely when the diff does not touch a manifest AND no package.json exists in projectPath', async () => {
+    const provider = makeProvider('[]')
+    const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
+
+    const findings = await agent.run({ diff: NON_MANIFEST_DIFF, projectPath: '/no/such/project' })
+
+    expect(findings).toEqual([])
+    expect(provider.chat).not.toHaveBeenCalled()
+    expect(mockRunTool).not.toHaveBeenCalled()
+    expect(agent.lastToolAvailability).toBe('not-applicable')
+  })
+
+  it('still runs the LLM fallback when the diff does not touch a manifest but package.json DOES exist (e.g. this repo itself)', async () => {
+    const provider = makeProvider('[]')
+    const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
+
+    // projectPath: '.' resolves to the real repo root during `npm test`, which has package.json
+    await agent.run({ diff: NON_MANIFEST_DIFF, projectPath: '.' })
+
+    expect(provider.chat).toHaveBeenCalledOnce()
+  })
+
+  it('does NOT skip when touchesManifest is true, even if package.json is not yet on disk (new project)', async () => {
+    mockRunTool.mockResolvedValue(null) // npm audit unavailable -- e.g. patch not applied to disk
+    const provider = makeProvider('[]')
+    const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
+
+    await agent.run({ diff: MANIFEST_DIFF, projectPath: '/brand/new/project/not/on/disk' })
+
+    // Falls through to the existing touchesManifest branch, not the new skip -- still calls the LLM
+    expect(provider.chat).toHaveBeenCalledOnce()
+    expect(agent.lastToolAvailability).toBe('unavailable-llm-fallback')
+  })
 })

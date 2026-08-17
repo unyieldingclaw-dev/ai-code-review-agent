@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { writeFileSync, unlinkSync } from 'fs'
-import { filterDiff, loadIgnorePatterns, IgnorePatterns } from '../../src/core/ignoreFilter.js'
+import {
+  filterDiff,
+  loadIgnorePatterns,
+  matchPattern,
+  IgnorePatterns,
+} from '../../src/core/ignoreFilter.js'
 
 const makeDiff = (files: string[]) =>
   files
@@ -41,6 +46,39 @@ describe('filterDiff', () => {
     const filtered = filterDiff(diff, ['node_modules/'])
     expect(filtered).not.toContain('node_modules/lodash/index.js')
     expect(filtered).toContain('src/main.ts')
+  })
+})
+
+describe('matchPattern', () => {
+  // `**/` must mean "zero or more directories, including none" per the gitignore spec --
+  // `**/*.md` matching only nested files (docs/README.md) and not a root-level README.md would
+  // silently defeat any exclude/agentPolicy default that relies on it for the common case.
+  it('matches a root-level file against a leading **/ pattern (zero directories)', () => {
+    expect(matchPattern('README.md', '**/*.md')).toBe(true)
+  })
+
+  it('still matches a nested file against the same **/ pattern (one or more directories)', () => {
+    expect(matchPattern('docs/README.md', '**/*.md')).toBe(true)
+    expect(matchPattern('docs/sub/README.md', '**/*.md')).toBe(true)
+  })
+
+  it('does not match a file with a different extension against **/*.md', () => {
+    expect(matchPattern('README.mdx', '**/*.md')).toBe(false)
+  })
+
+  it('matches zero-or-more-directories for a mid-pattern **/ segment', () => {
+    expect(matchPattern('src/test.ts', 'src/**/test.ts')).toBe(true)
+    expect(matchPattern('src/foo/test.ts', 'src/**/test.ts')).toBe(true)
+  })
+
+  it('leaves an unrelated file unmatched', () => {
+    expect(matchPattern('src/other.ts', 'src/**/test.ts')).toBe(false)
+  })
+
+  it('does not change behavior for a trailing /** directory pattern', () => {
+    expect(matchPattern('docs/anything', 'docs/**')).toBe(true)
+    expect(matchPattern('docs/x/y', 'docs/**')).toBe(true)
+    expect(matchPattern('other/x', 'docs/**')).toBe(false)
   })
 })
 

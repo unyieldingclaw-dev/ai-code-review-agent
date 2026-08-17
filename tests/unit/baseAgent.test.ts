@@ -36,7 +36,18 @@ describe('BaseAgent', () => {
     await new TestAgent(provider, DEFAULT_CONFIG).run({ diff: 'diff content' })
     expect(provider.chat).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ format: 'json' })
+      expect.objectContaining({ format: expect.objectContaining({ type: 'array' }) })
+    )
+  })
+
+  it('sends an array-typed JSON Schema instead of the bare "json" string', async () => {
+    const provider = makeProvider('[]')
+    await new TestAgent(provider, DEFAULT_CONFIG).run({ diff: 'x' })
+    expect(provider.chat).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        format: expect.objectContaining({ type: 'array' }),
+      })
     )
   })
 

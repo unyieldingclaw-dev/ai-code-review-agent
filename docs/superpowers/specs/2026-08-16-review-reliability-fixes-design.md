@@ -20,18 +20,13 @@ this codebase's source (not assumed from the report):
    not `progress.md`'s — both files corroborate the same decision, but the exact wording lives in
    `activeContext.md`.)
 
-2. **Response truncation on every agent, every run.** All four agents in the reproducing run
+2. **Response parsing issues on every agent, every run.** All four agents in the reproducing run
    (security, secrets, dependencies, adversarial) hit `base.ts`'s Stage 4 recovery ("response
-   appears truncated -- recovered 1 complete finding(s) before the cutoff"). Verified: `provider.ts`'s
-   `ChatOptions` has no `num_predict`/token-budget field at all, and `base.ts:38` sends
-   `format: 'json'` unconditionally on every call. This project's own prior measurement
-   (`activeContext.md`, 2026-07-25/26) already found `format: 'json'` alone raises truncation
-   frequency roughly 11x (1/16 → 11/16 calibration cases) — likely because grammar-constrained
-   decoding runs out of its (unreserved) response budget before it can close the JSON structure.
-   `num_ctx` is already generously set to 32k at the Ollama server level (`techContext.md`), so
-   context-window exhaustion alone is an unlikely primary cause, but hasn't been ruled out for
-   large diffs. Net effect: real findings are silently discarded after already being paid for in
-   generation time.
+   appears truncated -- recovered 1 complete finding(s) before the cutoff") — the reported symptom.
+   Initial hypothesis (missing `num_predict`) was investigated live against real Ollama and ruled
+   out — see Design, Issue 2 below for the full investigation and the actual confirmed root cause
+   (a `format: 'json'` object-vs-array shape mismatch, not a length cap), plus a second, separate,
+   out-of-scope finding (model under-reporting) that surfaced during that investigation.
 
 3. **Prose-vs-code confusion on documentation files.** `security.ts`/`adversarial.ts` prompts have
    no file-type awareness at all (confirmed by reading both in full) — nothing distinguishes a
@@ -67,9 +62,10 @@ this codebase's source (not assumed from the report):
   multiplies token cost by chunk count on every oversized diff by default, which conflicts with
   the stated efficiency constraint. An opt-in flag for callers who explicitly want this is in
   scope; an always-on default is not.
-- Fully solving response-truncation with a single guessed config value. The right fix depends on
-  measuring where the real budget goes (see Issue 2) — this spec defines the diagnostic step and
-  the config surface, not a specific hardcoded number.
+- Fixing model under-reporting (finding only 1 of several real issues in a diff). Discovered
+  during Issue 2's live investigation, confirmed real and reproducible, but distinct from what
+  Issue 2 originally scoped (truncation) and not fixable by any `ChatOptions`/config change — see
+  Issue 2's Non-Goal paragraph below for detail. Documented, not solved, here.
 
 ## Design
 
@@ -112,46 +108,82 @@ severity-based failure is never masked by the new code either.
 
 ### Issue 2: Response truncation
 
-**Approach:** diagnose before fixing. Add a diagnostic harness (a script under `calibration/`,
-matching the pattern already established by `calibration/evidenceVerifierCalibration.ts`) that
-runs a real oversized-diff prompt through `OllamaProvider.chat()` directly, logging: prompt token
-count (via Ollama's own `prompt_eval_count` response field, not estimated), response token count
-at the point of cutoff (`eval_count`), and whether `done_reason` reports `length` (hit a cap) vs.
-`stop` (model chose to stop) vs. something else. Ollama's `/api/chat` response already includes
-these fields — this doesn't require new instrumentation, just reading fields already returned and
-currently discarded.
+**Status: root cause investigated live against real Ollama; the original hypothesis (missing
+`num_predict`) was empirically ruled out, and a different, verified, fixable root cause was found
+instead.** This section documents the investigation because the conclusion doesn't match the
+Problem statement's original framing — worth being explicit about what changed and why, per this
+project's own standard of not asserting rationale that isn't backed by observed behavior.
 
-Based on what that measurement shows, the fix is one of (not all) the following — this spec
-intentionally leaves the final choice to what's measured rather than guessing:
+**What was measured (calibration/responseTruncationDiagnostic.ts, run live against
+`devstral:latest`):**
 
-- If `done_reason: length` and prompt tokens are small relative to 32k: the model/Ollama's default
-  `num_predict` is capping generation too early. Add an explicit `num_predict` to `ChatOptions`,
-  sized generously (e.g. 4096) based on the measured shortfall, not an arbitrary round number.
-- If prompt tokens are consuming most of the 32k budget on large diffs: the fix is reserving
-  response headroom relative to `num_ctx`, not just raising `num_predict` blindly (raising a cap
-  that's already unreachable because the prompt ate the budget wouldn't help).
-- If truncation correlates specifically with `format: 'json'` requests independent of both of the
-  above: worth re-confirming today's measurement still holds on the current model, and considering
-  whether `format: 'json'` should stay on for agents most prone to this on large diffs.
+1. Across `security`/`secrets`/`dependencies`/`adversarial`'s real system prompts, at diff sizes
+   from 2000 (matching `DEFAULT_CONFIG.maxDiffLines` — what agents actually receive in production)
+   up to 6777 lines, `done_reason` was `stop` in every single run. Never `length`. The originally
+   hypothesized cause (a token-length cap cutting generation short) does not occur at any tested
+   size.
+2. What actually happens: under `format: 'json'` (the bare string, current production behavior),
+   the model reliably emits a single JSON object — not the required top-level array — then stops
+   cleanly. `dependencies` returned `{"package.json":[],"requirements.txt":[]}` (no `severity`
+   field at all — would throw `ParseFailureError` today, not "truncated"); `security`/`secrets`/
+   `adversarial` returned a single bare finding-shaped object (has `severity`) — which
+   `BaseAgent.parseFindings`'s existing Stage 2b already catches and auto-wraps correctly today,
+   logging an accurate message, not "appears truncated."
+3. **Confirmed root cause of the object-vs-array mismatch:** `format: 'json'` (bare string) only
+   constrains "valid JSON," not array-of-N-objects. Tested directly: a diff with 3 real, unrelated,
+   injected vulnerabilities (SQL injection, XSS, hardcoded credentials) sent with `format: 'json'`
+   returned a bare non-array object; the identical request sent with an explicit JSON Schema
+   (`format: { type: 'array', items: {...} }` — Ollama's `format` field accepts either the string
+   `"json"` or a full JSON Schema object) correctly returned `array of 1`. The schema constraint
+   works.
+4. **A second, separate, unfixable-by-this-mechanism problem was also found:** even with the array
+   schema forcing correct shape, the model still reported only 1 of 6 unambiguous, independently
+   injected vulnerabilities in the same test diff (SQL injection, hardcoded API key, XSS via
+   innerHTML, hardcoded password, an auth-bypass debug flag, and weak MD5 hashing — the model
+   found and reported only the SQL injection, both schema-mode runs). This is not a truncation or
+   format problem — the model is choosing to stop after one finding regardless of format
+   constraints. No `ChatOptions` field fixes this; it would need prompt-engineering or
+   generation-parameter (temperature/repeat-penalty) work, which is out of scope for this plan
+   (see Non-Goals) and is tracked as a separate, deferred, documented finding rather than folded in
+   here.
 
-Whichever mechanism the measurement points to, `ChatOptions.numPredict?: number` is added as a new
-optional field either way (needed regardless of which branch above fires), threaded through
-`OllamaProvider.chat()`'s request body the same way `format`/`think` already are.
+**Approach (revised):** add an explicit JSON Schema `format` for the array-shaped agents
+(`base.ts`), fixing the verified object-vs-array mismatch — a real, cheap, narrowly-scoped fix for
+a confirmed bug. Do not attempt to fix the under-reporting problem in this plan; it's a distinct
+finding, documented as a Non-Goal below.
 
-**Call sites (explicit, since there are 4 and they differ):** `numPredict` is wired into
-`base.ts:38` and `coverageAnalyst.ts:70`'s `provider.chat()` calls only — both send
-`format: 'json'` and are the two call sites actually implicated by the measured truncation
-problem. `testGen.ts:66` outputs raw test code, not JSON (already excluded from `format: 'json'`
-per prior work), and is out of scope. `evidenceVerifier.ts:102` sends a single short
-SUPPORTED/NOT_SUPPORTED verdict line, not a findings array, and has not been observed to truncate
-— also out of scope. The value itself comes from a new `ReviewConfig.responseTokenBudget?: number`
-field (not a CLI flag — this is an internal reliability knob, not something most callers need to
-tune), defaulted to whatever the diagnostic script's measurement indicates.
+- `ChatOptions.format` (`provider.ts`) widens from `'json'` to `'json' | Record<string, unknown>`
+  — Ollama's own API already accepts either; this is additive, not a breaking change to the type.
+- `OllamaProvider.chat()`'s request body passes `format` through unchanged (it's already spread
+  conditionally) — no new logic needed there, since the object-vs-string distinction is opaque to
+  the provider; it just forwards whatever `ChatOptions.format` contains.
+- A new shared constant, `FINDING_ARRAY_SCHEMA`, defined once (in `base.ts`, the shared consumer),
+  describing `{ type: 'array', items: { type: 'object', properties: {...}, required: [...] } }`
+  with `required` matching exactly what `parsing.ts`'s `validateAndNormalizeFindings` actually
+  requires today (`severity`, `file`, `line`, `title`, `detail`, `evidence`, `recommendation` — the
+  canonical field names every current agent prompt already emits, not the legacy
+  `basis`/`suggestion` alternates `validateAndNormalizeFindings` also accepts). `base.ts:38`'s
+  `provider.chat()` call passes `format: FINDING_ARRAY_SCHEMA` instead of `format: 'json'`.
+- `coverageAnalyst.ts` needs its own, differently-shaped schema (`{ type: 'object', properties: {
+  findings: {...}, gaps: {...} } }`, matching its `{"findings":[...],"gaps":[...]}` top-level
+  shape, which is not an array) — a second constant, not a reuse of `FINDING_ARRAY_SCHEMA`.
+- `testGen.ts`/`evidenceVerifier.ts` are unchanged, same reasoning as before (raw code output /
+  single short verdict line, neither is array-shaped JSON).
+- No new `ReviewConfig` field is needed — unlike the original `responseTokenBudget` idea, a JSON
+  Schema constraint isn't a tunable numeric knob a caller would ever want to override per-run.
 
-**Efficiency note:** this is very likely to be a net token-efficiency win, not a cost — currently
-the model already generates tokens up to whatever the silent cutoff is, and everything past the
-one salvaged finding is generated, paid for, and discarded. Fixing the cutoff means those tokens
-produce usable output instead of being wasted.
+**Non-Goal (new, from this investigation): model under-reporting multiple real findings.**
+Documented above as a real, verified, but distinct problem from what Issue 2 originally scoped.
+Not fixed here. Worth a separately-scoped future investigation into prompt phrasing (e.g.
+explicitly instructing "list every issue you find, not just the most severe one") or generation
+parameters — but guessing at either without its own dedicated measurement would be exactly the
+kind of unverified fix this plan has been trying to avoid throughout.
+
+**Efficiency note:** the schema fix is a pure win under the stated efficiency constraint — it
+doesn't change token cost at all (same request shape, same model, same `format` field just
+carrying more information), it just makes the model's output conform to the shape every agent
+already asks for in its own prompt text, reducing reliance on `BaseAgent`'s Stage 2b/3/4 recovery
+paths having to compensate for a preventable shape mismatch.
 
 ### Issue 3: Prose-vs-code confusion
 
@@ -243,10 +275,14 @@ both cost and quality, no trade-off.
 - `exitCode.ts`: new `TRUNCATION_EXIT_CODE = 3`.
 - `cli/index.ts`: new `--allow-truncation`, `--chunk` flags; exit-code priority updated to
   agent-failure(2) > blocker-severity(1) > truncation(3) > clean(0).
-- `provider.ts`: `ChatOptions` gains `numPredict?: number`.
-- `ollamaProvider.ts`: request body includes `num_predict` when set.
-- `config.ts`: new `ReviewConfig.responseTokenBudget?: number`; `DEFAULT_CONFIG.agentPolicy` gains
-  `security`/`adversarial` `.md` excludes.
+- `provider.ts`: `ChatOptions.format` widens from `'json'` to `'json' | Record<string, unknown>`.
+- `ollamaProvider.ts`: no logic change — `format` is already forwarded opaquely.
+- `base.ts`: new `FINDING_ARRAY_SCHEMA` constant; `format: FINDING_ARRAY_SCHEMA` replaces
+  `format: 'json'` in its `provider.chat()` call.
+- `coverageAnalyst.ts`: new, differently-shaped schema constant for its `{findings, gaps}` object
+  shape; replaces `format: 'json'` in its own `provider.chat()` call.
+- `config.ts`: `DEFAULT_CONFIG.agentPolicy` gains `security`/`adversarial` `.md` excludes. (No new
+  config field for Issue 2 — the schema fix isn't a tunable value.)
 - `schema.ts`: new **top-level** `ReviewResult.filteredFiles?: Partial<Record<AgentName,
   string[]>>` (sibling of `PolicyResult`, not nested inside it); `ToolAvailability` gains
   `'not-applicable'`.
@@ -254,8 +290,6 @@ both cost and quality, no trade-off.
   only.
 - `runner.ts`: per-agent `filterDiff()` call site added, threaded from `agentPolicy`, populating
   the new `filteredFiles` field; `--chunk` handling in `preprocessDiff()`.
-- `base.ts`, `coverageAnalyst.ts`: pass `numPredict` (from `responseTokenBudget`) into their
-  `provider.chat()` calls. `testGen.ts`/`evidenceVerifier.ts` are explicitly unchanged.
 - `cli/formatter.ts`, `cli/formatters/sarif.ts`, `cli/formatters/githubAnnotations.ts`: exclude
   `'not-applicable'` from degraded-tools warnings.
 - `README.md`: documents the `agentPolicy` shallow-merge interaction with the new
@@ -268,10 +302,14 @@ both cost and quality, no trade-off.
   — plus `--allow-truncation` opt-out, and `--chunk` producing complete, deduplicated findings
   across a synthetic oversized diff (verify via the existing accumulator/synthesize path, not a
   new merge function) with `truncationMeta.truncated === false` on full-coverage chunked runs.
-- Issue 2: the diagnostic script is run against live Ollama first (not mocked) to determine which
-  branch of the fix applies; once chosen, a regression test with a mocked provider confirms
-  `num_predict` is sent in `base.ts`/`coverageAnalyst.ts`'s request bodies specifically, and
-  confirms `testGen.ts`/`evidenceVerifier.ts` requests are unchanged.
+- Issue 2: the diagnostic script (run live against Ollama, already complete — see the Approach
+  section above for the actual measurements and confirmed root cause) informed the fix; a
+  regression test with a mocked provider confirms `format: FINDING_ARRAY_SCHEMA` (not the string
+  `'json'`) is sent in `base.ts`'s request body, `coverageAnalyst.ts` sends its own distinct
+  object-shaped schema, and `testGen.ts`/`evidenceVerifier.ts` requests are unchanged. A live
+  sanity check (real Ollama, a diff with 2+ known findings) confirms the array shape is now
+  correct — not that under-reporting is fixed, since that's an explicitly out-of-scope, separate
+  finding (see Non-Goals in the Issue 2 section above).
 - Issue 3: regression test confirming a mixed diff (one `.md` file + one `.ts` file) sent to
   `security`/`adversarial` no longer includes the `.md` file's diff section, while the `.ts`
   section is untouched, the agent still runs (not skipped), and `ReviewResult.filteredFiles` (the
@@ -292,6 +330,7 @@ both cost and quality, no trade-off.
 
 ## Open Questions
 
-- Issue 2's exact `num_predict` value (or whether the fix ends up being about `format: 'json'`
-  instead) is genuinely undetermined until the diagnostic script runs against live Ollama — this
-  is intentional, not an oversight.
+- None remaining for the scope of this spec. Issue 2's original open question (what the live
+  measurement would show) is resolved — see the Approach section above. The model under-reporting
+  finding that surfaced during that investigation is a new, separate, deliberately out-of-scope
+  item (Issue 2's Non-Goal paragraph), not an open question for this plan to resolve.

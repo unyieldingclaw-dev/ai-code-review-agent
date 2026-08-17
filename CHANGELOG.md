@@ -16,6 +16,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   config field, default `false`); forced off for MCP callers regardless of project config. See
   `docs/superpowers/specs/2026-08-10-evidence-grounding-verification-design.md` for the full
   design and validation data.
+- `--allow-truncation`: opt out of the new truncated-but-clean exit code (below) for workflows
+  that have deliberately accepted partial diff coverage.
+- `--chunk`: instead of silently truncating an oversized diff to `--max-lines`, split it into
+  multiple full-coverage passes and merge the results — full diff coverage at the cost of
+  multiplying LLM calls by chunk count. Opt-in, off by default. Implemented as a wrapper
+  (`chunkRunner.ts`) outside `SwarmRunner` — calls the existing `run()` once per chunk unchanged.
+- `security`/`adversarial` now exclude `**/*.md` by default via `agentPolicy` — these two agents'
+  prompts have no file-type awareness and were misreading documentation prose (e.g. a vulnerable
+  code example inside a security writeup) as real, executable vulnerable code. Deterministic, not
+  a prompt instruction, since prompt-tightening alone has previously underperformed for this class
+  of problem. `ReviewResult.filteredFiles` reports which files were stripped from an agent's own
+  view (new — sibling of `PolicyResult`, not nested in it, since this covers an agent that still
+  ran, just with reduced input).
+- `ToolAvailability` gains a `'not-applicable'` value, for when a tool-integrated agent's LLM
+  fallback should be skipped entirely rather than run (see `dependencies` fix below).
+
+### Fixed
+
+- **Silent diff truncation had no exit-code signal.** A diff truncated to `--max-lines` produced
+  the same exit code as a genuinely complete review — CI could pass on a review that never saw
+  most of the diff. New exit code 3 (truncated-but-otherwise-clean); takes priority over
+  `--fail-on` but below the existing agent-failure (2) and real-finding (1) exit codes, so a
+  genuine blocker or agent failure is never masked by a lower-priority truncation code. Opt out
+  with `--allow-truncation`, or use the new `--chunk` (above) for full coverage instead.
+- **Every agent's structured JSON output needed truncation-recovery to parse.** Root-caused via a
+  live diagnostic script (`calibration/responseTruncationDiagnostic.ts`, new — permanent, run with
+  `npm run calibrate:truncation`): `format: 'json'` (the bare string Ollama's structured-output
+  mode accepted) only constrains "valid JSON," not the required top-level shape, so the model
+  reliably emitted a single bare object instead of an array. Not, as originally hypothesized, a
+  missing token cap — `done_reason` was `stop`, never `length`, at every diff size tested. Fixed by
+  sending an explicit JSON Schema (`format: { type: 'array' | 'object', ... }`) instead, which
+  empirically forces the correct shape. A separate, distinct problem surfaced during the same
+  investigation — the model under-reporting multiple real findings in one diff, even with the
+  shape fixed — is **not** fixed by this change; it's a model-capability limitation, not a format
+  issue, and is documented as an accepted, deliberately out-of-scope limitation rather than guessed
+  at with an unverified fix.
+- **`dependencies` assumed every project uses npm/Node.js.** On a project with no `package.json`
+  and a diff that never touches one (e.g. a Flutter/Dart project), the agent still ran its LLM
+  fallback and could fabricate a "missing manifest" style finding. Now skips the LLM entirely and
+  reports `toolAvailability.npmAudit: 'not-applicable'` in that case. A diff that DOES touch
+  `package.json`/`package-lock.json` (even one not yet on disk — e.g. reviewing an unapplied patch
+  that adds a manifest for the first time) is unaffected, reaching the existing
+  npm-audit-then-LLM-fallback logic exactly as before.
 
 ## [1.9.0] — 2026-08-09 (deterministic-tool integration, hallucination fixes, CI hardening)
 
