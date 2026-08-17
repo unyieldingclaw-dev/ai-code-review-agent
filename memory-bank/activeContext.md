@@ -16,9 +16,44 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-12
+**Last Updated**: 2026-08-16
 
 ## Current Focus
+
+**Review-reliability fixes complete and merged (2026-08-16)**: fixed 4 real bugs reported from an
+actual `ai-review-agent --profile security --diff` run against a Flutter/Dart project — silent
+diff truncation with no exit-code signal, agent JSON output needing truncation-recovery to parse,
+`security`/`adversarial` misreading `.md` prose as vulnerable code, `dependencies` assuming every
+project is npm/Node.js. All 4 verified against real source before design work; design spec +
+14-task plan written via `superpowers:writing-plans` (independently deep-reviewed, 11 issues fixed
+pre-plan), executed via `superpowers:subagent-driven-development` on branch
+`feature/review-reliability-fixes` (now merged and removed). Task 3's live diagnostic
+(`calibration/responseTruncationDiagnostic.ts`, new permanent script) disproved the plan's own
+original hypothesis for the JSON-parsing bug — not a missing `num_predict` cap (`done_reason` was
+`stop`, never `length`, at every diff size) but `format: 'json'` (the bare string) only
+constraining "valid JSON," not array shape. Verified fix: an explicit JSON Schema
+(`FINDING_ARRAY_SCHEMA`/`COVERAGE_RESULT_SCHEMA`) forces the correct shape. A separate,
+distinct finding from the same investigation — the model under-reporting multiple real findings
+even with shape fixed — was deliberately left unaddressed (documented Non-Goal, not fixable via
+any `ChatOptions` change). Mid-plan, applied "Capability vs Orchestration" reasoning from a
+maintenance-mode framing document to redesign `--chunk` as `chunkRunner.ts`, a thin wrapper calling
+`SwarmRunner.run()` once per chunk from entirely outside `SwarmRunner` itself, after the user
+pushed back on an initial recommendation to cut the feature instead of redesigning it. **A final
+holistic branch review (post-implementation, pre-merge, looking at the whole diff rather than
+task-by-task) caught 2 real cross-task regressions no single task's own review could have seen**:
+`chunkRunner.ts`'s result-merge took `agentStatus` from the last chunk only, silently hiding a real
+agent failure in an earlier chunk behind exit code 0 — undermining the exact guarantee `--chunk`
+exists to provide; and the new default `**/*.md` exclude relied on a pre-existing `matchPattern`
+glob bug that made `**/` require a literal `/`, so it could never match a root-level file like
+`README.md` — fixed the glob matcher itself (root cause, also benefits user `--ignore`/`.aiignore`
+patterns) rather than narrowing the new default. Both independently re-verified via direct
+reproduction before fixing. Live end-to-end verification against a synthetic oversized Flutter/Dart
+diff confirmed all 4 original symptoms resolved. 526 tests passing. Merged into
+`fix/full-codebase-audit-findings` (`00713e8`). Full detail:
+`docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md`,
+`docs/superpowers/plans/2026-08-16-review-reliability-fixes.md`, `progress.md`'s matching entry.
+
+---
 
 **Evidence-grounding verification pass complete and merged (2026-08-11/12)**: closed the
 "ACR reliability findings" item 4 gap noted below — findings whose own cited evidence contradicts

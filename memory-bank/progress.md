@@ -18,9 +18,9 @@ lineage: []
 
 **Last Updated**: 2026-08-16
 
-## 🚧 In Progress (2026-08-16)
+## ✅ Completed (2026-08-16)
 
-### Review-Reliability Fixes — branch `feature/review-reliability-fixes` (worktree `.worktrees/review-reliability-fixes`, off `fix/full-codebase-audit-findings`)
+### Review-Reliability Fixes — merged into `fix/full-codebase-audit-findings` (`00713e8`)
 
 User forwarded 4 concrete bugs from a real `ai-review-agent --profile security --diff` run against
 a Flutter/Dart project (not the earlier "ACR reliability findings" report — a separate, fresh bug
@@ -66,12 +66,66 @@ task, two-stage spec+quality review, controller-only commits).
 - Verified `qwen3:latest` (the evidence-verifier model) was already current mid-session
   (`ollama pull qwen3:latest`, digest `500a1f067a9f` unchanged) — unrelated side-check, not part of
   this plan's scope.
-- **Pending**: Tasks 4 (Provider — widen `ChatOptions.format`), 5 (`FINDING_ARRAY_SCHEMA` wiring),
-  6 (schema `filteredFiles` field), 7 (per-agent `filterDiff`/`agentPolicy` defaults, issue 3), 8
-  (README doc), 9 (`ToolAvailability` `'not-applicable'`), 10 (dependencies manifest pre-check,
-  issue 4), 11 (formatter guards), 12 (`chunkRunner.ts`), 13 (CLI `--chunk` wiring), 14 (full
-  regression + live verification). Full detail:
-  `docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md`,
+- [x] Tasks 4/5: `ChatOptions.format` widened to `'json' | Record<string, unknown>`;
+      `FINDING_ARRAY_SCHEMA`/`COVERAGE_RESULT_SCHEMA` wired into `base.ts`/`coverageAnalyst.ts` in
+      place of the bare `'json'` string — committed `698d3cd`/`2e8f0c5`. Live-verified end-to-end
+      through the real CLI (not just the standalone diagnostic): `agentStatus: "ok"` with no Stage
+      2b auto-wrap needed, and the run correctly caught both of two injected vulnerabilities in one
+      pass.
+- [x] Task 6: `ReviewResult.filteredFiles` (top-level, sibling of `PolicyResult`, not nested in
+      it — the case it covers is an agent that still ran, just with reduced input) — `9d649e0`.
+- [x] Task 7 (Issue 3 fix): `runner.ts`'s `withFilteredContext` wraps `withContext`, applying
+      `filterDiff()` per-agent via `agentPolicy.exclude`/`include` so an agent can run on a *subset*
+      of the diff, not just get whole-agent-skipped; new `DEFAULT_CONFIG.agentPolicy` excludes
+      `**/*.md` for `security`/`adversarial` specifically (the two agents verified to have zero
+      file-type awareness) — `1f37447`. Live-verified: a real CLI run's `filteredFiles.security`
+      correctly showed the `.md` file's diff section was stripped from the agent's own view before
+      the LLM ever saw it.
+- [x] Task 8: README documents the `agentPolicy` shallow-merge interaction (a project's own
+      `agentPolicy` for any agent replaces these new defaults entirely) — `92ec5e2`.
+- [x] Task 9: `ToolAvailability` gains `'not-applicable'` — `44a3d17`.
+- [x] Task 10 (Issue 4 fix): `dependencies.ts` skips the LLM entirely and reports
+      `'not-applicable'` when the diff doesn't touch a manifest AND no `package.json` exists on
+      disk — a diff that DOES touch one (even a brand-new one not yet on disk) still reaches the
+      existing npm-audit-then-LLM-fallback logic unchanged — `9a404bd`. Live-verified against a
+      synthetic Dart-project diff: `toolAvailability.npmAudit: "not-applicable"`, no fabricated
+      "missing manifest" finding.
+- [x] Task 11: all three formatters already handled `'not-applicable'` correctly with zero code
+      changes needed (verified by reading each, not assumed) — added regression tests only as a
+      guard against future drift — `8b8542e`.
+- [x] Tasks 12/13 (Issue 1's `--chunk`): `chunkRunner.ts` — a thin wrapper OUTSIDE `SwarmRunner`
+      that calls `runner.run()` once per `maxDiffLines`-sized chunk and merges results — plus the
+      `--chunk` CLI flag wiring `adf4ddc`/`f69fee8`. Deliberately kept outside `SwarmRunner`'s own
+      internals per the "Capability vs Orchestration" decision above.
+- [x] Task 14: full regression clean (517 tests, 0 typecheck/lint errors) plus live end-to-end
+      verification against a synthetic oversized Flutter/Dart-style diff (2278 lines, mixed `.md`
+      + real Dart source + `pubspec.yaml`) confirming all 4 original symptoms resolved in both the
+      default (`exit 3`, loud truncation) and `--chunk` (`exit 0`, full coverage, no `truncation`
+      field) paths. CHANGELOG entry — `093b563`.
+- [x] **Final holistic branch review (post-Task-14, pre-merge)**, looking at the whole diff rather
+      than task-by-task — same discipline as the evidence-grounding-verification merge below, and
+      it paid off the same way: caught 2 real cross-task regressions no single task's own review
+      could have seen, both independently re-verified directly before fixing (not taken on faith):
+      (1) `chunkRunner.ts`'s `mergeResults` took `agentStatus` from the last chunk only — since
+      `cli/index.ts`'s exit code 2 reads `agentStatus` directly, a real agent failure in an earlier
+      chunk was silently hidden behind a later chunk's success, undermining the exact guarantee
+      `--chunk` exists to provide. Fixed: `agentStatus` now merges across all chunks (an agent is
+      `'ok'` only if every chunk that ran it said `'ok'`). (2) The new `**/*.md` default (Task 7)
+      relied on `matchPattern` compiling `**/ ` to a *non-optional* literal slash, so it could only
+      match nested paths (`docs/README.md`), never a root-level file — the single most common
+      markdown file in any repo (`README.md`). Fixed `matchPattern` itself (`**/ ` → `(?:.*/)?`,
+      matching the documented gitignore spec exactly: "zero or more directories, including none")
+      rather than narrowing the default — this also fixes the same gap for user `--ignore`/
+      `.aiignore` patterns, not just this branch's new default. Also fixed a `Set`-dedup gap
+      (`filteredFiles` could double up entries across agent retries) and documented, but did not
+      fix, a narrower related gap (`extractChangedFiles`'s deliberate `/dev/null` exclusion — relied
+      on elsewhere for correct hallucination-filter behavior — means a delete-only diff bypasses the
+      whole-agent skip and under-reports `filteredFiles`; real but narrow, deferred rather than
+      patched same-session). 9 new regression tests. Committed `ad1373b`.
+- [x] Merged into `fix/full-codebase-audit-findings` via `git merge --no-ff` (`00713e8`); full
+      regression re-verified clean on the main checkout post-merge (526 tests, 0 typecheck errors).
+      Worktree and fully-merged `feature/review-reliability-fixes` branch removed.
+- Full detail: `docs/superpowers/specs/2026-08-16-review-reliability-fixes-design.md`,
   `docs/superpowers/plans/2026-08-16-review-reliability-fixes.md`.
 
 ## ✅ Completed (2026-08-12)
