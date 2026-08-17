@@ -140,24 +140,25 @@ async function runCli(
     stderrChunks.push(args.map(String).join(' ') + '\n')
   })
 
-  let exitCode = 0
-  const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: number | string) => {
-    exitCode = Number(code ?? 0)
-    throw new Error(`process.exit(${code})`)
-  })
-
+  // WHY process.exitCode instead of a process.exit() spy: the CLI sets process.exitCode and
+  // returns rather than calling process.exit(), so the event loop can drain naturally instead
+  // of being torn down mid-flight (process.exit() forcing immediate termination while async
+  // handles -- e.g. fetch/AbortController cleanup -- are still settling was reproduced as the
+  // cause of a Windows-only libuv crash, "Assertion failed: !(handle->flags &
+  // UV_HANDLE_CLOSING)"). Reset before and after each run since process.exitCode is a real
+  // mutable global that would otherwise leak between tests and into vitest's own exit code.
+  process.exitCode = undefined
   try {
     const { program } = await import('../../src/cli/index.js')
     await program.parseAsync(['node', 'cli', ...args])
-  } catch (err) {
-    if (!(err instanceof Error) || !err.message.startsWith('process.exit(')) throw err
   } finally {
     stdoutSpy.mockRestore()
     stderrSpy.mockRestore()
     consoleSpy.mockRestore()
-    exitSpy.mockRestore()
   }
 
+  const exitCode = Number(process.exitCode ?? 0)
+  process.exitCode = undefined
   return { exitCode, stdout: stdoutChunks.join(''), stderr: stderrChunks.join('') }
 }
 

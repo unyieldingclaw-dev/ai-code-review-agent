@@ -161,6 +161,16 @@ const CASES: CalibrationCase[] = [
     baitKeyword: 'REPLACE_WITH_REAL_KEY',
   },
   {
+    // Regression case for a real false positive reported against a Flutter/Dart project: a
+    // "password"-named identifier is not itself a finding -- the agent must check the VALUE
+    // assigned to it (see secrets.ts's value-shape rule). This fixture has zero real secrets --
+    // just a boolean UI-toggle flag and a controller reference, both merely named "password".
+    name: 'secrets-value-shape',
+    agentName: 'secrets',
+    fixtureFile: 'calibration/fixtures/secrets-value-shape.diff',
+    expectEmpty: true,
+  },
+  {
     // SecretsAgent's run() override routes any diff whose changed file exists on disk through
     // gitleaks instead of the LLM. gitleaksParser maps title/detail from gitleaks' own rule
     // metadata (RuleID/Description), not fixture-specific text -- --redact means `evidence` is
