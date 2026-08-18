@@ -67,6 +67,56 @@ UV_HANDLE_CLOSING), file src\win\async.c, line 76` after a review completed succ
   merged report if the last chunk had nothing to flag. Now merged (`checkedCount`/
   `unavailableCount` summed, `unavailableReasons`/`flagged` concatenated) across all chunks, like
   `agentStatus` already was.
+- `Finding.severity`/`.basis` were never validated against their real enum values anywhere in the
+  parse pipeline — an off-spec value from the LLM (or a malformed provider response) would silently
+  corrupt `SEVERITY_RANK`/`basisOrder` lookups across `orchestrator.ts`, `chunkRunner.ts`,
+  `cli/exitCode.ts`, and `evidenceVerifier.ts` instead of failing loudly. `validateAndNormalizeFindings`
+  now enum-validates both fields, defaults `basis` to `'INFERRED'` when absent, and fixes a
+  `blocking` default that didn't match its own documented rule
+  (`blocking: severity === 'critical' || 'high'`).
+- `--agents`/`--fail-on` accepted any string and failed silently downstream instead of erroring —
+  both are now validated against their real enum values at CLI startup (exit 1 with a clear
+  message). The CLI's catch-all error handler used the same exit code (1) for "tool couldn't run
+  at all" as for "review found a blocking finding," making the two failure modes indistinguishable
+  to CI. Added `STARTUP_FAILURE_EXIT_CODE = 4` and routed the catch-all handler through it.
+- MCP output (`formatMcpOutput`) and SARIF output never surfaced `agentStatus`/`truncation` —
+  a run where every agent crashed was formatted identically to a clean pass for any MCP client or
+  SARIF consumer (GitHub code scanning, etc.). MCP output now includes an explicit failure/
+  truncation warning; SARIF output now sets the standard `invocations[].executionSuccessful` /
+  `toolExecutionNotifications` fields via a new `buildInvocation()` helper.
+- `hallucinationCrossCheck`'s `DETERMINISTIC_SOURCES` corroboration-bypass list trusted
+  LLM-self-reported `source` strings (`'git'`, `'policy'`, `'lizard'`) that were never actually
+  backed by a real tool — only `gitleaks` and `npm-audit` are genuinely code-set, so an LLM could
+  self-tag a fabricated finding with one of the other values and skip corroboration entirely.
+  Narrowed to `['gitleaks', 'npm-audit']`; removed the now-dead prompt instructions in
+  `breakingChange.ts`, `licenseCompliance.ts`, `migrationSafety.ts`, `secrets.ts`, and
+  `dependencies.ts` that told agents to self-tag those source values. Also fixed a dead-branch bug
+  in `licenseCompliance.ts`/`breakingChange.ts` where severity and basis were coupled such that a
+  `SPECULATIVE`-basis finding was always dropped regardless of its actual severity.
+- `DependenciesAgent`/`LicenseComplianceAgent` skipped their LLM call inconsistently when a diff
+  didn't touch a manifest file (`package.json`/`package-lock.json`) — the skip logic didn't
+  account for every code path that could reach `run()`. Both agents now use the same
+  `touchesManifest` check (via `extractChangedFiles`) consistently, avoiding wasted LLM calls
+  regardless of entry point.
+- The `PowerShell` tool wasn't wired into `.claude/settings.json`'s PreToolUse hook matcher for
+  `review-reminders.ps1`, so commit/push review-gate reminders only fired for the `Bash` tool —
+  a real bypass for any session using the PowerShell tool exclusively. Added `TRUNCATE TABLE` and
+  a WHERE-aware `DELETE FROM` pattern to `dangerous-commands.ps1`/`.sh`'s CONFIRM tier (previously
+  undetected). `.github/workflows/review.yml` replaced `|| true` with `continue-on-error: true`
+  and now explicitly reports failure instead of silently no-op'ing on "Post PR Comment"/"Write Step
+  Summary"; `.github/workflows/calibrate.yml` no longer sets job-level `continue-on-error: true`.
+- `pre-push-check.ps1`/`.sh`'s secret-scan patterns were missing PEM blocks, `Authorization:
+Bearer` headers, JSON/YAML-style secret assignments, AWS secret access keys, and newer
+  fine-grained GitHub PAT formats; the exclusion for scan noise was `fixtures/`+`docs/` by prefix,
+  which suppressed scanning of every real path under both trees, not just the security-fixture
+  directory it was meant for — narrowed to `fixtures/security/` only. The `.sh` version's
+  `check_secret()` was case-sensitive where the `.ps1` version's `-match` is case-insensitive by
+  default, a platform-dependent false negative — now uses `grep -iE`. While testing the new
+  patterns, found and fixed a genuine pre-existing bug: `git log --not --remotes` (no explicit
+  positive starting ref) silently returns empty output in a repo with zero remotes configured,
+  meaning first-push secret scanning could no-op entirely for a brand-new repo — fixed by using
+  `git log HEAD --not --remotes` in both the diff-scan and large-file-list commands, in both
+  script variants.
 
 ### Testing
 
@@ -78,6 +128,15 @@ UV_HANDLE_CLOSING), file src\win\async.c, line 76` after a review completed succ
 - Added test coverage for `TestGenAgent`'s pytest branch (`def test_` detection) — every existing
   test used a fake `projectPath` that always fell through to the `vitest` branch, so the
   pytest-specific regex had zero coverage.
+- Deleted `tests/unit/orchestratorAgent.test.ts`, confirmed fully redundant against
+  `tests/unit/orchestrator.test.ts` during the 15-phase system-integrity audit's test-suite
+  integrity phase. Added regression tests across `baseAgent.test.ts` (enum validation),
+  `cli.test.ts` (flag validation, exit codes), `mcp/formatter.test.ts`, `formatters/sarif.test.ts`,
+  `orchestrator.test.ts` (`DETERMINISTIC_SOURCES` narrowing), `dependenciesAgent.test.ts`,
+  `licenseComplianceAgent.test.ts`, and `runner.test.ts` covering every fix above.
+- Extended `tests/review-reminders.Tests.ps1` with Pester coverage for the new TRUNCATE/DELETE FROM
+  guardrail patterns, the PowerShell-matcher hook wiring, and `pre-push-check.ps1`'s secret
+  scanning (verified live, not just read).
 
 ### Documentation
 
@@ -92,6 +151,24 @@ UV_HANDLE_CLOSING), file src\win\async.c, line 76` after a review completed succ
   rejected before shipping. See
   `docs/superpowers/specs/2026-08-17-absence-claim-investigation.md` for the full investigation
   and validation data.
+- Ran a 15-phase ACR Full-System Integrity & Hardening Review (system map, capability tracing,
+  contract/data-flow audit, agent/reviewer integrity, orchestration, failure modes, test-suite
+  integrity, CLI/hook/CI integrity, security/boundary review, efficiency, dead code, docs-vs-reality,
+  end-to-end proof) — see
+  `docs/superpowers/specs/2026-08-17-full-system-integrity-hardening-audit.md` for the full report.
+  All Tier 1/2 findings were verified against current source before being fixed (entries above);
+  Tier 3 items (sanitizer overhaul, chunking redesign, vscode-extension catch-up, Ollama
+  concurrency handling) were deferred as large, speculative redesigns per this project's
+  simplicity-first principle.
+- Fixed stale documentation surfaced by the audit's docs-vs-reality phase: README.md's
+  `--timeout` default in the Guardrails table contradicted the actual 180s default (was 60s);
+  stale `toolVersion`/`agentTimeoutMs` config examples; stale `npm run check`/`npm test`/
+  `npm run test:extension`/`npm run calibrate` descriptions and counts. `docs/HOOKS-GUIDE.md`'s
+  BLOCK pattern count (19 → 16) and a broken cross-reference to a non-existent env-block example
+  in `standards/SECURITY-GUARDRAILS.md` (replaced with an inline example in HOOKS-GUIDE.md itself).
+  `standards/SECURITY-GUARDRAILS.md` documented `DROP TABLE`/`DROP DATABASE` as Tier 2 CONFIRM,
+  but `dangerous-commands.ps1`/`.sh` actually implement them as Tier 1 BLOCK (no override) —
+  the doc now matches the implementation.
 
 ## [1.10.0] — 2026-08-17 (full-codebase audit fixes, evidence-grounding verification, review reliability)
 

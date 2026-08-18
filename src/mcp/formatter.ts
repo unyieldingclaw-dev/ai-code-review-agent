@@ -7,9 +7,35 @@ const SEVERITY_ICONS: Record<'critical' | 'high', string> = {
 }
 
 export function formatMcpOutput(result: ReviewResult): string {
-  const { findings, summary } = result
+  const { findings, summary, agentStatus, truncation } = result
+
+  // WHY this block exists at all: this output goes back to a calling LLM (e.g. Claude Code
+  // itself via the MCP tool), not a human reading a terminal -- it has no other channel to
+  // notice a failure. Before this fix, a run where every agent timed out and/or the diff was
+  // truncated to a fraction of its size rendered identically to a genuine clean pass, because
+  // this function never read agentStatus/truncation at all. The markdown formatter (cli/
+  // formatter.ts) already handles this correctly; this mirrors that gating logic for MCP.
+  const failedAgents = Object.entries(agentStatus ?? {}).filter(([, status]) => status !== 'ok')
+  const warnings: string[] = []
+  if (failedAgents.length > 0) {
+    const totalAgents = Object.keys(agentStatus ?? {}).length
+    const detail = failedAgents.map(([name, status]) => `${name}: ${status}`).join(', ')
+    warnings.push(
+      `⚠️ ${failedAgents.length}/${totalAgents} agent(s) failed (${detail}) — results may be incomplete.`
+    )
+  }
+  if (truncation?.truncated) {
+    warnings.push(
+      `⚠️ Diff truncated: reviewed ${truncation.keptLines}/${truncation.originalLines} lines — ` +
+        `findings past this point were never analyzed.`
+    )
+  }
+  const warningBlock = warnings.length > 0 ? warnings.join('\n') + '\n\n' : ''
 
   if (findings.length === 0) {
+    if (warnings.length > 0) {
+      return `## AI Code Review — ⚠️ No findings, but the review was incomplete\n\n${warningBlock}`
+    }
     return '## AI Code Review — ✅ No findings\n'
   }
 
@@ -22,11 +48,11 @@ export function formatMcpOutput(result: ReviewResult): string {
 
   if (actionable.length === 0) {
     const tail = buildTail(mediumCount, lowCount)
-    return `## AI Code Review — ✅ No critical or high findings\n\n_${tail}_\n`
+    return `## AI Code Review — ✅ No critical or high findings\n\n${warningBlock}${tail ? `_${tail}_\n` : ''}`
   }
 
   const count = actionable.length
-  const header = `## AI Code Review — ${count} finding${count === 1 ? '' : 's'}\n\n`
+  const header = `## AI Code Review — ${count} finding${count === 1 ? '' : 's'}\n\n${warningBlock}`
   const body = actionable.map(renderFinding).join('\n\n')
   const tail = buildTail(mediumCount, lowCount)
   const footer = tail ? `\n\n---\n_${tail}_\n` : '\n'

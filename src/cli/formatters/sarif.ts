@@ -43,6 +43,42 @@ function findingToSarifResult(f: Finding) {
   }
 }
 
+// WHY a standard `invocations[].executionSuccessful`/`toolExecutionNotifications` signal, not
+// just the non-standard `properties.agentStatus`/`properties.truncation` below: GitHub Code
+// Scanning (and most SARIF-consuming CI systems) don't surface arbitrary `properties` to a
+// reviewer, but `executionSuccessful` is a first-class SARIF field many consumers do check. Before
+// this, a run where every agent timed out (0 results, `properties.agentStatus` all non-"ok") was
+// structurally identical to a genuinely clean scan for any consumer gating on "0 results = pass."
+function buildInvocation(result: ReviewResult) {
+  const failedAgents = Object.entries(result.agentStatus ?? {}).filter(
+    ([, status]) => status !== 'ok'
+  )
+  const executionSuccessful = failedAgents.length === 0 && !result.truncation?.truncated
+  const notifications = [
+    ...failedAgents.map(([name, status]) => ({
+      level: 'error' as const,
+      message: { text: `Agent "${name}" failed: ${status} — results may be incomplete.` },
+    })),
+    ...(result.truncation?.truncated
+      ? [
+          {
+            level: 'warning' as const,
+            message: {
+              text:
+                `Diff truncated: reviewed ${result.truncation.keptLines}/` +
+                `${result.truncation.originalLines} lines — findings past this point were never ` +
+                `analyzed.`,
+            },
+          },
+        ]
+      : []),
+  ]
+  return {
+    executionSuccessful,
+    ...(notifications.length > 0 ? { toolExecutionNotifications: notifications } : {}),
+  }
+}
+
 export function formatSarif(result: ReviewResult): string {
   const sarif = {
     $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
@@ -58,6 +94,7 @@ export function formatSarif(result: ReviewResult): string {
           },
         },
         results: result.findings.map(findingToSarifResult),
+        invocations: [buildInvocation(result)],
         // Add run-level properties for context, policy, agent-status, and truncation metadata
         properties: {
           ...(result.context ? { context: result.context } : {}),

@@ -66,27 +66,41 @@ if (-not (Test-Path ".gitattributes")) {
 $remote = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>&1
 $hasUpstream = ($LASTEXITCODE -eq 0 -and $remote -notmatch 'fatal')
 $secretPatterns = @(
-    @{ label = "AWS access key";            pattern = 'AKIA[0-9A-Z]{16}' }
-    @{ label = "OpenAI/Anthropic API key";  pattern = 'sk-[a-zA-Z0-9]{32,}' }
-    @{ label = "GitHub personal token";     pattern = 'ghp_[a-zA-Z0-9]{36}' }
+    @{ label = "AWS access key";              pattern = 'AKIA[0-9A-Z]{16}' }
+    @{ label = "AWS secret access key";       pattern = 'aws_secret_access_key\s*[:=]\s*["\x27]?[A-Za-z0-9/+=]{40}["\x27]?' }
+    @{ label = "OpenAI/Anthropic API key";    pattern = 'sk-[a-zA-Z0-9]{32,}' }
+    @{ label = "GitHub token (classic or fine-grained)"; pattern = '(gh[oprsu]_[a-zA-Z0-9]{36,}|github_pat_[a-zA-Z0-9_]{22,})' }
+    @{ label = "Private key block";           pattern = '-----BEGIN [A-Z ]*PRIVATE KEY-----' }
+    @{ label = "Bearer token in header";      pattern = 'Authorization:\s*Bearer\s+[A-Za-z0-9\-_.]{16,}' }
     @{ label = "Generic password assignment"; pattern = 'password\s*=\s*["\x27][^"\x27\s]{8,}' }
-    @{ label = "Generic secret assignment";  pattern = 'secret\s*=\s*["\x27][^"\x27\s]{8,}' }
+    @{ label = "Generic secret assignment";   pattern = 'secret\s*=\s*["\x27][^"\x27\s]{8,}' }
+    @{ label = "JSON/YAML-style secret assignment"; pattern = '["\x27]?(api[_-]?key|password|secret|token)["\x27]?\s*:\s*["\x27][^"\x27\s]{8,}["\x27]' }
 )
-# WHY: fixtures/security/ and docs/ are excluded from secret scanning:
-# fixtures/security/ intentionally contains vulnerable code for regression testing;
-# docs/ (specs, plans) may quote fixture content as documentation examples.
+# WHY only fixtures/security/, not all of fixtures/ or docs/: the original exclusion
+# (fixtures/|docs/) covered every path under BOTH trees by prefix, so a real secret dropped
+# anywhere under fixtures/ (not just the security fixtures it was meant for) or anywhere under
+# docs/ was scanned zero times -- a real bypass surface, not just a false-positive suppressor.
+# fixtures/security/ intentionally contains vulnerable code for regression testing and is the
+# only path this was ever meant to cover.
 $inExcluded = $false
 if ($hasUpstream) {
     $pushDiff = git diff "$remote..HEAD" 2>&1 | ForEach-Object {
-        if ($_ -match '^\+\+\+ b/') { $inExcluded = $_ -match '^\+\+\+ b/(fixtures/|docs/)' }
+        if ($_ -match '^\+\+\+ b/') { $inExcluded = $_ -match '^\+\+\+ b/fixtures/security/' }
         if (-not $inExcluded -and $_ -match '^\+[^+]') { $_ }
     }
 } else {
-    # WHY: --not --remotes finds every commit reachable from HEAD but not from any
-    # remote-tracking ref — this is exactly the set of commits a first push would
-    # send. --format="" suppresses commit headers; only the patch lines remain.
-    $pushDiff = git log --not --remotes --format="" -p 2>&1 | ForEach-Object {
-        if ($_ -match '^\+\+\+ b/') { $inExcluded = $_ -match '^\+\+\+ b/(fixtures/|docs/)' }
+    # WHY explicit "HEAD" before --not --remotes: without a positive starting ref, `git log
+    # --not --remotes` silently returns NOTHING in a repo with zero remotes configured at all
+    # (a genuinely first-ever push, e.g. a brand-new local repo before `git remote add origin`
+    # has even run) -- confirmed empirically, this was a real bug, not a hypothetical: the entire
+    # secret scan silently no-opped for that case, and the "no commits to push" SKIP message
+    # below then misleadingly implied everything was already on a remote. HEAD --not --remotes
+    # finds every commit reachable from HEAD but not from any remote-tracking ref -- exactly the
+    # set of commits a first push would send, in both the "no remotes at all" and "remotes exist
+    # but this branch has no upstream" cases. --format="" suppresses commit headers; only the
+    # patch lines remain.
+    $pushDiff = git log HEAD --not --remotes --format="" -p 2>&1 | ForEach-Object {
+        if ($_ -match '^\+\+\+ b/') { $inExcluded = $_ -match '^\+\+\+ b/fixtures/security/' }
         if (-not $inExcluded -and $_ -match '^\+[^+]') { $_ }
     }
     if (-not $pushDiff) {
@@ -109,7 +123,7 @@ $largeFiles = @()
 $pushFileList = if ($hasUpstream) {
     git diff --name-only "$remote..HEAD" 2>&1
 } else {
-    git log --not --remotes --format="" --name-only 2>&1 | Where-Object { $_ -match '\S' } | Sort-Object -Unique
+    git log HEAD --not --remotes --format="" --name-only 2>&1 | Where-Object { $_ -match '\S' } | Sort-Object -Unique
 }
 $pushFileList | ForEach-Object {
     if ($_ -and (Test-Path $_)) {

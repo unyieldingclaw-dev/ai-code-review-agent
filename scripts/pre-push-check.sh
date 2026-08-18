@@ -60,20 +60,29 @@ REMOTE=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>&1 || true)
 HAS_UPSTREAM=0
 if [[ "$REMOTE" != *"fatal"* ]] && [ -n "$REMOTE" ]; then HAS_UPSTREAM=1; fi
 
-# WHY: fixtures/ and docs/ are excluded from secret scanning:
-# fixtures/security/ intentionally contains vulnerable code for regression testing;
-# docs/ (specs, plans) may quote fixture content as documentation examples.
+# WHY only fixtures/security/, not all of fixtures/ or docs/: the original exclusion
+# (fixtures|docs) covered every path under BOTH trees by prefix, so a real secret dropped
+# anywhere under fixtures/ (not just the security fixtures it was meant for) or anywhere under
+# docs/ was scanned zero times -- a real bypass surface, not just a false-positive suppressor.
+# fixtures/security/ intentionally contains vulnerable code for regression testing and is the
+# only path this was ever meant to cover.
 if [ "$HAS_UPSTREAM" -eq 1 ]; then
     PUSH_DIFF=$(git diff "${REMOTE}..HEAD" 2>&1 | awk '
-        /^\+\+\+ b\// { in_excl = ($0 ~ /^\+\+\+ b\/(fixtures|docs)\//) }
+        /^\+\+\+ b\// { in_excl = ($0 ~ /^\+\+\+ b\/fixtures\/security\//) }
         /^\+[^+]/ && !in_excl { print }
     ' || true)
 else
-    # WHY: --not --remotes finds every commit reachable from HEAD but not from any
-    # remote-tracking ref — exactly what a first push would send. --format="" drops
-    # commit headers so only patch lines remain.
-    PUSH_DIFF=$(git log --not --remotes --format="" -p 2>&1 | awk '
-        /^\+\+\+ b\// { in_excl = ($0 ~ /^\+\+\+ b\/(fixtures|docs)\//) }
+    # WHY explicit "HEAD" before --not --remotes: without a positive starting ref, `git log
+    # --not --remotes` silently returns NOTHING in a repo with zero remotes configured at all (a
+    # genuinely first-ever push, e.g. a brand-new local repo before `git remote add origin` has
+    # even run) -- confirmed empirically, a real bug: the entire secret scan silently no-opped
+    # for that case, and the "no commits to push" SKIP message below then misleadingly implied
+    # everything was already on a remote. HEAD --not --remotes finds every commit reachable from
+    # HEAD but not from any remote-tracking ref -- exactly what a first push would send, in both
+    # the "no remotes at all" and "remotes exist but this branch has no upstream" cases.
+    # --format="" drops commit headers so only patch lines remain.
+    PUSH_DIFF=$(git log HEAD --not --remotes --format="" -p 2>&1 | awk '
+        /^\+\+\+ b\// { in_excl = ($0 ~ /^\+\+\+ b\/fixtures\/security\//) }
         /^\+[^+]/ && !in_excl { print }
     ' || true)
     if [ -z "$PUSH_DIFF" ]; then
@@ -85,7 +94,11 @@ fi
 check_secret() {
     local label="$1" pattern="$2"
     local hits
-    hits=$(echo "$PUSH_DIFF" | grep -E "$pattern" | head -3 || true)
+    # WHY -i: grep is case-sensitive by default, unlike PowerShell's -match (case-insensitive by
+    # default) -- on any machine without pwsh installed (this .sh is the fallback), a differently
+    # cased secret keyword (e.g. "Password=", "SECRET_KEY=") previously passed through unscanned
+    # here while the .ps1 path would have caught it, a platform-dependent false negative.
+    hits=$(echo "$PUSH_DIFF" | grep -iE "$pattern" | head -3 || true)
     if [ -n "$hits" ]; then
         echo -e "${RED}[ERROR] Possible ${label} in push diff:${RESET}"
         echo "$hits" | while IFS= read -r line; do echo "        $line"; done
@@ -94,17 +107,21 @@ check_secret() {
     fi
 }
 
-check_secret "AWS access key"            'AKIA[0-9A-Z]{16}'
-check_secret "OpenAI/Anthropic API key"  'sk-[a-zA-Z0-9]{32,}'
-check_secret "GitHub personal token"     'ghp_[a-zA-Z0-9]{36}'
-check_secret "Generic password"          'password[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}'
-check_secret "Generic secret"            'secret[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}'
+check_secret "AWS access key"              'AKIA[0-9A-Z]{16}'
+check_secret "AWS secret access key"       'aws_secret_access_key[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9/+=]{40}["'"'"']?'
+check_secret "OpenAI/Anthropic API key"    'sk-[a-zA-Z0-9]{32,}'
+check_secret "GitHub token"                '(gh[oprsu]_[a-zA-Z0-9]{36,}|github_pat_[a-zA-Z0-9_]{22,})'
+check_secret "Private key block"           '\-\-\-\-\-BEGIN [A-Z ]*PRIVATE KEY\-\-\-\-\-'
+check_secret "Bearer token in header"      'Authorization:[[:space:]]*Bearer[[:space:]]+[A-Za-z0-9_.-]{16,}'
+check_secret "Generic password"            'password[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}'
+check_secret "Generic secret"              'secret[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}'
+check_secret "JSON/YAML-style secret assignment" '["'"'"']?(api[_-]?key|password|secret|token)["'"'"']?[[:space:]]*:[[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}["'"'"']'
 
 # Check 6: Files over 500 KB in push (warn)
 if [ "$HAS_UPSTREAM" -eq 1 ]; then
     PUSH_FILE_LIST=$(git diff --name-only "${REMOTE}..HEAD" 2>/dev/null || true)
 else
-    PUSH_FILE_LIST=$(git log --not --remotes --format="" --name-only 2>/dev/null | sort -u | grep -v '^$' || true)
+    PUSH_FILE_LIST=$(git log HEAD --not --remotes --format="" --name-only 2>/dev/null | sort -u | grep -v '^$' || true)
 fi
 LARGE=$(echo "$PUSH_FILE_LIST" | while IFS= read -r f; do
     if [ -n "$f" ] && [ -f "$f" ]; then

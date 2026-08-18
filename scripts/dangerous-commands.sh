@@ -73,6 +73,25 @@ confirm() {
     esac
 }
 
+# WHY DELETE FROM gets its own check instead of a plain confirm() call: unlike TRUNCATE, a
+# WHERE-scoped DELETE (e.g. "delete from sessions where expired_at < now()") is common and safe --
+# a blanket substring match would CONFIRM on routine, already-scoped deletes constantly.
+# standards/SECURITY-GUARDRAILS.md documents this as specifically "DELETE without WHERE", so only
+# flag it when no "where" appears anywhere in the (already-lowercased) command.
+confirm_delete_without_where() {
+    case "$input_lc" in
+        *"delete from"*)
+            case "$input_lc" in
+                *"where"*) ;; # has a WHERE clause somewhere -- assume scoped, don't flag
+                *)
+                    deny "CONFIRM REQUIRED: $1. Run manually if intentional."
+                    exit 0
+                    ;;
+            esac
+            ;;
+    esac
+}
+
 warn() {
     # WARN: credential/secrets access — command proceeds, access is surfaced
     case "$input_lc" in
@@ -104,6 +123,8 @@ confirm "git update-ref"    "low-level ref manipulation"        # WHY: low-level
 confirm "sudo rm"           "privileged deletion"               # WHY: elevated deletion can remove system files
 confirm "chmod -r 777"      "world-writable recursive chmod"    # WHY: makes entire tree world-writable
 confirm "--no-verify"       "bypasses pre-commit hooks (local governance)"  # WHY: skips safety hooks on commit
+confirm "truncate table"    "SQL table truncation (irreversible bulk delete, no WHERE clause possible)"  # WHY: bulk data loss, no scoping mechanism exists for TRUNCATE
+confirm_delete_without_where "unscoped SQL DELETE (no WHERE clause)"
 
 # WARN: credential/secrets access — legitimate workflows exist, surface the access only
 warn "id_rsa"           "SSH private key access"                # WHY: SSH private key — may be intentional (key setup)

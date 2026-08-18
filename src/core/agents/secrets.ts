@@ -130,6 +130,7 @@ Additional rules:
 - evidence: quote the specific diff line(s) that triggered this finding
 - recommendation: write corrected code, not just a description
 - blocking: true for critical/high, false for medium/low
-- source: "heuristic" for pattern-based detection; "gitleaks" if an external tool flagged it`
+- source: always "heuristic" — this prompt only runs when gitleaks wasn't available; a genuine
+  gitleaks finding is reported directly from its own output and never reaches this prompt at all`
   }
 }

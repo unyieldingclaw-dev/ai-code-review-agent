@@ -32,12 +32,12 @@ Configured in `.claude/settings.json`:
 
 Intercepts both Bash and PowerShell tool calls before they run using `scripts/dangerous-commands.ps1`. Enforces 3-tier safety:
 
-**BLOCK** (19 patterns — denies the tool call, command never runs):\
+**BLOCK** (16 patterns — denies the tool call, command never runs):\
 _Shell:_ `rm -rf` · `mkfs` · `dd if=` · `git push --force` · `git push -f` · `DROP TABLE` · `DROP DATABASE` · `| bash` · `| sh` · `|bash` · `|sh`\
 _PowerShell-native:_ `Remove-Item -Recurse -Force` · `Remove-Item -Force -Recurse` · `Format-Volume` · `| Invoke-Expression` · `|Invoke-Expression` · `| iex` · `|iex`
 
 **CONFIRM** (7 patterns — surfaces confirmation dialog):
-`git filter-branch` · `git update-ref` · `sudo rm` · `chmod -R 777` · `--no-verify` · `TRUNCATE TABLE` · `DELETE FROM`
+`git filter-branch` · `git update-ref` · `sudo rm` · `chmod -R 777` · `--no-verify` · `TRUNCATE TABLE` · `DELETE FROM` (only when no `WHERE` clause is present — a scoped, WHERE-qualified delete is not flagged)
 
 **WARN** (4 patterns — exits 0, surfaces access alert):
 `id_rsa` · `.pem` · `.env.production` · `credentials.json`
@@ -74,7 +74,15 @@ Checks whether a file being written is within the scope declared in the active t
 - **Out-of-scope write (default):** prints a warning and exits 0. Claude sees it and should pause.
 - **Out-of-scope write (hard-block mode):** denies the tool call via `hookSpecificOutput.permissionDecision: "deny"` when `PMB_CONTRACT_HARD_BLOCK=1` is set in the `env` block of `.claude/settings.json`.
 
-Set `PMB_CONTRACT_HARD_BLOCK=1` for sessions where scope discipline is critical. See `standards/SECURITY-GUARDRAILS.md` for the full env-block example.
+Set `PMB_CONTRACT_HARD_BLOCK=1` for sessions where scope discipline is critical, in the `env` block of `.claude/settings.json`:
+
+```json
+{
+  "env": {
+    "PMB_CONTRACT_HARD_BLOCK": "1"
+  }
+}
+```
 
 **Field paths and schema:** the hook reads the target file from the nested `tool_input.file_path` field of the hook's stdin JSON (`{"tool_name":"Edit","tool_input":{"file_path":"..."}}`), not a flat `.file_path` — the real payload never populates the flat field. Scope is read as the `scope: [{file, op}]` array documented in `docs/CONTRACTS-GUIDE.md` (each entry's `.file` property), not a `scope.files` list.
 

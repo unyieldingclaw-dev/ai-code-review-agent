@@ -846,6 +846,11 @@ describe('SwarmRunner semantic context caching', () => {
 })
 
 describe('SwarmRunner hallucinated-file defense', () => {
+  // WHY 'security', not 'dependencies': DependenciesAgent now skips the LLM call entirely (never
+  // even reaches the fabricated response below) when the diff doesn't touch a manifest file --
+  // see its run() override. These tests are about the orchestrator's file-existence hallucination
+  // defense, not about any one specific agent, so a plain security-domain finding exercises it
+  // the same way without depending on dependencies-specific skip logic.
   it('drops a finding whose file was never touched by the reviewed diff', async () => {
     const fabricated = JSON.stringify([
       {
@@ -867,7 +872,7 @@ describe('SwarmRunner hallucinated-file defense', () => {
       '+new',
     ].join('\n')
     const provider = makeProvider(fabricated)
-    const config = { ...DEFAULT_CONFIG, agents: ['dependencies'] as AgentName[] }
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[] }
     const runner = new SwarmRunner(config, provider)
 
     const result = await runner.run({ diff })
@@ -896,7 +901,7 @@ describe('SwarmRunner hallucinated-file defense', () => {
       '+new',
     ].join('\n')
     const provider = makeProvider(fabricated)
-    const config = { ...DEFAULT_CONFIG, agents: ['dependencies'] as AgentName[] }
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[] }
     const runner = new SwarmRunner(config, provider)
 
     const result = await runner.run({ diff })
@@ -904,7 +909,7 @@ describe('SwarmRunner hallucinated-file defense', () => {
     expect(result.hallucinationFilter).toEqual({
       dropped: [
         {
-          agent: 'dependencies',
+          agent: 'security',
           title: 'Wildcard version specifier for lodash',
           file: 'package.json',
         },

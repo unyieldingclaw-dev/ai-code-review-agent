@@ -67,26 +67,60 @@ jobs:
           git diff origin/${{ github.base_ref }}...HEAD > pr.diff
           echo "Diff size: $(wc -c < pr.diff) bytes"
 
+      # WHY continue-on-error (not "|| true"): "|| true" always exits 0, so a crash/timeout here
+      # was completely invisible -- the step showed a plain green checkmark identical to a real
+      # clean run, and (per the steps below) no PR comment was even posted noting the skip.
+      # continue-on-error still lets the rest of the job run, but marks this specific step with a
+      # visible "failed" indicator in the GitHub UI, and steps.review.outcome below lets the
+      # comment/summary steps report the failure explicitly instead of silently doing nothing.
       - name: Run AI Review
         id: review
+        continue-on-error: true
         run: |
-          ai-review-agent --diff pr.diff --format json --out findings.json || true
+          ai-review-agent --diff pr.diff --format json --out findings.json
         env:
           OLLAMA_URL: http://localhost:11434
 
       - name: Post PR Comment
         if: always()
         uses: actions/github-script@v9
+        env:
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
         with:
           script: |
             const fs = require('fs')
+            const lines = ['<!-- ai-review-agent:v1 -->', '## 🤖 AI Code Review', '']
             if (!fs.existsSync('findings.json')) {
-              console.log('No findings.json — skipping comment')
+              // WHY post a comment here instead of silently returning: this is the exact gap
+              // audit finding C6 identified -- a crashed/timed-out review previously left no
+              // trace anywhere a reviewer would look. steps.review.outcome distinguishes a real
+              // crash from the (expected, non-error) case of the review genuinely producing no
+              // output for another reason.
+              lines.push(
+                process.env.REVIEW_OUTCOME === 'failure'
+                  ? '⚠️ AI review failed to run (see the "Run AI Review" step logs for details). No review was performed for this PR.'
+                  : '⚠️ AI review did not produce output for this PR (no findings.json). See workflow logs.'
+              )
+              const body = lines.join('\n')
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number
+              })
+              const existing = comments.data.find(c => c.body.includes('<!-- ai-review-agent:v1 -->'))
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  comment_id: existing.id, body
+                })
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: context.issue.number, body
+                })
+              }
               return
             }
             const result = JSON.parse(fs.readFileSync('findings.json', 'utf8'))
             const findings = result.findings ?? []
-            const lines = ['<!-- ai-review-agent:v1 -->', '## 🤖 AI Code Review', '']
             if (findings.length === 0) {
               lines.push('✅ No issues found.')
             } else {
@@ -122,10 +156,18 @@ jobs:
 
       - name: Write Step Summary
         if: always()
+        env:
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
         run: |
           node -e "
             const fs = require('fs')
-            if (!fs.existsSync('findings.json')) process.exit(0)
+            if (!fs.existsSync('findings.json')) {
+              const status = process.env.REVIEW_OUTCOME === 'failure'
+                ? '⚠️ AI review failed to run — see the Run AI Review step logs.'
+                : '⚠️ AI review produced no output (no findings.json).'
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, \`## AI Review\n\${status}\n\`)
+              process.exit(0)
+            }
             const r = JSON.parse(fs.readFileSync('findings.json','utf8'))
             const rows = (r.findings||[]).map(f => \`| \${f.severity} | \${f.agent} | \${f.file}:\${f.line} | \${f.title} |\`).join('\n')
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, \`## AI Review\n| Severity | Agent | Location | Issue |\n|---|---|---|---|\n\${rows||'| — | — | — | No findings |'}\n\`)

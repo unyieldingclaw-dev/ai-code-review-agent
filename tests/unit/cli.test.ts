@@ -256,12 +256,12 @@ describe('CLI — argument parsing and output', () => {
     expect(stderr + '').toMatch(/No diff to review/)
   })
 
-  it('prints Ollama hint when runner throws connection error', async () => {
+  it('prints Ollama hint when runner throws connection error, using the distinct startup-failure exit code (not 1, which also means "blocker found")', async () => {
     MockSwarmRunner.mockImplementation(() => ({
       run: vi.fn().mockRejectedValue(new Error('Ollama not reachable at http://localhost:11434')),
     }))
     const { exitCode, stderr } = await runCli([])
-    expect(exitCode).toBe(1)
+    expect(exitCode).toBe(4) // STARTUP_FAILURE_EXIT_CODE
     expect(stderr).toMatch(/ollama serve/)
   })
 
@@ -577,6 +577,35 @@ describe('CLI — argument parsing and output', () => {
   it('rejects an invalid --verify-evidence-severity value', async () => {
     const { exitCode } = await runCli(['--verify-evidence-severity', 'urgent'])
     expect(exitCode).toBe(1)
+  })
+
+  it('rejects an invalid --fail-on value instead of silently disabling exit-code gating', async () => {
+    const { exitCode, stderr } = await runCli(['--fail-on', 'critcal'])
+    expect(exitCode).toBe(1)
+    expect(stderr).toMatch(/Invalid --fail-on value/)
+  })
+
+  it('rejects an --agents value containing an unrecognized name', async () => {
+    const { exitCode, stderr } = await runCli(['--agents', 'security,bogus-agent'])
+    expect(exitCode).toBe(1)
+    expect(stderr).toMatch(/Invalid --agents value/)
+    expect(stderr).toMatch(/bogus-agent/)
+  })
+
+  it('rejects an --agents value that is entirely unrecognized names, instead of silently running a 0-agent swarm', async () => {
+    const { exitCode, stderr } = await runCli(['--agents', 'scurity,depenencies'])
+    expect(exitCode).toBe(1)
+    expect(stderr).toMatch(/Invalid --agents value/)
+  })
+
+  it('accepts a valid --agents value', async () => {
+    MockSwarmRunner.mockImplementation(() => ({
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }))
+    const { exitCode } = await runCli(['--agents', 'security,correctness'])
+    expect(exitCode).toBe(0)
+    const config = MockSwarmRunner.mock.calls[0][0]
+    expect(config.agents).toEqual(['security', 'correctness'])
   })
 
   // WHY --max-lines 1 in these tests: the mocked diff is fixed at 2 lines ('+ added line\n-

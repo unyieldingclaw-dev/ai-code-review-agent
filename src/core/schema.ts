@@ -16,9 +16,31 @@ export type AgentName =
   | 'migration-safety'
   | 'complexity'
 
+// Single source of truth for "is this a real agent name" -- used by the CLI to validate
+// --agents (previously an unchecked `as AgentName[]` cast let any typo silently run 0 agents).
+export const AGENT_NAMES: AgentName[] = [
+  'security',
+  'performance',
+  'correctness',
+  'design',
+  'dependencies',
+  'coverage',
+  'testgen',
+  'adversarial',
+  'integration',
+  'breaking-change',
+  'license',
+  'secrets',
+  'error-handling',
+  'observability',
+  'migration-safety',
+  'complexity',
+]
+
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
 export const SEVERITY_OPTIONS: Severity[] = ['critical', 'high', 'medium', 'low']
 export type Basis = 'VERIFIED' | 'INFERRED' | 'SPECULATIVE'
+export const BASIS_OPTIONS: Basis[] = ['VERIFIED', 'INFERRED', 'SPECULATIVE']
 export type TestFramework = 'vitest' | 'jest' | 'mocha' | 'pytest'
 
 export type ReviewDomain =
@@ -43,10 +65,7 @@ export type EvidenceSource =
   | 'llm'
   | 'heuristic'
   | 'gitleaks'
-  | 'trufflehog'
-  | 'semgrep'
   | 'npm-audit'
-  | 'osv'
   | 'lizard'
   | 'git'
   | 'policy'

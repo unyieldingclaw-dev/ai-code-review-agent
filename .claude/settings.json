@@ -47,6 +47,10 @@
           {
             "type": "command",
             "command": "pwsh -NonInteractive -File scripts/dangerous-commands.ps1 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "pwsh -NonInteractive -File scripts/review-reminders.ps1 2>/dev/null || true"
           }
         ]
       },

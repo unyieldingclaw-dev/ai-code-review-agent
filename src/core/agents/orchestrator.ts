@@ -9,16 +9,20 @@ import type {
 import { SEVERITY_RANK } from '../schema.js'
 import { normalizeFilePath, stripDiffPrefix } from '../filePath.js'
 
-export const DETERMINISTIC_SOURCES: EvidenceSource[] = [
-  'gitleaks',
-  'trufflehog',
-  'semgrep',
-  'npm-audit',
-  'osv',
-  'lizard',
-  'git',
-  'policy',
-]
+// WHY only these two: DETERMINISTIC_SOURCES exempts a solo critical/high finding from the
+// corroboration-required downgrade below (hallucinationCrossCheck), on the premise that a real
+// external tool -- not the LLM's own judgment -- produced it. 'gitleaks' and 'npm-audit' are the
+// only two labels ever actually set by code (parseGitleaksOutput/parseNpmAuditOutput), on the
+// code path that bypasses the LLM entirely -- see secrets.ts/dependencies.ts's `run()` overrides.
+// Previously this list also included 'lizard', 'git', and 'policy' (never set by code -- only by
+// an LLM prompt instructing the model to self-report one of those strings) plus 'trufflehog',
+// 'semgrep', 'osv' (never emitted by anything in this codebase at all). Any agent's own
+// hallucinated or merely-confident output could self-tag one of the spoofable values and skip the
+// safety net this list exists to enforce -- confirmed concretely for breakingChange.ts
+// ("git")/licenseCompliance.ts ("policy")/migrationSafety.ts ("git"), whose prompts have since
+// been corrected to stop instructing that self-tag (see docs/superpowers/specs/
+// 2026-08-17-full-system-integrity-hardening-audit.md, finding C5).
+export const DETERMINISTIC_SOURCES: EvidenceSource[] = ['gitleaks', 'npm-audit']
 
 // Dedup tie-breaker: when multiple agents flag the same file:line, the agent
 // with the highest index is kept; others are recorded in corroboratingAgents.
