@@ -23,6 +23,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `formatMarkdown`'s "No issues found" line was unqualified even when the diff was truncated —
+  a reported real-world case (12,599-line diff, `--max-lines` default of 2000) still printed a
+  bare "✅ No issues found." at the end of the report, reading as a clean full pass when only
+  ~16% of the diff was actually reviewed. The truncation warning is printed separately near the
+  top of the report, but a reader skimming to the final verdict line — the way that line is
+  designed to be read — can miss it entirely. Now reads "No issues found in the portion reviewed
+  (X/Y lines — diff was truncated)" when `truncation.truncated` is true.
 - CLI process could crash on exit on Windows with `Assertion failed: !(handle->flags &
 UV_HANDLE_CLOSING), file src\win\async.c, line 76` after a review completed successfully and
   valid output had already been written — caused by `process.exit()` forcing immediate process
