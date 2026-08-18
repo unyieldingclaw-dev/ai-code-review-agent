@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-08-18 (review-reliability & evidence-verification fixes, 15-phase full-system audit remediation)
+
 ### Added
 
 - `--verify-evidence-severity <level>` (`verifyEvidenceSeverity` config field, default `high`):
