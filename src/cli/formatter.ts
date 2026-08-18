@@ -126,7 +126,19 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
 
   if (findings.length === 0) {
     if (failedAgents.length === 0) {
-      lines.push(useEmoji ? '✅ No issues found.' : 'No issues found.')
+      // WHY qualify this when truncated (not just rely on the standalone warning above): the
+      // warning and this line are visually separate, and a reader who skims to the bottom line
+      // for a pass/fail verdict -- the exact way this line is designed to be read -- can miss the
+      // warning above entirely. A real bug report: a 12,599-line diff truncated to 2,000
+      // (--max-lines default) still ended in an unqualified "No issues found," reading as a clean
+      // full pass when only ~16% of the diff was actually reviewed.
+      lines.push(
+        truncation?.truncated
+          ? `${useEmoji ? '✅ ' : ''}No issues found in the portion reviewed (${truncation.keptLines}/${truncation.originalLines} lines — diff was truncated).`
+          : useEmoji
+            ? '✅ No issues found.'
+            : 'No issues found.'
+      )
     }
     return lines.join('\n')
   }
