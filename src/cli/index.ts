@@ -215,7 +215,8 @@ program
               `Invalid --verify-evidence-severity value: "${options.verifyEvidenceSeverity}". ` +
                 `Use one of: ${SEVERITY_OPTIONS.join('|')}.`
             )
-            process.exit(1)
+            process.exitCode = 1
+            return
           }
           config.verifyEvidenceSeverity = options.verifyEvidenceSeverity as Severity
         }
