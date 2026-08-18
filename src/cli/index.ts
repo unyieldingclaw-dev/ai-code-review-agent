@@ -12,13 +12,14 @@ import { isPathWithin } from '../core/filePath.js'
 import { OllamaProvider } from '../core/llm/ollamaProvider.js'
 import { formatMarkdown, formatJson, formatSarif, formatGithubAnnotations } from './formatter.js'
 import type { AgentName, AgentProgressEvent, Severity } from '../core/schema.js'
-import { SEVERITY_OPTIONS } from '../core/schema.js'
+import { SEVERITY_OPTIONS, AGENT_NAMES } from '../core/schema.js'
 import {
   shouldFail,
   FAIL_ON_OPTIONS,
   hasAgentFailures,
   AGENT_FAILURE_EXIT_CODE,
   TRUNCATION_EXIT_CODE,
+  STARTUP_FAILURE_EXIT_CODE,
 } from './exitCode.js'
 import type { FailOnLevel } from './exitCode.js'
 import { resolveProfile } from '../core/profiles.js'
@@ -175,8 +176,24 @@ program
 
         if (options.model) config.model = options.model
         if (options.ollamaUrl) config.ollamaUrl = options.ollamaUrl
-        if (options.agents)
-          config.agents = options.agents.split(',').map((a) => a.trim()) as AgentName[]
+        if (options.agents) {
+          const requested = options.agents.split(',').map((a) => a.trim())
+          // WHY reject any unrecognized name outright instead of the previous silent
+          // console.warn-and-drop (in runner.ts's buildAgents): a typo'd --agents value that
+          // happened to contain zero recognized names used to silently run a 0-agent swarm --
+          // exit 0, "No issues found," with no error anywhere. Validating here, eagerly, closes
+          // that gap at the source instead of relying on a downstream warning nobody reads.
+          const invalid = requested.filter((a) => !AGENT_NAMES.includes(a as AgentName))
+          if (invalid.length > 0) {
+            console.error(
+              `Invalid --agents value(s): ${invalid.join(', ')}. Use a comma-separated list ` +
+                `from: ${AGENT_NAMES.join('|')}.`
+            )
+            process.exitCode = 1
+            return
+          }
+          config.agents = requested as AgentName[]
+        }
         if (options.profile && !options.agents) {
           try {
             config.agents = resolveProfile(options.profile)
@@ -200,6 +217,17 @@ program
         if (options.ignore.length > 0)
           config.ignorePaths = [...config.ignorePaths, ...options.ignore]
         if (!options.sanitize) config.sanitize = false
+        // WHY validate here, mirroring --verify-evidence-severity below: previously an
+        // unrecognized value (e.g. a typo'd "critcal") made every SEVERITY_RANK[failOn] lookup
+        // in shouldFail()/shouldEarlyExit() evaluate to `undefined`, so a CRITICAL finding would
+        // silently never trip --fail-on -- exit 0 with no error, no warning, nothing.
+        if (!FAIL_ON_OPTIONS.includes(options.failOn)) {
+          console.error(
+            `Invalid --fail-on value: "${options.failOn}". Use one of: ${FAIL_ON_OPTIONS.join('|')}.`
+          )
+          process.exitCode = 1
+          return
+        }
         config.failOn = options.failOn
         config.failFast = !!options.failFast
         config.parallel = !!options.parallel
@@ -387,7 +415,12 @@ program
         ) {
           process.stderr.write(`Make sure Ollama is running: ollama serve\n`)
         }
-        process.exitCode = 1
+        // WHY a distinct code, not 1: exit 1 also means "the review ran clean and found a
+        // blocking finding" (see hasBlocker below). Every path that reaches this catch means the
+        // opposite -- no review result was ever produced (Ollama unreachable, diff file missing,
+        // a write failure, etc.) -- so a CI script branching on `exit code === 1` to "read the
+        // report" would find no report exists. See exitCode.ts's STARTUP_FAILURE_EXIT_CODE.
+        process.exitCode = STARTUP_FAILURE_EXIT_CODE
       }
     }
   )

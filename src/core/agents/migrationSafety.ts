@@ -38,7 +38,7 @@ Additional rules:
 - evidence: quote the specific diff line(s) that triggered this finding
 - recommendation: write corrected code, not just a description
 - blocking: true for critical/high, false for medium/low
-- source: "git" when based on comparing schema diff (old vs new column definitions), "llm" otherwise`
+- source: always "llm" — this agent has no deterministic schema-diff tool backing it`
   }
 }
 

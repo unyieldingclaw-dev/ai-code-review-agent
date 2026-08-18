@@ -225,4 +225,44 @@ describe('formatSarif', () => {
     const output = JSON.parse(formatSarif(makeResult()))
     expect(output.runs[0].properties.evidenceCheckFilter).toBeUndefined()
   })
+
+  it('marks the run executionSuccessful=true with no notifications on a genuinely clean run', () => {
+    const output = JSON.parse(formatSarif(makeResult()))
+    expect(output.runs[0].invocations).toHaveLength(1)
+    expect(output.runs[0].invocations[0].executionSuccessful).toBe(true)
+    expect(output.runs[0].invocations[0].toolExecutionNotifications).toBeUndefined()
+  })
+
+  it('marks the run executionSuccessful=false with an error notification when an agent failed, even with zero findings', () => {
+    // Real bug: a total-agent-failure run with 0 results was structurally identical to a clean
+    // scan for any consumer that only checks SARIF's standard executionSuccessful/results fields.
+    const output = JSON.parse(formatSarif(makeResult({ agentStatus: { security: 'timeout' } })))
+    expect(output.runs[0].results).toHaveLength(0)
+    expect(output.runs[0].invocations[0].executionSuccessful).toBe(false)
+    expect(output.runs[0].invocations[0].toolExecutionNotifications).toEqual([
+      { level: 'error', message: { text: expect.stringContaining('security') } },
+    ])
+  })
+
+  it('marks the run executionSuccessful=false with a warning notification when the diff was truncated', () => {
+    const output = JSON.parse(
+      formatSarif(
+        makeResult({ truncation: { truncated: true, originalLines: 12599, keptLines: 2000 } })
+      )
+    )
+    expect(output.runs[0].invocations[0].executionSuccessful).toBe(false)
+    expect(output.runs[0].invocations[0].toolExecutionNotifications).toEqual([
+      { level: 'warning', message: { text: expect.stringContaining('2000') } },
+    ])
+  })
+
+  it('includes one notification per failed agent, keeping successful agents out of it', () => {
+    const output = JSON.parse(
+      formatSarif(makeResult({ agentStatus: { security: 'ok', dependencies: 'parse-error' } }))
+    )
+    const notifications = output.runs[0].invocations[0].toolExecutionNotifications
+    expect(notifications).toHaveLength(1)
+    expect(notifications[0].message.text).toContain('dependencies')
+    expect(notifications[0].message.text).not.toContain('"security"')
+  })
 })

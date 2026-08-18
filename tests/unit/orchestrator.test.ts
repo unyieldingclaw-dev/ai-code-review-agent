@@ -439,14 +439,14 @@ describe('OrchestratorAgent.synthesize — hallucinationCrossCheck', () => {
     expect(secretFinding?.severity).toBe('critical')
   })
 
-  it('does NOT downgrade a solo High finding from semgrep', () => {
+  it('does NOT downgrade a solo High finding from a deterministic source (npm-audit)', () => {
     const findings: Finding[] = [
       makeFinding({
         id: 'f1',
-        source: 'semgrep',
+        source: 'npm-audit',
         severity: 'high',
         confidence: 40,
-        agent: 'security',
+        agent: 'dependencies',
       }),
       makeFinding({
         id: 'f2',
@@ -460,6 +460,61 @@ describe('OrchestratorAgent.synthesize — hallucinationCrossCheck', () => {
     const result = orchestrator.synthesize(findings)
     const secFinding = result.find((f) => f.id === 'f1')
     expect(secFinding?.severity).toBe('high')
+  })
+
+  // Regression test for audit finding C5: DETERMINISTIC_SOURCES used to also include 'lizard',
+  // 'git', and 'policy' -- labels only ever set by an LLM self-reporting its own prompt
+  // instruction, never by real code. Any agent's hallucinated or merely-confident output could
+  // self-tag one of those and skip the corroboration-required downgrade below entirely. Confirmed
+  // empirically before the fix (a solo, low-confidence, source:"git" finding survived at its
+  // original severity); this proves the fix closes it.
+  it('DOES downgrade a solo Critical finding whose source is a spoofable, non-tool-backed value ("git")', () => {
+    const findings: Finding[] = [
+      makeFinding({
+        id: 'f1',
+        source: 'git',
+        severity: 'critical',
+        confidence: 40, // below the 60 threshold
+        agent: 'breaking-change',
+      }),
+      // A second, unrelated finding from a different agent -- hallucinationCrossCheck no-ops
+      // entirely when only one agent is present in the whole batch (agentsPresent.size <= 1),
+      // so this is required to actually exercise the corroboration-required downgrade path.
+      makeFinding({
+        id: 'f2',
+        agent: 'correctness',
+        file: 'src/other.ts',
+        line: 99,
+        source: 'llm',
+        severity: 'low',
+      }),
+    ]
+    const result = orchestrator.synthesize(findings)
+    const finding = result.find((f) => f.id === 'f1')
+    expect(finding?.severity).toBe('high')
+  })
+
+  it('DOES downgrade a solo High finding whose source is a spoofable, non-tool-backed value ("policy")', () => {
+    const findings: Finding[] = [
+      makeFinding({
+        id: 'f1',
+        source: 'policy',
+        severity: 'high',
+        confidence: 40,
+        agent: 'license',
+      }),
+      makeFinding({
+        id: 'f2',
+        agent: 'correctness',
+        file: 'src/other.ts',
+        line: 99,
+        source: 'llm',
+        severity: 'low',
+      }),
+    ]
+    const result = orchestrator.synthesize(findings)
+    const finding = result.find((f) => f.id === 'f1')
+    expect(finding?.severity).toBe('medium')
   })
 
   it('DOES downgrade a solo High finding from llm source with low confidence', () => {

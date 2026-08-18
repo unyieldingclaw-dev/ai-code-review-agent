@@ -16,9 +16,67 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-17
+**Last Updated**: 2026-08-18
 
 ## Current Focus
+
+**Audit remediation (Batches 1-8) complete and committed (2026-08-18), commit `ee44007` on
+branch `fix/audit-remediation-batch`**: every Tier 1/2 finding from the 15-phase audit below was
+re-verified against current source before being fixed (per user instruction: "look at the results
+again... verify they are accurate"), plus one newly-discovered bug found empirically while testing
+(`git log --not --remotes` silently returning nothing with zero remotes configured — fixed in both
+`pre-push-check.ps1`/`.sh`). Covered: severity/basis enum validation + `blocking` default fix,
+`--agents`/`--fail-on` CLI validation + `STARTUP_FAILURE_EXIT_CODE`, MCP/SARIF failure-visibility,
+`DETERMINISTIC_SOURCES` narrowed to `gitleaks`/`npm-audit` only, `dependencies`/`license` agent
+manifest-skip consistency, PowerShell-tool hook-matcher wiring + TRUNCATE/unscoped-DELETE
+guardrails + CI silent-failure fixes, secret-scan pattern hardening, and stale-docs cleanup
+(README, HOOKS-GUIDE.md, SECURITY-GUARDRAILS.md's DROP TABLE/DATABASE tier misclassification).
+Tier 3 (sanitizer overhaul, chunking redesign, vscode-extension catch-up, Ollama concurrency)
+explicitly deferred as large speculative redesigns, per the audit's own remediation-priority list.
+Verified via 575/575 unit tests, 33/33 Pester tests, typecheck, build, format, and lint — all
+green — plus a full `/change-review` gate before commit (2 non-blocking Low/Info notes, no
+blockers). **Next step**: user to decide whether to push/open a PR for `fix/audit-remediation-batch`
+or keep reviewing locally first — not yet asked/pushed.
+
+---
+
+**15-phase ACR Full-System Integrity & Hardening Review complete (2026-08-17)**: user-provided
+exhaustive audit spec (system map → capability tracing → data-flow/contract audit → agent integrity
+→ orchestration → failure-mode audit → test-suite integrity → CLI/hook/CI integrity →
+security/boundary review → efficiency → dead code → docs-vs-reality → empirical end-to-end proof →
+remediation rules → final report), executed via 12 parallel Explore subagents (batched into 4
+rounds) plus a final empirical-verification pass run directly by the main agent (not delegated) via
+a standalone tsx script exercising real `src/` code with adversarial input — 7/7 targeted claims
+reproduced deterministically. Full report:
+`docs/superpowers/specs/2026-08-17-full-system-integrity-hardening-audit.md` (not yet committed).
+**No fixes applied yet — this was a pure investigation phase**, per the audit's own explicit
+constraint ("do not start by rewriting anything"). Headline findings, all confirmed by reading
+source (several also empirically reproduced): (1) `severity`/`basis`/`blocking`/`source` are never
+validated against their enums anywhere in the parse/normalize path, silently corrupting exit-code
+gating, sort order, the publication filter, and the hallucination-corroboration safety net across 8+
+call sites in 4 files — and 3 agents' own prompts (`breakingChange`, `licenseCompliance`,
+`migrationSafety`) make the `source`-spoofing instance concretely exploitable by self-tagging
+`source: "git"`/`"policy"` with zero real tool behind either label; (2) `src/mcp/formatter.ts` never
+reads `agentStatus`/`truncation` — a total-agent-failure-plus-truncated run reads as an unqualified
+"✅ No findings" to the calling LLM, the exact path `/change-review` Job 7 uses for real gating
+decisions; SARIF has the equivalent gap for CI consumers; (3) all three files containing these bugs
+show 95-100% test coverage — structurally invisible to coverage since the bugs are absences of
+validation, not unexercised branches, and one bug (`blocking`'s wrong fallback default) is actively
+locked in as "correct" by an existing test; (4) governance-layer bypass surface: `review-reminders`/
+`check-contract` hooks are only wired to specific tool matchers (PowerShell isn't wired to either),
+git-command detection is literal-substring (evaded by `git -c core.hooksPath=...`/aliases/`git.exe`),
+review-ok markers are bound to diff content not actor identity (cross-session TOCTOU), and there's no
+server-side secret-scan backstop on the normal push/PR path; (5) `review.yml`'s AI-review CI step is
+wrapped in `|| true` with no downstream gate — a crash produces an all-green PR with zero review
+signal. Also confirmed genuinely solid: no command injection anywhere (array-based `spawn`
+everywhere), MCP/`--write-tests` path-containment is robust (empirically probed against traversal/
+UNC/ADS payloads), SSRF via malicious `ollamaUrl` is blocked by a hostname allowlist, zero dead code/
+orphaned files, CHANGELOG maintained with unusual rigor. Full findings list (Critical/High/Medium/
+Low, ~50 items), wiring matrix, failure matrix, efficiency findings, and a 3-tier remediation
+priority list (simple fixes first, 2 tiers of larger work explicitly deferred) are in the report
+file. **Next step**: user to decide which remediation tier(s) to act on and in what order.
+
+---
 
 **v1.10.0 shipped (2026-08-17)**: the review-reliability-fixes and evidence-grounding-verification
 work below, plus the 5-batch full-codebase audit fixes, had accumulated locally since 2026-08-09/16

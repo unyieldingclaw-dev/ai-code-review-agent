@@ -3,7 +3,8 @@
 // Accepts both legacy LLM field names (basis, detail, suggestion) and canonical
 // schema names (evidence, description, recommendation).
 
-import type { Finding, AgentName, ReviewDomain, AgentStatus } from './schema.js'
+import type { Finding, AgentName, ReviewDomain, AgentStatus, Severity, Basis } from './schema.js'
+import { SEVERITY_OPTIONS, BASIS_OPTIONS } from './schema.js'
 
 export class ParseFailureError extends Error {
   constructor(
@@ -127,12 +128,23 @@ export function validateAndNormalizeFindings(items: unknown[], agentName: AgentN
   const valid: Finding[] = []
   let dropped = 0
   for (const f of items as Finding[]) {
+    // WHY validate severity/basis against their real enum members, not just `typeof === 'string'`:
+    // every downstream consumer (SEVERITY_RANK lookups in capAndSort/shouldFail/applyPublicationFilter/
+    // evidenceVerifier, basisOrder in capAndSort) indexes a plain object by these values with no guard.
+    // An LLM-emitted typo or garbage string (e.g. "sev3", "Confirmed") previously passed through
+    // unvalidated and silently produced `undefined`/NaN in every one of those lookups -- breaking exit-
+    // code gating, sort order, and the publication filter without ever surfacing an error. Dropping the
+    // finding here (same as any other missing-required-field case) is the safe failure direction: it's
+    // a genuinely malformed structured-output item, not a value worth guessing a default for.
     const passes =
       typeof f === 'object' &&
       f !== null &&
       typeof f.severity === 'string' &&
-      // Accept basis (legacy LLM field) OR evidence (canonical schema name)
-      (typeof f.basis === 'string' || typeof f.evidence === 'string') &&
+      SEVERITY_OPTIONS.includes(f.severity as Severity) &&
+      // Accept basis (legacy LLM field, must be a real enum member if present) OR evidence
+      // (canonical schema name, basis is then defaulted below)
+      ((typeof f.basis === 'string' && BASIS_OPTIONS.includes(f.basis as Basis)) ||
+        (f.basis === undefined && typeof f.evidence === 'string')) &&
       typeof f.file === 'string' &&
       typeof f.line === 'number' &&
       typeof f.title === 'string' &&
@@ -148,7 +160,9 @@ export function validateAndNormalizeFindings(items: unknown[], agentName: AgentN
   if (dropped > 0) {
     console.error(
       `[${agentName}] validateFindings: dropped ${dropped}/${items.length} item(s) — ` +
-        `missing required fields (severity, basis/evidence, file, line, title, detail, suggestion/recommendation)`
+        `missing required fields, or an unrecognized severity/basis value ` +
+        `(severity must be one of ${SEVERITY_OPTIONS.join('/')}; basis, if present, must be one of ` +
+        `${BASIS_OPTIONS.join('/')}; also require file, line, title, detail, suggestion/recommendation)`
     )
   }
   return valid.map((f, i) => {
@@ -161,11 +175,22 @@ export function validateAndNormalizeFindings(items: unknown[], agentName: AgentN
       agent: agentName,
       confidence: Math.max(0, Math.min(100, rawConf)),
       domain: f.domain ?? agentDefaultDomain(agentName),
+      // WHY default to INFERRED, not VERIFIED/SPECULATIVE: `passes` above only lets a finding
+      // through with no basis when it has a real `evidence` string instead (the "legacy" LLM
+      // field shape) -- INFERRED reflects "the model gave supporting evidence but no explicit
+      // self-declared confidence tier," without the over-trust of VERIFIED or the under-value of
+      // SPECULATIVE (which applyPublicationFilter drops outright below `high` severity).
+      basis: f.basis ?? 'INFERRED',
       evidence: f.evidence ?? f.detail ?? '',
       impact: f.impact ?? '',
       recommendation,
       suggestion,
-      blocking: f.blocking ?? f.severity === 'critical',
+      // WHY true for high as well as critical: every agent's own system prompt documents
+      // "blocking: true for critical/high, false for medium/low" -- the previous critical-only
+      // default silently contradicted that stated policy for every high-severity finding whose
+      // JSON omitted `blocking` (a field the schema doesn't mark required, so omission is a real,
+      // model-nondeterministic occurrence, not a hypothetical).
+      blocking: f.blocking ?? (f.severity === 'critical' || f.severity === 'high'),
       source: f.source ?? 'llm',
       ...(f.lineEnd !== undefined ? { lineEnd: Math.max(f.line, f.lineEnd) } : {}),
     }

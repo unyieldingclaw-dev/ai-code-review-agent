@@ -16,7 +16,58 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-16
+**Last Updated**: 2026-08-18
+
+## ✅ Completed (2026-08-18)
+
+### Audit remediation Batches 1-8 — Tier 1/2 fixes verified, implemented, tested, and committed
+
+Every finding from the 15-phase audit below was re-verified against current source (not taken on
+faith) before being fixed, per user instruction. 8 batches covering: severity/basis/blocking enum
+validation and normalization fix (`parsing.ts`); `--agents`/`--fail-on` CLI validation plus a new
+`STARTUP_FAILURE_EXIT_CODE` (4) distinguishing "tool couldn't run" from "found a blocker" (exit 1);
+MCP and SARIF output now surface `agentStatus`/`truncation` failure state instead of looking
+identical to a clean pass; `DETERMINISTIC_SOURCES` narrowed from 8 values to the 2 actually
+code-set (`gitleaks`, `npm-audit`), closing a self-tagged source-spoofing gap in the
+hallucination-corroboration safety net; `dependencies`/`license` agents now skip consistently on
+non-manifest diffs; PowerShell tool wired into the commit/push review-gate hook matcher, plus new
+TRUNCATE TABLE / unscoped DELETE FROM guardrails and CI silent-failure fixes in `review.yml`/
+`calibrate.yml`; pre-push secret-scan pattern hardening (PEM, Bearer, JSON-style, AWS, GitHub PAT)
+plus a fix for a newly-discovered pre-existing bug (`git log --not --remotes` silently no-opping
+with zero remotes configured); stale-docs cleanup (README, HOOKS-GUIDE.md, and
+SECURITY-GUARDRAILS.md's DROP TABLE/DATABASE tier misclassification — documented as needing
+confirmation, actually implemented as an outright block). Deleted `orchestratorAgent.test.ts`
+(confirmed redundant against `orchestrator.test.ts`). Regression: 575/575 unit tests, 33/33 Pester
+tests, typecheck, build, format, and lint all pass. Full `/change-review` gate run before commit (2
+non-blocking Low/Info notes). Committed as `ee44007` on branch `fix/audit-remediation-batch` — not
+yet pushed. Tier 3 items (sanitizer overhaul, chunking redesign, vscode-extension catch-up, Ollama
+concurrency handling) explicitly deferred as large, speculative redesigns.
+
+## ✅ Completed (2026-08-17)
+
+### 15-phase ACR Full-System Integrity & Hardening Review — investigation complete, no fixes applied yet
+
+Full user-provided 15-phase audit spec executed in full: system map, capability tracing,
+data-flow/contract audit, agent/reviewer integrity, orchestration audit, failure-mode audit
+(explicit mandate: "'no findings' must never be indistinguishable from 'the reviewer failed to
+run'"), test-suite integrity, CLI/hook/CI integrity, security/boundary review, efficiency/token
+audit, dead-code/stale-architecture audit, docs-vs-reality, empirical end-to-end proof, remediation
+prioritization, and a final structured report. 12 research phases run as parallel Explore subagents
+in 4 batched rounds; the empirical-proof phase was run directly by the main agent (not delegated)
+against real `src/` code, reproducing 7/7 targeted claims deterministically. Report:
+`docs/superpowers/specs/2026-08-17-full-system-integrity-hardening-audit.md`. ~50 findings across
+Critical/High/Medium/Low, a wiring matrix, a failure matrix, efficiency findings, architecture
+findings, test gaps, and a 3-tier remediation priority list. Headline items: unvalidated
+severity/basis/blocking/source enums corrupting 8+ downstream decision points; MCP output formatter
+and SARIF both blind to agent failure/truncation; 95-100% test coverage on the exact files
+containing these bugs (coverage structurally can't detect absence-of-validation defects);
+governance-hook bypass surface (tool-matcher gaps, literal-substring git-command detection,
+cross-session marker TOCTOU, no server-side secret-scan backstop); `review.yml`'s AI-review CI step
+silently no-ops on failure. Also confirmed solid: no command injection anywhere, robust path-
+containment (empirically probed), SSRF blocked via hostname allowlist, zero dead code/orphaned
+files. **Status: investigation-only per the audit's explicit constraint — no remediation started.**
+Next: user to pick which of the 3 remediation tiers (simple fixes / small-design-needed / deferred
+larger work) to act on.
 
 ## ✅ Completed (2026-08-16)
 

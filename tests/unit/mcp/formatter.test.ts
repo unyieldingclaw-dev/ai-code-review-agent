@@ -174,4 +174,53 @@ describe('formatMcpOutput', () => {
     expect(result).not.toContain('low')
     expect(result).toContain('ai-review-agent')
   })
+
+  it('does not report an unqualified clean pass when every agent failed and there are no findings', () => {
+    // Real bug: a run where every agent timed out and found nothing was indistinguishable from
+    // a genuine clean pass to the calling LLM, since this formatter never read agentStatus.
+    const result = formatMcpOutput(
+      makeResult({
+        agentStatus: { security: 'timeout', correctness: 'timeout' },
+      })
+    )
+    expect(result).not.toMatch(/^## AI Code Review — ✅ No findings\n$/)
+    expect(result).toMatch(/incomplete/i)
+    expect(result).toContain('security: timeout')
+    expect(result).toContain('correctness: timeout')
+  })
+
+  it('does not report an unqualified clean pass when the diff was truncated and there are no findings', () => {
+    const result = formatMcpOutput(
+      makeResult({
+        truncation: { truncated: true, originalLines: 12599, keptLines: 2000 },
+      })
+    )
+    expect(result).not.toMatch(/^## AI Code Review — ✅ No findings\n$/)
+    expect(result).toMatch(/truncat/i)
+    expect(result).toContain('2000')
+    expect(result).toContain('12599')
+  })
+
+  it('still shows the clean checkmark when agentStatus is all ok and nothing was truncated', () => {
+    const result = formatMcpOutput(
+      makeResult({
+        agentStatus: { security: 'ok', correctness: 'ok' },
+        truncation: { truncated: false, originalLines: 100, keptLines: 100 },
+      })
+    )
+    expect(result).toBe('## AI Code Review — ✅ No findings\n')
+  })
+
+  it('surfaces an agent-failure warning above real findings, not just on the empty-findings path', () => {
+    const finding = makeFinding('critical')
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [finding],
+        summary: { totalFindings: 1, bySeverity: { critical: 1 }, byAgent: {}, durationMs: 100 },
+        agentStatus: { security: 'ok', dependencies: 'parse-error' },
+      })
+    )
+    expect(result).toContain('dependencies: parse-error')
+    expect(result).toContain(finding.title)
+  })
 })

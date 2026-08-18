@@ -1,9 +1,23 @@
 import { BaseAgent } from './base.js'
-import type { AgentName } from '../schema.js'
+import { extractChangedFiles } from '../policyFilter.js'
+import type { AgentName, Finding, ReviewInput } from '../schema.js'
 
 export class LicenseComplianceAgent extends BaseAgent {
   get name(): AgentName {
     return 'license'
+  }
+
+  // WHY skip whenever the diff doesn't touch a manifest, rather than always making the LLM call:
+  // this agent's own prompt already instructs the model to return [] when "the diff has no
+  // package.json changes adding new dependencies" -- unlike DependenciesAgent/SecretsAgent, this
+  // agent had no code-level skip at all before this fix, so it burned a full-diff LLM call on
+  // every review regardless of relevance, for an outcome the model would return empty anyway.
+  async run(input: ReviewInput, signal?: AbortSignal): Promise<Finding[]> {
+    const touchesManifest = extractChangedFiles(input.diff).some(
+      (f) => f === 'package.json' || f === 'package-lock.json'
+    )
+    if (!touchesManifest) return []
+    return super.run(input, signal)
   }
 
   get systemPrompt(): string {
@@ -25,11 +39,13 @@ Focus on package.json changes (dependencies, devDependencies, peerDependencies).
 Output ONLY a JSON array. No prose, no explanation, no markdown fences.
 
 Required format:
-[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"package.json","line":42,"title":"Short title under 60 chars","detail":"Package name, its license, and why it's problematic","suggestion":"MIT-licensed alternative or advice to obtain a commercial license","domain":"License","evidence":"<specific diff line(s) showing the added dependency>","impact":"<legal/compliance risk, e.g. GPL copyleft would require open-sourcing proprietary code, or AGPL triggers on network use>","recommendation":"<MIT-licensed alternative or steps to obtain a commercial license>","blocking":false,"source":"policy"}]
+[{"severity":"high","basis":"VERIFIED|INFERRED|SPECULATIVE","confidence":85,"file":"package.json","line":42,"title":"Short title under 60 chars","detail":"Package name, its license, and why it's problematic","suggestion":"MIT-licensed alternative or advice to obtain a commercial license","domain":"License","evidence":"<specific diff line(s) showing the added dependency>","impact":"<legal/compliance risk, e.g. GPL copyleft would require open-sourcing proprietary code, or AGPL triggers on network use>","recommendation":"<MIT-licensed alternative or steps to obtain a commercial license>","blocking":false,"source":"llm"}]
 
 Rules:
 - severity=high for GPL, AGPL, SSPL, Commons Clause
-- severity=medium for LGPL, EUPL, CDDL or uncertain cases
+- severity=medium for LGPL, EUPL, CDDL (based on the license type itself, regardless of how
+  certain you are it applies — do not lower severity just because you're unsure; uncertainty
+  belongs in basis, not severity)
 - basis=VERIFIED: you know this package's license from training data
 - basis=INFERRED: the package name or description strongly implies the license
 - basis=SPECULATIVE: you're unsure — flag for human review
@@ -37,6 +53,7 @@ Rules:
 - evidence: quote the specific diff line(s) that triggered this finding
 - recommendation: write corrected code, not just a description
 - blocking: true for critical/high, false for medium/low
+- source: always "llm" — this agent has no deterministic license-lookup tool backing it
 - If the diff has no package.json changes adding new dependencies, return: []`
   }
 }

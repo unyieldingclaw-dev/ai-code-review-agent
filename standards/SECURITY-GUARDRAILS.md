@@ -58,6 +58,12 @@ This standard defines what AI should **BLOCK**, **CONFIRM**, or **WARN** about.
 | Never execute commands that modify system files outside project    | Scope violation      |
 | Never run commands with `sudo` or admin privileges unless explicit | Privilege escalation |
 
+### Database Operations (Destructive)
+
+| Rule            | Trigger                       | Rationale                     |
+| --------------- | ----------------------------- | ----------------------------- |
+| DROP statements | `DROP TABLE`, `DROP DATABASE` | Irreversible schema/data loss |
+
 ### AI Response to BLOCK
 
 ```
@@ -97,12 +103,13 @@ AI: "I cannot commit .env files as they may contain secrets.
 
 ### Database Operations
 
-| Rule                         | Trigger                       | Rationale        |
-| ---------------------------- | ----------------------------- | ---------------- |
-| DROP statements              | `DROP TABLE`, `DROP DATABASE` | Data destruction |
-| DELETE without WHERE         | `DELETE FROM table`           | Mass deletion    |
-| TRUNCATE                     | `TRUNCATE TABLE`              | Data destruction |
-| Schema changes in production | Migrations in prod config     | High impact      |
+| Rule                         | Trigger                   | Rationale        |
+| ---------------------------- | ------------------------- | ---------------- |
+| DELETE without WHERE         | `DELETE FROM table`       | Mass deletion    |
+| TRUNCATE                     | `TRUNCATE TABLE`          | Data destruction |
+| Schema changes in production | Migrations in prod config | High impact      |
+
+Note: `DROP TABLE`/`DROP DATABASE` are Tier 1 **BLOCK** (see [System Protection](#system-protection)), not CONFIRM — they are irreversible with no legitimate override, unlike `DELETE`/`TRUNCATE` which can be scoped or run against non-production data.
 
 ### Security-Sensitive Files
 
@@ -176,8 +183,8 @@ Adjust tier thresholds to match environment:
 
 Copy the tier tables from this document into your rules file (`.cursor/rules/security.mdc`, `CLAUDE.md`, or `AGENTS.md`). Apply `alwaysApply: true` in Cursor. The condensed form needed for a rules file is:
 
-- **BLOCK**: secrets in commits, force push to main, destructive system commands, rules-file tampering
-- **CONFIRM**: file deletions, amend/rebase, skip-hooks flag, destructive SQL, auth/CI config changes
+- **BLOCK**: secrets in commits, force push to main, destructive system commands, rules-file tampering, `DROP TABLE`/`DROP DATABASE`
+- **CONFIRM**: file deletions, amend/rebase, skip-hooks flag, `DELETE`/`TRUNCATE`, auth/CI config changes
 - **WARN**: large changes (>5 files or >200 lines), new files, missing tests, skipping verification
 
 ## Complementary Tools

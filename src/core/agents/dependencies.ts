@@ -1,5 +1,3 @@
-import { existsSync } from 'fs'
-import { join } from 'path'
 import { BaseAgent } from './base.js'
 import { runTool } from '../../utils/shell.js'
 import { extractChangedFiles } from '../policyFilter.js'
@@ -17,22 +15,19 @@ export class DependenciesAgent extends BaseAgent {
     const touchesManifest = extractChangedFiles(input.diff).some(
       (f) => f === 'package.json' || f === 'package-lock.json'
     )
-    // Guarded to !touchesManifest specifically: a diff that DOES touch package.json (e.g. adding
-    // one for the first time) must still reach the existing npm-audit-then-LLM-fallback branch
-    // below unchanged, even if package.json isn't on disk yet (e.g. reviewing an unapplied
-    // --diff patch) -- that's the correct, already-working case. This check only ever fires for
-    // the actually-reported bug: a diff that mentions no manifest at all, in a project that never
-    // had one. Root-level existsSync only, not a recursive/monorepo-aware walk -- a project with
-    // only a workspace-nested package.json is a known, accepted gap (see design spec Issue 4).
-    if (
-      !touchesManifest &&
-      input.projectPath &&
-      !existsSync(join(input.projectPath, 'package.json'))
-    ) {
+    // WHY skip whenever the diff simply doesn't touch a manifest, not just when no package.json
+    // exists anywhere in the project: this agent's own prompt already instructs the model to
+    // return [] when "the diff has no package.json / requirements.txt changes" -- so the previous
+    // narrower guard (only skip if package.json is ALSO absent from disk) still paid a full LLM
+    // call in the far more common case of a real Node.js project (package.json present) whose
+    // current diff just doesn't touch it, for an outcome the model would return empty anyway.
+    // This is a strict superset of the original guard: any diff that would have skipped before
+    // (no manifest touched, no package.json on disk) still skips here too.
+    if (!touchesManifest) {
       this.lastToolAvailability = 'not-applicable'
       return []
     }
-    if (touchesManifest && input.projectPath) {
+    if (input.projectPath) {
       // shell:true is required for npm specifically (Node refuses to spawn .cmd/.bat files on
       // Windows otherwise) -- safe here because these args are always this hardcoded literal
       // array, never diff-derived content. cwd is required too: without it, npm audit runs
@@ -44,7 +39,8 @@ export class DependenciesAgent extends BaseAgent {
         return parseNpmAuditOutput(output, this.name)
       }
     }
-    if (touchesManifest) this.lastToolAvailability = 'unavailable-llm-fallback'
+    // touchesManifest is always true here -- the !touchesManifest branch above already returned.
+    this.lastToolAvailability = 'unavailable-llm-fallback'
     return super.run(input, signal)
   }
 
@@ -89,7 +85,9 @@ Rules:
 - evidence: quote or reference the specific diff line(s) that triggered this finding
 - recommendation: give the concrete fix (e.g. exact pinned version), not just "pin the version"
 - blocking: true for critical/high, false for medium/low
-- source: use "npm-audit" if this is a known published CVE, otherwise "llm"
+- source: always "llm" — this prompt only runs when a real npm-audit result wasn't available; a
+  genuine npm-audit finding is reported directly from its own output and never reaches this
+  prompt at all, so never self-report "npm-audit" from your own training-data recall of a CVE
 - Only report severity >= medium
 - If the diff has no package.json / requirements.txt changes, return: []`
   }

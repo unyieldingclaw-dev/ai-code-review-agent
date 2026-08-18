@@ -88,6 +88,7 @@ $confirmPatterns = @(
     @{ pattern = "sudo rm";           reason = "privileged deletion" }                      # WHY: elevated deletion can remove system files
     @{ pattern = "chmod -R 777";      reason = "world-writable recursive chmod" }           # WHY: makes entire tree world-writable
     @{ pattern = "--no-verify";       reason = "bypasses pre-commit hooks (local governance)" } # WHY: skips safety hooks on commit
+    @{ pattern = "TRUNCATE TABLE";    reason = "SQL table truncation (irreversible bulk delete, no WHERE clause possible)" } # WHY: bulk data loss, no scoping mechanism exists for TRUNCATE
 )
 
 foreach ($entry in $confirmPatterns) {
@@ -95,6 +96,16 @@ foreach ($entry in $confirmPatterns) {
         Deny ($CONFIRM_MSG -f $entry.reason)
         exit 0
     }
+}
+
+# WHY DELETE FROM gets its own check instead of a plain $confirmPatterns entry: unlike TRUNCATE,
+# a WHERE-scoped DELETE (e.g. "DELETE FROM sessions WHERE expired_at < NOW()") is common and
+# safe -- a blanket substring match would CONFIRM on routine, already-scoped deletes constantly.
+# standards/SECURITY-GUARDRAILS.md documents this as specifically "DELETE without WHERE", so only
+# flag it when no "WHERE" appears anywhere in the command.
+if ($cmd -imatch 'DELETE\s+FROM\s+\S+' -and $cmd -inotmatch '\bWHERE\b') {
+    Deny ($CONFIRM_MSG -f "unscoped SQL DELETE (no WHERE clause)")
+    exit 0
 }
 
 # WARN: credential/secrets access — legitimate workflows exist, surface the access only

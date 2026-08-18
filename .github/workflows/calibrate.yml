@@ -15,7 +15,14 @@ jobs:
     # A manual workflow_dispatch run once that bug was fixed completed 12 of 16 cases in ~9min
     # before hitting the old 10min limit (~30-70s/case); 20min leaves real margin for the full
     # 16-case suite + testgen check.
-    continue-on-error: true # non-blocking — release publishes even if runner is offline
+    # WHY no job-level continue-on-error: it used to mask ANY step's failure, not just the
+    # intended "runner offline" case -- exactly how a real bash-vs-pwsh shell-default bug (see
+    # the shell: bash comment below) went undetected for an unknown period, every run showing
+    # green. The known-tolerable case (Ollama not running) is already handled without it: "Install
+    # dependencies"/"Build"/"Run calibration suite" only run when steps.ollama.outputs.available
+    # is true (see their `if:` conditions below), and a job with only *skipped* steps still shows
+    # success in GitHub Actions -- skipped is not failed. So if those steps DO run and then fail,
+    # it's a genuine new problem (a real crash, not "runner offline"), and the job should go red.
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
     defaults:

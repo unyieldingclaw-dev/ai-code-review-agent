@@ -256,6 +256,44 @@ describe('BaseAgent', () => {
     expect(findings[0].blocking).toBe(true)
   })
 
+  it("fills blocking=true for high severity when LLM omits blocking (matches every agent prompt's stated policy)", async () => {
+    const raw = JSON.stringify([
+      {
+        severity: 'high',
+        basis: 'VERIFIED',
+        confidence: 90,
+        file: 'src/a.ts',
+        line: 1,
+        title: 'T',
+        detail: 'D',
+        suggestion: 'S',
+        // blocking intentionally omitted
+      },
+    ])
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
+    const findings = await agent.run({ diff: 'diff' })
+    expect(findings[0].blocking).toBe(true)
+  })
+
+  it('fills blocking=false for medium severity when LLM omits blocking', async () => {
+    const raw = JSON.stringify([
+      {
+        severity: 'medium',
+        basis: 'VERIFIED',
+        confidence: 90,
+        file: 'src/a.ts',
+        line: 1,
+        title: 'T',
+        detail: 'D',
+        suggestion: 'S',
+        // blocking intentionally omitted
+      },
+    ])
+    const agent = new TestAgent(makeProvider(raw), DEFAULT_CONFIG)
+    const findings = await agent.run({ diff: 'diff' })
+    expect(findings[0].blocking).toBe(false)
+  })
+
   it('fills source as llm when LLM omits source', async () => {
     const raw = JSON.stringify([
       {
@@ -317,7 +355,7 @@ describe('BaseAgent', () => {
 describe('validateAndNormalizeFindings', () => {
   const AGENT = 'security' as const
 
-  it('keeps a finding that has evidence (canonical) but no basis (legacy)', () => {
+  it('keeps a finding that has evidence (canonical) but no basis (legacy), defaulting basis to INFERRED', () => {
     const item = {
       severity: 'high',
       evidence: 'src/foo.ts:42 — unescaped input',
@@ -330,6 +368,7 @@ describe('validateAndNormalizeFindings', () => {
     const result = validateAndNormalizeFindings([item], AGENT)
     expect(result).toHaveLength(1)
     expect(result[0].evidence).toBe('src/foo.ts:42 — unescaped input')
+    expect(result[0].basis).toBe('INFERRED')
   })
 
   it('keeps a finding that has basis (legacy) but no evidence (canonical)', () => {
@@ -353,5 +392,54 @@ describe('validateAndNormalizeFindings', () => {
     expect(result).toHaveLength(0)
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('dropped 1/1'))
     consoleSpy.mockRestore()
+  })
+
+  it('drops a finding with an unrecognized severity value instead of letting it corrupt downstream SEVERITY_RANK lookups', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const item = {
+      severity: 'sev3', // not a real Severity
+      basis: 'VERIFIED',
+      file: 'src/a.ts',
+      line: 1,
+      title: 'T',
+      detail: 'D',
+      recommendation: 'R',
+    }
+    const result = validateAndNormalizeFindings([item], AGENT)
+    expect(result).toHaveLength(0)
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('dropped 1/1'))
+    consoleSpy.mockRestore()
+  })
+
+  it('drops a finding with an unrecognized basis value instead of letting it corrupt downstream basisOrder lookups', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const item = {
+      severity: 'high',
+      basis: 'MAYBE', // not a real Basis
+      file: 'src/a.ts',
+      line: 1,
+      title: 'T',
+      detail: 'D',
+      recommendation: 'R',
+    }
+    const result = validateAndNormalizeFindings([item], AGENT)
+    expect(result).toHaveLength(0)
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('dropped 1/1'))
+    consoleSpy.mockRestore()
+  })
+
+  it('keeps a finding with a valid non-default basis value (SPECULATIVE)', () => {
+    const item = {
+      severity: 'medium',
+      basis: 'SPECULATIVE',
+      file: 'src/a.ts',
+      line: 1,
+      title: 'T',
+      detail: 'D',
+      recommendation: 'R',
+    }
+    const result = validateAndNormalizeFindings([item], AGENT)
+    expect(result).toHaveLength(1)
+    expect(result[0].basis).toBe('SPECULATIVE')
   })
 })

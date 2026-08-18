@@ -286,7 +286,7 @@ Create `ai-review.config.json` in your project root to override defaults:
   ],
   "testOutputDir": "./ai-review-tests",
   "maxDiffLines": 2000,
-  "agentTimeoutMs": 60000,
+  "agentTimeoutMs": 180000,
   "retryAttempts": 2,
   "retryDelayMs": 2000,
   "sanitize": true,
@@ -300,6 +300,7 @@ Create `ai-review.config.json` in your project root to override defaults:
 
 - `complexityThreshold`: Cyclomatic complexity number (CCN) threshold passed to `lizard` (`-C`) when it's installed — functions exceeding it are flagged. If omitted, `lizard`'s own default (`15`) applies. Has no effect when `lizard` isn't installed (the LLM-only fallback path uses its own prompt-described thresholds instead).
 - `agentPolicy`: Per-agent include/exclude path rules. An agent runs only when at least one changed file matches its `include` patterns; it is skipped when **all** changed files match its `exclude` patterns. Uses gitignore-style globs. Omitting a rule means the agent always runs.
+- `verifierModel`: Ollama model used by `--verify-evidence` to cross-check findings (a deliberately separate model/instance from the main review — see `--verify-evidence`'s `--help` text). No CLI flag; config-file only. Defaults to `qwen3:latest`.
 
 **`agentPolicy` example** — skip `license` on non-lockfile changes, restrict `migration-safety` to migration paths:
 
@@ -364,7 +365,7 @@ Negation patterns (`!`) are supported — a file matching `!important.log` is ke
 | Guardrail                     | CLI flag                             | Default                                                        |
 | ----------------------------- | ------------------------------------ | -------------------------------------------------------------- |
 | Diff size limit               | `--max-lines`                        | 2000 lines                                                     |
-| Per-agent timeout             | `--timeout`                          | 60 s                                                           |
+| Per-agent timeout             | `--timeout`                          | 180 s (scaled up to 2x for large diffs)                        |
 | Transient failure retry       | `--retry-attempts` / `--retry-delay` | 2 attempts, 2 s backoff                                        |
 | Severity gating               | `--fail-on`                          | high                                                           |
 | Path exclusions               | `--ignore` / `.aiignore`             | —                                                              |
@@ -434,7 +435,7 @@ Every `--format json` response includes a stable envelope:
 ```json
 {
   "schemaVersion": "ai-review-agent/v1",
-  "toolVersion": "1.1.0",
+  "toolVersion": "1.10.0",
   "profile": "change-review",
   "findings": [],
   "summary": { "totalFindings": 0, "bySeverity": {}, "byAgent": {}, "durationMs": 0 },
@@ -452,11 +453,11 @@ Every `--format json` response includes a stable envelope:
 ## Development
 
 ```bash
-npm run check                           # full local gate: tests + typecheck + build + format
-npm test                                # unit tests only — no Ollama needed (295 passing)
-npm run test:extension                  # VS Code extension tests (25 passing)
+npm run check                           # full local gate: tests + typecheck + build + format check + eslint
+npm test                                # unit tests only — no Ollama needed (575 passing)
+npm run test:extension                  # VS Code extension tests (32 passing)
 npm run typecheck                       # 0 TypeScript errors
 npm run build                           # compile to dist/
 INTEGRATION=1 npm run test:integration  # e2e pipeline — requires Ollama + devstral
-npm run calibrate                       # calibration suite — requires Ollama + devstral (~30-45 min)
+npm run calibrate                       # calibration suite — requires Ollama + devstral (~15-20 min)
 ```

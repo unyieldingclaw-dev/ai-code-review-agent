@@ -23,6 +23,16 @@ beforeEach(() => {
   mockRunTool.mockResolvedValue(null) // default: npm audit not run, existing tests unaffected
 })
 
+// WHY a real manifest-touching diff, not a bare 'diff' string: DependenciesAgent now skips the
+// LLM call entirely whenever the diff doesn't touch package.json/package-lock.json (see the
+// agent's run() override) -- these tests need to actually reach the LLM to test its output.
+const MANIFEST_DIFF = `diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -1,1 +1,1 @@
+-"a":"1"
++"a":"2"`
+
 describe('DependenciesAgent', () => {
   it('has name dependencies', () => {
     expect(new DependenciesAgent(makeProvider('[]'), DEFAULT_CONFIG).name).toBe('dependencies')
@@ -30,7 +40,7 @@ describe('DependenciesAgent', () => {
 
   it('returns empty array when provider returns empty JSON array', async () => {
     expect(
-      await new DependenciesAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: 'diff' })
+      await new DependenciesAgent(makeProvider('[]'), DEFAULT_CONFIG).run({ diff: MANIFEST_DIFF })
     ).toEqual([])
   })
 
@@ -48,7 +58,7 @@ describe('DependenciesAgent', () => {
       },
     ])
     const findings = await new DependenciesAgent(makeProvider(raw), DEFAULT_CONFIG).run({
-      diff: 'diff',
+      diff: MANIFEST_DIFF,
     })
     expect(findings).toHaveLength(1)
     expect(findings[0].agent).toBe('dependencies')
@@ -57,7 +67,7 @@ describe('DependenciesAgent', () => {
 
   it('throws ParseFailureError on parse failure', async () => {
     await expect(
-      new DependenciesAgent(makeProvider(''), DEFAULT_CONFIG).run({ diff: 'diff' })
+      new DependenciesAgent(makeProvider(''), DEFAULT_CONFIG).run({ diff: MANIFEST_DIFF })
     ).rejects.toThrow(ParseFailureError)
   })
 
@@ -68,13 +78,6 @@ describe('DependenciesAgent', () => {
 })
 
 describe('DependenciesAgent npm-audit integration', () => {
-  const MANIFEST_DIFF = `diff --git a/package.json b/package.json
---- a/package.json
-+++ b/package.json
-@@ -1,1 +1,1 @@
--"a":"1"
-+"a":"2"`
-
   const NON_MANIFEST_DIFF = `diff --git a/src/foo.ts b/src/foo.ts
 --- a/src/foo.ts
 +++ b/src/foo.ts
@@ -95,15 +98,19 @@ describe('DependenciesAgent npm-audit integration', () => {
     expect(agent.lastToolAvailability).toBe('used')
   })
 
-  it('falls back to the LLM when the diff does not touch a manifest file', async () => {
+  it('skips the LLM (and npm audit) when the diff does not touch a manifest file, regardless of projectPath', async () => {
+    // WHY this changed from "falls back to the LLM": the agent's own prompt already returns []
+    // when the diff has no manifest changes, so paying a full LLM call for that guaranteed-empty
+    // outcome was pure waste -- see the run() override's WHY comment.
     const provider = makeProvider('[]')
     const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
 
-    await agent.run({ diff: NON_MANIFEST_DIFF, projectPath: '.' })
+    const findings = await agent.run({ diff: NON_MANIFEST_DIFF, projectPath: '.' })
 
+    expect(findings).toEqual([])
     expect(mockRunTool).not.toHaveBeenCalled()
-    expect(provider.chat).toHaveBeenCalledOnce()
-    expect(agent.lastToolAvailability).toBeUndefined()
+    expect(provider.chat).not.toHaveBeenCalled()
+    expect(agent.lastToolAvailability).toBe('not-applicable')
   })
 
   it('falls back to the LLM with degraded status when manifest changed but projectPath is missing', async () => {
@@ -144,7 +151,7 @@ describe('DependenciesAgent npm-audit integration', () => {
     )
   })
 
-  it('skips the LLM entirely when the diff does not touch a manifest AND no package.json exists in projectPath', async () => {
+  it('skips the LLM entirely when the diff does not touch a manifest and projectPath has no package.json', async () => {
     const provider = makeProvider('[]')
     const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
 
@@ -156,14 +163,19 @@ describe('DependenciesAgent npm-audit integration', () => {
     expect(agent.lastToolAvailability).toBe('not-applicable')
   })
 
-  it('still runs the LLM fallback when the diff does not touch a manifest but package.json DOES exist (e.g. this repo itself)', async () => {
+  it('also skips the LLM when the diff does not touch a manifest even though package.json DOES exist (e.g. this repo itself)', async () => {
+    // WHY this changed from "still runs the LLM fallback": skipping is correct regardless of
+    // whether the project happens to be a Node project -- the agent's own prompt already returns
+    // [] for a diff with no manifest changes, so running the LLM for that case was pure waste.
     const provider = makeProvider('[]')
     const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
 
     // projectPath: '.' resolves to the real repo root during `npm test`, which has package.json
-    await agent.run({ diff: NON_MANIFEST_DIFF, projectPath: '.' })
+    const findings = await agent.run({ diff: NON_MANIFEST_DIFF, projectPath: '.' })
 
-    expect(provider.chat).toHaveBeenCalledOnce()
+    expect(findings).toEqual([])
+    expect(provider.chat).not.toHaveBeenCalled()
+    expect(agent.lastToolAvailability).toBe('not-applicable')
   })
 
   it('does NOT skip when touchesManifest is true, even if package.json is not yet on disk (new project)', async () => {
