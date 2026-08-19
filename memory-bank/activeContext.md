@@ -20,6 +20,42 @@ lineage: []
 
 ## Current Focus
 
+**Deterministic false-positive filter for injection/swallowed-exception findings, implemented and
+live-verified (2026-08-18, uncommitted)**: a follow-up report (`is_group_member(gid uuid)`, a
+parameterized Postgres RLS function, flagged as SQL injection) turned into a broader finding —
+`security`/`correctness`/`adversarial`/`error-handling` all fabricate injection/swallowed-exception
+claims against this same clean fixture, measured live against Ollama. Two rounds of prompt-only
+fixes (already applied to all five agents' `.ts` prompt files, uncommitted) plateaued — `security`
+stuck at 5/8, `error-handling` at 3/6 — because blocking one rationalization made the model invent
+another rather than concluding "no finding" (confirmed: after "gid isn't parameterized" was ruled
+out, round-2 misfires switched to claiming `auth.uid()` itself was attacker-controlled). Matches
+this project's own precedent: `secrets.ts`'s `hasCredentialShapedValue` hit the identical wall and
+was fixed the same way, not with more wording.
+
+**Round 2 (2026-08-19)**: three further issues found and fixed on top of the filter — a `license`
+agent hallucinating license identity (6/10, now 0/8 via `licenseFacts.ts` ground-truth lookup), an
+`adversarial` NULL-semantics hallucination (a prompt fix made it _worse_, 6/10 → 9/10, confirming
+the confabulation diagnosis a third time; reverted and fixed deterministically, 7/10 → 4/10
+any-findings), and two command-injection filter gaps found from a live PMB run — including a
+**false negative where a genuine `$USER_INPUT` command injection would have been dropped**. Two
+other items in that brief were verified as NOT bugs: the "missing finding"/"swapped counts" were
+correct orchestrator behavior made invisible by unrendered `corroboratingAgents`, and the
+truncation exit-code taxonomy (0/1/2/3/4 plus `--chunk`) already exists. See `progress.md`.
+
+**Fix**: new `src/core/claimSupport.ts` + `filterUnsupportedClaims` in `orchestrator.ts` — drops an
+injection/swallowed-exception finding when its own file's diff section contains no syntax capable
+of that mechanism (checkable by the vulnerability class's own definition). IDOR is deliberately out
+of scope (not syntactically falsifiable) and stays covered by prompt rules + `--verify-evidence`.
+Live-reverified, not just unit-tested: `security`/`error-handling` went from 2/8 raw misfires to
+0/8 surviving; a genuine-injection counter-test fixture confirmed zero over-suppression (all 11 injection findings produced across
+3 trials each survived; 11/11
+real findings survived). Wired into `calibration/calibrate.ts`. **Still uncommitted** on branch
+`docs/record-v1.11.0-release`, which backs open PR #31 (memory-bank docs, unrelated) — needs
+`npm run check`, then a decision on whether these commits land in PR #31 or move to their own
+branch before pushing. See `progress.md`'s "Follow-up reported by user" entry (2026-08-18) for full
+detail, and `handoff.md` (repo root, should be deleted once this lands) for exact remaining steps
+if a session gets interrupted mid-flight.
+
 **v1.11.0 shipped end-to-end (2026-08-18)**: the audit-remediation work below (Batches 1-8) is
 fully merged, tagged, and published. Sequence: PR #29 (`fix/audit-remediation-batch`, commit
 `e9312f5` after squashing 3 local WIP commits into one — needed because the pre-push git hook

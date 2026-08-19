@@ -54,4 +54,14 @@ describe('SecurityAgent', () => {
     expect(agent.systemPrompt).toMatch(/injection/i)
     expect(agent.systemPrompt).toMatch(/OWASP/i)
   })
+
+  // Regression test for a false positive reproduced live (4/5 trials against real Ollama): this
+  // agent flagged IDOR/injection against a parameterized Postgres function that scopes its query
+  // by auth.uid() -- the exact mechanism that prevents IDOR, and no dynamic SQL construction
+  // anywhere for injection to exploit.
+  it('system prompt requires evidence of the actual mechanism before naming injection or IDOR', () => {
+    const agent = new SecurityAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    expect(agent.systemPrompt).toMatch(/bound\/typed parameter/i)
+    expect(agent.systemPrompt).toMatch(/auth\.uid\(\)/i)
+  })
 })

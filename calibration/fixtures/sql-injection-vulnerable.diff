@@ -1,0 +1,22 @@
+diff --git a/supabase/migrations/20260818000002_search_visits.sql b/supabase/migrations/20260818000002_search_visits.sql
+new file mode 100644
+--- /dev/null
++++ b/supabase/migrations/20260818000002_search_visits.sql
+@@ -0,0 +1,20 @@
++create or replace function search_visits(term text, sort_col text)
++returns setof public.visits
++language plpgsql
++security definer
++set search_path = ''
++as $$
++begin
++  return query execute
++    'select * from public.visits where note like ''%' || term || '%'''
++    || ' order by ' || sort_col;
++end;
++$$;
++
++drop policy if exists "visits_search" on visits;
++create policy "visits_search"
++  on visits for select
++  using (user_id = auth.uid());

@@ -636,3 +636,297 @@ describe('OrchestratorAgent.synthesize — crossReference breaking-change escala
     expect(bc?.severity).toBe('high') // unchanged
   })
 })
+
+describe('OrchestratorAgent.synthesize — filterUnsupportedClaims', () => {
+  // The reproduction fixture for the originally-reported bug: a parameterized, auth.uid()-scoped
+  // Postgres RLS function with no dynamic-SQL-construction or exception-handling syntax at all.
+  const CLEAN_SQL_DIFF = `diff --git a/supabase/migrations/x.sql b/supabase/migrations/x.sql
+new file mode 100644
+--- /dev/null
++++ b/supabase/migrations/x.sql
+@@ -0,0 +1,10 @@
++create or replace function is_group_member(gid uuid)
++returns boolean
++language sql
++security definer
++set search_path = ''
++as $$
++  select exists (
++    select 1 from public.group_members
++    where group_id = gid and user_id = auth.uid()
++  );
++$$;
+`
+
+  // A genuine injection: string concatenation feeding EXECUTE.
+  const VULNERABLE_SQL_DIFF = `diff --git a/supabase/migrations/y.sql b/supabase/migrations/y.sql
+new file mode 100644
+--- /dev/null
++++ b/supabase/migrations/y.sql
+@@ -0,0 +1,8 @@
++create or replace function search_visits(term text)
++returns setof public.visits
++language plpgsql
++as $$
++begin
++  return query execute 'select * from public.visits where note like ''%' || term || '%''';
++end;
++$$;
+`
+
+  it('drops an injection finding whose file section has no dynamic construction', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'security-0',
+        agent: 'security',
+        file: 'supabase/migrations/x.sql',
+        title: 'SQL Injection in is_group_member',
+        detail: 'The gid parameter is interpolated into the query.',
+      }),
+    ]
+    const result = orch.synthesize(findings, undefined, undefined, CLEAN_SQL_DIFF)
+    expect(result).toHaveLength(0)
+  })
+
+  it('keeps an injection finding whose file section contains genuine dynamic construction', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'security-0',
+        agent: 'security',
+        file: 'supabase/migrations/y.sql',
+        title: 'SQL Injection in search_visits',
+        detail: 'term is concatenated directly into the executed query string.',
+      }),
+    ]
+    const result = orch.synthesize(findings, undefined, undefined, VULNERABLE_SQL_DIFF)
+    expect(result).toHaveLength(1)
+  })
+
+  it('drops a swallowed-exception finding whose file section has no exception-handling construct', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'error-handling-0',
+        agent: 'error-handling',
+        file: 'supabase/migrations/x.sql',
+        title: 'Swallowed exception',
+        detail: 'Errors from this function are silently discarded.',
+      }),
+    ]
+    const result = orch.synthesize(findings, undefined, undefined, CLEAN_SQL_DIFF)
+    expect(result).toHaveLength(0)
+  })
+
+  it('keeps a swallowed-exception finding whose file section contains a real exception-handling construct', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const tryCatchDiff = `diff --git a/src/handler.ts b/src/handler.ts
+--- a/src/handler.ts
++++ b/src/handler.ts
+@@ -1,3 +1,5 @@
++try {
++  risky()
++} catch (e) { }
+`
+    const findings = [
+      finding({
+        id: 'error-handling-0',
+        agent: 'error-handling',
+        file: 'src/handler.ts',
+        title: 'Swallowed exception',
+        detail: 'The catch block is empty.',
+      }),
+    ]
+    const result = orch.synthesize(findings, undefined, undefined, tryCatchDiff)
+    expect(result).toHaveLength(1)
+  })
+
+  it('does not touch a finding that makes neither an injection nor a swallowed-exception claim', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'security-0',
+        agent: 'security',
+        file: 'supabase/migrations/x.sql',
+        title: 'Missing rate limiting',
+        detail: 'This policy has no rate limit.',
+      }),
+    ]
+    const result = orch.synthesize(findings, undefined, undefined, CLEAN_SQL_DIFF)
+    expect(result).toHaveLength(1)
+  })
+
+  it('does not filter anything when diffText is omitted (backward compatible)', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'security-0',
+        file: 'supabase/migrations/x.sql',
+        title: 'SQL Injection',
+        detail: 'unsanitized input reaches the query',
+      }),
+    ]
+    const result = orch.synthesize(findings)
+    expect(result).toHaveLength(1)
+  })
+
+  it('fails open when the finding’s file has no matching section in the diff', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'security-0',
+        file: 'src/unrelated.ts',
+        title: 'SQL Injection',
+        detail: 'unsanitized input reaches the query',
+      }),
+    ]
+    const result = orch.synthesize(findings, undefined, undefined, CLEAN_SQL_DIFF)
+    expect(result).toHaveLength(1)
+  })
+
+  it('exempts deterministic-source findings (e.g. npm-audit) from the claim-support check', () => {
+    // A real npm-audit CVE can legitimately be titled "SQL injection in <package>" and is
+    // attributed to package.json, whose diff section will of course contain no dynamic SQL.
+    // Without this exemption the filter would silently drop real, tool-sourced findings.
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'dependencies-0',
+        agent: 'dependencies',
+        source: 'npm-audit',
+        file: 'package.json',
+        title: 'SQL injection in vulnerable-orm@1.2.3',
+        detail: 'CVE-2026-00000: known SQL injection vulnerability.',
+      }),
+    ]
+    const diffWithPackageJson = `diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -1,3 +1,3 @@
+-  "vulnerable-orm": "1.2.2",
++  "vulnerable-orm": "1.2.3",
+`
+    const result = orch.synthesize(findings, undefined, undefined, diffWithPackageJson)
+    expect(result).toHaveLength(1)
+  })
+
+  it('records a dropped claim into the sink with a distinguishing reason', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'security-0',
+        agent: 'security',
+        file: 'supabase/migrations/x.sql',
+        title: 'SQL Injection in is_group_member',
+        detail: 'unparameterized query',
+      }),
+    ]
+    const dropped: Array<{ agent: string; title: string; file: string; reason?: string }> = []
+    const result = orch.synthesize(findings, undefined, dropped, CLEAN_SQL_DIFF)
+    expect(result).toHaveLength(0)
+    expect(dropped).toEqual([
+      {
+        agent: 'security',
+        title: 'SQL Injection in is_group_member',
+        file: 'supabase/migrations/x.sql',
+        reason: 'unsupported-injection-claim',
+      },
+    ])
+  })
+
+  it('drops a NULL-raises-an-error claim against SQL that contains no raising construct', () => {
+    // In SQL, comparing to NULL yields unknown and filters the row -- it does not error. With no
+    // RAISE, cast, or constraint anywhere in the section, the claimed mechanism cannot occur.
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'adversarial-0',
+        agent: 'adversarial',
+        file: 'supabase/migrations/x.sql',
+        title: 'Null UUID Input Breaks Function',
+        detail: 'Passing null to is_group_member causes an SQL syntax error',
+      }),
+    ]
+    const dropped: Array<{ agent: string; title: string; file: string; reason?: string }> = []
+    const result = orch.synthesize(findings, undefined, dropped, CLEAN_SQL_DIFF)
+    expect(result).toHaveLength(0)
+    expect(dropped[0].reason).toBe('unsupported-null-error-claim')
+  })
+
+  it('keeps a NULL-raises claim when the SQL section really can raise', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const castDiff = `diff --git a/supabase/migrations/z.sql b/supabase/migrations/z.sql
+new file mode 100644
+--- /dev/null
++++ b/supabase/migrations/z.sql
+@@ -0,0 +1,2 @@
++create function f(t text) returns uuid language sql as $$
++  select t::uuid;
++$$;
+`
+    const findings = [
+      finding({
+        id: 'adversarial-0',
+        agent: 'adversarial',
+        file: 'supabase/migrations/z.sql',
+        title: 'Malformed input causes an error',
+        detail: 'Passing an invalid uuid string causes a cast error',
+      }),
+    ]
+    const result = orch.synthesize(findings, undefined, undefined, castDiff)
+    expect(result).toHaveLength(1)
+  })
+
+  it('never applies the NULL-raises check outside SQL files', () => {
+    // In an imperative language a null dereference raises with no raising keyword present, so
+    // acting on this claim there would drop genuine crash findings.
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const tsDiff = `diff --git a/src/handler.ts b/src/handler.ts
+--- a/src/handler.ts
++++ b/src/handler.ts
+@@ -1,2 +1,3 @@
++export const name = (u) => u.profile.name
+`
+    const findings = [
+      finding({
+        id: 'adversarial-0',
+        agent: 'adversarial',
+        file: 'src/handler.ts',
+        title: 'Null user crashes handler',
+        detail: 'Passing null as u causes a TypeError when reading profile',
+      }),
+    ]
+    const result = orch.synthesize(findings, undefined, undefined, tsDiff)
+    expect(result).toHaveLength(1)
+  })
+
+  it('runs before crossReference, so an unsupported pair cannot escalate each other first', () => {
+    // The diagnosed co-fabrication case: security and adversarial invented matching injection
+    // findings at the same location on the same safe function. If crossReference ran first it
+    // would escalate the security finding's severity before this filter could drop it.
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'security-0',
+        agent: 'security',
+        severity: 'medium',
+        file: 'supabase/migrations/x.sql',
+        line: 1,
+        title: 'SQL Injection in is_group_member',
+        detail: 'unparameterized query',
+      }),
+      finding({
+        id: 'adversarial-0',
+        agent: 'adversarial',
+        severity: 'medium',
+        file: 'supabase/migrations/x.sql',
+        line: 1,
+        title: 'SQL Injection exploit path',
+        detail: 'attacker-controlled gid reaches the query',
+      }),
+    ]
+    const result = orch.synthesize(findings, undefined, undefined, CLEAN_SQL_DIFF)
+    expect(result).toHaveLength(0)
+  })
+})

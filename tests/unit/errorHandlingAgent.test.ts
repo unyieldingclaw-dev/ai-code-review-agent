@@ -51,4 +51,12 @@ describe('ErrorHandlingAgent', () => {
     expect(agent.systemPrompt).toMatch(/swallowed/i)
     expect(agent.systemPrompt).toMatch(/promise/i)
   })
+
+  // Regression test for a false positive reproduced live (1/5 trials against real Ollama): this
+  // agent invented a "swallowed exception" finding against a `language sql` Postgres function,
+  // which has no try/catch or exception-handling construct at all to swallow anything with.
+  it('system prompt requires an actual exception-handling construct before flagging', () => {
+    const agent = new ErrorHandlingAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    expect(agent.systemPrompt).toMatch(/language sql/i)
+  })
 })

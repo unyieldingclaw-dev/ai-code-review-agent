@@ -42,9 +42,29 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
   }
 
   if (result.hallucinationFilter && result.hallucinationFilter.dropped.length > 0) {
-    lines.push(
-      `${useEmoji ? '🔍 ' : ''}Hallucination filter: ${result.hallucinationFilter.dropped.length} finding(s) dropped — referenced file(s) not present in the reviewed diff.`
-    )
+    // WHY grouped by reason: this sink has two writers with unrelated causes --
+    // filterNonexistentFiles (file absent from the diff) and filterUnsupportedClaims (file IS in
+    // the diff, but its claimed mechanism has no supporting syntax). A single hardcoded sentence
+    // reported every claim-support drop as "referenced file not present", which was factually
+    // false for all of them. Findings carry `reason` only for the latter, so an absent `reason`
+    // means the file-existence filter dropped it.
+    const dropped = result.hallucinationFilter.dropped
+    const REASON_TEXT: Record<string, string> = {
+      'unsupported-injection-claim': 'no dynamic query/command construction in the file',
+      'unsupported-exception-claim': 'no exception-handling construct in the file',
+      'unsupported-null-error-claim': 'SQL NULL comparison yields no match, not an error',
+    }
+    const byReason = new Map<string, number>()
+    for (const d of dropped) {
+      const key = d.reason
+        ? (REASON_TEXT[d.reason] ?? d.reason)
+        : 'referenced file(s) not present in the reviewed diff'
+      byReason.set(key, (byReason.get(key) ?? 0) + 1)
+    }
+    lines.push(`${useEmoji ? '🔍 ' : ''}Hallucination filter: ${dropped.length} finding(s) dropped`)
+    for (const [reason, count] of byReason) {
+      lines.push(`  - ${count} — ${reason}`)
+    }
     lines.push('')
   }
 
@@ -152,8 +172,19 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     for (const f of group) {
       lines.push(`### ${f.title}`)
       const conf = f.confidence ?? 70
+      // WHY corroboratingAgents is surfaced here: deduplicate() merges same-location findings from
+      // multiple agents into the highest-priority agent's finding, recording the others in this
+      // field -- but nothing ever rendered it. From the outside a run whose progress lines said
+      // "security 4 findings, adversarial 1 finding" then printed 4 findings all labelled
+      // `Agent: security` looked like the adversarial finding had been silently lost, when it had
+      // actually corroborated one of them (and, via hallucinationCrossCheck, is why that one kept
+      // its severity while uncorroborated siblings were downgraded). Reported as a suspected
+      // aggregation bug from a live run; the aggregation was correct, the reporting was not.
+      const corroborated = f.corroboratingAgents?.length
+        ? ` | **Corroborated by:** ${f.corroboratingAgents.join(', ')}`
+        : ''
       lines.push(
-        `**Agent:** ${f.agent} | **Basis:** ${f.basis} | **Confidence:** ${conf}% | **File:** \`${f.file}:${f.line}\``
+        `**Agent:** ${f.agent} | **Basis:** ${f.basis} | **Confidence:** ${conf}% | **File:** \`${f.file}:${f.line}\`${corroborated}`
       )
       lines.push('')
       lines.push(f.detail)

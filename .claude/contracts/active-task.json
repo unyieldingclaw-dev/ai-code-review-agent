@@ -1,43 +1,126 @@
 {
-  "task": "Fix all confirmed findings from the 15-phase ACR Full-System Integrity & Hardening Review (Tiers 1 and 2 of docs/superpowers/specs/2026-08-17-full-system-integrity-hardening-audit.md) -- enum validation, CLI flag validation, MCP/SARIF failure-visibility, DETERMINISTIC_SOURCES spoofing, agent skip logic, governance/CI hardening, secret-scan hardening, and docs cleanup. Tier 3 (sanitizer redesign, chunking redesign, vscode-extension catch-up, Ollama concurrency) explicitly deferred, not in scope.",
+  "task": "Deterministic post-filters for review findings whose claimed defect mechanism is structurally absent from the diff. Grew during execution beyond the original injection/swallowed-exception scope, as each new class was measured: (1) injection + swallowed-exception claims (claimSupport.ts + filterUnsupportedClaims); (2) SQL NULL-raises-an-error claims; (3) fabricated license assertions contradicted by the project's own lockfile (licenseFacts.ts); plus two reporting fixes surfaced while diagnosing the above (corroboratingAgents was computed but never rendered; agent progress lines now say 'raw findings'). Follows the hasCredentialShapedValue precedent in secrets.ts: prompt-only fixes were measured live against Ollama across three separate agents and each time failed to reduce the rate -- for license it made it worse (6/10 -> 9/10). IDOR is explicitly out of scope, not being deterministically falsifiable.",
   "status": "complete",
-  "created_at": "2026-08-18T13:24:25Z",
-  "expires_at": "2026-08-18T21:24:25Z",
-  "approved_by": "user (explicit 'approved' reply to Task Contract Proposal)",
+  "created_at": "2026-08-18T00:00:00Z",
+  "expires_at": "2026-08-18T08:00:00Z",
+  "approved_by": "user (ExitPlanMode approval of the deterministic-filter plan, after answering scope/disposition/branch design questions)",
   "scope": [
-    { "file": "src/core/parsing.ts", "op": "edit" },
-    { "file": "src/core/schema.ts", "op": "edit" },
-    { "file": "tests/unit/parsing.test.ts", "op": "edit" },
-    { "file": "tests/unit/baseAgent.test.ts", "op": "edit" },
-    { "file": "src/cli/index.ts", "op": "edit" },
-    { "file": "tests/unit/cli.test.ts", "op": "edit" },
-    { "file": "src/mcp/formatter.ts", "op": "edit" },
-    { "file": "src/cli/formatters/sarif.ts", "op": "edit" },
-    { "file": "tests/unit/mcp/formatter.test.ts", "op": "edit" },
-    { "file": "tests/unit/formatters/sarif.test.ts", "op": "edit" },
-    { "file": "src/core/agents/orchestrator.ts", "op": "edit" },
-    { "file": "src/core/agents/breakingChange.ts", "op": "edit" },
-    { "file": "src/core/agents/licenseCompliance.ts", "op": "edit" },
-    { "file": "src/core/agents/migrationSafety.ts", "op": "edit" },
-    { "file": "src/core/agents/secrets.ts", "op": "edit" },
-    { "file": "src/core/agents/dependencies.ts", "op": "edit" },
-    { "file": "tests/unit/orchestrator.test.ts", "op": "edit" },
-    { "file": "tests/unit/breakingChangeAgent.test.ts", "op": "edit" },
-    { "file": "tests/unit/licenseComplianceAgent.test.ts", "op": "edit" },
-    { "file": "tests/unit/migrationSafetyAgent.test.ts", "op": "edit" },
-    { "file": "tests/unit/secretsAgent.test.ts", "op": "edit" },
-    { "file": "tests/unit/dependenciesAgent.test.ts", "op": "edit" },
-    { "file": ".claude/settings.json", "op": "edit" },
-    { "file": "scripts/dangerous-commands.ps1", "op": "edit" },
-    { "file": "scripts/dangerous-commands.sh", "op": "edit" },
-    { "file": ".github/workflows/review.yml", "op": "edit" },
-    { "file": ".github/workflows/calibrate.yml", "op": "edit" },
-    { "file": "scripts/pre-push-check.ps1", "op": "edit" },
-    { "file": "scripts/pre-push-check.sh", "op": "edit" },
-    { "file": "README.md", "op": "edit" },
-    { "file": "docs/HOOKS-GUIDE.md", "op": "edit" },
-    { "file": "standards/SECURITY-GUARDRAILS.md", "op": "edit" },
-    { "file": "CHANGELOG.md", "op": "edit" },
-    { "file": "tests/unit/orchestratorAgent.test.ts", "op": "delete" }
-  ]
+    {
+      "file": ".claude/contracts/active-task.json",
+      "op": "edit"
+    },
+    {
+      "file": "CHANGELOG.md",
+      "op": "edit"
+    },
+    {
+      "file": "calibration/calibrate.ts",
+      "op": "edit"
+    },
+    {
+      "file": "calibration/fixtures/license-clean.diff",
+      "op": "edit"
+    },
+    {
+      "file": "calibration/fixtures/sql-injection-clean.diff",
+      "op": "add"
+    },
+    {
+      "file": "calibration/fixtures/sql-injection-vulnerable.diff",
+      "op": "add"
+    },
+    {
+      "file": "memory-bank/activeContext.md",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/progress.md",
+      "op": "edit"
+    },
+    {
+      "file": "src/cli/formatter.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/cli/index.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/agents/adversarial.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/agents/correctness.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/agents/design.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/agents/errorHandling.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/agents/licenseCompliance.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/agents/orchestrator.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/agents/security.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/claimSupport.ts",
+      "op": "add"
+    },
+    {
+      "file": "src/core/licenseFacts.ts",
+      "op": "add"
+    },
+    {
+      "file": "src/core/runner.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/schema.ts",
+      "op": "edit"
+    },
+    {
+      "file": "tests/unit/adversarialAgent.test.ts",
+      "op": "edit"
+    },
+    {
+      "file": "tests/unit/claimSupport.test.ts",
+      "op": "add"
+    },
+    {
+      "file": "tests/unit/correctnessAgent.test.ts",
+      "op": "edit"
+    },
+    {
+      "file": "tests/unit/designAgent.test.ts",
+      "op": "edit"
+    },
+    {
+      "file": "tests/unit/errorHandlingAgent.test.ts",
+      "op": "edit"
+    },
+    {
+      "file": "tests/unit/licenseFacts.test.ts",
+      "op": "add"
+    },
+    {
+      "file": "tests/unit/orchestrator.test.ts",
+      "op": "edit"
+    },
+    {
+      "file": "tests/unit/securityAgent.test.ts",
+      "op": "edit"
+    }
+  ],
+  "scope_note": "Scope was reconciled against the actual delivered diff at completion. The original declaration covered only the injection/swallowed-exception filter; the license and NULL filters and the reporting fixes were added during execution at the user's direction as each was measured. Timestamps: created_at/expires_at were written as round placeholder values rather than real clock stamps, and the work actually spanned 2026-08-18 into 2026-08-19, past the recorded expiry. Recorded here rather than back-dated to a fabricated-looking exact time."
 }

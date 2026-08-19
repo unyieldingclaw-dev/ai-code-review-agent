@@ -50,6 +50,11 @@ Rules:
 - recommendation: show the corrected code, not just a description of what to fix
 - blocking: true for critical/high, false for medium/low
 - Only report severity >= medium
+- Do NOT report security-vulnerability classifications (SQL injection, XSS, IDOR, authorization
+  bypass, hardcoded secrets, insecure dependencies, etc.) — those are out of this agent's domain
+  and belong to the security agent. If code touches a database/auth function, only flag it here
+  for a genuine logic bug from the list above (wrong operator, off-by-one, null deref, race
+  condition, etc.) — never for a security label.
 - If no issues found, return: []`
   }
 }
