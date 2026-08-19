@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.12.0] — 2026-08-19 (deterministic false-positive filters for fabricated findings)
+
 ### Fixed
 
 - `security`/`correctness`/`adversarial`/`error-handling` could hallucinate SQL-injection or
@@ -81,6 +83,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   matching Postgres `$BODY$` dollar-quote tags and `$1` bind params) — all keep findings rather
   than dropping them, and are documented in `memory-bank/progress.md` rather than tightened
   without their own measurement.
+- **Six further false negatives in the new filters**, found by a multi-agent `/code-review` pass and
+  its opponent audit before release. Each would have silently dropped a real finding:
+  - Injection classes with no string building — XSS via `dangerouslySetInnerHTML`, NoSQL via an
+    object passed to a query API, CRLF/header injection — were dropped, because
+    `hasDynamicConstruction` only knows query/command string assembly and cannot falsify them.
+    They now fail open. The exclusion matches an injection **class** term, not a bare noun: an
+    earlier attempt matched `html`/`dom`/`headers` anywhere in the text, which let fabricated SQL
+    injection findings escape the filter simply by mentioning one.
+  - `claimsNullRaisesError` treated `fail`/`fails`/`failure` as a raising verb. "A complete failure
+    of tenant isolation" is ordinary security prose, so a real finding against a `using (true)`
+    RLS policy — a world-readable table — was dropped outright. Removing that one alternative
+    measured 5/12 wrong → 0/12; fabricated raise claims still match, since they always name an
+    explicit verb (error/throw/raise/crash).
+  - Shell and Rust error suppression (`2>/dev/null`, `|| true`, `let _ =`, `.ok()`) counted as
+    "no error-handling construct", so legitimate swallowed-error findings in those languages were
+    dropped. Those idioms now count as error handling.
+  - `licenseFacts` threw a `TypeError` on npm's deprecated object-form `license`
+    (`{"type":"MIT"}`), and the throw escaped the agent's `run()`, failing the whole agent rather
+    than the one lookup.
+  - `extractAddedDependencies` matched any `"key": "value"` manifest line, so a `"version"` bump
+    alongside a real dependency made the license backstop fail open — meaning it fired almost never
+    in practice, since version bumps accompany most dependency changes.
+  - The report labelled every claim-support drop "referenced file(s) not present in the reviewed
+    diff", which was false for all of them (those files ARE in the diff). Drops are now grouped by
+    reason, which is what the `reason` field was added for.
+- `license` agent's prompt had gained a list of concrete package names (`lodash`, `express`,
+  `react`, `chalk`, `axios`) as examples of permissive packages. That re-introduced the exact
+  hallucination-seed pattern removed in `a906515` (and in `9e0bc29` for `dependencies`), and
+  `chalk` is the designated false-positive bait for this agent's own calibration case. Removed; the
+  guidance is now stated without naming any package.
 - `corroboratingAgents` was computed by the orchestrator's dedup step but never rendered anywhere,
   so a run whose progress lines read "security 4 findings, adversarial 1 finding" and then printed
   4 findings all labelled `Agent: security` looked like the adversarial finding had been silently
