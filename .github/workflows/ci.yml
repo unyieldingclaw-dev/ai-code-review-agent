@@ -46,6 +46,36 @@ jobs:
         continue-on-error: true
         run: npm run build
 
+      # WHY this is CI and not just advice: memory-bank/README.md has always specified per-file
+      # line limits, and nothing enforced them. activeContext.md reached 902 lines against a max of
+      # 150 (601% over) and progress.md 1157 against 400, together making the auto-read payload
+      # 190,798 bytes -- reloaded on every session start and every compaction. A single session added
+      # ~19.8KB. Advice does not bound an append-only file; a failing build does.
+      #
+      # archive/ is deliberately excluded: it exists to hold the overflow and is not auto-read.
+      - name: Memory bank size limits
+        id: mbsize
+        continue-on-error: true
+        run: |
+          FAIL=0
+          check() {
+            f="memory-bank/$1.md"; max="$2"
+            [ -f "$f" ] || return 0
+            n=$(wc -l < "$f")
+            if [ "$n" -gt "$max" ]; then
+              echo "FAILED: $f is $n lines, limit $max -- move completed history to memory-bank/archive/"
+              FAIL=1
+            else
+              echo "ok: $f $n/$max"
+            fi
+          }
+          check projectbrief 150
+          check systemPatterns 300
+          check techContext 400
+          check activeContext 150
+          check progress 400
+          exit $FAIL
+
       # WHY continue-on-error + this gate, instead of letting each step fail the
       # job immediately: this repo previously had NO push/PR CI gate at all --
       # typecheck/lint/test/build only ran at release-tag time, so a broken main
@@ -61,4 +91,5 @@ jobs:
           if [ "${{ steps.lint.outcome }}" != "success" ]; then echo "FAILED: Lint"; FAIL=1; fi
           if [ "${{ steps.test.outcome }}" != "success" ]; then echo "FAILED: Run tests"; FAIL=1; fi
           if [ "${{ steps.build.outcome }}" != "success" ]; then echo "FAILED: Build"; FAIL=1; fi
+          if [ "${{ steps.mbsize.outcome }}" != "success" ]; then echo "FAILED: Memory bank size limits"; FAIL=1; fi
           exit $FAIL
