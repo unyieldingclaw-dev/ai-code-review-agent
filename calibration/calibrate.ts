@@ -238,14 +238,18 @@ const CASES: CalibrationCase[] = [
     // concatenation injection (search_visits) -- live-verified the finding survives
     // filterUnsupportedClaims: across 3 trials each for security/correctness/error-handling/
     // adversarial, all 11 injection findings the four agents produced survived. baitKeyword guards
-    // against the specific over-generalization measured during round-2 prompt tuning: blaming the
-    // correctly-scoped `auth.uid()` policy check itself as the vulnerability, instead of the
-    // actual string concatenation.
+    // WHY the bait is a SAFE DECOY function rather than a token from the vulnerable code: the
+    // fixture previously baited on `auth.uid`, which appears in the fixture itself, so a perfectly
+    // correct injection finding that merely mentioned the surrounding policy failed the case --
+    // observed flaking across runs. `is_group_member` here is parameterized and has no injection
+    // surface at all, so naming it is unambiguously a misattribution. That is also the exact
+    // false positive originally reported, which makes this a real discrimination test: find the
+    // injection in search_visits, do not blame the safe function beside it.
     name: 'security-sql-vulnerable',
     agentName: 'security',
     fixtureFile: 'calibration/fixtures/sql-injection-vulnerable.diff',
     expectedKeyword: 'injection',
-    baitKeyword: 'auth.uid',
+    baitKeyword: 'is_group_member',
   },
 ]
 
