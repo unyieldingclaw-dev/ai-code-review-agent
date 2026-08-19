@@ -44,9 +44,11 @@ const makeResult = (overrides: Partial<ReviewResult> = {}): ReviewResult => ({
 
 // Mock SwarmRunner
 vi.mock('../../src/core/runner.js', () => ({
-  SwarmRunner: vi.fn().mockImplementation(() => ({
-    run: vi.fn().mockResolvedValue(makeResult()),
-  })),
+  SwarmRunner: vi.fn().mockImplementation(function () {
+    return {
+      run: vi.fn().mockResolvedValue(makeResult()),
+    }
+  }),
 }))
 
 // Mock chunkRunner — same pattern as SwarmRunner above (mocked module, not a spy on a real
@@ -62,38 +64,42 @@ vi.mock('../../src/core/chunkRunner.js', () => ({
 
 // Mock OllamaProvider — valid URL check is bypassed by mock
 vi.mock('../../src/core/llm/ollamaProvider.js', () => ({
-  OllamaProvider: vi.fn().mockImplementation(() => ({})),
+  OllamaProvider: vi.fn().mockImplementation(function () {
+    return {}
+  }),
 }))
 
 // Mock loadConfig — returns a fresh object each call. cli/index.ts mutates the returned
 // config in place (e.g. --timeout sets agentTimeoutMs/timeoutScalingEnabled directly on it),
 // so a shared object reference here would leak mutations from one test into the next.
 vi.mock('../../src/core/config.js', () => ({
-  loadConfig: vi.fn().mockImplementation(() => ({
-    model: 'devstral:latest',
-    provider: 'ollama',
-    ollamaUrl: 'http://localhost:11434',
-    maxFindings: 15,
-    agents: ['security', 'correctness'],
-    contextLines: 10,
-    testOutputDir: './ai-review-tests',
-    maxDiffLines: 2000,
-    agentTimeoutMs: 60000,
-    timeoutScalingEnabled: true,
-    ignorePaths: [],
-    sanitize: true,
-    failOn: 'high',
-    failFast: false,
-    parallel: false,
-    retryAttempts: 2,
-    retryDelayMs: 2000,
-    contextBudgetChars: 4000,
-    contextMode: 'static',
-    agentPolicy: {},
-    verifyEvidence: false,
-    verifierModel: 'qwen3:latest',
-    verifyEvidenceSeverity: 'high',
-  })),
+  loadConfig: vi.fn().mockImplementation(function () {
+    return {
+      model: 'devstral:latest',
+      provider: 'ollama',
+      ollamaUrl: 'http://localhost:11434',
+      maxFindings: 15,
+      agents: ['security', 'correctness'],
+      contextLines: 10,
+      testOutputDir: './ai-review-tests',
+      maxDiffLines: 2000,
+      agentTimeoutMs: 60000,
+      timeoutScalingEnabled: true,
+      ignorePaths: [],
+      sanitize: true,
+      failOn: 'high',
+      failFast: false,
+      parallel: false,
+      retryAttempts: 2,
+      retryDelayMs: 2000,
+      contextBudgetChars: 4000,
+      contextMode: 'static',
+      agentPolicy: {},
+      verifyEvidence: false,
+      verifierModel: 'qwen3:latest',
+      verifyEvidenceSeverity: 'high',
+    }
+  }),
 }))
 
 import { spawnSync } from 'child_process'
@@ -165,71 +171,77 @@ async function runCli(
 
 describe('CLI — argument parsing and output', () => {
   it('exits 0 when no blocking findings and --fail-on high (default)', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult({ findings: [] })),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult({ findings: [] })),
+      }
+    })
     const { exitCode } = await runCli([])
     expect(exitCode).toBe(0)
   })
 
   it('exits 1 when a critical finding is present and --fail-on high', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [
-            {
-              id: 'f1',
-              agentName: 'security',
-              severity: 'critical',
-              title: 'SQL injection',
-              description: 'desc',
-              file: 'src/db.ts',
-              line: 1,
-              lineEnd: 1,
-              confidence: 90,
-              domain: 'security',
-              evidence: 'e',
-              impact: 'i',
-              recommendation: 'r',
-              blocking: true,
-              source: 'llm',
-              corroboratingAgents: [],
-            },
-          ],
-        })
-      ),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            findings: [
+              {
+                id: 'f1',
+                agentName: 'security',
+                severity: 'critical',
+                title: 'SQL injection',
+                description: 'desc',
+                file: 'src/db.ts',
+                line: 1,
+                lineEnd: 1,
+                confidence: 90,
+                domain: 'security',
+                evidence: 'e',
+                impact: 'i',
+                recommendation: 'r',
+                blocking: true,
+                source: 'llm',
+                corroboratingAgents: [],
+              },
+            ],
+          })
+        ),
+      }
+    })
     const { exitCode } = await runCli(['--fail-on', 'high'])
     expect(exitCode).toBe(1)
   })
 
   it('exits 0 for a high finding when --fail-on critical', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [
-            {
-              id: 'f1',
-              agentName: 'security',
-              severity: 'high',
-              title: 'XSS',
-              description: 'desc',
-              file: 'src/ui.ts',
-              line: 5,
-              lineEnd: 5,
-              confidence: 80,
-              domain: 'security',
-              evidence: 'e',
-              impact: 'i',
-              recommendation: 'r',
-              blocking: false,
-              source: 'llm',
-              corroboratingAgents: [],
-            },
-          ],
-        })
-      ),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            findings: [
+              {
+                id: 'f1',
+                agentName: 'security',
+                severity: 'high',
+                title: 'XSS',
+                description: 'desc',
+                file: 'src/ui.ts',
+                line: 5,
+                lineEnd: 5,
+                confidence: 80,
+                domain: 'security',
+                evidence: 'e',
+                impact: 'i',
+                recommendation: 'r',
+                blocking: false,
+                source: 'llm',
+                corroboratingAgents: [],
+              },
+            ],
+          })
+        ),
+      }
+    })
     const { exitCode } = await runCli(['--fail-on', 'critical'])
     expect(exitCode).toBe(0)
   })
@@ -257,9 +269,11 @@ describe('CLI — argument parsing and output', () => {
   })
 
   it('prints Ollama hint when runner throws connection error, using the distinct startup-failure exit code (not 1, which also means "blocker found")', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockRejectedValue(new Error('Ollama not reachable at http://localhost:11434')),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockRejectedValue(new Error('Ollama not reachable at http://localhost:11434')),
+      }
+    })
     const { exitCode, stderr } = await runCli([])
     expect(exitCode).toBe(4) // STARTUP_FAILURE_EXIT_CODE
     expect(stderr).toMatch(/ollama serve/)
@@ -292,165 +306,185 @@ describe('CLI — argument parsing and output', () => {
   })
 
   it('passes --fail-on never: exits 0 even with critical finding', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [
-            {
-              id: 'f1',
-              agentName: 'security',
-              severity: 'critical',
-              title: 'RCE',
-              description: 'desc',
-              file: 'src/eval.ts',
-              line: 1,
-              lineEnd: 1,
-              confidence: 95,
-              domain: 'security',
-              evidence: 'e',
-              impact: 'i',
-              recommendation: 'r',
-              blocking: true,
-              source: 'llm',
-              corroboratingAgents: [],
-            },
-          ],
-        })
-      ),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            findings: [
+              {
+                id: 'f1',
+                agentName: 'security',
+                severity: 'critical',
+                title: 'RCE',
+                description: 'desc',
+                file: 'src/eval.ts',
+                line: 1,
+                lineEnd: 1,
+                confidence: 95,
+                domain: 'security',
+                evidence: 'e',
+                impact: 'i',
+                recommendation: 'r',
+                blocking: true,
+                source: 'llm',
+                corroboratingAgents: [],
+              },
+            ],
+          })
+        ),
+      }
+    })
     const { exitCode } = await runCli(['--fail-on', 'never'])
     expect(exitCode).toBe(0)
   })
 
   it('exits 2 when any agent failed, even if remaining findings would pass --fail-on', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [],
-          agentStatus: { security: 'timeout' },
-        })
-      ),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            findings: [],
+            agentStatus: { security: 'timeout' },
+          })
+        ),
+      }
+    })
     const { exitCode } = await runCli(['--fail-on', 'never'])
     expect(exitCode).toBe(2)
   })
 
   it('exits 2 (not 1) when agents failed AND findings would also trip --fail-on', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [
-            {
-              id: 'f-0',
-              agent: 'security',
-              severity: 'critical',
-              basis: 'VERIFIED',
-              file: 'a.ts',
-              line: 1,
-              title: 'T',
-              detail: 'D',
-              domain: 'Security',
-              evidence: 'E',
-              impact: 'I',
-              recommendation: 'R',
-              suggestion: 'S',
-              blocking: true,
-              source: 'llm',
-              confidence: 90,
-            },
-          ],
-          agentStatus: { security: 'ok', correctness: 'timeout' },
-        })
-      ),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            findings: [
+              {
+                id: 'f-0',
+                agent: 'security',
+                severity: 'critical',
+                basis: 'VERIFIED',
+                file: 'a.ts',
+                line: 1,
+                title: 'T',
+                detail: 'D',
+                domain: 'Security',
+                evidence: 'E',
+                impact: 'I',
+                recommendation: 'R',
+                suggestion: 'S',
+                blocking: true,
+                source: 'llm',
+                confidence: 90,
+              },
+            ],
+            agentStatus: { security: 'ok', correctness: 'timeout' },
+          })
+        ),
+      }
+    })
     const { exitCode } = await runCli(['--fail-on', 'high'])
     expect(exitCode).toBe(2)
   })
 
   it('exits 0 when all agents succeed and no findings trip --fail-on', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult({ findings: [], agentStatus: { security: 'ok' } })),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi
+          .fn()
+          .mockResolvedValue(makeResult({ findings: [], agentStatus: { security: 'ok' } })),
+      }
+    })
     const { exitCode } = await runCli(['--fail-on', 'high'])
     expect(exitCode).toBe(0)
   })
 
   it('exits 1 (not 3) when a truncated run also contains a blocker finding', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [
-            {
-              id: 'f-0',
-              agent: 'security',
-              severity: 'critical',
-              basis: 'VERIFIED',
-              file: 'a.ts',
-              line: 1,
-              title: 'T',
-              detail: 'D',
-              domain: 'Security',
-              evidence: 'E',
-              impact: 'I',
-              recommendation: 'R',
-              suggestion: 'S',
-              blocking: true,
-              source: 'llm',
-              confidence: 90,
-            },
-          ],
-          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
-        })
-      ),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            findings: [
+              {
+                id: 'f-0',
+                agent: 'security',
+                severity: 'critical',
+                basis: 'VERIFIED',
+                file: 'a.ts',
+                line: 1,
+                title: 'T',
+                detail: 'D',
+                domain: 'Security',
+                evidence: 'E',
+                impact: 'I',
+                recommendation: 'R',
+                suggestion: 'S',
+                blocking: true,
+                source: 'llm',
+                confidence: 90,
+              },
+            ],
+            truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+          })
+        ),
+      }
+    })
     const { exitCode } = await runCli(['--fail-on', 'high'])
     expect(exitCode).toBe(1)
   })
 
   it('exits 3 when truncated with no blocker finding', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [],
-          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
-        })
-      ),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            findings: [],
+            truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+          })
+        ),
+      }
+    })
     const { exitCode } = await runCli([])
     expect(exitCode).toBe(3)
   })
 
   it('exits 0 on a truncated-but-clean run when --allow-truncation is passed', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [],
-          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
-        })
-      ),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            findings: [],
+            truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+          })
+        ),
+      }
+    })
     const { exitCode } = await runCli(['--allow-truncation'])
     expect(exitCode).toBe(0)
   })
 
   it('exits 2 (not 3) when agents failed AND the run was also truncated', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          findings: [],
-          agentStatus: { security: 'ok', correctness: 'timeout' },
-          truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
-        })
-      ),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            findings: [],
+            agentStatus: { security: 'ok', correctness: 'timeout' },
+            truncation: { truncated: true, originalLines: 5000, keptLines: 2000 },
+          })
+        ),
+      }
+    })
     const { exitCode } = await runCli([])
     expect(exitCode).toBe(2)
   })
 
   it('--timeout sets agentTimeoutMs and disables timeout scaling', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     await runCli(['--timeout', '5000'])
     const config = MockSwarmRunner.mock.calls[0][0]
     expect(config.agentTimeoutMs).toBe(5000)
@@ -458,36 +492,44 @@ describe('CLI — argument parsing and output', () => {
   })
 
   it('leaves timeout scaling enabled when --timeout is not passed', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     await runCli([])
     const config = MockSwarmRunner.mock.calls[0][0]
     expect(config.timeoutScalingEnabled).toBe(true)
   })
 
   it('--parallel enables parallel execution', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     await runCli(['--parallel'])
     const config = MockSwarmRunner.mock.calls[0][0]
     expect(config.parallel).toBe(true)
   })
 
   it('leaves parallel execution off by default when --parallel is not passed', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     await runCli([])
     const config = MockSwarmRunner.mock.calls[0][0]
     expect(config.parallel).toBe(false)
   })
 
   it('--verify-evidence enables evidence verification and constructs a verifier provider using verifierModel, not the main review model', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     const { OllamaProvider } = await import('../../src/core/llm/ollamaProvider.js')
     const MockOllamaProvider = vi.mocked(OllamaProvider)
 
@@ -510,9 +552,11 @@ describe('CLI — argument parsing and output', () => {
   })
 
   it('falls back to qwen3:latest when config.verifierModel is an empty string', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     const { loadConfig } = await import('../../src/core/config.js')
     vi.mocked(loadConfig).mockReturnValueOnce({
       model: 'devstral:latest',
@@ -539,9 +583,11 @@ describe('CLI — argument parsing and output', () => {
   })
 
   it('leaves verifyEvidence off and constructs only the main review provider by default', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     const { OllamaProvider } = await import('../../src/core/llm/ollamaProvider.js')
     const MockOllamaProvider = vi.mocked(OllamaProvider)
 
@@ -557,18 +603,22 @@ describe('CLI — argument parsing and output', () => {
   })
 
   it('--verify-evidence-severity overrides the config value when passed', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     await runCli(['--verify-evidence', '--verify-evidence-severity', 'medium'])
     const config = MockSwarmRunner.mock.calls[0][0]
     expect(config.verifyEvidenceSeverity).toBe('medium')
   })
 
   it('leaves verifyEvidenceSeverity at the config default (high) when the flag is not passed', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     await runCli(['--verify-evidence'])
     const config = MockSwarmRunner.mock.calls[0][0]
     expect(config.verifyEvidenceSeverity).toBe('high')
@@ -599,9 +649,11 @@ describe('CLI — argument parsing and output', () => {
   })
 
   it('accepts a valid --agents value', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     const { exitCode } = await runCli(['--agents', 'security,correctness'])
     expect(exitCode).toBe(0)
     const config = MockSwarmRunner.mock.calls[0][0]
@@ -613,9 +665,11 @@ describe('CLI — argument parsing and output', () => {
   // config.maxDiffLines true -- without it, --chunk alone would never trigger the runChunked
   // branch and these tests would pass trivially regardless of whether the wiring is correct.
   it('calls runChunked instead of runner.run directly when --chunk is passed and the diff exceeds maxDiffLines', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(makeResult()),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(makeResult()),
+      }
+    })
     mockRunChunked.mockResolvedValue(makeResult())
     const { exitCode } = await runCli(['--diff', 'x.diff', '--chunk', '--max-lines', '1'])
     expect(exitCode).toBe(0)
@@ -624,7 +678,9 @@ describe('CLI — argument parsing and output', () => {
 
   it('does not call runChunked when --chunk is not passed', async () => {
     const runSpy = vi.fn().mockResolvedValue(makeResult())
-    MockSwarmRunner.mockImplementation(() => ({ run: runSpy }))
+    MockSwarmRunner.mockImplementation(function () {
+      return { run: runSpy }
+    })
     const { exitCode } = await runCli(['--diff', 'x.diff', '--max-lines', '1'])
     expect(exitCode).toBe(0)
     expect(mockRunChunked).not.toHaveBeenCalled()
@@ -653,24 +709,26 @@ describe('--write-tests path containment (Layer B backstop)', () => {
   })
 
   it('skips writing a test file whose path resolves outside projectPath, and logs it, while still writing legitimate files', async () => {
-    MockSwarmRunner.mockImplementation(() => ({
-      run: vi.fn().mockResolvedValue(
-        makeResult({
-          testFiles: [
-            {
-              path: 'ai-review-tests/foo.test.ts',
-              content: 'legit test content',
-              framework: 'vitest',
-            },
-            {
-              path: '../../../../../../etc/passwd',
-              content: 'malicious content',
-              framework: 'vitest',
-            },
-          ],
-        })
-      ),
-    }))
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            testFiles: [
+              {
+                path: 'ai-review-tests/foo.test.ts',
+                content: 'legit test content',
+                framework: 'vitest',
+              },
+              {
+                path: '../../../../../../etc/passwd',
+                content: 'malicious content',
+                framework: 'vitest',
+              },
+            ],
+          })
+        ),
+      }
+    })
     const fs = await import('fs')
     const writeFileSyncMock = vi.mocked(fs.writeFileSync)
 

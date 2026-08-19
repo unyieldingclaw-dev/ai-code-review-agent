@@ -127,14 +127,6 @@ export function extractAddedDependencies(diff: string): string[] {
 }
 
 /**
- * The package's real license, from the reviewed project's own metadata. Returns null when it
- * cannot be determined -- callers must treat null as "unknown", never as "no problem".
- *
- * Prefers package-lock.json: it covers the whole resolved tree (410/410 entries carry a `license`
- * field in this repo's lockfileVersion 3), including packages not physically present in
- * node_modules. Falls back to the installed package's own manifest.
- */
-/**
  * Normalizes the several shapes npm has used for the `license` field into an SPDX string.
  *
  * WHY this is not just `as string`: npm's deprecated-but-still-published forms are
@@ -147,8 +139,12 @@ function normalizeLicenseField(value: unknown): string | null {
   if (typeof value === 'string') return value
   if (Array.isArray(value)) {
     const parts = value.map(normalizeLicenseField).filter((v): v is string => v !== null)
-    // An array means dual licensing -- the package may be used under ANY of them, so OR.
-    return parts.length > 0 ? parts.join(' OR ') : null
+    // WHY AND, not OR: `license` as an array is not an npm-documented shape (the deprecated
+    // multi-license field was `licenses`), so its intent is ambiguous. Joining with OR made
+    // ["GPL-3.0","MIT"] resolve permissive and drop a legitimate copyleft finding -- the only
+    // false-negative path in this module. AND is the conservative reading: permissive only if
+    // every entry is, which at worst leaves the finding in place for a human to judge.
+    return parts.length > 0 ? parts.join(' AND ') : null
   }
   if (value && typeof value === 'object' && 'type' in value) {
     const t = (value as { type?: unknown }).type
@@ -157,6 +153,14 @@ function normalizeLicenseField(value: unknown): string | null {
   return null
 }
 
+/**
+ * The package's real license, from the reviewed project's own metadata. Returns null when it
+ * cannot be determined -- callers must treat null as "unknown", never as "no problem".
+ *
+ * Prefers package-lock.json: it covers the whole resolved tree (410/410 entries carry a `license`
+ * field in this repo's lockfileVersion 3), including packages not physically present in
+ * node_modules. Falls back to the installed package's own manifest.
+ */
 export function resolvePackageLicense(projectPath: string, packageName: string): string | null {
   const lockPath = join(projectPath, 'package-lock.json')
   if (existsSync(lockPath)) {

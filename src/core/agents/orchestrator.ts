@@ -70,6 +70,46 @@ const AGENT_PRIORITY: AgentName[] = [
 // which line within a multi-line statement/block a finding belongs to).
 const SAME_LOCATION_LINE_PROXIMITY = 5
 
+// Claim classes this filter can falsify. Each pairs a claim matcher with the syntax whose ABSENCE
+// disproves it, plus the phrase used to explain the drop.
+//
+// WHY a table and not an if/else chain: the chain that assigned `reason` and the ternary that
+// mapped `reason` to explanatory text were two parallel structures TypeScript could not keep in
+// sync. Adding a fourth class meant editing three places, and missing the mapping would silently
+// print another class's explanation to the user. Here the reason and its wording are one record,
+// and a new class is one array entry.
+//
+// `appliesTo` gates a rule on the file itself. Only the NULL rule needs it: in an imperative
+// language a null dereference genuinely does throw, so applying that check outside SQL would
+// produce false negatives.
+const CLAIM_RULES: ReadonlyArray<{
+  reason: NonNullable<DroppedHallucinatedFinding['reason']>
+  claims: (f: Finding) => boolean
+  evidence: (section: string) => boolean
+  appliesTo?: (file: string) => boolean
+  missing: string
+}> = [
+  {
+    reason: 'unsupported-injection-claim',
+    claims: claimsInjection,
+    evidence: hasDynamicConstruction,
+    missing: 'no dynamic query/command construction',
+  },
+  {
+    reason: 'unsupported-exception-claim',
+    claims: claimsSwallowedException,
+    evidence: hasExceptionHandling,
+    missing: 'no exception-handling construct',
+  },
+  {
+    reason: 'unsupported-null-error-claim',
+    claims: claimsNullRaisesError,
+    evidence: sqlSectionCanRaise,
+    appliesTo: isSqlFile,
+    missing: 'no error-raising construct (SQL NULL comparison yields no match, not an error)',
+  },
+]
+
 export class OrchestratorAgent {
   // No LLMProvider param -- synthesis is 100% deterministic (dedup, cross-reference, hallucination
   // filtering), no LLM calls.
@@ -170,26 +210,15 @@ export class OrchestratorAgent {
       // already rejects files absent from the diff, so this is the residual parse-mismatch case.
       if (section === undefined) return true
 
-      let reason: DroppedHallucinatedFinding['reason']
-      if (claimsInjection(f) && !hasDynamicConstruction(section)) {
-        reason = 'unsupported-injection-claim'
-      } else if (claimsSwallowedException(f) && !hasExceptionHandling(section)) {
-        reason = 'unsupported-exception-claim'
-      } else if (isSqlFile(f.file) && claimsNullRaisesError(f) && !sqlSectionCanRaise(section)) {
-        reason = 'unsupported-null-error-claim'
-      }
-      if (!reason) return true
+      const rule = CLAIM_RULES.find(
+        (r) => (r.appliesTo?.(f.file) ?? true) && r.claims(f) && !r.evidence(section)
+      )
+      if (!rule) return true
 
-      dropped?.push({ agent: f.agent, title: f.title, file: f.file, reason })
-      const missing =
-        reason === 'unsupported-injection-claim'
-          ? 'no dynamic query/command construction'
-          : reason === 'unsupported-exception-claim'
-            ? 'no exception-handling construct'
-            : 'no error-raising construct (SQL NULL comparison yields no match, not an error)'
+      dropped?.push({ agent: f.agent, title: f.title, file: f.file, reason: rule.reason })
       console.error(
         `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- ${f.file} contains ` +
-          `${missing}, so the claimed mechanism cannot be present (likely a fabricated finding)`
+          `${rule.missing}, so the claimed mechanism cannot be present (likely a fabricated finding)`
       )
       return false
     })

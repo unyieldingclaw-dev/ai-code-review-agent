@@ -24,7 +24,7 @@
 // to catch the IDOR case correctly even though it missed the injection one.
 
 import type { Finding } from './schema.js'
-import { splitByFileBoundary } from './chunkRunner.js'
+import { splitByFileBoundary } from './diffSplit.js'
 import { extractChangedFiles } from './policyFilter.js'
 import { normalizeFilePath, stripDiffPrefix } from './filePath.js'
 

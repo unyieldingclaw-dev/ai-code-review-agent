@@ -88,13 +88,23 @@ const CASES: CalibrationCase[] = [
   {
     // This fixture touches package.json, so once projectPath is set below, DependenciesAgent's
     // run() override routes it through the real npm-audit tool path instead of the LLM -- the
-    // agent no longer sees this fixture's fabricated "lodash wildcard" text at all, so the
-    // expectations here assert against real npm audit output (a known vulnerability report),
-    // not the diff's own bait content.
+    // agent never sees this fixture's fabricated "lodash wildcard" text at all.
+    //
+    // WHY expectEmpty and not expectedKeyword: 'vulnerability'. This case used to assert against
+    // real npm-audit output of THIS repo, which silently coupled it to the repo's own incidental
+    // vulnerability count. Bringing `npm audit` to 0 (2026-08-19) made it fail -- the case was
+    // only ever passing because the repo happened to be vulnerable, and the alternative is keeping
+    // a known CVE around so a test stays green, which is absurd. What it still guards is the bug
+    // it was created for: if the npm-audit path breaks and the agent falls back to the LLM, the
+    // prompt's old "lodash wildcard" example gets echoed as a fabricated finding, and this fails.
+    //
+    // Positive-detection coverage for the npm-audit path is genuinely lost here. Restoring it
+    // needs a fixture project with its own vulnerable lockfile plus a per-case projectPath, which
+    // the current single-repo harness cannot express -- tracked in memory-bank/progress.md
+    // alongside the same self-referential problem in license-clean.
     name: 'dependencies',
     fixtureFile: 'calibration/fixtures/dependencies.diff',
-    expectedKeyword: 'vulnerability',
-    baitKeyword: 'wildcard',
+    expectEmpty: true,
   },
   {
     // Regression case for a real hallucination bug: dependencies.ts's prompt used to carry a

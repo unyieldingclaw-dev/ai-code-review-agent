@@ -30,11 +30,15 @@ export class LicenseComplianceAgent extends BaseAgent {
     // Fails open
     // whenever any added package can't be resolved -- see licenseFacts.ts for why corroboration is
     // deliberately NOT required.
+    // Short-circuit before touching the filesystem: with no findings there is nothing to filter,
+    // and allAddedDependenciesArePermissive parses the project's lockfile on every call.
+    if (findings.length === 0) return findings
+
     const { verified, resolved } = allAddedDependenciesArePermissive(
       input.diff,
       input.projectPath ?? '.'
     )
-    if (!verified || findings.length === 0) return findings
+    if (!verified) return findings
 
     const summary = resolved.map((r) => `${r.name}=${r.license}`).join(', ')
     for (const f of findings) {

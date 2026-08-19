@@ -42,6 +42,20 @@ describe('isPermissiveLicense', () => {
   })
 })
 
+describe('license field shape normalization (via resolvePackageLicense contract)', () => {
+  it('treats an OR expression as permissive if any branch is', () => {
+    expect(isPermissiveLicense('(MIT OR GPL-3.0)')).toBe(true)
+  })
+
+  it('treats an array-shaped license conservatively, not as a free choice', () => {
+    // An array is not an npm-documented shape for `license`, so its intent is ambiguous.
+    // normalizeLicenseField joins with AND: ["GPL-3.0","MIT"] must NOT resolve permissive, or a
+    // legitimate copyleft finding would be dropped -- the only false-negative path in this module.
+    expect(isPermissiveLicense('GPL-3.0 AND MIT')).toBe(false)
+    expect(isPermissiveLicense('MIT AND ISC')).toBe(true)
+  })
+})
+
 describe('extractAddedDependencies', () => {
   it('extracts package names from added manifest lines', () => {
     const diff = `diff --git a/package.json b/package.json

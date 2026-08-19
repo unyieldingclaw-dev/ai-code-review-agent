@@ -184,25 +184,41 @@ Three further issues found and fixed after the deterministic filter landed, all 
      practice, since version bumps accompany most dependency changes. Now skips known manifest
      scalar keys and requires a semver-shaped value.
 
-   **Known, accepted, NOT fixed** (recorded so they are not rediscovered as new):
+   **FIXED in the post-review round (2026-08-19)** — four of the five limitations recorded above:
 
-   - `claimSupport.ts` imports `splitByFileBoundary` from `chunkRunner.ts` — an inverted dependency
-     (leaf importing an orchestration wrapper). No runtime cycle today (chunkRunner's only
-     `runner.ts` import is `import type`), but nothing guards it: no `eslint-plugin-import` or
-     madge check exists, so converting that to a value import would silently create
-     `cli → runner → orchestrator → claimSupport → chunkRunner → runner`.
-   - `orchestrator.ts` maps `reason` → user-facing text via a chain parallel to the one assigning
-     `reason`. TypeScript cannot keep the two in sync; a fourth claim class would print the wrong
-     explanation. A small rule table collapses both.
-   - `chunkRunner.ts:160` keeps only the LAST chunk's `hallucinationFilter`. Harmless when the only
-     writer was `filterNonexistentFiles`, but `filterUnsupportedClaims` can drop real findings and
-     this line is their only user-visible trace, so earlier chunks' drops vanish on chunked runs.
-   - `license-clean` calibration resolves `commander` from **this repo's** lockfile, so it proves
-     the filter reads ACR's own metadata rather than a reviewed project's. Real usage is unaffected
-     (`--dir` resolves correctly); the calibration signal is what weakened.
-   - `normalizeLicenseField` joins an array-form `license` with `OR` (npm's deprecated "user may
-     choose" semantics), so `["GPL-3.0","MIT"]` resolves permissive — the one path in that module
-     that can produce a false negative.
+   - `splitByFileBoundary` moved to a new dependency-free `diffSplit.ts`; `claimSupport` no longer
+     imports the orchestration wrapper, so the inverted direction (and the latent
+     `cli → runner → orchestrator → claimSupport → chunkRunner → runner` cycle a value import would
+     have created) is gone. `chunkRunner` re-exports it so its existing contract tests still apply.
+   - `orchestrator.ts`'s parallel `reason`-assign and `reason`→text chains collapsed into a single
+     `CLAIM_RULES` table, so a new claim class is one array entry and the two can no longer drift.
+   - `chunkRunner` now merges `hallucinationFilter` across all chunks instead of last-chunk-wins.
+   - `normalizeLicenseField` joins an array-form `license` with `AND`, not `OR`, so
+     `["GPL-3.0","MIT"]` no longer resolves permissive. Regression-tested.
+
+   Also fixed in the same round: all 14 `npm audit` vulnerabilities (5 in production dependencies,
+   via `@modelcontextprotocol/sdk` — two high-severity), which required a **vitest 2 → 4** major
+   upgrade and migrating 34 constructible mock factories to `function` form; the formatter's
+   grouped-by-reason output gained real assertions (the prior test passed even when the text was
+   wrong); and `licenseCompliance` no longer parses the lockfile when there are no findings.
+
+   **STILL OPEN — calibration cases coupled to this repo's own state:**
+
+   - `license-clean` calibration resolves `commander` from **this repo's** lockfile, so the case
+     proves the filter reads ACR's own metadata rather than a reviewed project's. Real usage is
+     unaffected (`--dir` resolves correctly); it is the calibration signal that is weaker than it
+     looks. Fixing it properly needs a fixture whose package resolves in an arbitrary project under
+     review, which the current single-repo calibration harness cannot express.
+   - `dependencies` had the **same defect, and fixing the CVEs exposed it**: the case asserted
+     against real `npm audit` output of this repo, so it was only ever green because the repo
+     happened to be vulnerable. Bringing `npm audit` to 0 broke it. Converted to `expectEmpty`
+     (which still guards the original hallucination bug — an LLM fallback echoing the prompt's old
+     "lodash wildcard" example), but **positive-detection coverage for the npm-audit path is lost**
+     until the harness supports a per-case `projectPath` pointing at a fixture project with its own
+     vulnerable lockfile.
+
+   Both are the same root cause: a calibration case whose expectation depends on the reviewed
+   repo's incidental state rather than on the fixture. Worth auditing the remaining cases for it.
 
 5. **Command-injection filter gaps** (from a live PMB run against a 14,872-line diff):
    - Bare `||` was read as SQL concatenation, but it is logical OR in shell/JS/YAML, so static

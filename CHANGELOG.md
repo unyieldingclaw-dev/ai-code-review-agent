@@ -7,6 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [1.12.0] — 2026-08-19 (deterministic false-positive filters for fabricated findings)
 
+### Security
+
+- **All 14 known dependency vulnerabilities resolved — `npm audit` now reports 0.** Five were in
+  production dependencies, reaching the published package transitively via
+  `@modelcontextprotocol/sdk`: `ip-address` (high — SSRF/trust-boundary bypass from octal-vs-decimal
+  octet decoding), `fast-uri` (high — host confusion via a literal backslash authority delimiter),
+  `@hono/node-server` (path traversal in `serve-static` on Windows via encoded `%5C`), `hono`, and
+  `body-parser`. These were pre-existing on `main`, not introduced by this release. The remaining
+  dev-only advisories in the vitest/vite chain required a major upgrade to **vitest 4**, which
+  changed how constructible mocks work: `vi.fn().mockImplementation(() => ({...}))` is no longer
+  valid for a mock that gets `new`-ed. 34 mock factories across `cli.test.ts` and `mcp/tool.test.ts`
+  were migrated to `function` form.
+
 ### Fixed
 
 - `security`/`correctness`/`adversarial`/`error-handling` could hallucinate SQL-injection or
@@ -113,6 +126,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   hallucination-seed pattern removed in `a906515` (and in `9e0bc29` for `dependencies`), and
   `chalk` is the designated false-positive bait for this agent's own calibration case. Removed; the
   guidance is now stated without naming any package.
+- Under `--chunk`, `hallucinationFilter` was merged last-chunk-wins, so drops recorded in earlier
+  chunks vanished from the report. That was harmless when the only writer was
+  `filterNonexistentFiles` (those findings referenced files outside the diff), but
+  `filterUnsupportedClaims` can drop a real finding when a claim matcher misfires on genuine prose
+  — measured twice during review — and this line is its only user-visible trace. Now merged across
+  all chunks, like `agentStatus` and `evidenceCheckFilter`.
+- `licenseFacts` resolved an array-shaped `license` field by joining with `OR`, so
+  `["GPL-3.0","MIT"]` read as permissive and would drop a legitimate copyleft finding — the only
+  false-negative path in that module. An array is not an npm-documented shape for `license`
+  (the deprecated multi-license field was `licenses`), so it now joins with `AND`: permissive only
+  if every entry is.
+- `splitByFileBoundary` moved from `chunkRunner.ts` to a new dependency-free `diffSplit.ts`.
+  `claimSupport` (a leaf) importing it from `chunkRunner` (an orchestration wrapper that references
+  `SwarmRunner`) inverted the dependency direction; no runtime cycle existed only because that
+  reference is `import type`, and nothing in CI guards against it becoming a value import.
+- The `reason` → explanation mapping in `filterUnsupportedClaims` was a ternary chain parallel to
+  the if/else chain that assigned `reason`, which TypeScript could not keep in sync — a fourth
+  claim class would have printed another class's explanation. Both collapsed into one rule table.
+- `licenseCompliance` parsed the project's lockfile before checking whether there were any findings
+  to filter.
 - `corroboratingAgents` was computed by the orchestrator's dedup step but never rendered anywhere,
   so a run whose progress lines read "security 4 findings, adversarial 1 finding" and then printed
   4 findings all labelled `Agent: security` looked like the adversarial finding had been silently
