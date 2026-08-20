@@ -16,6 +16,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `scripts/setup-npm-token.ps1` (existed solely to bootstrap the token this replaces). No
   `NPM_TOKEN` GitHub secret is required going forward.
 
+## [1.12.1] — 2026-08-19 (agent-count accuracy, truncation hint)
+
+### Fixed
+
+- CLI announced the pre-policy agent count (`config.agents.length`) before `SwarmRunner.run`,
+  but `evaluatePolicy` can skip agents inside that call — e.g. `--profile fast` on an all-markdown
+  diff announced "3 agents" then printed `[1/2]`/`[2/2]`, because `security` defaults to exclude
+  `**/*.md`. The count is now taken from the first progress event, which carries the real
+  post-policy total. Added a fallback for the case that event can't cover: if policy skips every
+  agent, nothing else would print, so it now says so explicitly and names the skipped agents.
+- The truncation warning recommended raising `--max-lines` and never mentioned `--chunk`. On
+  CPU-offloaded hardware that's the worse advice — it grows a single prompt, which is what pushes
+  agents past `--timeout`. It now recommends `--chunk` first, states the pass count, and notes that
+  raising `--max-lines` is slower per agent.
+
 ## [1.12.0] — 2026-08-19 (deterministic false-positive filters for fabricated findings)
 
 ### Security
