@@ -253,10 +253,18 @@ export class SwarmRunner {
     if (diffLines > this.config.maxDiffLines) {
       const excludedLines = diffLines - this.config.maxDiffLines
       console.warn(
+        // WHY --chunk is recommended FIRST: it reviews the whole diff while keeping each pass at
+        // maxDiffLines, so prompt size per LLM call is unchanged. Raising --max-lines instead
+        // grows a single prompt, which on CPU-offloaded hardware is exactly what pushes agents
+        // past their timeout -- reported externally as agents timing out at 181s while the same
+        // run was also being silently truncated. Recommending the option that makes the other
+        // failure worse, without saying so, is what made this hint misleading.
         `[ai-review] Diff truncated: ${excludedLines} of ${diffLines} lines were excluded ` +
           `(kept the first ${this.config.maxDiffLines}, the --max-lines limit). Findings past ` +
-          `that point were never analyzed. Raise --max-lines to review the full diff, or split ` +
-          `it into smaller changes.`
+          `that point were never analyzed. Use --chunk to review the whole diff in ` +
+          `${Math.ceil(diffLines / this.config.maxDiffLines)} passes of the same size, or raise ` +
+          `--max-lines to review it in one larger pass (slower per agent, and more likely to hit ` +
+          `--timeout on CPU-bound hardware).`
       )
       input = {
         ...input,

@@ -169,6 +169,57 @@ async function runCli(
   return { exitCode, stdout: stdoutChunks.join(''), stderr: stderrChunks.join('') }
 }
 
+describe('CLI — agent-count announcement', () => {
+  it('announces the post-policy agent count, not the configured one', async () => {
+    // Reported externally: `--profile fast` announced "3 agents" then printed [1/2] and [2/2],
+    // because the diff was all markdown and `security` defaults to exclude '**/*.md'. The count
+    // was read from config.agents.length before evaluatePolicy ran inside SwarmRunner.run.
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockImplementation(async (_input, onProgress) => {
+          onProgress?.({ phase: 'start', name: 'correctness', index: 1, total: 2 })
+          onProgress?.({ phase: 'end', name: 'correctness', index: 1, total: 2, findings: [] })
+          return makeResult({ findings: [] })
+        }),
+      }
+    })
+    const { stderr } = await runCli([])
+    expect(stderr).toContain('with 2 agents')
+    expect(stderr).not.toMatch(/with (?!2 agents)\d+ agents/)
+  })
+
+  it('says so explicitly when policy skipped every agent and none ran', async () => {
+    // Degenerate case the lazy announce cannot cover: no progress event ever fires. A run that
+    // reviewed nothing must not look like a run that found nothing.
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockResolvedValue(
+          makeResult({
+            findings: [],
+            policy: { agentsSkipped: ['security', 'adversarial'], reason: {} },
+          })
+        ),
+      }
+    })
+    const { stderr } = await runCli([])
+    expect(stderr).toContain('No agents ran')
+    expect(stderr).toContain('security, adversarial')
+  })
+
+  it('singularises the count when exactly one agent runs', async () => {
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockImplementation(async (_input, onProgress) => {
+          onProgress?.({ phase: 'end', name: 'secrets', index: 1, total: 1, findings: [] })
+          return makeResult({ findings: [] })
+        }),
+      }
+    })
+    const { stderr } = await runCli([])
+    expect(stderr).toContain('with 1 agent...')
+  })
+})
+
 describe('CLI — argument parsing and output', () => {
   it('exits 0 when no blocking findings and --fail-on high (default)', async () => {
     MockSwarmRunner.mockImplementation(function () {

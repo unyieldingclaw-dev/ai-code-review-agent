@@ -276,11 +276,24 @@ program
         const runner = new SwarmRunner(config, provider, verifierProvider)
 
         const reviewingLabel = options.emoji !== false ? '🔍' : 'Reviewing'
-        process.stderr.write(
-          `\n${reviewingLabel} Running ai-review-agent with ${config.agents.length} agents...\n\n`
-        )
+        // WHY this is announced lazily from the first progress event, rather than eagerly from
+        // config.agents.length: agentPolicy can skip an agent AFTER this point (evaluatePolicy runs
+        // inside SwarmRunner.run), so the configured count is not the count that runs. Reported
+        // externally -- `--profile fast` announced "3 agents" then printed [1/2] and [2/2], because
+        // the diff was all markdown and `security` defaults to exclude '**/*.md'. Progress events
+        // carry the real post-policy total, so announcing from the first one is accurate by
+        // construction. See the all-skipped fallback below for when no event ever arrives.
+        let announcedTotal: number | null = null
+        const announce = (total: number) => {
+          if (announcedTotal !== null) return
+          announcedTotal = total
+          process.stderr.write(
+            `\n${reviewingLabel} Running ai-review-agent with ${total} agent${total !== 1 ? 's' : ''}...\n\n`
+          )
+        }
 
         const onProgress = (event: AgentProgressEvent) => {
+          announce(event.total)
           if (event.phase === 'start') {
             process.stderr.write(`[${event.index}/${event.total}] ${event.name}  starting…\n`)
           } else {
@@ -330,6 +343,19 @@ program
                 contextMode
               )
             : await runner.run({ diff, projectPath }, onProgress, contextMode)
+
+        // Fallback for the degenerate case the lazy announce cannot cover: if agentPolicy skipped
+        // EVERY agent, no progress event ever fires, so nothing was printed. Saying so explicitly
+        // is better than the old behavior, which announced a count and then silently ran fewer --
+        // a run that reviewed nothing must not look like a run that found nothing.
+        if (announcedTotal === null) {
+          const skipped = result.policy?.agentsSkipped ?? []
+          process.stderr.write(
+            `\n${reviewingLabel} No agents ran` +
+              (skipped.length > 0 ? ` — all skipped by agentPolicy: ${skipped.join(', ')}` : '') +
+              `.\n\n`
+          )
+        }
 
         // Stamp integration metadata so callers can parse the contract version
         result.schemaVersion = 'ai-review-agent/v1'
