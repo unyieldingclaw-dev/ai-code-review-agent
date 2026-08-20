@@ -39,9 +39,24 @@ SECURITY-GUARDRAILS.md's DROP TABLE/DATABASE tier misclassification — document
 confirmation, actually implemented as an outright block). Deleted `orchestratorAgent.test.ts`
 (confirmed redundant against `orchestrator.test.ts`). Regression: 575/575 unit tests, 33/33 Pester
 tests, typecheck, build, format, and lint all pass. Full `/change-review` gate run before commit (2
-non-blocking Low/Info notes). Committed as `ee44007` on branch `fix/audit-remediation-batch` — not
-yet pushed. Tier 3 items (sanitizer overhaul, chunking redesign, vscode-extension catch-up, Ollama
-concurrency handling) explicitly deferred as large, speculative redesigns.
+non-blocking Low/Info notes). Tier 3 items (sanitizer overhaul, chunking redesign, vscode-extension
+catch-up, Ollama concurrency handling) explicitly deferred as large, speculative redesigns.
+
+**Shipped**: squashed local WIP commits into one clean commit (`e9312f5`, after splitting 4 fake-
+secret Pester test fixtures via string concatenation so pushing the test file didn't self-trigger
+the scanner it tests) → PR #29 → merged to `main`. Version bump PR #30 (`1.10.0` → `1.11.0`,
+CHANGELOG finalized, README synced) → merged to `main`. Tagged `v1.11.0`, published to npm —
+confirmed live (`npm view ai-review-agent version` → `1.11.0`).
+
+### Follow-up reported by user (separate session), not yet started
+
+`adversarial` agent false-positive: flags parameterized Postgres function calls in RLS policies
+(e.g. `is_group_member(visits.group_id)`) as SQL injection when there's no dynamic SQL construction
+anywhere in the chain — same safe pattern repeats in 6+ policies in the reporter's schema. Likely
+fires on "function call near an access-control-sounding identifier in a security file" rather than
+checking for `EXECUTE`/`format()`/string concatenation. The user's retest confirmed this session's
+timeout/truncation fix works (292s-with-timeout → 34s clean, zero truncation) — only this
+false-positive remains open.
 
 ## ✅ Completed (2026-08-17)
 

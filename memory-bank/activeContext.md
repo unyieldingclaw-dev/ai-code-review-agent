@@ -20,23 +20,38 @@ lineage: []
 
 ## Current Focus
 
-**Audit remediation (Batches 1-8) complete and committed (2026-08-18), commit `ee44007` on
-branch `fix/audit-remediation-batch`**: every Tier 1/2 finding from the 15-phase audit below was
-re-verified against current source before being fixed (per user instruction: "look at the results
-again... verify they are accurate"), plus one newly-discovered bug found empirically while testing
-(`git log --not --remotes` silently returning nothing with zero remotes configured — fixed in both
-`pre-push-check.ps1`/`.sh`). Covered: severity/basis enum validation + `blocking` default fix,
-`--agents`/`--fail-on` CLI validation + `STARTUP_FAILURE_EXIT_CODE`, MCP/SARIF failure-visibility,
-`DETERMINISTIC_SOURCES` narrowed to `gitleaks`/`npm-audit` only, `dependencies`/`license` agent
-manifest-skip consistency, PowerShell-tool hook-matcher wiring + TRUNCATE/unscoped-DELETE
-guardrails + CI silent-failure fixes, secret-scan pattern hardening, and stale-docs cleanup
-(README, HOOKS-GUIDE.md, SECURITY-GUARDRAILS.md's DROP TABLE/DATABASE tier misclassification).
-Tier 3 (sanitizer overhaul, chunking redesign, vscode-extension catch-up, Ollama concurrency)
-explicitly deferred as large speculative redesigns, per the audit's own remediation-priority list.
-Verified via 575/575 unit tests, 33/33 Pester tests, typecheck, build, format, and lint — all
-green — plus a full `/change-review` gate before commit (2 non-blocking Low/Info notes, no
-blockers). **Next step**: user to decide whether to push/open a PR for `fix/audit-remediation-batch`
-or keep reviewing locally first — not yet asked/pushed.
+**v1.11.0 shipped end-to-end (2026-08-18)**: the audit-remediation work below (Batches 1-8) is
+fully merged, tagged, and published. Sequence: PR #29 (`fix/audit-remediation-batch`, commit
+`e9312f5` after squashing 3 local WIP commits into one — needed because the pre-push git hook
+scans each commit's own patch individually when there's no upstream yet, so a later fix-up commit
+alone couldn't clear an earlier commit's flagged content) merged to `main`; PR #30
+(`chore/release-v1.11.0`) bumped `package.json`/`package-lock.json` to `1.11.0`, finalized
+CHANGELOG's `[Unreleased]` into a dated entry, updated README's `toolVersion` example, merged to
+`main`; tag `v1.11.0` pushed; `npm publish` succeeded (confirmed via `npm view ai-review-agent
+version` → `1.11.0`, `dist-tags.latest` → `1.11.0`) after the user first hit `npm whoami` 401
+(not logged in) then a same-session `npm publish` 404 that turned out to be a registry
+propagation quirk — the publish had actually succeeded despite the client-visible error, confirmed
+when a retry correctly refused with "cannot publish over the previously published version." Global
+`ai-review-agent` on this machine is `npm link`-ed directly to this repo (not a separate registry
+install), so it already reflected every fix throughout this session, coincidentally, as long as
+`main`/the active branch stayed built — worth remembering this is fragile (branch-dependent, not a
+structural guarantee) if it comes up again. **Also mid-session**: caught (and fixed, in the squash)
+a self-inflicted issue where the new secret-scan Pester test fixtures (fake PEM/Bearer/JSON-style/
+GitHub-PAT strings) tripped the very pre-push secret scanner they were testing — resolved by
+splitting the literals via string concatenation so the static source line doesn't match the regex
+while the runtime-reconstructed value still does; confirmed `fixtures/security/` has never been a
+real committed path in this repo (decided not to create one — no current consumer, would be
+speculative infrastructure per this project's Karpathy principles).
+
+**Open item, reported by the user from a separate session, not yet started**: `adversarial` agent
+false-positive — flags `is_group_member(visits.group_id)`-style parameterized Postgres function
+calls in RLS policies as SQL injection, when they're not (no `EXECUTE`/`format()`/string
+concatenation; identical pattern appears safely in 6+ other policies in that schema). Root cause
+guess: the heuristic fires on "function call near an access-control-sounding identifier in a
+security-domain file" rather than checking for actual dynamic SQL construction. The user's retest
+also confirmed this session's timeout/truncation fix works (292s-with-timeout → 34s, zero
+truncation across all 4 agents on the retest diff) — that part is closed, just the false-positive
+remains. User asked me to wait/hasn't yet confirmed whether to start on it.
 
 ---
 
