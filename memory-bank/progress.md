@@ -42,8 +42,27 @@ dependabot's `gitleaks-action-3.0.0` (PR #14) remain, as intended.
 
 PR #33 merged (squash, `dcd37d7`) after CI went green. `main` was then ahead of the published
 `v1.12.0` tag by one fix, so bumped to `1.12.1` (`package.json`/`package-lock.json`), finalized the
-`CHANGELOG.md` entry, and updated `README.md`'s `toolVersion` example — same shape as the 1.11.0
+`CHANGELOG.md` entry, and updated `README.md`'s `toolVersion` example (PR #34) — same shape as the 1.11.0
 release PR (#30). `npm run check` equivalent (typecheck/format/lint) and 717/717 tests green.
+
+**Migrated npm publishing to Trusted Publishing (OIDC), closing out the `NPM_TOKEN` expiry risk**
+(PR #35). The token was an Automation token with "Bypass 2FA" set — a class npm is restricting for
+direct publishing in Jan 2027, and this one specifically expired 2026-09-08. `release.yml` already
+had `id-token: write`/`registry-url`/`--provenance`; only the `NODE_AUTH_TOKEN` env var still made
+it token-based. User configured the Trusted Publisher relationship on npmjs.com (GitHub Actions /
+`unyieldingclaw-dev` / `ai-code-review-agent` / `release.yml`, "Allow npm publish"), then removed
+`NODE_AUTH_TOKEN` and the expiry-reminder step, added `npm install -g npm@latest` (OIDC publishing
+needs npm >= 11.5.1, and `setup-node` just bundles whatever ships with Node 24), and deleted
+`scripts/setup-npm-token.ps1` (existed solely to bootstrap the token being replaced).
+
+**Verified live, not just reasoned about**: tagging and pushing `v1.12.1` triggered a real
+OIDC-based publish on the first attempt — `npm notice publish Signed provenance statement...`,
+package landed on the registry, GitHub release created, zero auth errors. Confirmed the one
+worrying-looking line in that run's log (`npm warn publish "bin[ai-review-agent]"... was invalid
+and removed`) is pre-existing npm normalization unrelated to the migration — `./dist/cli/index.js`
+→ `dist/cli/index.js`, identical on the already-published `1.12.0`, not a regression. After the
+live confirmation, `NPM_TOKEN` was deleted from GitHub secrets entirely — publishing now has no
+token in the loop at all.
 
 ## ✅ Completed (2026-08-18)
 
