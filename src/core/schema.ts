@@ -142,6 +142,13 @@ export interface DroppedHallucinatedFinding {
   agent: AgentName
   title: string
   file: string
+  /** Why the finding was dropped. Omitted by the file-existence filter, whose drops all share the
+   *  one reason its own log line already states; set by filterUnsupportedClaims, which drops for
+   *  several distinguishable reasons a report reader needs to tell apart. */
+  reason?:
+    | 'unsupported-injection-claim'
+    | 'unsupported-exception-claim'
+    | 'unsupported-null-error-claim'
 }
 
 export interface HallucinationFilterMetadata {

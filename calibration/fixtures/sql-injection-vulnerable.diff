@@ -1,0 +1,30 @@
+diff --git a/supabase/migrations/20260818000002_search_visits.sql b/supabase/migrations/20260818000002_search_visits.sql
+new file mode 100644
+--- /dev/null
++++ b/supabase/migrations/20260818000002_search_visits.sql
+@@ -0,0 +1,24 @@
++-- Safe, parameterized helper. Its own declared parameter is bound, not concatenated.
++create or replace function is_group_member(gid uuid)
++returns boolean
++language sql
++security definer
++set search_path = ''
++as $$
++  select exists (
++    select 1 from public.group_members where group_id = gid
++  );
++$$;
++
++-- Genuinely injectable: term and sort_col are concatenated into the executed query text.
++create or replace function search_visits(term text, sort_col text)
++returns setof public.visits
++language plpgsql
++security definer
++set search_path = ''
++as $$
++begin
++  return query execute
++    'select * from public.visits where note like ''%' || term || '%'''
++    || ' order by ' || sort_col;
++end;
++$$;

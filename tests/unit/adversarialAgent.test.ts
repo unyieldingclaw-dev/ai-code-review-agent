@@ -52,4 +52,12 @@ describe('AdversarialAgent', () => {
     const agent = new AdversarialAgent(makeProvider('[]'), DEFAULT_CONFIG)
     expect(agent.systemPrompt).toMatch(/adversar|abuse|attack|malicious|exploit/i)
   })
+
+  // Regression test for a real, user-reported false positive, reproduced live (1/5 trials
+  // against real Ollama): this agent flagged "Potential SQL injection" against a parameterized
+  // Postgres function call with no dynamic SQL construction anywhere in the diff.
+  it('system prompt requires evidence before labeling a finding SQL injection or IDOR', () => {
+    const agent = new AdversarialAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    expect(agent.systemPrompt).toMatch(/security agent's/i)
+  })
 })

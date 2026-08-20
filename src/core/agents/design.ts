@@ -50,6 +50,11 @@ Rules:
 - detail: always name the violated principle by its full name (e.g. "Single Responsibility Principle", "Open/Closed Principle")
 - blocking: true for critical/high, false for medium/low
 - Only report severity >= medium
+- Do NOT report security-vulnerability classifications (e.g. "insecure dependency," SQL injection,
+  IDOR, authorization bypass, hardcoded secrets) — those are out of this agent's domain and belong
+  to the security agent. If a design issue happens to touch auth/security-adjacent code, describe
+  it purely in design terms (coupling, a named SOLID violation, abstraction leak) — never borrow a
+  vulnerability label.
 - If no issues found, return: []`
   }
 }

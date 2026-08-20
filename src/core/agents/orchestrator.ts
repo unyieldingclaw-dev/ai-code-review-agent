@@ -8,6 +8,17 @@ import type {
 } from '../schema.js'
 import { SEVERITY_RANK } from '../schema.js'
 import { normalizeFilePath, stripDiffPrefix } from '../filePath.js'
+import {
+  claimsInjection,
+  claimsSwallowedException,
+  claimsNullRaisesError,
+  hasDynamicConstruction,
+  hasExceptionHandling,
+  isSqlFile,
+  sqlSectionCanRaise,
+  sliceDiffByFile,
+  lookupFileSection,
+} from '../claimSupport.js'
 
 // WHY only these two: DETERMINISTIC_SOURCES exempts a solo critical/high finding from the
 // corroboration-required downgrade below (hallucinationCrossCheck), on the premise that a real
@@ -59,6 +70,46 @@ const AGENT_PRIORITY: AgentName[] = [
 // which line within a multi-line statement/block a finding belongs to).
 const SAME_LOCATION_LINE_PROXIMITY = 5
 
+// Claim classes this filter can falsify. Each pairs a claim matcher with the syntax whose ABSENCE
+// disproves it, plus the phrase used to explain the drop.
+//
+// WHY a table and not an if/else chain: the chain that assigned `reason` and the ternary that
+// mapped `reason` to explanatory text were two parallel structures TypeScript could not keep in
+// sync. Adding a fourth class meant editing three places, and missing the mapping would silently
+// print another class's explanation to the user. Here the reason and its wording are one record,
+// and a new class is one array entry.
+//
+// `appliesTo` gates a rule on the file itself. Only the NULL rule needs it: in an imperative
+// language a null dereference genuinely does throw, so applying that check outside SQL would
+// produce false negatives.
+const CLAIM_RULES: ReadonlyArray<{
+  reason: NonNullable<DroppedHallucinatedFinding['reason']>
+  claims: (f: Finding) => boolean
+  evidence: (section: string) => boolean
+  appliesTo?: (file: string) => boolean
+  missing: string
+}> = [
+  {
+    reason: 'unsupported-injection-claim',
+    claims: claimsInjection,
+    evidence: hasDynamicConstruction,
+    missing: 'no dynamic query/command construction',
+  },
+  {
+    reason: 'unsupported-exception-claim',
+    claims: claimsSwallowedException,
+    evidence: hasExceptionHandling,
+    missing: 'no exception-handling construct',
+  },
+  {
+    reason: 'unsupported-null-error-claim',
+    claims: claimsNullRaisesError,
+    evidence: sqlSectionCanRaise,
+    appliesTo: isSqlFile,
+    missing: 'no error-raising construct (SQL NULL comparison yields no match, not an error)',
+  },
+]
+
 export class OrchestratorAgent {
   // No LLMProvider param -- synthesis is 100% deterministic (dedup, cross-reference, hallucination
   // filtering), no LLM calls.
@@ -69,10 +120,14 @@ export class OrchestratorAgent {
   // omitted. The real runner.ts call site always provides it.
   // dropped is an optional sink the caller can pass to collect findings this filter drops, so
   // they can be surfaced in the report instead of only logged -- no-op to omit it.
+  // diffText is optional for the same reason changedFiles is -- every existing test calls
+  // synthesize(findings) bare, and the claim-support filter simply no-ops when it's omitted. The
+  // real runner.ts call site always provides it.
   synthesize(
     findings: Finding[],
     changedFiles?: string[],
-    dropped?: DroppedHallucinatedFinding[]
+    dropped?: DroppedHallucinatedFinding[],
+    diffText?: string
   ): Finding[] {
     let result = [...findings]
     // Drop findings referencing a file the diff never touched, before anything downstream
@@ -86,6 +141,14 @@ export class OrchestratorAgent {
     // this project's existing convention elsewhere for uncertain/missing state.
     if (changedFiles && changedFiles.length > 0) {
       result = this.filterNonexistentFiles(result, changedFiles, dropped)
+    }
+    // WHY before crossReference and not later: crossReference escalates a security finding whose
+    // location matches an adversarial one, which is exactly the co-fabrication case this filter
+    // exists to catch -- both agents were measured inventing injection findings on the same lines
+    // of the same safe SQL function. Filtering afterwards would let a fabricated pair escalate
+    // each other's severity first.
+    if (diffText) {
+      result = this.filterUnsupportedClaims(result, diffText, dropped)
     }
     // Cross-reference before dedup so coverage gaps can escalate correctness findings
     result = this.crossReference(result)
@@ -114,6 +177,48 @@ export class OrchestratorAgent {
       console.error(
         `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- references ` +
           `${f.file}, which is not in the reviewed diff (likely a hallucinated finding)`
+      )
+      return false
+    })
+  }
+
+  // Drops findings whose claimed mechanism is structurally absent from the file they name:
+  // an injection claim against a file section containing no dynamic query/command construction,
+  // or a swallowed-exception claim against one containing no exception-handling construct. Both
+  // are decidable from syntax by the definition of the vulnerability class -- see claimSupport.ts
+  // for why prompt wording alone provably could not close this, and why IDOR is excluded.
+  private filterUnsupportedClaims(
+    findings: Finding[],
+    diffText: string,
+    dropped?: DroppedHallucinatedFinding[]
+  ): Finding[] {
+    const sections = sliceDiffByFile(diffText)
+    // Fail open when the diff couldn't be sliced at all (malformed/non-standard format), matching
+    // the empty-changedFiles reasoning above: filtering against nothing would reject everything.
+    if (sections.size === 0) return findings
+
+    return findings.filter((f) => {
+      // WHY deterministic sources are exempt: an npm-audit CVE title legitimately reads e.g.
+      // "SQL injection in <package>", and its finding is attributed to package.json -- whose diff
+      // section will of course contain no dynamic SQL. Without this exemption the filter would
+      // silently drop real, tool-sourced vulnerability reports. Same premise as
+      // hallucinationCrossCheck's exemption: a real external tool, not the LLM, produced it.
+      if (DETERMINISTIC_SOURCES.includes(f.source)) return true
+
+      const section = lookupFileSection(sections, f.file)
+      // Fail open: a finding whose file has no section here can't be checked. filterNonexistentFiles
+      // already rejects files absent from the diff, so this is the residual parse-mismatch case.
+      if (section === undefined) return true
+
+      const rule = CLAIM_RULES.find(
+        (r) => (r.appliesTo?.(f.file) ?? true) && r.claims(f) && !r.evidence(section)
+      )
+      if (!rule) return true
+
+      dropped?.push({ agent: f.agent, title: f.title, file: f.file, reason: rule.reason })
+      console.error(
+        `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- ${f.file} contains ` +
+          `${rule.missing}, so the claimed mechanism cannot be present (likely a fabricated finding)`
       )
       return false
     })

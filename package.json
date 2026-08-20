@@ -1,6 +1,6 @@
 {
   "name": "ai-review-agent",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "Local AI code review swarm — 15 observe-only default agents powered by Ollama, zero API costs (testgen opt-in)",
   "type": "module",
   "keywords": [
@@ -63,12 +63,12 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^20.0.0",
     "@types/update-notifier": "^6.0.8",
-    "@vitest/coverage-v8": "^2.0.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^10.5.0",
     "prettier": "^3.8.4",
     "tsx": "^4.0.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.62.0",
-    "vitest": "^2.0.0"
+    "vitest": "^4.1.11"
   }
 }

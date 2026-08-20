@@ -47,6 +47,11 @@ import type {
   EvidenceCheckFilterMetadata,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
+import { splitByFileBoundary } from './diffSplit.js'
+
+// Re-exported for the existing chunkRunner.test.ts contract tests; defined in diffSplit.ts so
+// leaf consumers (claimSupport) need not import this orchestration module.
+export { splitByFileBoundary }
 
 export async function runChunked(
   runner: SwarmRunner,
@@ -72,33 +77,6 @@ export async function runChunked(
   }
 
   return mergeResults(results, maxFindings)
-}
-
-// Splits a diff into chunks of up to maxLines each without ever splitting a single file's
-// `diff --git` section across two chunks (see the header comment above for why). Packs sections
-// greedily in order; a section larger than maxLines on its own still becomes its own chunk rather
-// than being dropped or force-split.
-export function splitByFileBoundary(diff: string, maxLines: number): string[] {
-  const sections = diff.split(/(?=^diff --git )/m).filter((s) => s.length > 0)
-  if (sections.length === 0) return ['']
-
-  const chunks: string[] = []
-  let current: string[] = []
-  let currentLines = 0
-
-  for (const section of sections) {
-    const sectionLines = section.split('\n').length
-    if (current.length > 0 && currentLines + sectionLines > maxLines) {
-      chunks.push(current.join(''))
-      current = []
-      currentLines = 0
-    }
-    current.push(section)
-    currentLines += sectionLines
-  }
-  if (current.length > 0) chunks.push(current.join(''))
-
-  return chunks
 }
 
 // Mirrors OrchestratorAgent.capAndSort exactly (severity desc, then VERIFIED > INFERRED >
@@ -140,6 +118,16 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
   const sanitizerRedacted = results.reduce((sum, r) => sum + (r.sanitizer?.redactedLines ?? 0), 0)
   const sanitizerWarnings = results.flatMap((r) => r.sanitizer?.warnings ?? [])
 
+  // WHY this is merged rather than last-chunk-wins like coverageGapFilter: when the only writer
+  // was filterNonexistentFiles, an incomplete explanation cost nothing -- those findings were
+  // fabrications referencing files outside the diff. filterUnsupportedClaims now also writes here,
+  // and it CAN drop a real finding (a claim matcher misfiring on genuine prose -- measured twice).
+  // This line is then the only user-visible trace that anything was dropped, so losing earlier
+  // chunks' entries would hide exactly the drops most worth auditing.
+  const droppedAcrossChunks = results.flatMap((r) => r.hallucinationFilter?.dropped ?? [])
+  const mergedHallucinationFilter =
+    droppedAcrossChunks.length > 0 ? { dropped: droppedAcrossChunks } : undefined
+
   return {
     findings,
     testFiles,
@@ -157,7 +145,7 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
     // for a given run; see Task 13).
     ...(last.policy ? { policy: last.policy } : {}),
     ...(mergedAgentStatus ? { agentStatus: mergedAgentStatus } : {}),
-    ...(last.hallucinationFilter ? { hallucinationFilter: last.hallucinationFilter } : {}),
+    ...(mergedHallucinationFilter ? { hallucinationFilter: mergedHallucinationFilter } : {}),
     ...(last.coverageGapFilter ? { coverageGapFilter: last.coverageGapFilter } : {}),
     ...(last.toolAvailability ? { toolAvailability: last.toolAvailability } : {}),
     ...(mergedEvidenceCheckFilter ? { evidenceCheckFilter: mergedEvidenceCheckFilter } : {}),

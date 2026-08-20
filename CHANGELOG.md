@@ -5,6 +5,155 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.12.0] — 2026-08-19 (deterministic false-positive filters for fabricated findings)
+
+### Security
+
+- **All 14 known dependency vulnerabilities resolved — `npm audit` now reports 0.** Five were in
+  production dependencies, reaching the published package transitively via
+  `@modelcontextprotocol/sdk`: `ip-address` (high — SSRF/trust-boundary bypass from octal-vs-decimal
+  octet decoding), `fast-uri` (high — host confusion via a literal backslash authority delimiter),
+  `@hono/node-server` (path traversal in `serve-static` on Windows via encoded `%5C`), `hono`, and
+  `body-parser`. These were pre-existing on `main`, not introduced by this release. The remaining
+  dev-only advisories in the vitest/vite chain required a major upgrade to **vitest 4**, which
+  changed how constructible mocks work: `vi.fn().mockImplementation(() => ({...}))` is no longer
+  valid for a mock that gets `new`-ed. 34 mock factories across `cli.test.ts` and `mcp/tool.test.ts`
+  were migrated to `function` form.
+
+### Fixed
+
+- `security`/`correctness`/`adversarial`/`error-handling` could hallucinate SQL-injection or
+  swallowed-exception findings against declarative code containing neither dynamic query/command
+  construction nor any exception-handling construct at all — reported against a real Postgres RLS
+  function, `is_group_member(gid uuid)`, a parameterized `language sql` function whose own
+  declared parameter was mistaken for unparameterized input. Two rounds of increasingly explicit
+  prompt rules were applied and measured live against Ollama; the misfire rate didn't drop, it
+  changed shape — once one rationalization ("gid isn't parameterized") was explicitly ruled out,
+  the model invented another (claiming `auth.uid()` itself was attacker-controlled), leaving
+  `security` at 5/8 and `error-handling` at 3/6 after both rounds. Fixed the same way
+  `hasCredentialShapedValue` (`secrets.ts`) was: a deterministic post-filter
+  (`filterUnsupportedClaims` in `orchestrator.ts`, patterns in the new `claimSupport.ts`) that
+  drops an injection/swallowed-exception claim when the finding's own file section contains no
+  syntax capable of producing that mechanism — checkable by the definition of the vulnerability
+  class, not by model judgment. Scoped to the finding's own file, not the whole diff (a whole-diff
+  check would almost never fire, since `${...}`/`await`/`||` are near-ubiquitous in real
+  TypeScript diffs for unrelated reasons). Live-reverified after the fix: `security` and
+  `error-handling` both went from 2/8 raw misfires to 0/8 surviving; a genuine-injection
+  counter-test fixture (`sql-injection-vulnerable.diff`) confirms the filter does not
+  over-suppress — across 3 trials each for security, correctness, error-handling and
+  adversarial, all 11 injection findings those agents produced survived the filter (11/11). Live
+  calibration also surfaced a third rationalization not covered by the literal "injection"/"sqli"
+  wording — validation-language phrasing making the identical claim (e.g. "Potential Unsafe User
+  Input Usage in SQL Function") — now matched too, narrowly, only when tied to an explicit
+  sql/query/statement term nearby so an unrelated, legitimate "missing input validation" finding
+  elsewhere is not misclassified. IDOR is deliberately out of scope for this filter (no syntax
+  whose absence disproves an authorization gap) and remains covered by the prompt rules plus
+  `--verify-evidence`.
+- A third claim class in the same filter: `adversarial` fabricated claims that Postgres raises an
+  exception on a NULL input to `is_group_member`, when a NULL comparison in a `WHERE` clause simply
+  evaluates to no match. A prompt fix stating the correct semantics made it **worse (6/10 → 9/10)**
+  — the model absorbed the fact and re-framed the complaint — so that was reverted and replaced
+  with a deterministic check (`claimsNullRaisesError` + `sqlSectionCanRaise`), gated on the file
+  being SQL because in an imperative language a null dereference genuinely does throw. Measured
+  7/10 → 4/10 any-findings on the clean fixture. The residual is the vaguer "does not validate /
+  unexpected behavior" phrasing, deliberately not matched — it asserts no checkable mechanism, and
+  broadening to catch it was tested and would drop legitimate LEFT JOIN / missing-COALESCE
+  findings.
+- The injection filter above read a bare `||` as SQL string concatenation, but `||` is logical OR
+  in shell, JS, and YAML. Static, fully hardcoded command lines (`script.sh || true`,
+  `script.sh || FAIL=1`) therefore looked like dynamic construction, so fabricated
+  "Command Injection via Script Parameters" findings against them survived the filter — reported
+  from a live run against a real repo's hook and workflow files, 4/4 of that run's security
+  findings. `||` now only counts as evidence when it abuts a string literal, which is what genuine
+  SQL concatenation always does.
+- **False negative on a real vulnerability class**, found while investigating the above: shell
+  interpolation has no `${...}` braces, so `script.sh "$USER_INPUT"` matched none of the
+  interpolation patterns and a genuine command-injection finding against it would have been
+  silently dropped. Bare `$VAR`, `$(...)`, and backtick command substitution now all count as
+  dynamic construction.
+- `license` agent could assert a fabricated license for a package — measured 6/10 against a fixture
+  adding lodash, claiming LGPL-3.0 with `basis=VERIFIED` for a famously MIT package, and in one
+  trial naming MIT correctly while still filing a high-severity finding. Root cause was the prompt
+  instructing the model to "look up its license from your training knowledge", i.e. to recall a
+  fact rather than read one. Added `licenseFacts.ts`: a deterministic post-filter that resolves
+  every dependency the diff adds against the reviewed project's own `package-lock.json` (or
+  `node_modules`) and drops commercial-incompatibility findings the project's metadata contradicts.
+  Contradiction-only and fails open on any unresolvable package, so the genuine LGPL detection in
+  `license.diff` (`node-lame`, deliberately not a dependency here) still fires. Live-verified:
+  6/10 → 0/8 on the clean fixture, 5/5 still detecting on the positive one.
+- **Two false negatives in the injection filter's evidence patterns**, found by validating it
+  against a cross-language corpus of real injections rather than the single
+  counter-test fixture (the fixture proved the mechanism; it could not prove coverage). Both would
+  have caused a genuine vulnerability finding to be silently dropped — the dangerous direction, as
+  opposed to the merely-noisy false positives this filter exists to remove. (1) **C# interpolated
+  strings** (`$"SELECT ... {id}"`): the `\$\w` alternative requires a word character after `$`,
+  but C# puts a quote there. (2) **Rust `format!(...)`**: `format\s*\(` missed the `!`.
+  The corpus run was 37 samples at the time, of which these two failed; the corpus committed as a
+  regression test has since grown to **39 samples, all passing**. It lives in
+  `tests/unit/claimSupport.test.ts`, covering Python, JS, TS, Java, PHP, Ruby, Go, C#, shell, Perl,
+  C, plpgsql, T-SQL, Rust, Kotlin, Scala, and Groovy. The same run also characterized three
+  fail-open inertness sources (`execute` matching Python/JS `.execute(`, and `\$\w`
+  matching Postgres `$BODY$` dollar-quote tags and `$1` bind params) — all keep findings rather
+  than dropping them, and are documented in `memory-bank/progress.md` rather than tightened
+  without their own measurement.
+- **Six further false negatives in the new filters**, found by a multi-agent `/code-review` pass and
+  its opponent audit before release. Each would have silently dropped a real finding:
+  - Injection classes with no string building — XSS via `dangerouslySetInnerHTML`, NoSQL via an
+    object passed to a query API, CRLF/header injection — were dropped, because
+    `hasDynamicConstruction` only knows query/command string assembly and cannot falsify them.
+    They now fail open. The exclusion matches an injection **class** term, not a bare noun: an
+    earlier attempt matched `html`/`dom`/`headers` anywhere in the text, which let fabricated SQL
+    injection findings escape the filter simply by mentioning one.
+  - `claimsNullRaisesError` treated `fail`/`fails`/`failure` as a raising verb. "A complete failure
+    of tenant isolation" is ordinary security prose, so a real finding against a `using (true)`
+    RLS policy — a world-readable table — was dropped outright. Removing that one alternative
+    measured 5/12 wrong → 0/12; fabricated raise claims still match, since they always name an
+    explicit verb (error/throw/raise/crash).
+  - Shell and Rust error suppression (`2>/dev/null`, `|| true`, `let _ =`, `.ok()`) counted as
+    "no error-handling construct", so legitimate swallowed-error findings in those languages were
+    dropped. Those idioms now count as error handling.
+  - `licenseFacts` threw a `TypeError` on npm's deprecated object-form `license`
+    (`{"type":"MIT"}`), and the throw escaped the agent's `run()`, failing the whole agent rather
+    than the one lookup.
+  - `extractAddedDependencies` matched any `"key": "value"` manifest line, so a `"version"` bump
+    alongside a real dependency made the license backstop fail open — meaning it fired almost never
+    in practice, since version bumps accompany most dependency changes.
+  - The report labelled every claim-support drop "referenced file(s) not present in the reviewed
+    diff", which was false for all of them (those files ARE in the diff). Drops are now grouped by
+    reason, which is what the `reason` field was added for.
+- `license` agent's prompt had gained a list of concrete package names (`lodash`, `express`,
+  `react`, `chalk`, `axios`) as examples of permissive packages. That re-introduced the exact
+  hallucination-seed pattern removed in `a906515` (and in `9e0bc29` for `dependencies`), and
+  `chalk` is the designated false-positive bait for this agent's own calibration case. Removed; the
+  guidance is now stated without naming any package.
+- Under `--chunk`, `hallucinationFilter` was merged last-chunk-wins, so drops recorded in earlier
+  chunks vanished from the report. That was harmless when the only writer was
+  `filterNonexistentFiles` (those findings referenced files outside the diff), but
+  `filterUnsupportedClaims` can drop a real finding when a claim matcher misfires on genuine prose
+  — measured twice during review — and this line is its only user-visible trace. Now merged across
+  all chunks, like `agentStatus` and `evidenceCheckFilter`.
+- `licenseFacts` resolved an array-shaped `license` field by joining with `OR`, so
+  `["GPL-3.0","MIT"]` read as permissive and would drop a legitimate copyleft finding — the only
+  false-negative path in that module. An array is not an npm-documented shape for `license`
+  (the deprecated multi-license field was `licenses`), so it now joins with `AND`: permissive only
+  if every entry is.
+- `splitByFileBoundary` moved from `chunkRunner.ts` to a new dependency-free `diffSplit.ts`.
+  `claimSupport` (a leaf) importing it from `chunkRunner` (an orchestration wrapper that references
+  `SwarmRunner`) inverted the dependency direction; no runtime cycle existed only because that
+  reference is `import type`, and nothing in CI guards against it becoming a value import.
+- The `reason` → explanation mapping in `filterUnsupportedClaims` was a ternary chain parallel to
+  the if/else chain that assigned `reason`, which TypeScript could not keep in sync — a fourth
+  claim class would have printed another class's explanation. Both collapsed into one rule table.
+- `licenseCompliance` parsed the project's lockfile before checking whether there were any findings
+  to filter.
+- `corroboratingAgents` was computed by the orchestrator's dedup step but never rendered anywhere,
+  so a run whose progress lines read "security 4 findings, adversarial 1 finding" and then printed
+  4 findings all labelled `Agent: security` looked like the adversarial finding had been silently
+  lost. It had actually merged into a same-location security finding — and is why that one kept its
+  severity while uncorroborated siblings were downgraded. Now shown as "Corroborated by:". Agent
+  progress lines also now say "N raw findings" to make explicit that they are pre-synthesis counts,
+  which legitimately differ from the final report's totals and severities.
+
 ## [1.11.0] — 2026-08-18 (review-reliability & evidence-verification fixes, 15-phase full-system audit remediation)
 
 ### Added

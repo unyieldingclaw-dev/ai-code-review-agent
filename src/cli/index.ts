@@ -286,7 +286,12 @@ program
           } else {
             const elapsed = `${Math.round((event.elapsedMs ?? 0) / 1000)}s`
             const count = event.findings?.length ?? 0
-            let summary = `${count} finding${count !== 1 ? 's' : ''}`
+            // "raw" because these are the agent's own findings, BEFORE the orchestrator
+            // deduplicates same-location findings across agents, downgrades uncorroborated
+            // critical/high ones, and applies the publication filter. The final report therefore
+            // legitimately shows fewer findings, and different severities, than these lines add up
+            // to -- which without this label read as findings being silently lost.
+            let summary = `${count} raw finding${count !== 1 ? 's' : ''}`
             if (count > 0 && event.findings) {
               const bySev: Record<string, number> = {}
               for (const f of event.findings) bySev[f.severity] = (bySev[f.severity] ?? 0) + 1

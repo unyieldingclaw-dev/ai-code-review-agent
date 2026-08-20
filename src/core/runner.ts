@@ -754,7 +754,12 @@ export class SwarmRunner {
     }
 
     const droppedHallucinated: DroppedHallucinatedFinding[] = []
-    const findings = this.orchestrator.synthesize(allFindings, changedFiles, droppedHallucinated)
+    const findings = this.orchestrator.synthesize(
+      allFindings,
+      changedFiles,
+      droppedHallucinated,
+      input.diff
+    )
 
     const evidenceCheckFilter: EvidenceCheckFilterMetadata | undefined =
       this.config.verifyEvidence && this.verifierProvider

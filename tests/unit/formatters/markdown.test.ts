@@ -178,6 +178,71 @@ describe('formatMarkdown', () => {
     const output = formatMarkdown(result)
     expect(output).toContain('1')
     expect(output).toMatch(/hallucinat/i)
+    // A drop with no `reason` came from the file-existence filter, so it must still read that way.
+    expect(output).toContain('referenced file(s) not present in the reviewed diff')
+  })
+
+  it('groups drops by reason instead of labelling them all "file not present"', () => {
+    // Regression: this sink has two writers. filterUnsupportedClaims drops findings whose file IS
+    // in the diff, so the previous single hardcoded sentence was factually false for every one of
+    // them. Asserting only a count and /hallucinat/i passed even when the text was wrong.
+    const result = makeResult({
+      findings: [],
+      hallucinationFilter: {
+        dropped: [
+          { agent: 'dependencies', title: 'Wildcard version', file: 'package.json' },
+          {
+            agent: 'security',
+            title: 'SQL Injection',
+            file: 'db.sql',
+            reason: 'unsupported-injection-claim' as const,
+          },
+          {
+            agent: 'error-handling',
+            title: 'Swallowed exception',
+            file: 'db.sql',
+            reason: 'unsupported-exception-claim' as const,
+          },
+          {
+            agent: 'adversarial',
+            title: 'Null raises',
+            file: 'db.sql',
+            reason: 'unsupported-null-error-claim' as const,
+          },
+        ],
+      },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('4 finding(s) dropped')
+    expect(output).toContain('1 — referenced file(s) not present in the reviewed diff')
+    expect(output).toContain('1 — no dynamic query/command construction in the file')
+    expect(output).toContain('1 — no exception-handling construct in the file')
+    expect(output).toContain('1 — SQL NULL comparison yields no match, not an error')
+  })
+
+  it('collapses same-reason drops into one line with a count', () => {
+    const result = makeResult({
+      findings: [],
+      hallucinationFilter: {
+        dropped: [
+          {
+            agent: 'security',
+            title: 'A',
+            file: 'a.sql',
+            reason: 'unsupported-injection-claim' as const,
+          },
+          {
+            agent: 'adversarial',
+            title: 'B',
+            file: 'b.sql',
+            reason: 'unsupported-injection-claim' as const,
+          },
+        ],
+      },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('2 finding(s) dropped')
+    expect(output).toContain('2 — no dynamic query/command construction in the file')
   })
 
   it('does not show a hallucination-filter note when nothing was dropped', () => {

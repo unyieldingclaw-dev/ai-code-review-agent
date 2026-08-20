@@ -1,16 +1,23 @@
 # Project Instructions for Claude
 
-This file provides instructions for Claude Code. Read this file and all files in `memory-bank/` at the start of every conversation.
+This file provides instructions for Claude Code. Read this file and the five memory-bank files listed below at the start of every conversation.
 
 ## Memory Bank
 
-At the start of every conversation, and again after any context compaction, silently read ALL files in `memory-bank/` to restore full project context:
+At the start of every conversation, and again after any context compaction, silently read these five
+files to restore full project context:
 
 1. `memory-bank/projectbrief.md` - Non-negotiable requirements and constraints
 2. `memory-bank/systemPatterns.md` - Architecture decisions and patterns to follow
 3. `memory-bank/techContext.md` - Tech stack, dependencies, environment
 4. `memory-bank/activeContext.md` - Current focus and next steps
 5. `memory-bank/progress.md` - What's complete and planned
+
+**Do NOT auto-read `memory-bank/archive/`.** It holds completed history moved out of the two files
+above to keep them within the size limits `memory-bank/README.md` sets (activeContext 150 lines,
+progress 400). Auto-reading it would restore the exact cost the archive removes -- the payload was
+190,798 bytes before this split and is 48,622 after. Read a file from `archive/` only when you are
+specifically looking for historical detail the current files point you to.
 
 **Rules:** Never ask for info already in Memory Bank. Never violate projectbrief.md. Always follow systemPatterns.md. After completing any significant task or multi-file change, update the relevant memory-bank files before continuing to new work. Do not rely on compaction summaries as the primary persistence mechanism for important operational context. Never write secrets, credentials, PII, or full code dumps to memory-bank/ files.
 

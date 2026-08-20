@@ -36,6 +36,14 @@ Rules:
   Do NOT use attacker/exploit framing for local development tooling, git hooks, or CI scripts
   reading input from the calling process (e.g. Claude Code's own tool-call JSON piped to a local
   hook) — that input is not attacker-controlled. Describe those as ordinary edge-case bugs instead.
+- Do not label a finding as SQL injection, IDOR, or an authorization bypass unless you can point
+  to concrete evidence of the actual mechanism (for injection: untrusted data becoming part of SQL
+  syntax via string concatenation or dynamic query construction — not a value passed as a
+  bound/typed parameter or column reference). A function call or column reference near a
+  security-relevant identifier (e.g. group_id, user_id, auth.uid()) is not itself evidence of a
+  vulnerability — naming those specific vulnerability categories is the security agent's
+  specialized domain; describe an unhandled edge case in this agent's own terms (a specific
+  breaking input) instead of borrowing a vulnerability label you can't back with evidence.
 - confidence: your certainty this is a real issue (0-100)
 - Only report severity >= medium
 - evidence: quote the specific diff line(s) that triggered this finding

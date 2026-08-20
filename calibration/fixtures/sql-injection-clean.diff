@@ -1,0 +1,26 @@
+diff --git a/supabase/migrations/20260818000001_scope_visits_group_policy.sql b/supabase/migrations/20260818000001_scope_visits_group_policy.sql
+new file mode 100644
+--- /dev/null
++++ b/supabase/migrations/20260818000001_scope_visits_group_policy.sql
+@@ -0,0 +1,21 @@
++create or replace function is_group_member(gid uuid)
++returns boolean
++language sql
++security definer
++set search_path = ''
++as $$
++  select exists (
++    select 1 from public.group_members
++    where group_id = gid and user_id = auth.uid()
++  );
++$$;
++
++drop policy if exists "visits_select" on visits;
++create policy "visits_select"
++  on visits for select
++  using (is_group_member(visits.group_id));
++
++drop policy if exists "wishlist_items_select" on wishlist_items;
++create policy "wishlist_items_select"
++  on wishlist_items for select
++  using (is_group_member(wishlist_items.group_id));

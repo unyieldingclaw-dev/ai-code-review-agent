@@ -11,18 +11,22 @@ vi.mock('child_process', () => ({
 
 // Mock SwarmRunner so tests never call Ollama
 vi.mock('../../../src/core/runner.js', () => ({
-  SwarmRunner: vi.fn().mockImplementation(() => ({
-    run: vi.fn().mockResolvedValue({
-      findings: [],
-      testFiles: [],
-      summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
-    }),
-  })),
+  SwarmRunner: vi.fn().mockImplementation(function () {
+    return {
+      run: vi.fn().mockResolvedValue({
+        findings: [],
+        testFiles: [],
+        summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
+      }),
+    }
+  }),
 }))
 
 // Mock OllamaProvider — trivial stub
 vi.mock('../../../src/core/llm/ollamaProvider.js', () => ({
-  OllamaProvider: vi.fn().mockImplementation(() => ({})),
+  OllamaProvider: vi.fn().mockImplementation(function () {
+    return {}
+  }),
 }))
 
 // Mock loadConfig — return default config
@@ -119,12 +123,11 @@ describe('runReviewTool', () => {
       stdout: 'diff --git a/f.ts b/f.ts\n+line',
     } as unknown as SpawnSyncReturns<string>)
     const { SwarmRunner } = await import('../../../src/core/runner.js')
-    vi.mocked(SwarmRunner).mockImplementationOnce(
-      () =>
-        ({
-          run: vi.fn().mockRejectedValue(new Error('LLM provider not available')),
-        }) as unknown as InstanceType<typeof SwarmRunner>
-    )
+    vi.mocked(SwarmRunner).mockImplementationOnce(function () {
+      return {
+        run: vi.fn().mockRejectedValue(new Error('LLM provider not available')),
+      } as unknown as InstanceType<typeof SwarmRunner>
+    })
     const result = await runReviewTool({})
     expect(result).toContain('Ollama is not reachable')
   })
@@ -155,7 +158,9 @@ describe('runReviewTool', () => {
       testFiles: [],
       summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
     })
-    vi.mocked(SwarmRunner).mockImplementationOnce((config: Parameters<typeof SwarmRunner>[0]) => {
+    vi.mocked(SwarmRunner).mockImplementationOnce(function (
+      config: Parameters<typeof SwarmRunner>[0]
+    ) {
       expect(config.agents).not.toContain('testgen')
       return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
     })
@@ -189,7 +194,9 @@ describe('runReviewTool', () => {
       testFiles: [],
       summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
     })
-    vi.mocked(SwarmRunner).mockImplementationOnce((config: Parameters<typeof SwarmRunner>[0]) => {
+    vi.mocked(SwarmRunner).mockImplementationOnce(function (
+      config: Parameters<typeof SwarmRunner>[0]
+    ) {
       expect(config.verifyEvidence).toBe(false)
       return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
     })
@@ -219,7 +226,9 @@ describe('runReviewTool', () => {
       testFiles: [],
       summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 10 },
     })
-    vi.mocked(SwarmRunner).mockImplementationOnce((config: Parameters<typeof SwarmRunner>[0]) => {
+    vi.mocked(SwarmRunner).mockImplementationOnce(function (
+      config: Parameters<typeof SwarmRunner>[0]
+    ) {
       expect(config.chunk).toBe(false)
       return { run: runMock } as unknown as InstanceType<typeof SwarmRunner>
     })

@@ -19,6 +19,7 @@ import { MigrationSafetyAgent } from '../src/core/agents/migrationSafety.js'
 import { SecretsAgent } from '../src/core/agents/secrets.js'
 import { ComplexityAgent } from '../src/core/agents/complexity.js'
 import { OrchestratorAgent } from '../src/core/agents/orchestrator.js'
+import { claimsInjection, claimsSwallowedException } from '../src/core/claimSupport.js'
 import { BaseAgent } from '../src/core/agents/base.js'
 import type { Finding } from '../src/core/schema.js'
 
@@ -33,6 +34,17 @@ interface CalibrationCase {
   expectedKeyword?: string
   baitKeyword?: string
   expectEmpty?: boolean
+  // Narrower than expectEmpty: asserts the synthesized findings contain no injection or
+  // swallowed-exception claim, but tolerates other finding categories surviving. Needed because
+  // some agents have their own separate, unrelated hallucination patterns on a given fixture --
+  // e.g. the security agent occasionally fabricates an IDOR claim, and the adversarial agent
+  // can still emit residual NULL-handling findings against the SQL clean fixture in the vaguer
+  // "does not validate / unexpected behavior" phrasing that claimsNullRaisesError deliberately
+  // does not match (IDOR has no syntactic tell at all; the vague NULL phrasing asserts no
+  // checkable mechanism). expectEmpty would make this case flaky by
+  // asserting an invariant broader than what the filter actually guarantees; this asserts exactly
+  // what it guarantees.
+  expectNoInjectionOrExceptionClaims?: boolean
 }
 
 const BORDER = '╔════════════════════════════════════════════════════════════╗'
@@ -76,13 +88,23 @@ const CASES: CalibrationCase[] = [
   {
     // This fixture touches package.json, so once projectPath is set below, DependenciesAgent's
     // run() override routes it through the real npm-audit tool path instead of the LLM -- the
-    // agent no longer sees this fixture's fabricated "lodash wildcard" text at all, so the
-    // expectations here assert against real npm audit output (a known vulnerability report),
-    // not the diff's own bait content.
+    // agent never sees this fixture's fabricated "lodash wildcard" text at all.
+    //
+    // WHY expectEmpty and not expectedKeyword: 'vulnerability'. This case used to assert against
+    // real npm-audit output of THIS repo, which silently coupled it to the repo's own incidental
+    // vulnerability count. Bringing `npm audit` to 0 (2026-08-19) made it fail -- the case was
+    // only ever passing because the repo happened to be vulnerable, and the alternative is keeping
+    // a known CVE around so a test stays green, which is absurd. What it still guards is the bug
+    // it was created for: if the npm-audit path breaks and the agent falls back to the LLM, the
+    // prompt's old "lodash wildcard" example gets echoed as a fabricated finding, and this fails.
+    //
+    // Positive-detection coverage for the npm-audit path is genuinely lost here. Restoring it
+    // needs a fixture project with its own vulnerable lockfile plus a per-case projectPath, which
+    // the current single-repo harness cannot express -- tracked in memory-bank/progress.md
+    // alongside the same self-referential problem in license-clean.
     name: 'dependencies',
     fixtureFile: 'calibration/fixtures/dependencies.diff',
-    expectedKeyword: 'vulnerability',
-    baitKeyword: 'wildcard',
+    expectEmpty: true,
   },
   {
     // Regression case for a real hallucination bug: dependencies.ts's prompt used to carry a
@@ -131,6 +153,17 @@ const CASES: CalibrationCase[] = [
     // OUTPUT FORMAT example (plus a concrete MongoDB mention in its SSPL rule text), which the
     // model could echo back as a fabricated finding on a diff with nothing to report. This
     // fixture only adds a permissive-licensed (MIT) package -- the agent must return nothing.
+    //
+    // Uses `commander` specifically, NOT an arbitrary MIT package: it is a real dependency of this
+    // repo, so it resolves in package-lock.json and the deterministic ground-truth filter in
+    // licenseFacts.ts can actually verify it. The fixture previously added `lodash`, which is not
+    // a dependency here and therefore resolves nowhere -- that made this case a pure test of model
+    // recall, which measured 6/10 FAILING (the model asserted LGPL-3.0 for lodash with
+    // basis=VERIFIED, and in one trial named MIT correctly yet still filed a high-severity
+    // finding). With a resolvable package this asserts the real mechanism instead. NOTE: packages
+    // that resolve nowhere still fall back to model recall by design (licenseFacts.ts fails open
+    // so a genuine LGPL detection like license.diff's `node-lame` survives) -- that residual is
+    // mitigated by prompt wording only, not deterministically.
     name: 'license-clean',
     agentName: 'license',
     fixtureFile: 'calibration/fixtures/license-clean.diff',
@@ -187,6 +220,46 @@ const CASES: CalibrationCase[] = [
     fixtureFile: 'calibration/fixtures/complexity.diff',
     expectedKeyword: 'complexity',
     baitKeyword: 'formatAddress',
+  },
+  {
+    // Regression case for the originally-reported bug: a parameterized, auth.uid()-scoped
+    // Postgres RLS function was hallucinated as SQL injection / swallowed-exception by
+    // security/correctness/adversarial/error-handling despite containing no dynamic-SQL-
+    // construction or exception-handling syntax at all. Two rounds of prompt-only fixes measured
+    // live against Ollama plateaued (security 5/8, error-handling 3/6); this is now guarded by
+    // the deterministic filterUnsupportedClaims post-filter in orchestrator.ts (claimSupport.ts),
+    // not prompt wording alone -- live-reverified after the filter: security and error-handling
+    // both went from 2/8 raw misfires to 0/8 surviving injection/swallowed-exception claims.
+    //
+    // Uses expectNoInjectionOrExceptionClaims, not expectEmpty: the security agent also
+    // occasionally fabricates an IDOR claim on this fixture (e.g. "Potential Insecure Direct
+    // Object Reference"), which filterUnsupportedClaims deliberately does not cover -- IDOR has
+    // no syntactic tell, so it's not deterministically falsifiable (see claimSupport.ts header).
+    // expectEmpty would make this case fail on that expected, out-of-scope residual instead of
+    // testing what this filter actually guarantees.
+    name: 'security-sql-clean',
+    agentName: 'security',
+    fixtureFile: 'calibration/fixtures/sql-injection-clean.diff',
+    expectNoInjectionOrExceptionClaims: true,
+  },
+  {
+    // Over-suppression counter-test: the filter must not blanket-drop every injection claim on a
+    // Postgres migration just because it's SQL. This fixture is a genuine EXECUTE + string-
+    // concatenation injection (search_visits) -- live-verified the finding survives
+    // filterUnsupportedClaims: across 3 trials each for security/correctness/error-handling/
+    // adversarial, all 11 injection findings the four agents produced survived. baitKeyword guards
+    // WHY the bait is a SAFE DECOY function rather than a token from the vulnerable code: the
+    // fixture previously baited on `auth.uid`, which appears in the fixture itself, so a perfectly
+    // correct injection finding that merely mentioned the surrounding policy failed the case --
+    // observed flaking across runs. `is_group_member` here is parameterized and has no injection
+    // surface at all, so naming it is unambiguously a misattribution. That is also the exact
+    // false positive originally reported, which makes this a real discrimination test: find the
+    // injection in search_visits, do not blame the safe function beside it.
+    name: 'security-sql-vulnerable',
+    agentName: 'security',
+    fixtureFile: 'calibration/fixtures/sql-injection-vulnerable.diff',
+    expectedKeyword: 'injection',
+    baitKeyword: 'is_group_member',
   },
 ]
 
@@ -263,9 +336,10 @@ async function main() {
         diff,
         projectPath: process.cwd(),
       })
-      // Exercise the same file-existence defense runner.ts applies in real usage, so
-      // calibration reflects actual end-to-end behavior, not just the raw agent's output.
-      const findings = orch.synthesize(rawFindings, extractChangedFiles(diff))
+      // Exercise the same file-existence and claim-support defenses runner.ts applies in real
+      // usage, so calibration reflects actual end-to-end behavior, not just the raw agent's
+      // output.
+      const findings = orch.synthesize(rawFindings, extractChangedFiles(diff), undefined, diff)
 
       if (c.expectEmpty) {
         if (findings.length === 0) {
@@ -275,6 +349,24 @@ async function main() {
           console.log(
             `  ❌ FAIL — expected zero findings, got ${findings.length}: ` +
               findings.map((f) => `"${f.title}"`).join(', ')
+          )
+          failed++
+        }
+        continue
+      }
+
+      if (c.expectNoInjectionOrExceptionClaims) {
+        const bad = findings.filter((f) => claimsInjection(f) || claimsSwallowedException(f))
+        if (bad.length === 0) {
+          console.log(
+            `  ✅ PASS — no surviving injection/swallowed-exception claims ` +
+              `(${findings.length} other finding(s) tolerated)`
+          )
+          passed++
+        } else {
+          console.log(
+            `  ❌ FAIL — ${bad.length} injection/swallowed-exception claim(s) survived: ` +
+              bad.map((f) => `"${f.title}"`).join(', ')
           )
           failed++
         }

@@ -50,4 +50,12 @@ describe('DesignAgent', () => {
     const agent = new DesignAgent(makeProvider('[]'), DEFAULT_CONFIG)
     expect(agent.systemPrompt).toMatch(/design|architect|pattern|coupling|cohesion|layer/i)
   })
+
+  // Regression test for a false positive reproduced live: this agent has zero security framing
+  // in its focus list, yet invented an "Insecure Authentication Dependency" finding citing
+  // auth.uid() itself as the evidence -- a safe, standard Supabase RLS pattern.
+  it('system prompt tells the agent not to invent security-vulnerability labels', () => {
+    const agent = new DesignAgent(makeProvider('[]'), DEFAULT_CONFIG)
+    expect(agent.systemPrompt).toMatch(/security agent/i)
+  })
 })
