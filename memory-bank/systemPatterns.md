@@ -155,8 +155,35 @@ Types: feat, fix, chore, docs, refactor, test, style
 
 ### Branch Strategy
 
-- `master` — active development (single-dev project, no PR workflow yet)
-- `main` — target for PRs when distribution is set up
+- `main` — default branch and the target for every PR. All work lands via PR, squash-merged.
+
+### Working With the Review Gates (learned 2026-08-19)
+
+The `/code-review` and `/change-review` markers are consumed by a **substring match on the tool
+command text** (`$cmd -match 'git\s+push\b'` in `review-reminders.ps1`, which is the hook that
+actually runs — pwsh is tried first, `.sh` is only a fallback). The matcher cannot distinguish
+`git push` in command position from `git push` as quoted data.
+
+- **Keep the literal strings `git push` / `git commit` out of command text.** A PR-body heredoc
+  mentioning `git push --delete`, or a `grep "git push"` pattern, trips the gate and burns the
+  marker — forcing a pointless re-review. Hyphenate, reword ("pushing"), or write prose to a file
+  instead of inlining it in the command.
+- **A stale PR branch is updated with `gh pr update-branch`, never a rebase.** Force-push is
+  hard-blocked in this environment, so rebasing an already-pushed branch is a dead end (you cannot
+  publish the rewritten history). `gh pr update-branch` merges the base branch in server-side and
+  needs no force-push. Merging `main` into the branch locally also works.
+- Tag pushes trip the push gate too, even though they carry no diff. The marker is then the hash
+  of an empty diff (`e3b0c442...`), which is legitimate — there is genuinely nothing to review.
+
+**Known open defect:** `review-reminders-post.*` is supposed to reissue the marker when a gated
+command fails, and did not after a failed tag push. Either PostToolUse does not fire on tool error,
+or the `git rev-parse '@{u}'` did-the-ref-move check is structurally wrong for tags (a tag push
+never moves the branch upstream). Reproduce before changing — do not guess.
+
+**Do not "fix" this by loosening the matcher without measurement.** Anchoring to command position
+would reduce false trips, but the failure direction is _missing a real push_ (`xargs git push`, a
+push inside a loop) — silently disabling a security gate. Same rule as the `claimSupport.ts`
+filters: measure, don't inspect.
 
 ## Never Do This
 
