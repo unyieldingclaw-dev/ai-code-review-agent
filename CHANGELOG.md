@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+
+- `release.yml` now publishes to npm via Trusted Publishing (OIDC) instead of a long-lived
+  `NPM_TOKEN` secret — npm exchanges the workflow's existing `id-token: write` OIDC token for a
+  short-lived publish credential scoped to this exact repo/workflow, verified against a Trusted
+  Publisher relationship configured on npmjs.com. Requires npm CLI >= 11.5.1, so added an explicit
+  `npm install -g npm@latest` step rather than relying on whatever version `setup-node` bundles
+  with Node 24. Removed the now-dead `NODE_AUTH_TOKEN` env var, the expiry-reminder step, and
+  `scripts/setup-npm-token.ps1` (existed solely to bootstrap the token this replaces). No
+  `NPM_TOKEN` GitHub secret is required going forward.
+
 ## [1.12.1] — 2026-08-19 (agent-count accuracy, truncation hint)
 
 ### Fixed
