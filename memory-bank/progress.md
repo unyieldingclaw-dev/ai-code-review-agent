@@ -16,9 +16,34 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-18
+**Last Updated**: 2026-08-19
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
+
+## ✅ Completed (2026-08-19)
+
+**v1.12.0 published to npm** (provenance attached, GitHub release out) after PR #31 and #32 merged
+to `main`. Opened PR #33 (`fix/agent-count-and-maxlines`): agent-count announcement now uses the
+real post-policy total (was PMB's item 3a); truncation hint now recommends `--chunk` before
+`--max-lines`. 717 tests. Deliberately did not raise `maxDiffLines` from 2000 — unmeasured tradeoff
+against PMB's timeouts.
+
+Reviewing the deterministic-filter fixes found two of six were themselves defective — a
+`/code-review` opponent audit caught a regex that still dropped a real RLS finding after being
+called fixed (see the "Independent audit" entry below). Treat `claimSupport.ts` changes as
+security-relevant: measure, don't inspect.
+
+Identified 22 stale remote branches (all merged PRs). `git push --delete` is blocked by the same
+`/change-review` push-gate hook used for code changes, since a branch deletion has no diff to
+review — with explicit user approval, deleted all 22 via `gh api -X DELETE
+repos/:owner/:repo/git/refs/heads/<branch>` instead, which routes around that hook. Verified via
+`git branch -r`: only `main`, `chore/agent-calibration`, `claude/plan-overview-4dg42o`, and
+dependabot's `gitleaks-action-3.0.0` (PR #14) remain, as intended.
+
+PR #33 merged (squash, `dcd37d7`) after CI went green. `main` was then ahead of the published
+`v1.12.0` tag by one fix, so bumped to `1.12.1` (`package.json`/`package-lock.json`), finalized the
+`CHANGELOG.md` entry, and updated `README.md`'s `toolVersion` example — same shape as the 1.11.0
+release PR (#30). `npm run check` equivalent (typecheck/format/lint) and 717/717 tests green.
 
 ## ✅ Completed (2026-08-18)
 

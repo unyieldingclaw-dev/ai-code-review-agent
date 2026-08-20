@@ -435,7 +435,7 @@ Every `--format json` response includes a stable envelope:
 ```json
 {
   "schemaVersion": "ai-review-agent/v1",
-  "toolVersion": "1.12.0",
+  "toolVersion": "1.12.1",
   "profile": "change-review",
   "findings": [],
   "summary": { "totalFindings": 0, "bySeverity": {}, "byAgent": {}, "durationMs": 0 },
