@@ -22,6 +22,9 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Update npm
+        run: npm install -g npm@latest # Trusted Publishing (OIDC) needs npm >= 11.5.1
+
       - name: Install dependencies
         run: npm ci
 
@@ -50,13 +53,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: NPM_TOKEN expiry reminder
-        run: echo "::warning::NPM_TOKEN (github-actions-publish) expires 2026-09-08. Renew at npmjs.com before this date and update the NPM_TOKEN secret."
-
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         run: gh release create "${{ github.ref_name }}" --generate-notes --title "${{ github.ref_name }}"
