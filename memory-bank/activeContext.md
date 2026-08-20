@@ -20,9 +20,8 @@ lineage: []
 
 ## Current Focus
 
-**v1.12.0 published.** PR #31 and #32 merged to `main` (`ed74653`); tagged and released via the
-automated `release.yml` (`v*.*.*` tag → npm publish with provenance, no manual `npm publish` step).
-`npm view ai-review-agent version` → `1.12.0`. GitHub release out.
+**v1.12.1 published, npm publishing now runs on Trusted Publishing (OIDC) — no token in the repo
+at all.** `NPM_TOKEN` is deleted from GitHub secrets; `npm view ai-review-agent version` → `1.12.1`.
 
 Four hallucination classes now have deterministic backstops instead of prompt wording: injection,
 swallowed-exception, SQL NULL-error, and fabricated licenses. Prompt-only fixes were measured live
@@ -30,31 +29,12 @@ against Ollama across three separate agents and failed every time — for `licen
 it _worse_ (6/10 → 9/10) — matching what `secrets.ts` already recorded for
 `hasCredentialShapedValue`. Measurements and the review/audit rounds are in `progress.md`.
 
-**PR #33 merged to `main`** (squash, `dcd37d7`, branch `fix/agent-count-and-maxlines` deleted):
-fixes PMB's item 3a — agent-count announcement now uses the real post-policy total — plus the
-truncation hint now recommends `--chunk` before `--max-lines`. 717 tests green. Deliberately did
-NOT raise `maxDiffLines` from 2000 in this PR — would trade truncation for timeouts PMB is already
-hitting, unmeasured; don't "fix" this without measuring first. **Not yet published to npm** —
-`main` is ahead of the `v1.12.0` tag by this one fix; needs a version bump + tag to ship.
-
-**22 stale remote branches deleted 2026-08-19** via `gh api -X DELETE` (explicit user approval;
-routes around the `/change-review` push-gate hook, which can't be satisfied by a diff-less branch
-deletion). Verified via `git branch -r`: only `main`, `chore/agent-calibration`,
-`claude/plan-overview-4dg42o`, and dependabot's `gitleaks-action-3.0.0` (PR #14) remain.
-
 **Verified state:** 717 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
 use `grep "orchestrator] dropped"` to tell a real filter regression from model variance.
 
 **Open, undecided:**
 
-- **NPM token → Trusted Publishing (OIDC) migration — deferred, not started.** Current `NPM_TOKEN` (Automation
-  token, "Bypass 2FA" set) expires 2026-09-08; npm restricts that token class for direct publishing
-  in Jan 2027. `release.yml` already has `id-token: write`, `registry-url`, `--provenance` — only
-  `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}` still makes it token-based. Order: configure Trusted
-  Publisher on npmjs.com first, then remove that line from `release.yml`, then verify on a release,
-  then delete the token. User previously declined a PR correcting the stale "renew the token"
-  guidance that used to be here — re-offer, don't do it unasked.
 - Dependabot PR #14 (gitleaks-action 2→3): undecided — needs an actual look, not an auto-merge.
 
 **Open risks, detailed in `progress.md`:**
@@ -85,15 +65,14 @@ use `grep "orchestrator] dropped"` to tell a real filter regression from model v
 - `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
 - `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
-- **npm**: `ai-review-agent@1.12.0` published (provenance attached)
+- **npm**: `ai-review-agent@1.12.1` published via Trusted Publishing (OIDC), provenance attached.
+  `release.yml` has no npm secret dependency at all — `id-token: write` + the Trusted Publisher
+  relationship configured on npmjs.com (GitHub Actions / `unyieldingclaw-dev` /
+  `ai-code-review-agent` / `release.yml`) is sufficient. `npm install -g npm@latest` runs early in
+  the workflow since OIDC publishing needs npm >= 11.5.1.
 
 ## Next Steps
 
-- **Publish v1.12.1** (or next version) to ship PR #33's fixes — `main` is ahead of the last
-  published tag.
-- **Migrate to npm Trusted Publishing (OIDC)** before the current token expires 2026-09-08. See
-  "Open, undecided" above for the exact order of operations. Explicitly deferred by the user on
-  2026-08-19 ("forget about npm today") — re-raise, don't do unasked.
 - **Dependabot PR #14** (gitleaks-action 2→3): a major bump to the action the pre-push secret scan
   depends on — needs an actual look, not an auto-merge.
 - **Anthropic/Claude provider** (backlog): alternative to Ollama.
@@ -103,12 +82,12 @@ use `grep "orchestrator] dropped"` to tell a real filter regression from model v
 
 **Infrastructure**: Ollama must be running on port 11434 for integration tests and calibration (not required for unit tests)
 
-**Git**: working on `fix/deterministic-false-positive-filters` (PR #32, stacked on PR #31)
+**Git**: `main`, clean, at `v1.12.1`.
 
 ## Key Commands
 
 ```bash
-npm test                    # all unit tests (714 passing)
+npm test                    # all unit tests (717 passing)
 npm run typecheck           # 0 errors
 npm run build               # compile to dist/
 node dist/cli/index.js --help   # smoke test CLI
