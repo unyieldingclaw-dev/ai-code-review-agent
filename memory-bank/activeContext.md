@@ -16,7 +16,7 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-19
+**Last Updated**: 2026-08-20
 
 ## Current Focus
 
@@ -33,9 +33,26 @@ it _worse_ (6/10 → 9/10) — matching what `secrets.ts` already recorded for
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
 use `grep "orchestrator] dropped"` to tell a real filter regression from model variance.
 
-**Open, undecided:**
+**Review-gate tooling investigation (2026-08-20).** Dogfooding `/code-review` and `/change-review`
+surfaced twelve defects in the PMB-owned hook scripts, all sharing one shape: the enforcement did
+not happen and the output said everything was fine. Findings and the recommended order were handed
+to the PMB session as verbiage — **none of it is fixable here.** Those scripts are `TEMPLATE_OWNED`
+and `mb upgrade` overwrites them unconditionally; see `systemPatterns.md` for the ownership rule
+and the two working conventions that came out of it (keep the literal strings `git push`/`git
+commit` out of command text; use `gh pr update-branch` rather than rebasing a pushed branch, since
+force-push is blocked here).
 
-- Dependabot PR #14 (gitleaks-action 2→3): undecided — needs an actual look, not an auto-merge.
+**Upgrade to PMB 1.2.1 — deliberately on hold.** It would fix a live breakage (see below), but
+`mb upgrade` copies from `$MB_HOME/templates`, i.e. PMB's **working tree**, not a tag or release.
+That tree currently has uncommitted in-flight edits, so upgrading now would import someone's
+half-finished work. Revisit once PMB's tree is clean and committed.
+
+**Live breakage inherited from 1.1.1 — `last-reviewed` is not being maintained.**
+`update-reviewed.*` reads a flat `.file_path` where the payload nests under `tool_input`, so it
+exits 0 on every call and never stamps the date. Verified: files edited 2026-08-20 still carry
+June/July dates. `mb doctor` reads those dates for staleness detection, so it is consuming a dead
+sensor and will report actively-edited files as months stale. Fixed in PMB 1.2.1 — arrives with the
+upgrade above, not with a local edit.
 
 **Open risks, detailed in `progress.md`:**
 
@@ -73,8 +90,8 @@ use `grep "orchestrator] dropped"` to tell a real filter regression from model v
 
 ## Next Steps
 
-- **Dependabot PR #14** (gitleaks-action 2→3): a major bump to the action the pre-push secret scan
-  depends on — needs an actual look, not an auto-merge.
+- **PMB 1.2.1 upgrade** — blocked on PMB's working tree being clean (see Current Focus). Fixes the
+  `last-reviewed` breakage; nothing else here depends on it.
 - **Anthropic/Claude provider** (backlog): alternative to Ollama.
 - **Marketplace publish** (VS Code extension): explicitly DEFERRED.
 

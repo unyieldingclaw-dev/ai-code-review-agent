@@ -16,9 +16,27 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-19
+**Last Updated**: 2026-08-20
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
+
+## ✅ Completed (2026-08-20)
+
+**Dependabot PR #14 merged** — `gitleaks-action` v2 → v3 (`e0c47f4`), a pure Node 20 → Node 24
+runtime migration. Not routine housekeeping: the pinned v2 action was already printing a Node 20
+deprecation warning on every release run, and Node 20 is removed from GitHub-hosted runners on
+2026-09-16 — at which point the secret-scan step, which is not `continue-on-error`, would have hard
+-failed the whole release pipeline. PR #37 followed to correct the stale `# Pinned to v2 tag SHA`
+comment dependabot left above the new v3 SHA; in a supply-chain pin that comment is the only
+human-readable check that the opaque SHA is what it claims to be.
+
+**Review-gate tooling investigation.** Dogfooding the gates surfaced twelve defects in the
+PMB-owned hook scripts, all failing toward green — the enforcement did not run and the output
+reported success. Delivered to the PMB session as verbiage; none of it is fixable in this repo
+(`TEMPLATE_OWNED`, overwritten by `mb upgrade`). Two durable working conventions and the ownership
+rule were recorded in `systemPatterns.md`. Also established that `mb upgrade` reads PMB's working
+tree rather than a tag, which is why the 1.2.1 upgrade is on hold. Details and current status in
+`activeContext.md`.
 
 ## ✅ Completed (2026-08-19)
 
