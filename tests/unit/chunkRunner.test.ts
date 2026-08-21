@@ -126,6 +126,85 @@ describe('runChunked', () => {
     expect(merged.agentStatus).toEqual({ security: 'ok', dependencies: 'ok' })
   })
 
+  // Regression: toolAvailability was last-chunk-wins, so a partial gitleaks scan in chunk 1
+  // followed by a clean chunk 2 rendered as a COMPLETED scan -- reintroducing at the chunk layer
+  // the exact false claim that adding 'partial' removed at the agent layer.
+  it('merges toolAvailability -- a partial scan in an earlier chunk is not hidden by a later clean one', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { gitleaks: 'partial' } }))
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { gitleaks: 'used' } }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.toolAvailability?.gitleaks).toBe('partial')
+  })
+
+  // A tool that ran on one chunk and not another covered part of the diff and not the rest, which
+  // is what 'partial' means. Reporting 'unavailable-llm-fallback' here would claim it never ran.
+  it('collapses a used/unavailable disagreement to partial rather than to unavailable', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { gitleaks: 'used' } }))
+      .mockResolvedValueOnce(
+        makeResult({ toolAvailability: { gitleaks: 'unavailable-llm-fallback' } })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.toolAvailability?.gitleaks).toBe('partial')
+  })
+
+  it('reports used for a tool only when every chunk that reported it said used', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { gitleaks: 'used', lizard: 'used' } }))
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { gitleaks: 'used', lizard: 'used' } }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.toolAvailability).toEqual({ gitleaks: 'used', lizard: 'used' })
+  })
+
+  // 'not-applicable' is neutral: a chunk with no manifest changes says nothing about npm audit and
+  // must not degrade a verdict another chunk legitimately earned. Ordered with 'used' FIRST on
+  // purpose -- the reverse order passes under last-chunk-wins too, so it would not be falsifying.
+  it('ignores not-applicable chunks when another chunk reported a substantive value', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { npmAudit: 'used' } }))
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { npmAudit: 'not-applicable' } }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.toolAvailability?.npmAudit).toBe('used')
+  })
+
+  it('keeps not-applicable when it is the only value any chunk reported', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { npmAudit: 'not-applicable' } }))
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { npmAudit: 'not-applicable' } }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.toolAvailability?.npmAudit).toBe('not-applicable')
+  })
+
+  it('omits toolAvailability entirely when no chunk reported any tool', async () => {
+    const runMock = vi.fn().mockResolvedValue(makeResult())
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.toolAvailability).toBeUndefined()
+  })
+
   it('caps merged findings at maxFindings instead of returning chunkCount x maxFindings', async () => {
     const makeFindings = (n: number, prefix: string) =>
       Array.from(

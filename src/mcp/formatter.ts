@@ -1,4 +1,5 @@
 import type { Finding, ReviewResult } from '../core/schema.js'
+import { TOOL_LABELS, toolsWithAvailability } from '../core/schema.js'
 
 // Only critical and high are rendered — medium/low appear in the tail only.
 const SEVERITY_ICONS: Record<'critical' | 'high', string> = {
@@ -30,11 +31,47 @@ export function formatMcpOutput(result: ReviewResult): string {
         `findings past this point were never analyzed.`
     )
   }
-  const warningBlock = warnings.length > 0 ? warnings.join('\n') + '\n\n' : ''
+
+  // WHY tool availability is a SEPARATE array from `warnings` rather than another entry in it:
+  // `warnings` gates the headline below ("No findings, but the review was incomplete"). A failed
+  // agent or a truncated diff means the review did not complete as designed, so it earns that
+  // headline. A missing optional tool does not -- the agent ran in a documented degraded mode and
+  // returned a real result. Folding these together would flip every clean run into "incomplete"
+  // for any user who simply has not installed lizard, training the caller to ignore the warning
+  // that actually matters. cli/formatter.ts draws the same line; this keeps MCP consistent with it.
+  //
+  // Before this, formatMcpOutput never read toolAvailability, so a partial gitleaks scan, a not-installed
+  // tool, and a fully clean tool run were indistinguishable to the calling LLM -- the reader least
+  // able to notice, since it has no terminal output to fall back on.
+  const toolNotes: string[] = []
+  const partialTools = toolsWithAvailability(result.toolAvailability, 'partial')
+  if (partialTools.length > 0) {
+    const names = partialTools.map((t) => TOOL_LABELS[t]).join(', ')
+    toolNotes.push(
+      `🔧 Partial scan: ${names} covered some of the reviewed surface but not all of it — ` +
+        `findings for the remainder came from the model, not the tool.`
+    )
+  }
+  const degradedTools = toolsWithAvailability(result.toolAvailability, 'unavailable-llm-fallback')
+  if (degradedTools.length > 0) {
+    const names = degradedTools.map((t) => TOOL_LABELS[t]).join(', ')
+    toolNotes.push(
+      `🔧 Degraded mode: ${names} not installed — the affected agent(s) ran without it, ` +
+        `which may reduce finding accuracy.`
+    )
+  }
+
+  const notices = [...warnings, ...toolNotes]
+  const warningBlock = notices.length > 0 ? notices.join('\n') + '\n\n' : ''
 
   if (findings.length === 0) {
+    // Only `warnings` downgrades the headline -- toolNotes still render underneath it, so a
+    // degraded tool is reported without being escalated into "the review was incomplete".
     if (warnings.length > 0) {
       return `## AI Code Review — ⚠️ No findings, but the review was incomplete\n\n${warningBlock}`
+    }
+    if (toolNotes.length > 0) {
+      return `## AI Code Review — ✅ No findings\n\n${warningBlock}`
     }
     return '## AI Code Review — ✅ No findings\n'
   }

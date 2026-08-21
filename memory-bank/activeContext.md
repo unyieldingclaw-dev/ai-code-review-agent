@@ -46,17 +46,18 @@ wrong** — `formatter.ts` is the only site branching on the value. Generalisabl
 rationale recorded in a code comment is a claim, not a finding, and is worth re-checking before
 inheriting it.
 
-**Verified state:** 728 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
+**Verified state:** 741 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
 use `grep "orchestrator] dropped"` to tell a real filter regression from model variance. Target one
 case with `CALIBRATION_CASE=name1,name2` rather than running all 21.
 
-**Two working conventions from this session** (belong in `systemPatterns.md` alongside the other
-review-gate rules; left here because that file was outside the approved contract scope):
-write the review marker in a **separate tool call** from the push — the PreToolUse hook checks
-before the command runs, so doing both in one call always fails. And verify a regression test
-actually FAILS against the old code before trusting it; every test added 2026-08-21 was confirmed
-that way.
+**`toolAvailability` now reaches every consumer honestly (2026-08-21).** MCP output ignored the
+field entirely, so a partial scan, a missing tool, and a clean run were identical to a calling LLM —
+the reader with no terminal to fall back on. `chunkRunner` also merged it last-chunk-wins, which
+re-created at the chunk layer the same false "complete scan" claim `'partial'` had just removed at
+the agent layer. Both fixed; `TOOL_LABELS` moved to `schema.ts` so the two formatters cannot drift.
+Working conventions from these sessions are now in `systemPatterns.md` (marker/gate mechanics, and
+verifying a regression test fails before trusting it).
 
 **Review-gate tooling investigation (2026-08-20).** Dogfooding `/code-review` and `/change-review`
 surfaced twelve defects in the PMB-owned hook scripts, all sharing one shape: the enforcement did
@@ -85,13 +86,9 @@ upgrade above, not with a local edit.
   evidence side has produced none. That is the fragile half.
 - The two calibration cases coupled to this repo's own state (`license-clean`, `dependencies`) are
   both closed. The remaining cases have not been audited for the same shape.
-- **MCP output ignores `toolAvailability` entirely** (`src/mcp/formatter.ts` reads only
-  `agentStatus`/`truncation`). A partial scan, a not-installed tool, and a clean tool run are
-  indistinguishable to a calling LLM — the reader least able to notice. Pre-existing, not caused by
-  `'partial'`; found by an opponent audit 2026-08-21.
-- `chunkRunner.ts:150` merges `toolAvailability` last-chunk-wins, so a `'partial'` first chunk
-  followed by a `'used'` one reports a complete scan. Opt-in `--chunk` only; its
-  accepted-simplification comment predates `'partial'` existing.
+- `policy`, `filteredFiles`, and `context` are still last-chunk-wins in `chunkRunner`. That remains
+  a deliberate, documented simplification — none of them asserts anything about coverage the way
+  `toolAvailability` does, which is why only that field was promoted to a real merge.
 - The `ai-review` CI runner can hang indefinitely (observed 43 min without starting step 1). This is
   environment-side — the runner runs interactively via `run.cmd`, not as a supervised service, so
   nothing restarts it. `review.yml`'s `timeout-minutes: 45` is a backstop, not a fix.
@@ -110,9 +107,10 @@ upgrade above, not with a local edit.
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, 20min timeout. Calibration is nondeterministic — 21–22/22
   is normal; a single failing case is usually model variance, not a regression.
-- **728 unit tests**; `npm audit` clean (prod + dev)
+- **741 unit tests**; `npm audit` clean (prod + dev)
 - `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
-  LLM entirely; `ReviewResult.toolAvailability` surfaces degraded-mode fallback (markdown + SARIF)
+  LLM entirely; `ReviewResult.toolAvailability` surfaces degraded and partial runs (markdown, SARIF,
+  and MCP), merged across chunks rather than last-chunk-wins
 - `src/core/parsing.ts`: `validateAndNormalizeFindings()` extracted from BaseAgent (SRP)
 - `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
 - `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable

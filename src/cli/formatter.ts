@@ -1,4 +1,5 @@
-import type { ReviewResult, Severity, ToolAvailabilityMetadata } from '../core/schema.js'
+import type { ReviewResult, Severity } from '../core/schema.js'
+import { TOOL_LABELS, toolsWithAvailability } from '../core/schema.js'
 export { formatSarif } from './formatters/sarif.js'
 export { formatGithubAnnotations } from './formatters/githubAnnotations.js'
 
@@ -100,26 +101,14 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     lines.push('')
   }
 
-  // WHY key off ToolAvailabilityMetadata's own keys instead of a second hand-typed literal union:
-  // this and the array below used to each independently list the same 3 tool keys, which could
-  // silently drift apart (e.g. a new tool integration added to the schema but forgotten here).
-  // Deriving the iteration list from this object's own keys means there's exactly one place that
-  // enumerates them.
-  const TOOL_LABELS: Record<keyof ToolAvailabilityMetadata, string> = {
-    gitleaks: 'gitleaks',
-    npmAudit: 'npm audit',
-    lizard: 'lizard',
-  }
-  const degradedTools = (Object.keys(TOOL_LABELS) as (keyof ToolAvailabilityMetadata)[]).filter(
-    (t) => result.toolAvailability?.[t] === 'unavailable-llm-fallback'
-  )
+  // TOOL_LABELS and this lookup live in schema.ts, next to the interface they key off -- see the
+  // comment there for why a per-formatter copy is a drift hazard rather than a convenience.
+  const degradedTools = toolsWithAvailability(result.toolAvailability, 'unavailable-llm-fallback')
   // WHY a separate note rather than folding 'partial' into the degraded list: the degraded message
   // below says the tool is not installed and tells the reader to install it. For a partial scan
   // that advice is wrong -- the tool is installed and did run; what needs attention is the files it
   // could not cover, whose findings came from the model instead.
-  const partialTools = (Object.keys(TOOL_LABELS) as (keyof ToolAvailabilityMetadata)[]).filter(
-    (t) => result.toolAvailability?.[t] === 'partial'
-  )
+  const partialTools = toolsWithAvailability(result.toolAvailability, 'partial')
   if (partialTools.length > 0) {
     const names = partialTools.map((t) => TOOL_LABELS[t]).join(', ')
     lines.push(
