@@ -124,9 +124,12 @@ const CASES: CalibrationCase[] = [
     baitKeyword: 'trimOrDefault',
   },
   {
+    // Keyword is the fixture's REAL ISSUE function, not 'integration' -- see the complexity case
+    // for the rationale. notifyWebhook is a new external HTTP call with no integration test;
+    // buildPayload is the pure-function bait.
     name: 'integration',
     fixtureFile: 'calibration/fixtures/integration.diff',
-    expectedKeyword: 'integration',
+    expectedKeyword: 'notifyWebhook',
     baitKeyword: 'buildPayload',
   },
   {
@@ -176,6 +179,18 @@ const CASES: CalibrationCase[] = [
     baitKeyword: 'loadUserPreferences',
   },
   {
+    // Keyword is the fixture's REAL ISSUE function, not 'logging' -- see the complexity case for
+    // WHY this case keeps the weaker domain-vocabulary keyword while complexity and integration
+    // were strengthened to fixture identifiers: 'cancelOrder' was tried and measured, not assumed.
+    // Across 6 live runs the agent named the function in 4 -- it reliably finds the right issue
+    // (all 6 runs reported the missing log on order cancellation, none flagged the formatDate
+    // bait) but varies on whether it names the symbol. A ~67% keyword hit rate makes the case
+    // flaky, which injects exactly the noise that gets misread as model variance in the overall
+    // score, so 'logging' is the lesser evil here.
+    //
+    // The durable fix is asserting on the finding's FILE rather than its wording -- every run
+    // localized to src/services/orderService.ts regardless of phrasing. That needs an
+    // expectedFile field on CalibrationCase and is deliberately out of scope here.
     name: 'observability',
     fixtureFile: 'calibration/fixtures/observability.diff',
     expectedKeyword: 'logging',
@@ -216,9 +231,16 @@ const CASES: CalibrationCase[] = [
     baitKeyword: 'AWS_SESSION_TOKEN',
   },
   {
+    // WHY the keyword is the fixture's function name and not 'complexity': the ComplexityAgent's
+    // own domain vocabulary appears in nearly any output it produces, so asserting on it verifies
+    // that the agent ran and used its prompt's words -- not that it located the right code. The
+    // fixture marks exactly one REAL ISSUE (calculateShippingCost, deeply nested) against one
+    // FALSE POSITIVE BAIT (formatAddress, long but linear); naming the real one is what proves
+    // detection. Matches the pattern the stronger cases already use (coverage/processRefund,
+    // correctness/isAdult, breaking-change/_formatUser).
     name: 'complexity',
     fixtureFile: 'calibration/fixtures/complexity.diff',
-    expectedKeyword: 'complexity',
+    expectedKeyword: 'calculateShippingCost',
     baitKeyword: 'formatAddress',
   },
   {
@@ -264,6 +286,37 @@ const CASES: CalibrationCase[] = [
 ]
 
 async function main() {
+  // Run a subset of cases without editing this file -- e.g. to verify one assertion change
+  // against live Ollama instead of paying for all 21 agent runs:
+  // CALIBRATION_CASE=complexity,observability npm run calibrate
+  // Matches CALIBRATION_MODEL's env-var idiom below.
+  //
+  // WHY an unknown name is a hard error and not an empty run: a typo'd filter that quietly
+  // matches nothing would report "0 passed, 0 failed" and exit 0 -- a green result from a
+  // suite that never executed, which is precisely the failure class this suite exists to
+  // catch. Checked before the Ollama ping so a typo fails in milliseconds, not after setup.
+  //
+  // WHY 'testgen' is a valid name despite not being in CASES: it runs from a hardcoded block
+  // after the loop rather than as a CalibrationCase, so it needs explicit inclusion both in the
+  // known-name list here and in its own guard below. Without that it would run on every
+  // filtered invocation, making a targeted single-case run pay for an extra agent.
+  const caseFilter = (process.env.CALIBRATION_CASE || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const knownNames = [...CASES.map((c) => c.name), 'testgen']
+  if (caseFilter.length > 0) {
+    const unknown = caseFilter.filter((n) => !knownNames.includes(n))
+    if (unknown.length > 0) {
+      console.error(`Unknown calibration case(s): ${unknown.join(', ')}`)
+      console.error(`Known cases: ${knownNames.join(', ')}`)
+      process.exit(1)
+    }
+  }
+  const selectedCases =
+    caseFilter.length > 0 ? CASES.filter((c) => caseFilter.includes(c.name)) : CASES
+  const runTestGen = caseFilter.length === 0 || caseFilter.includes('testgen')
+
   // Override which model calibration runs against without editing config.ts -- e.g. to bake
   // off a candidate model's finding quality: CALIBRATION_MODEL=qwen3:latest npm run calibrate
   const model = process.env.CALIBRATION_MODEL || DEFAULT_CONFIG.model
@@ -328,7 +381,7 @@ async function main() {
   let passed = 0
   let failed = 0
 
-  for (const c of CASES) {
+  for (const c of selectedCases) {
     process.stdout.write(`\nRunning calibration: ${c.name}...\n`)
     const diff = readFileSync(c.fixtureFile, 'utf-8')
     try {
@@ -378,12 +431,28 @@ async function main() {
           f.title.toLowerCase().includes(c.expectedKeyword!.toLowerCase()) ||
           f.detail.toLowerCase().includes(c.expectedKeyword!.toLowerCase())
       )
-      const hasBait = findings.some(
-        (f) => f.title.includes(c.baitKeyword!) || f.detail.includes(c.baitKeyword!)
-      )
+      // WHY the explicit baitKeyword guard, when every current case declares bait: `baitKeyword`
+      // is optional on CalibrationCase, and without this guard a case omitting it passes
+      // `undefined` to String.includes, which coerces to the literal string "undefined" -- so any
+      // finding reading "may be undefined" / "undefined behavior" would register as a
+      // false-positive hit and FAIL the case for reasons unrelated to what it tests. Verified:
+      // `'possible undefined dereference'.includes(undefined)` === true.
+      //
+      // This is defensive, not a fix for an observed failure: all 16 keyword cases currently set
+      // baitKeyword, so the path is unreachable today. It is guarded because the type permits the
+      // omission and the failure it would produce is silent and misattributable to model variance.
+      const hasBait = c.baitKeyword
+        ? findings.some(
+            (f) => f.title.includes(c.baitKeyword!) || f.detail.includes(c.baitKeyword!)
+          )
+        : false
 
       if (hasLegitimate && !hasBait) {
-        console.log(`  ✅ PASS — found '${c.expectedKeyword}', rejected '${c.baitKeyword}'`)
+        console.log(
+          c.baitKeyword
+            ? `  ✅ PASS — found '${c.expectedKeyword}', rejected '${c.baitKeyword}'`
+            : `  ✅ PASS — found '${c.expectedKeyword}' (no bait declared)`
+        )
         passed++
       } else {
         if (!hasLegitimate) console.log(`  ❌ FAIL — missed '${c.expectedKeyword}'`)
@@ -397,7 +466,7 @@ async function main() {
   }
 
   // TestGen: verify test generation from gaps
-  {
+  if (runTestGen) {
     process.stdout.write(`\nRunning calibration: testgen...\n`)
     try {
       const diff = readFileSync('calibration/fixtures/testgen.diff', 'utf-8')
