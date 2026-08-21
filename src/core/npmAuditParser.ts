@@ -35,6 +35,33 @@ const SEVERITY_MAP: Record<string, Severity | undefined> = {
   critical: 'critical',
 }
 
+/**
+ * True only when `json` is a structurally valid npm-audit report — parseable, and carrying a
+ * `vulnerabilities` object. An empty `vulnerabilities: {}` is valid and returns true: that is a
+ * genuine "audited, nothing found".
+ *
+ * WHY this exists separately from parseNpmAuditOutput: `npm audit --json` writes a JSON *error*
+ * object to stdout and exits non-zero when it cannot reach the registry, e.g.
+ * `{"message":"request to .../security/advisories/bulk failed, reason: connect ECONNREFUSED",...}`.
+ * runTool deliberately ignores exit codes (npm audit exits non-zero on real findings too), so that
+ * error object came back as ordinary non-null output, DependenciesAgent marked the run
+ * `toolAvailability: 'used'`, and the parser mapped the unrecognised shape to []. The report then
+ * read "0 dependency vulnerabilities, verified by npm-audit" from an audit that never ran, and the
+ * LLM fallback that exists for exactly this case was skipped because the output was not null.
+ * Verified against a live unreachable registry. Callers use this to tell "audited clean" from
+ * "could not audit" before claiming the tool was used.
+ */
+export function isUsableAuditReport(json: string): boolean {
+  try {
+    const report: unknown = JSON.parse(json)
+    if (!report || typeof report !== 'object') return false
+    const vulns = (report as NpmAuditReport).vulnerabilities
+    return !!vulns && typeof vulns === 'object'
+  } catch {
+    return false
+  }
+}
+
 export function parseNpmAuditOutput(json: string, agentName: AgentName): Finding[] {
   let report: NpmAuditReport
   try {
