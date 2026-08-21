@@ -182,17 +182,43 @@ export interface EvidenceCheckFilterMetadata {
   flagged: EvidenceCheckFinding[]
 }
 
-// 'partial': the tool ran and produced results for some of the changed files but not all of them,
-// so the LLM was run over the diff as well to cover the remainder. Distinct from
+// 'partial': the tool covered some of the reviewed surface but not all of it. Distinct from
 // 'unavailable-llm-fallback', which asserts the tool did not run at all -- reporting a partial
 // gitleaks scan as an unavailable one is false, and the direction that matters: it tells a reader
 // to install a tool that is already installed instead of asking why files were skipped.
+//
+// Two producers set it, and the wording stays general because of the second: SecretsAgent, when
+// gitleaks succeeded on some files and was skipped on others; and chunkRunner, when chunks of a
+// --chunk run disagreed about the same tool. What covers the remainder differs by tool -- for
+// gitleaks and npm audit the LLM fallback does, but ComplexityAgent always calls the LLM and lizard
+// only augments its prompt -- so this deliberately does not claim a specific fallback path.
 export type ToolAvailability = 'used' | 'partial' | 'unavailable-llm-fallback' | 'not-applicable'
 
 export interface ToolAvailabilityMetadata {
   gitleaks?: ToolAvailability
   npmAudit?: ToolAvailability
   lizard?: ToolAvailability
+}
+
+// WHY this lives next to ToolAvailabilityMetadata rather than in either formatter: cli/formatter.ts
+// and mcp/formatter.ts both need to name which tools degraded, and a hand-typed copy in each can
+// silently drift from the schema (a new tool integration added to the interface but forgotten in a
+// renderer). Keying the map off `keyof ToolAvailabilityMetadata` makes that a compile error instead:
+// adding a field here fails the build until every renderer accounts for it.
+export const TOOL_LABELS: Record<keyof ToolAvailabilityMetadata, string> = {
+  gitleaks: 'gitleaks',
+  npmAudit: 'npm audit',
+  lizard: 'lizard',
+}
+
+/** Tool keys whose reported availability matches `state`, in TOOL_LABELS order. */
+export function toolsWithAvailability(
+  toolAvailability: ToolAvailabilityMetadata | undefined,
+  state: ToolAvailability
+): (keyof ToolAvailabilityMetadata)[] {
+  return (Object.keys(TOOL_LABELS) as (keyof ToolAvailabilityMetadata)[]).filter(
+    (t) => toolAvailability?.[t] === state
+  )
 }
 
 export type AgentStatus = 'ok' | 'timeout' | 'parse-error' | 'error'

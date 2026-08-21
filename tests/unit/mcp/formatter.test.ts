@@ -211,6 +211,70 @@ describe('formatMcpOutput', () => {
     expect(result).toBe('## AI Code Review — ✅ No findings\n')
   })
 
+  // Real gap: formatMcpOutput read neither toolAvailability field, so a partial gitleaks scan, a
+  // not-installed tool, and a fully clean tool run were indistinguishable to the calling LLM --
+  // the reader least able to notice, having no terminal output to fall back on.
+  it('reports a partial tool scan to the calling LLM', () => {
+    const result = formatMcpOutput(makeResult({ toolAvailability: { gitleaks: 'partial' } }))
+    expect(result).toMatch(/partial scan/i)
+    expect(result).toContain('gitleaks')
+  })
+
+  it('reports a not-installed tool to the calling LLM', () => {
+    const result = formatMcpOutput(
+      makeResult({ toolAvailability: { lizard: 'unavailable-llm-fallback' } })
+    )
+    expect(result).toMatch(/degraded mode/i)
+    expect(result).toContain('lizard')
+  })
+
+  // The headline distinction that keeps the warning worth reading: a failed agent or a truncated
+  // diff means the review did not complete as designed. A missing optional tool does not -- the
+  // agent ran in a documented degraded mode and returned a real result. Folding the two together
+  // would mark every clean run "incomplete" for anyone who simply has not installed lizard.
+  it('does not downgrade the headline to "incomplete" for a merely degraded tool', () => {
+    const result = formatMcpOutput(
+      makeResult({ toolAvailability: { gitleaks: 'unavailable-llm-fallback' } })
+    )
+    expect(result).toContain('✅ No findings')
+    expect(result).not.toMatch(/incomplete/i)
+    expect(result).toContain('gitleaks')
+  })
+
+  it('still downgrades the headline when an agent failed alongside a degraded tool', () => {
+    const result = formatMcpOutput(
+      makeResult({
+        agentStatus: { security: 'timeout' },
+        toolAvailability: { gitleaks: 'unavailable-llm-fallback' },
+      })
+    )
+    expect(result).toMatch(/incomplete/i)
+    expect(result).toContain('gitleaks')
+    expect(result).toContain('security: timeout')
+  })
+
+  it('says nothing about tools when every tool ran cleanly', () => {
+    const result = formatMcpOutput(makeResult({ toolAvailability: { gitleaks: 'used' } }))
+    expect(result).toBe('## AI Code Review — ✅ No findings\n')
+  })
+
+  it('says nothing about a not-applicable tool', () => {
+    const result = formatMcpOutput(makeResult({ toolAvailability: { npmAudit: 'not-applicable' } }))
+    expect(result).toBe('## AI Code Review — ✅ No findings\n')
+  })
+
+  it('surfaces a tool note above real findings, not just on the empty-findings path', () => {
+    const result = formatMcpOutput(
+      makeResult({
+        findings: [makeFinding('critical')],
+        summary: { totalFindings: 1, bySeverity: { critical: 1 }, byAgent: {}, durationMs: 100 },
+        toolAvailability: { gitleaks: 'partial' },
+      })
+    )
+    expect(result).toMatch(/partial scan/i)
+    expect(result.indexOf('Partial scan')).toBeLessThan(result.indexOf('Test finding'))
+  })
+
   it('surfaces an agent-failure warning above real findings, not just on the empty-findings path', () => {
     const finding = makeFinding('critical')
     const result = formatMcpOutput(

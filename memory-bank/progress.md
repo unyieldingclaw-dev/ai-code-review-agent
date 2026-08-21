@@ -20,6 +20,54 @@ lineage: []
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
+## ✅ Completed (2026-08-21, third session)
+
+**Both open risks from PR #43 closed, plus the conventions promoted to `systemPatterns.md`.**
+
+**MCP output ignored `toolAvailability` entirely.** `formatMcpOutput` read only `agentStatus` and
+`truncation`, so a partial gitleaks scan, a not-installed tool, and a fully clean tool run were
+identical to the calling LLM — the reader least able to notice, having no terminal output to fall
+back on. This was the same defect class MCP had already been fixed for once (agent failure and
+truncation, in the 15-phase audit remediation); tool availability was simply never added.
+
+**The fix deliberately does NOT reuse the existing `warnings` array**, and that is the design
+decision worth keeping. `warnings` gates the headline (`"No findings, but the review was
+incomplete"`). A failed agent or truncated diff earns that headline; a missing optional tool does
+not — the agent ran in a documented degraded mode and returned a real result. Folding them together
+would have marked every clean run "incomplete" for anyone who simply has not installed lizard,
+training the caller to ignore the warning that actually matters. `cli/formatter.ts` already drew
+that line; MCP now matches it. Tool notes render in the body without touching the headline.
+
+**`chunkRunner` merged `toolAvailability` last-chunk-wins**, so a `'partial'` first chunk followed
+by a clean second chunk reported a COMPLETED scan — re-creating at the chunk layer the exact false
+claim `'partial'` had just removed at the agent layer. Now merged: any disagreement between chunks
+collapses to `'partial'`, and `'not-applicable'` is neutral (ignored unless it is the only value, so
+a chunk with no manifest changes cannot degrade a verdict npm audit legitimately earned elsewhere).
+
+An earlier draft of that rule carried an `else 'unavailable-llm-fallback'` branch for mixed sets.
+**No input can reach it** — a mixed set is ≥2 distinct values from
+`{used, partial, unavailable-llm-fallback}`, and every such pair contains `used` or `partial`. Found
+by re-reading the design before implementing, not by testing. `policy`/`filteredFiles`/`context`
+stay last-chunk-wins on purpose: none of them asserts anything about coverage.
+
+**`TOOL_LABELS` moved to `schema.ts`** next to `ToolAvailabilityMetadata`. `cli/formatter.ts`'s own
+comment already warned that two hand-typed copies of the tool-key list can silently drift; adding
+MCP as a third consumer with its own copy would have repeated exactly that mistake. Keying off
+`keyof ToolAvailabilityMetadata` makes a new tool integration a compile error until every renderer
+accounts for it.
+
+**Falsification found a weak test.** Of six new chunk-merge tests, only two failed against
+last-chunk-wins. The `'not-applicable'` neutrality test had the substantive value in the _last_
+chunk, where last-chunk-wins gives the same answer — so it was a guard test, not a regression test.
+Reordering it made it falsify (`expected 'not-applicable' to be 'used'`), bringing the count to
+three. The five MCP tests all failed correctly. **741 tests** · typecheck/build/format/lint green.
+
+**Conventions promoted to `systemPatterns.md`** from `activeContext.md` (volatile, and the wrong
+home for stable rules): the `PreToolUse` marker-timing rule, the fact that the commit and push
+markers are distinct and the push marker must be recomputed _after_ committing, and a new section on
+verifying a regression test fails — including the ordering trap above and the point that the failure
+_message_ matters as much as the failure.
+
 ## ✅ Completed (2026-08-21, later session)
 
 **Both items PR #42 deferred are closed** (PR #42 merged as `a56d007` first).
@@ -33,7 +81,8 @@ gitleaks covered some files and the LLM covered the rest.
 The deferral rationale recorded in PR #42 — that `'partial'` "would ripple into the markdown/SARIF/
 MCP consumers" — **was wrong, and was checked rather than inherited.** `formatter.ts` is the only
 site that branches on the value; `sarif.ts:109` and `chunkRunner.ts:150` pass the object through
-opaquely, `src/mcp/` never reads it, `runner.ts`'s `recordToolAvailability` is value-agnostic, and
+opaquely, `src/mcp/` never read it _at all_ (fixed in the session above — that silence was itself a
+defect, just not a compile-breaking one), `runner.ts`'s `recordToolAvailability` is value-agnostic, and
 no exhaustive `switch` exists (confirmed by a clean `typecheck` after widening the union). The
 ripple was one `filter` plus one new note. The stale comments asserting otherwise are removed —
 they would otherwise keep deferring the same work. `ComplexityAgent` deliberately gets no
@@ -172,9 +221,9 @@ token in the loop at all.
 
 ### Test Coverage
 
-- **Unit Tests**: 728 passing across 45 test files (run `npm test` for current count)
+- **Unit Tests**: 741 passing across 45 test files (run `npm test` for current count)
 - **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
-- **Total**: 728
+- **Total**: 741
 
 ### Implementation Progress
 

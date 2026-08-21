@@ -16,10 +16,13 @@
 // internal truncation applies within it, same as it always has for an over-max-lines diff) -- a
 // much narrower, already-handled edge case than the general boundary-split this replaces.
 //
-// Known, accepted simplification: purely diagnostic metadata (toolAvailability, policy,
-// filteredFiles, context) reflects whichever chunk ran LAST, not a true merge across chunks --
-// acceptable for an opt-in feature, since none of it gates an exit code, and losing an earlier
-// chunk's copy of it costs nothing the user-facing report still depends on.
+// Known, accepted simplification: purely diagnostic metadata (policy, filteredFiles, context)
+// reflects whichever chunk ran LAST, not a true merge across chunks -- acceptable for an opt-in
+// feature, since none of it gates an exit code, and losing an earlier chunk's copy of it costs
+// nothing the user-facing report still depends on.
+// toolAvailability was on that list until 'partial' existed, and no longer qualifies: a partial
+// first chunk followed by a clean one rendered as a COMPLETED tool scan, which is a claim about
+// security coverage rather than a diagnostic detail. See mergeToolAvailability below.
 // agentStatus and evidenceCheckFilter are the two exceptions and ARE merged across all chunks
 // (see mergeAgentStatus/mergeEvidenceCheckFilter below): agentStatus feeds cli/index.ts's exit
 // code 2, so a last-chunk-wins simplification there would let a real failure in an earlier chunk
@@ -45,8 +48,10 @@ import type {
   AgentName,
   AgentStatus,
   EvidenceCheckFilterMetadata,
+  ToolAvailability,
+  ToolAvailabilityMetadata,
 } from './schema.js'
-import { SEVERITY_RANK } from './schema.js'
+import { SEVERITY_RANK, TOOL_LABELS } from './schema.js'
 import { splitByFileBoundary } from './diffSplit.js'
 
 // Re-exported for the existing chunkRunner.test.ts contract tests; defined in diffSplit.ts so
@@ -127,6 +132,7 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
   const droppedAcrossChunks = results.flatMap((r) => r.hallucinationFilter?.dropped ?? [])
   const mergedHallucinationFilter =
     droppedAcrossChunks.length > 0 ? { dropped: droppedAcrossChunks } : undefined
+  const mergedToolAvailability = mergeToolAvailability(results)
 
   return {
     findings,
@@ -147,7 +153,7 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
     ...(mergedAgentStatus ? { agentStatus: mergedAgentStatus } : {}),
     ...(mergedHallucinationFilter ? { hallucinationFilter: mergedHallucinationFilter } : {}),
     ...(last.coverageGapFilter ? { coverageGapFilter: last.coverageGapFilter } : {}),
-    ...(last.toolAvailability ? { toolAvailability: last.toolAvailability } : {}),
+    ...(mergedToolAvailability ? { toolAvailability: mergedToolAvailability } : {}),
     ...(mergedEvidenceCheckFilter ? { evidenceCheckFilter: mergedEvidenceCheckFilter } : {}),
     ...(last.filteredFiles ? { filteredFiles: last.filteredFiles } : {}),
   }
@@ -172,9 +178,48 @@ function mergeEvidenceCheckFilter(
   }
 }
 
+/**
+ * Per-tool availability across chunks, replacing a last-chunk-wins read.
+ *
+ * WHY this is merged rather than left as last-chunk-wins with the other diagnostic metadata: once
+ * 'partial' existed, a first chunk reporting a partial gitleaks scan followed by a clean second
+ * chunk rendered as a COMPLETED scan -- reintroducing, at the chunk layer, the exact false claim
+ * that adding 'partial' removed at the agent layer. Unlike policy or filteredFiles, this field
+ * makes an assertion about how much of the diff a security tool actually covered.
+ *
+ * Any disagreement between chunks collapses to 'partial'. That is the whole rule: a mixed set is
+ * two or more distinct values drawn from {used, partial, unavailable-llm-fallback}, and every such
+ * pair contains 'used' or 'partial', so the tool demonstrably covered part of the diff and not the
+ * rest -- which is what 'partial' means. (An earlier draft carried an "else unavailable" branch
+ * for mixed sets; no input can reach it.)
+ *
+ * 'not-applicable' is neutral and ignored unless it is the only value: a chunk with no manifest
+ * changes says nothing about npm audit, and must not degrade a verdict another chunk legitimately
+ * earned.
+ */
+function mergeToolAvailability(results: ReviewResult[]): ToolAvailabilityMetadata | undefined {
+  const merged: ToolAvailabilityMetadata = {}
+  for (const key of Object.keys(TOOL_LABELS) as (keyof ToolAvailabilityMetadata)[]) {
+    const reported = results
+      .map((r) => r.toolAvailability?.[key])
+      .filter((v): v is ToolAvailability => v !== undefined)
+    if (reported.length === 0) continue
+
+    const substantive = reported.filter((v) => v !== 'not-applicable')
+    if (substantive.length === 0) {
+      merged[key] = 'not-applicable'
+      continue
+    }
+    const distinct = new Set(substantive)
+    merged[key] = distinct.size === 1 ? [...distinct][0]! : 'partial'
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined
+}
+
 // A last-chunk-wins merge here would let a real failure in an earlier chunk go unreported --
 // e.g. `security` times out on chunk 1 but succeeds on chunk 2 -- because cli/index.ts's exit
 // code 2 is driven directly by this field (hasAgentFailures checks `status !== 'ok'` across it).
+//
 // An agent's merged status is 'ok' only if every chunk that reported a status for it said 'ok';
 // otherwise it keeps the first non-'ok' status seen (which specific failure reason wins doesn't
 // change the exit-code outcome, since any non-'ok' value triggers it the same way).

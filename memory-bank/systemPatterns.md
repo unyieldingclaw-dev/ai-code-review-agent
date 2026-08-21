@@ -172,8 +172,35 @@ actually runs — pwsh is tried first, `.sh` is only a fallback). The matcher ca
   hard-blocked in this environment, so rebasing an already-pushed branch is a dead end (you cannot
   publish the rewritten history). `gh pr update-branch` merges the base branch in server-side and
   needs no force-push. Merging `main` into the branch locally also works.
+- **Write the marker in a separate tool call from the gated command.** The gate is `PreToolUse`, so
+  it evaluates before the command runs — writing the marker and pushing in one call always fails,
+  because the marker does not exist yet at the moment the hook checks.
 - Tag pushes trip the push gate too, even though they carry no diff. The marker is then the hash
   of an empty diff (`e3b0c442...`), which is legitimate — there is genuinely nothing to review.
+- **The two markers are not interchangeable and gate different commands.** `/code-review` writes
+  `.claude/.code-review-ok`, which gates `git commit`, and its hash covers `git diff HEAD`.
+  `/change-review` writes `.claude/.change-review-ok`, which gates the push, and its hash covers
+  `git diff origin/main...HEAD`. Both are needed to take a change from working tree to merged PR,
+  and the push marker must be recomputed **after** committing — the branch diff changes the moment
+  a commit exists, so a marker written pre-commit no longer matches.
+
+### Verify a Regression Test Fails Before Trusting It (learned 2026-08-21)
+
+A regression test that passes against the unfixed code proves nothing, and this repo has shipped at
+least one assertion that could not fail (`DependenciesAgent`'s calibration cases were both
+`expectEmpty`, so an agent returning `[]` passed — proven by patching it to `return []`).
+
+Before trusting any new test: revert the fix, confirm the test fails **and that the failure message
+is the one you expect**, then restore. The message matters as much as the failure — it is what
+proves the test is exercising the mechanism rather than tripping on setup. Recent examples:
+`expected 'unavailable-llm-fallback' to be 'partial'`, `expected null to be 'MIT'`,
+`expected 'not-applicable' to be 'used'`.
+
+Watch for tests that pass under both old and new behavior by accident of ordering. A chunk-merge
+test with `not-applicable` in the last position passes under last-chunk-wins too; putting the
+substantive value last is what makes it falsifying. Check which of a batch actually fail — if
+fewer fail than you expected, the rest are guard tests, not regression tests, and should not be
+counted as evidence the bug is covered.
 
 **Confirmed defect (reproduced 2026-08-20):** `review-reminders-post.*` is supposed to reissue the
 marker when a gated command fails, but **PostToolUse does not fire when the tool call exits
