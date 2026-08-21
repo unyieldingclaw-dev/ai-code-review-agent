@@ -1,0 +1,19 @@
+diff --git a/src/users/service.ts b/src/users/service.ts
+index 1111111..2222222 100644
+--- a/src/users/service.ts
++++ b/src/users/service.ts
+@@ -1,14 +1,11 @@
+ import { db } from '../db'
+
+ export async function getUsersWithPosts(userIds: string[]) {
+-  const users = await db.query('SELECT * FROM users WHERE id = ANY($1)', [userIds])
+-  for (const user of users.rows) {
+-    user.posts = await db.query('SELECT * FROM posts WHERE user_id = $1', [user.id])
+-  }
+-  return users.rows
++  const rows = await db.query(
++    'SELECT u.*, p.id AS post_id, p.title FROM users u LEFT JOIN posts p ON p.user_id = u.id WHERE u.id = ANY($1)',
++    [userIds]
++  )
++  return groupPostsByUser(rows.rows)
+ }

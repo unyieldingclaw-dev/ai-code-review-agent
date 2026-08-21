@@ -39,25 +39,19 @@ because `commander` happens to be an ACR dependency. Keyword strengthening is me
 `calculateShippingCost` 5/5, `notifyWebhook` 4/4, `cancelOrder` 4/6 → reverted. Failing cases now
 print what the agent actually returned. Details in `progress.md`.
 
-**`ToolAvailability` gained `'partial'` (2026-08-21).** A partial gitleaks scan used to report
-`'unavailable-llm-fallback'`, telling readers to install a tool that was already installed. The
-prior session deferred this believing it rippled into markdown/SARIF/MCP; **that was checked and was
-wrong** — `formatter.ts` is the only site branching on the value. Generalisable lesson: a deferral
-rationale recorded in a code comment is a claim, not a finding, and is worth re-checking before
-inheriting it.
+**`toolAvailability` is now honest end-to-end (2026-08-21).** `'partial'` was added (a partial
+gitleaks scan used to claim the tool never ran), then surfaced in MCP output — which ignored the
+field entirely, so a partial scan, a missing tool, and a clean run were identical to a calling LLM —
+and merged across chunks rather than last-chunk-wins, which had re-created the same false "complete
+scan" claim one layer up. `TOOL_LABELS` moved to `schema.ts` so the formatters cannot drift.
+Generalisable lesson from the deferral that held `'partial'` back: **a rationale recorded in a code
+comment is a claim, not a finding** — re-check it before inheriting it. It asserted a
+markdown/SARIF/MCP ripple; only one site actually branched on the value.
 
-**Verified state:** 741 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
+**Verified state:** 752 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
 use `grep "orchestrator] dropped"` to tell a real filter regression from model variance. Target one
 case with `CALIBRATION_CASE=name1,name2` rather than running all 21.
-
-**`toolAvailability` now reaches every consumer honestly (2026-08-21).** MCP output ignored the
-field entirely, so a partial scan, a missing tool, and a clean run were identical to a calling LLM —
-the reader with no terminal to fall back on. `chunkRunner` also merged it last-chunk-wins, which
-re-created at the chunk layer the same false "complete scan" claim `'partial'` had just removed at
-the agent layer. Both fixed; `TOOL_LABELS` moved to `schema.ts` so the two formatters cannot drift.
-Working conventions from these sessions are now in `systemPatterns.md` (marker/gate mechanics, and
-verifying a regression test fails before trusting it).
 
 **Review-gate tooling investigation (2026-08-20).** Dogfooding `/code-review` and `/change-review`
 surfaced twelve defects in the PMB-owned hook scripts, all sharing one shape: the enforcement did
@@ -79,6 +73,15 @@ exits 0 on every call and never stamps the date. Verified: files edited 2026-08-
 June/July dates. `mb doctor` reads those dates for staleness detection, so it is consuming a dead
 sensor and will report actively-edited files as months stale. Fixed in PMB 1.2.1 — arrives with the
 upgrade above, not with a local edit.
+
+**ACR was reviewing the wrong side of its own diffs (2026-08-21).** Two false findings on PR #44 led
+to four bugs. Fixed: finding paths kept the diff's `a/` prefix so 33% of real findings pointed at
+nonexistent files and their GitHub annotations landed nowhere (#45); and agents reported deleted
+code as a current defect (8/8 measured), now dropped by a `filterUnsupportedClaims` rule. A prompt
+fix for the latter measured 7/7 — no effect — and was reverted. **The method mattered more than
+either fix:** `gh run download` on the CI run yields the real `ai-review-findings` artifact, and
+replaying it through `synthesize()` caught a miswiring that every unit test and a scratch probe both
+missed. See `systemPatterns.md`.
 
 **Open risks, detailed in `progress.md`:**
 
@@ -107,7 +110,7 @@ upgrade above, not with a local edit.
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, 20min timeout. Calibration is nondeterministic — 21–22/22
   is normal; a single failing case is usually model variance, not a regression.
-- **741 unit tests**; `npm audit` clean (prod + dev)
+- **752 unit tests**; `npm audit` clean (prod + dev)
 - `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
   LLM entirely; `ReviewResult.toolAvailability` surfaces degraded and partial runs (markdown, SARIF,
   and MCP), merged across chunks rather than last-chunk-wins

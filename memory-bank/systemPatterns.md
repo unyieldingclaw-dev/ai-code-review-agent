@@ -184,6 +184,46 @@ actually runs — pwsh is tried first, `.sh` is only a fallback). The matcher ca
   and the push marker must be recomputed **after** committing — the branch diff changes the moment
   a commit exists, so a marker written pre-commit no longer matches.
 
+### Validate a Filter Through the Pipeline, Not a Probe (learned 2026-08-21)
+
+A standalone script that reimplements a check and reports it working proves the _idea_, not the
+_wiring_. `isPreImageOnlyEvidence` was first wired to the section from `sliceDiffByFile` — but that
+function stores `diffSectionCode(section)`, which is **post-image by construction**, so the filter
+could never fire. Every unit test of the predicate passed, because the predicate was correct. A
+scratch probe had also reported it working, because the probe extracted removed lines from the raw
+diff itself rather than going through `sliceDiffByFile`.
+
+It was caught only by replaying a real `findings.json` artifact through `OrchestratorAgent.synthesize`
+and seeing `dropped: 0` where the probe predicted 1.
+
+- **Replay real captured output through the real entry point.** `gh run download <run-id>` retrieves
+  the `ai-review-findings` artifact `review.yml` uploads; it is the highest-value test input this
+  project has, because it is what the tool actually produced rather than what a fixture author
+  imagined. It also revealed two bugs nobody was looking for (33% of findings carrying unresolvable
+  `a/` paths, and same-agent duplicates surviving dedup).
+- **A filter needs a test at the wiring seam, not only on its predicate.** The orchestrator-level
+  test pins this: reintroducing `isPreImageOnlyEvidence(f.evidence, section, section)` fails it while
+  all 109 `claimSupport` unit tests still pass.
+- **Watch for a probe that agrees with you.** If a scratch script and the real pipeline disagree,
+  the pipeline is right. Prefer importing the actual exported function over reimplementing it.
+
+### Prompt Wording Does Not Fix Measured Defect Rates Here (reconfirmed 2026-08-21)
+
+Fourth independent confirmation, and the first where the prediction was explicitly argued the other
+way first. The reasoning was: the three prior failures were _hallucination_ (the model inventing a
+mechanism, then rationalizing), whereas reporting deleted code looked like a _missing frame_ — the
+model had its facts right and nothing in the prompt said `-` lines were gone. Supplying genuinely
+absent information seemed different in kind, and worth measuring rather than dismissing by analogy.
+
+It was not different. An explicit instruction ("lines starting with '-' have been DELETED and are
+NOT in the resulting code — never report a problem that exists only on a '-' line") measured **7/7
+still reporting the deleted defect**, against 8/8 before. The instruction was reverted rather than
+kept as decoration.
+
+Measuring it was still correct — the datapoint is worth more than the assumption either way. But the
+prior stands: for a _measured_ defect rate in this project, reach for a deterministic filter and
+treat prompt wording as unproven until measured.
+
 ### Verify a Regression Test Fails Before Trusting It (learned 2026-08-21)
 
 A regression test that passes against the unfixed code proves nothing, and this repo has shipped at

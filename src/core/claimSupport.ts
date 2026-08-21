@@ -250,6 +250,31 @@ export function sliceDiffByFile(diff: string): Map<string, string> {
   return sections
 }
 
+/**
+ * The '-' counterpart of sliceDiffByFile: file path -> the code that file's diff section DELETES.
+ *
+ * WHY a second map rather than passing raw sections to the callers: sliceDiffByFile deliberately
+ * stores `diffSectionCode(section)`, so what a caller receives is already post-image code with the
+ * removed lines discarded -- correct for CLAIM_RULES, which ask "can the alleged mechanism exist in
+ * the resulting code", and which must not start seeing deleted lines. Handing out raw sections
+ * instead would silently change what every existing rule matches against. This keeps the two
+ * questions separate and additive.
+ *
+ * Caught by running the real findings.json from PR #44 through the actual orchestrator rather than
+ * a reimplementation: an earlier version of the pre-image filter took the sliceDiffByFile section
+ * and could therefore never fire, because that string is post-image by construction. A standalone
+ * probe of the same logic against the raw diff had reported it working.
+ */
+export function sliceRemovedCodeByFile(diff: string): Map<string, string> {
+  const sections = new Map<string, string>()
+  for (const section of splitByFileBoundary(diff, 1)) {
+    for (const file of extractChangedFiles(section)) {
+      sections.set(stripDiffPrefix(normalizeFilePath(file)), diffSectionRemovedCode(section))
+    }
+  }
+  return sections
+}
+
 // Diff headers, in the order they can appear in a `diff --git` section. `+++ b/path` starts with
 // '+' and would otherwise survive as an "added line", so headers must be removed before the
 // added/context split below.
@@ -276,6 +301,75 @@ export function diffSectionCode(section: string): string {
     .filter((line) => line.startsWith('+') || line.startsWith(' ') || line === '')
     .map((line) => line.slice(1))
     .join('\n')
+}
+
+/** The '-' counterpart of diffSectionCode: the code this diff section DELETES, prefix removed. */
+export function diffSectionRemovedCode(section: string): string {
+  return section
+    .split('\n')
+    .filter((line) => !DIFF_HEADER.test(line))
+    .filter((line) => line.startsWith('-'))
+    .map((line) => line.slice(1))
+    .join('\n')
+}
+
+/** Collapses all whitespace runs to single spaces and drops leading diff markers, so a quoted
+ *  multi-line hunk compares equal to the model's single-line rendering of it. Measured need: the
+ *  model reported a three-line loop as one line of evidence, which no literal match would find. */
+function normalizeForQuoteMatch(text: string): string {
+  return text.replace(/^[-+]/gm, '').replace(/\s+/g, ' ').trim()
+}
+
+// Below this length, evidence is too generic for containment to mean anything -- a fragment like
+// "return []" can appear in deleted code coincidentally while the finding is really about the new
+// code. The measured cases are far longer (72 and 110 characters), so this costs no real coverage.
+const MIN_QUOTED_EVIDENCE_CHARS = 30
+
+/**
+ * True when a finding's `evidence` is provably quoted from lines this diff DELETES and appears
+ * nowhere in the code the diff produces -- i.e. the finding describes the pre-image.
+ *
+ * WHY this exists: measured 8/8 on a fixture whose post-image is clean, the agent reported the
+ * deleted defect as current, quoting the removed lines verbatim. On the real findings.json from
+ * PR #44's CI run the `performance` agent did the same thing -- reported the last-chunk-wins merge
+ * that the very same diff removes, and recommended, as the fix, the function that diff adds.
+ *
+ * WHY a filter and not a prompt rule: measured, not assumed. An explicit instruction ("lines
+ * starting with '-' have been DELETED... never report a problem that exists only on a '-' line")
+ * was added to buildUserPrompt and measured over 7 trials on the same fixture: still 7/7 reporting
+ * the deleted defect. That is the fourth independent time prompt wording failed to move a
+ * measured defect rate in this project (see progress.md); the instruction was reverted rather than
+ * kept as decoration.
+ *
+ * WHY it anchors on evidence text rather than the reported line number: line numbers were measured
+ * unreliable -- the same finding reported line 7, 5, and 7 across three trials while its evidence
+ * string stayed byte-identical.
+ *
+ * Fail-open by construction: this returns false whenever the evidence is paraphrased rather than
+ * quoted, so the finding is kept. That bounds the damage to "does nothing", never "drops something
+ * real" -- the correct direction for a filter over security findings.
+ */
+export function isPreImageOnlyEvidence(
+  evidence: string | undefined,
+  removedCode: string,
+  postImageCode: string
+): boolean {
+  // WHY the typeof guard and not just a falsy check: parsing.ts's `evidence: f.evidence ?? f.detail
+  // ?? ''` only falls through on null/undefined, so a finding whose `evidence` arrived as a NUMBER
+  // (valid `basis`, non-string evidence -- possible via the stage-3/4 recovery parses, which
+  // JSON.parse whatever the model emitted rather than re-checking the declared schema) passes
+  // validation with that number intact. Without this guard normalizeForQuoteMatch throws
+  // "text.replace is not a function" from inside synthesize(), i.e. AFTER every agent has already
+  // run, turning one malformed finding into a total run failure. The sibling predicates
+  // (claimsInjection et al.) use regex.test(), which coerces instead of throwing -- this was the
+  // only new crash path.
+  if (typeof evidence !== 'string' || evidence === '') return false
+  const quoted = normalizeForQuoteMatch(evidence)
+  if (quoted.length < MIN_QUOTED_EVIDENCE_CHARS) return false
+  if (!normalizeForQuoteMatch(removedCode).includes(quoted)) return false
+  // The decisive half: if the same text also survives into the added/context code, the finding is
+  // about code that still exists (a moved or re-added line) and must not be dropped.
+  return !normalizeForQuoteMatch(postImageCode).includes(quoted)
 }
 
 /**

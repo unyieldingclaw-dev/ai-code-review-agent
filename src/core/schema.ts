@@ -149,6 +149,11 @@ export interface DroppedHallucinatedFinding {
     | 'unsupported-injection-claim'
     | 'unsupported-exception-claim'
     | 'unsupported-null-error-claim'
+    // Distinct from the three above on purpose: those mean the claimed mechanism cannot exist in
+    // the code at all (a fabrication). This one means the code is real but was DELETED by the diff
+    // under review -- the finding describes the pre-image. A reader triaging drops needs to tell
+    // "the agent invented this" apart from "the agent reviewed the wrong side of the diff".
+    | 'pre-image-only-evidence'
 }
 
 export interface HallucinationFilterMetadata {
