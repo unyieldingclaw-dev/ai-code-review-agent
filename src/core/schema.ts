@@ -182,7 +182,12 @@ export interface EvidenceCheckFilterMetadata {
   flagged: EvidenceCheckFinding[]
 }
 
-export type ToolAvailability = 'used' | 'unavailable-llm-fallback' | 'not-applicable'
+// 'partial': the tool ran and produced results for some of the changed files but not all of them,
+// so the LLM was run over the diff as well to cover the remainder. Distinct from
+// 'unavailable-llm-fallback', which asserts the tool did not run at all -- reporting a partial
+// gitleaks scan as an unavailable one is false, and the direction that matters: it tells a reader
+// to install a tool that is already installed instead of asking why files were skipped.
+export type ToolAvailability = 'used' | 'partial' | 'unavailable-llm-fallback' | 'not-applicable'
 
 export interface ToolAvailabilityMetadata {
   gitleaks?: ToolAvailability

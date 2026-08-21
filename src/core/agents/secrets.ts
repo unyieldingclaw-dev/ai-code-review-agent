@@ -4,7 +4,7 @@ import { extractChangedFiles } from '../policyFilter.js'
 import { parseGitleaksOutput } from '../gitleaksParser.js'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import type { AgentName, Finding, ReviewInput } from '../schema.js'
+import type { AgentName, Finding, ReviewInput, ToolAvailability } from '../schema.js'
 
 // A hardcoded secret must be a literal value -- a boolean, a bare identifier reference, or a
 // constructor/function call can never itself BE a secret, regardless of what the identifier is
@@ -45,6 +45,7 @@ export class SecretsAgent extends BaseAgent {
     // directory, dropping every real file and falling back to the LLM with no signal why.
     const projectPath = input.projectPath ?? '.'
     const files = extractChangedFiles(input.diff).filter((f) => existsSync(join(projectPath, f)))
+    let fallbackAvailability: ToolAvailability = 'unavailable-llm-fallback'
     if (files.length > 0) {
       const allFindings: Finding[] = []
       let gitleaksRan = false
@@ -85,12 +86,18 @@ export class SecretsAgent extends BaseAgent {
       // nothing for others, gitleaksRan is true from the successes alone and this reported a
       // COMPLETED secret scan -- while the file holding an actual credential may be one of the
       // ones silently skipped. Falling through to the LLM path instead means the whole diff still
-      // gets looked at, including the files gitleaks could not read, and toolAvailability
-      // truthfully reports that the tool result was not relied on.
+      // gets looked at, including the files gitleaks could not read.
       //
-      // Deliberately not a new ToolAvailability value: 'partial' would be more precise, but it is
-      // a schema change rippling into the markdown/SARIF/MCP consumers, and for a secrets scanner
-      // the safer default is to actually scan the unscanned files rather than to label the gap.
+      // The reported availability is 'partial' rather than 'unavailable-llm-fallback' when gitleaks
+      // ran on at least one file: it did run, so telling the reader it was unavailable would send
+      // them to install a tool they already have instead of asking why files were skipped.
+      //
+      // This deliberately reverses the note that stood here after a56d007, which deferred 'partial'
+      // because it "ripples into the markdown/SARIF/MCP consumers". That estimate was checked
+      // rather than re-inherited and was wrong: formatter.ts is the ONLY site that branches on the
+      // value -- sarif.ts passes the object through opaquely, src/mcp/ never reads it, and
+      // runner.ts's recordToolAvailability is value-agnostic, so widening the union touched neither
+      // SARIF nor MCP. Adding 'not-applicable' (44a3d17) likewise needed only schema.ts.
       // The tradeoff is an LLM call in a case that previously skipped one; reachability is low
       // (the file must exist -- files are existence-filtered above -- yet be unreadable by
       // gitleaks), so this trades a rare extra call for never silently under-scanning.
@@ -99,13 +106,14 @@ export class SecretsAgent extends BaseAgent {
         return allFindings
       }
       if (skipped.length > 0) {
+        fallbackAvailability = gitleaksRan ? 'partial' : 'unavailable-llm-fallback'
         console.error(
           `[secrets] gitleaks produced no output for ${skipped.length} of ${files.length} ` +
             `file(s) -- falling back to the LLM so they are not left unscanned: ${skipped.join(', ')}`
         )
       }
     }
-    this.lastToolAvailability = 'unavailable-llm-fallback'
+    this.lastToolAvailability = fallbackAvailability
     const findings = await super.run(input, signal)
     return findings.filter((f) => {
       if (hasCredentialShapedValue(f)) return true

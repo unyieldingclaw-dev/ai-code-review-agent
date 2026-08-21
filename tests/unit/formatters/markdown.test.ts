@@ -310,6 +310,19 @@ describe('formatMarkdown', () => {
     expect(output).not.toMatch(/degraded|fallback/i)
   })
 
+  // 'partial' must not render as the degraded note, which says the tool is not installed and tells
+  // the reader to install it -- wrong advice when the tool ran and only some files were skipped.
+  it('shows a partial-scan note, not a not-installed note, when a tool covered only some files', () => {
+    const result = makeResult({
+      findings: [],
+      toolAvailability: { gitleaks: 'partial' },
+    })
+    const output = formatMarkdown(result)
+    expect(output).toMatch(/partial scan/i)
+    expect(output).toMatch(/gitleaks/i)
+    expect(output).not.toMatch(/not installed/i)
+  })
+
   it('does not include a not-applicable tool in the degraded-tools warning', () => {
     const result = makeResult({
       findings: [],

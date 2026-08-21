@@ -1,0 +1,46 @@
+{
+  "_comment": [
+    "Lockfile fixture for the license-clean calibration case. Carries the `license` field that",
+    "licenseFacts.resolvePackageLicense reads, so the case's deterministic backstop resolves",
+    "`commander` from THIS fixture rather than from ACR's own package-lock.json.",
+    "",
+    "WHY it exists: license-clean asserts that a permissive dependency produces no compliance",
+    "finding, and the backstop that guarantees that resolves the package against the reviewed",
+    "project's metadata. With projectPath defaulting to process.cwd(), the reviewed project was ACR",
+    "itself -- the case only passed because `commander` happens to be a real dependency here, so it",
+    "was testing this repo's incidental dependency set rather than the mechanism. Dropping commander",
+    "from ACR would have silently turned this into a pure test of model recall, which is the exact",
+    "6/10-failing configuration the backstop was built to replace.",
+    "",
+    "Unlike vulnerable-lockfile.json, the non-lockfile filename here is not about Dependabot (this",
+    "content is a single permissive package and raises no alerts) -- it is materializeFixtureProject's",
+    "uniform input convention, and keeps the two fixtures symmetric.",
+    "",
+    "No `npm install` is required: resolvePackageLicense prefers the lockfile's own `license` field",
+    "over node_modules, so a lockfile-only fixture project resolves fully.",
+    "",
+    "npm ignores unknown top-level keys, so this _comment block is inert."
+  ],
+  "name": "acr-calibration-license-clean-fixture",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "acr-calibration-license-clean-fixture",
+      "version": "1.0.0",
+      "dependencies": {
+        "commander": "^12.1.0"
+      }
+    },
+    "node_modules/commander": {
+      "version": "12.1.0",
+      "resolved": "https://registry.npmjs.org/commander/-/commander-12.1.0.tgz",
+      "integrity": "sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFJnnWA==",
+      "license": "MIT",
+      "engines": {
+        "node": ">=18"
+      }
+    }
+  }
+}

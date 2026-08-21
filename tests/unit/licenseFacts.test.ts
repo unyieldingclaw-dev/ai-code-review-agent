@@ -1,5 +1,8 @@
 // tests/unit/licenseFacts.test.ts
 import { describe, it, expect } from 'vitest'
+import { copyFileSync, mkdtempSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
 import {
   isPermissiveLicense,
   extractAddedDependencies,
@@ -97,6 +100,26 @@ describe('resolvePackageLicense', () => {
 
   it('returns null when the project path has no manifest metadata at all', () => {
     expect(resolvePackageLicense('/nonexistent-path-xyz', 'commander')).toBeNull()
+  })
+
+  // Pins the license-clean calibration fixture. Nothing else does: licenseCompliance.ts
+  // short-circuits before reading the lockfile when the model returns zero findings, so the
+  // fixture is only exercised on the runs where the model misfires -- and calibration is weekly,
+  // not a PR gate. Without this, dropping the fixture's `license` field would silently revert
+  // license-clean to testing model recall (measured 6/10 FAILING) and surface only as flakiness.
+  it('resolves commander from the license-clean fixture lockfile, not from this repo', () => {
+    const fixtureDir = mkdtempSync(join(tmpdir(), 'acr-licensefacts-'))
+    try {
+      copyFileSync(
+        'calibration/fixtures/license-clean-lockfile.json',
+        join(fixtureDir, 'package-lock.json')
+      )
+      expect(resolvePackageLicense(fixtureDir, 'commander')).toBe('MIT')
+      // Control: the fixture, not ambient state, is doing the work.
+      expect(resolvePackageLicense(fixtureDir, 'node-lame')).toBeNull()
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true })
+    }
   })
 })
 
