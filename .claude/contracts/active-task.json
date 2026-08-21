@@ -1,22 +1,26 @@
 {
-  "task": "Close the two open risks recorded after PR #43 -- MCP output ignoring toolAvailability entirely, and chunkRunner merging it last-chunk-wins -- and promote the two review-gate working conventions from activeContext.md to systemPatterns.md, which is their proper home.",
-  "status": "complete",
-  "completion_note": "Delivered within the declared scope; no file outside it was written. Falsification caught a weak test: of six new chunk-merge tests only two failed against last-chunk-wins, because the 'not-applicable' neutrality case had the substantive value in the last chunk, where last-chunk-wins gives the same answer. Reordering it made it falsify ('expected not-applicable to be used'), bringing the count to three; the other three are guard tests for edge cases, not regression coverage, and are not counted as evidence the bug is covered. All five MCP tests failed correctly against the pre-change formatter. 741 tests, typecheck/build/format/lint green. The stale 'accepted simplification' comment in chunkRunner.ts was updated rather than left contradicting the new merge, and progress.md's earlier claim that src/mcp/ 'never reads it' was annotated rather than left to read as still-current.",
-  "created_at": "2026-08-21T17:00:00Z",
-  "expires_at": "2026-08-22T01:00:00Z",
-  "approved_by": "user (explicit 'approved' after reviewing the proposal, with a request to re-examine the design first; three corrections were made before starting and are recorded in design_notes)",
-  "scope": [
+  "task": "Fix ACR's mishandling of the diff pre-image, found by investigating two false findings on PR #44. Two independent bugs, shipped as two PRs: (A) finding file paths retain the diff's a/ prefix and point at files that do not exist, so SARIF and GitHub annotations land nowhere; (B) agents report deleted code as a current defect, citing the removed side of a diff and recommending the added side as the cure.",
+  "status": "in_progress",
+  "created_at": "2026-08-21T20:00:00Z",
+  "expires_at": "2026-08-22T04:00:00Z",
+  "approved_by": "user ('Your call. Do what is best', delegating after being given the A+B vs A+B+D choice and the recommendation to defer D)",
+  "scope_pr1_paths": [
     { "file": ".claude/contracts/active-task.json", "op": "create" },
-    { "file": "src/core/schema.ts", "op": "edit" },
-    { "file": "src/cli/formatter.ts", "op": "edit" },
-    { "file": "src/mcp/formatter.ts", "op": "edit" },
-    { "file": "src/core/chunkRunner.ts", "op": "edit" },
-    { "file": "tests/unit/mcp/formatter.test.ts", "op": "edit" },
-    { "file": "tests/unit/chunkRunner.test.ts", "op": "edit" },
-    { "file": "memory-bank/systemPatterns.md", "op": "edit" },
-    { "file": "memory-bank/activeContext.md", "op": "edit" },
-    { "file": "memory-bank/progress.md", "op": "edit" }
+    { "file": "src/core/agents/orchestrator.ts", "op": "edit" },
+    { "file": "tests/unit/orchestrator.test.ts", "op": "edit" }
   ],
-  "design_notes": "Three corrections made when re-examining the proposal before starting, at the user's request. (1) The proposed chunk-merge rule carried an unreachable branch: 'mixed -> partial if any is used/partial, else unavailable-llm-fallback' cannot reach the else, because a mixed set is >=2 distinct values from {used, partial, unavailable} and any such pair contains used or partial. Simplified to: any mixed set collapses to 'partial'. (2) The proposed MCP change would have pushed tool notes into the existing `warnings` array, which gates the headline -- flipping '✅ No findings' to '⚠️ No findings, but the review was incomplete' for every user who merely lacks an optional tool. Agent failure and truncation mean the review did not complete as designed; a missing optional tool means it ran in a documented degraded mode, and cli/formatter.ts already draws that distinction. Tool notes therefore go in a separate array that renders without gating the headline. (3) schema.ts's 'partial' doc comment says the LLM covered the remainder -- true for gitleaks but chunkRunner is now a second producer, and for lizard the LLM runs regardless, so the wording is generalized.",
-  "scope_note": "TOOL_LABELS moves to schema.ts rather than a new module: schema.ts already carries runtime consts (AGENT_NAMES, SEVERITY_RANK, SEVERITY_OPTIONS), so this does not change the file's nature, and keying the map off `keyof ToolAvailabilityMetadata` is strongest next to the interface it derives from -- a new tool key then fails to compile until every formatter is updated. cli/formatter.ts's existing comment already warns that two hand-typed copies of this list can silently drift; adding MCP as a third consumer with its own copy would repeat exactly that mistake. Chunk-merge precedence treats 'not-applicable' as neutral (ignored unless it is the only value), so a chunk with no manifest changes cannot degrade a verdict npm audit legitimately earned elsewhere."
+  "scope_pr2_preimage": [
+    { "file": "src/core/claimSupport.ts", "op": "edit" },
+    { "file": "src/core/agents/orchestrator.ts", "op": "edit" },
+    { "file": "src/core/agents/base.ts", "op": "edit (only if the prompt fix measures well)" },
+    { "file": "tests/unit/claimSupport.test.ts", "op": "edit" },
+    { "file": "calibration/fixtures/performance-postimage-clean.diff", "op": "create" },
+    { "file": "calibration/calibrate.ts", "op": "edit" },
+    { "file": "memory-bank/progress.md", "op": "edit" },
+    { "file": "memory-bank/activeContext.md", "op": "edit" },
+    { "file": "memory-bank/systemPatterns.md", "op": "edit" }
+  ],
+  "measurements": "Taken before any code was written. (1) Pre-image reporting reproduces 8/8 on a fixture whose post-image is clean -- the agent quotes the deleted N+1 loop verbatim in its evidence field. (2) Counter-test: the same N+1 on the ADDED side is still detected 5/5 valid trials, so the agent is not simply blind. (3) Decisive test on real production output: the proposed rule applied to the real findings.json from PR #44's CI run drops exactly 1 of 15 findings -- the genuine pre-image one -- and keeps all 14 others. (4) The real performance finding's evidence is a verbatim quote of the deleted line, confirming the load-bearing assumption that the filter can anchor on evidence text. (5) 5 of 15 real findings (33%) carry an a/ prefix.",
+  "design_notes": "PR1 fixes the path at orchestrator.filterNonexistentFiles rather than at parsing.ts ingestion, because that is the ONLY seam holding changedFiles -- and the strip must be conditional on the result matching a real changed file. An unconditional strip would corrupt paths in a repo that genuinely has a top-level a/ or b/ directory. Checking the unstripped form FIRST preserves such a repo's real paths; only a path that fails that check and succeeds stripped gets rewritten. PR2 anchors on the evidence field rather than the line number, because line numbers were measured unreliable (the same finding reported line 7, 5, 7 across three trials while the evidence text stayed byte-identical). The rule fires only when normalized evidence appears in removed lines AND NOT in added+context, so a paraphrased evidence string simply fails to match and the finding is kept -- fail-open by construction.",
+  "out_of_scope": "Bug C: breaking-change flagged a function-local const (verified indented, never exported at 8618c0f^) as a removed public API. A deterministic filter would have to prove a symbol was NEVER exported -- a negative, defeated by `export { X }` lists, re-exports and default exports -- and the harm direction is dropping a real breaking change. Recorded, not fixed. Bug D: same-agent duplicate findings survive dedup (5 real findings that should be 2; identical agent/title/file/line/evidence). orchestrator.ts:276 keeps same-agent same-location findings deliberately, since one agent can report two distinct issues on one line; the predicate is too coarse but tightening it touches the corroboration path that feeds severity escalation, so it gets its own PR and review rather than riding along."
 }
