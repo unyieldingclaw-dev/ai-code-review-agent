@@ -155,8 +155,57 @@ Types: feat, fix, chore, docs, refactor, test, style
 
 ### Branch Strategy
 
-- `master` — active development (single-dev project, no PR workflow yet)
-- `main` — target for PRs when distribution is set up
+- `main` — default branch and the target for every PR. All work lands via PR, squash-merged.
+
+### Working With the Review Gates (learned 2026-08-19)
+
+The `/code-review` and `/change-review` markers are consumed by a **substring match on the tool
+command text** (`$cmd -match 'git\s+push\b'` in `review-reminders.ps1`, which is the hook that
+actually runs — pwsh is tried first, `.sh` is only a fallback). The matcher cannot distinguish
+`git push` in command position from `git push` as quoted data.
+
+- **Keep the literal strings `git push` / `git commit` out of command text.** A PR-body heredoc
+  mentioning `git push --delete`, or a `grep "git push"` pattern, trips the gate and burns the
+  marker — forcing a pointless re-review. Hyphenate, reword ("pushing"), or write prose to a file
+  instead of inlining it in the command.
+- **A stale PR branch is updated with `gh pr update-branch`, never a rebase.** Force-push is
+  hard-blocked in this environment, so rebasing an already-pushed branch is a dead end (you cannot
+  publish the rewritten history). `gh pr update-branch` merges the base branch in server-side and
+  needs no force-push. Merging `main` into the branch locally also works.
+- Tag pushes trip the push gate too, even though they carry no diff. The marker is then the hash
+  of an empty diff (`e3b0c442...`), which is legitimate — there is genuinely nothing to review.
+
+**Confirmed defect (reproduced 2026-08-20):** `review-reminders-post.*` is supposed to reissue the
+marker when a gated command fails, but **PostToolUse does not fire when the tool call exits
+non-zero** — so the reissue never happens and the marker is lost. Proven by A/B on the same failing
+push: with `; echo "EXIT=$?"` appended (overall exit 0) the marker is correctly reissued; bare
+(exit 1) it is not, and `.claude/.pending-push-presha` survives — the post-hook deletes that file
+unconditionally at entry, so its survival proves the hook never ran. Practical consequence: a
+failed push burns the marker and forces a pointless re-review.
+
+Separately latent: the ref-move check uses `git rev-parse '@{u}'`, which never moves for a **tag**
+push, so a successful tag push would read as a failure.
+
+**Do not patch these scripts here.** `review-reminders*`, `pre-push-check*`, `dangerous-commands*`,
+`check-contract*`, and `update-reviewed*` are PMB-owned (`TEMPLATE_OWNED` in `mb.sh`), overwritten
+unconditionally by `mb upgrade` — PMB's own comment on that list reads "no project customization."
+A local fix is erased on the next upgrade. Report upstream instead. PMB has a structural fix for
+this defect (Layer 1 downgraded to peek-only, with the git hook as sole marker consumer) on an
+unmerged branch.
+
+**Live consequence in this repo — `last-reviewed` is not being maintained.** `update-reviewed.*`
+(PostToolUse on Write/Edit) reads a flat `.file_path` from the hook payload, but the real payload
+nests it under `tool_input`. The field is always null, so the script exits 0 on every call and
+never stamps the date. Verified 2026-08-20: three memory-bank files edited that day still carried
+`last-reviewed` dates from June and July. Consequence beyond the stale field — `mb doctor` uses
+those dates to detect stale memory-bank files, so it is reading a dead sensor and will report
+actively-edited files as months stale. Fixed in PMB 1.2.1; this repo is on 1.1.1
+(`.pmb-version`), so the fix arrives with `mb upgrade`, not with a local edit.
+
+**Do not "fix" this by loosening the matcher without measurement.** Anchoring to command position
+would reduce false trips, but the failure direction is _missing a real push_ (`xargs git push`, a
+push inside a loop) — silently disabling a security gate. Same rule as the `claimSupport.ts`
+filters: measure, don't inspect.
 
 ## Never Do This
 
