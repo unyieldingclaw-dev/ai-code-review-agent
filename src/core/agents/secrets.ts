@@ -48,6 +48,7 @@ export class SecretsAgent extends BaseAgent {
     if (files.length > 0) {
       const allFindings: Finding[] = []
       let gitleaksRan = false
+      const skipped: string[] = []
       for (const file of files) {
         const output = await runTool(
           'gitleaks',
@@ -69,13 +70,39 @@ export class SecretsAgent extends BaseAgent {
           false,
           projectPath
         )
-        if (output === null) continue // gitleaks not installed
+        if (output === null) {
+          // gitleaks produced no stdout for this file: either it isn't installed, or it exited
+          // non-zero on this specific file (unreadable, locked, or a shape it rejects). runTool
+          // already logs the latter to stderr, but skipping silently here meant a file that was
+          // never scanned was indistinguishable from one scanned and found clean.
+          skipped.push(file)
+          continue
+        }
         gitleaksRan = true
         allFindings.push(...parseGitleaksOutput(output, this.name))
       }
-      if (gitleaksRan) {
+      // WHY a partial scan does not return here: if gitleaks succeeded on some files and produced
+      // nothing for others, gitleaksRan is true from the successes alone and this reported a
+      // COMPLETED secret scan -- while the file holding an actual credential may be one of the
+      // ones silently skipped. Falling through to the LLM path instead means the whole diff still
+      // gets looked at, including the files gitleaks could not read, and toolAvailability
+      // truthfully reports that the tool result was not relied on.
+      //
+      // Deliberately not a new ToolAvailability value: 'partial' would be more precise, but it is
+      // a schema change rippling into the markdown/SARIF/MCP consumers, and for a secrets scanner
+      // the safer default is to actually scan the unscanned files rather than to label the gap.
+      // The tradeoff is an LLM call in a case that previously skipped one; reachability is low
+      // (the file must exist -- files are existence-filtered above -- yet be unreadable by
+      // gitleaks), so this trades a rare extra call for never silently under-scanning.
+      if (gitleaksRan && skipped.length === 0) {
         this.lastToolAvailability = 'used'
         return allFindings
+      }
+      if (skipped.length > 0) {
+        console.error(
+          `[secrets] gitleaks produced no output for ${skipped.length} of ${files.length} ` +
+            `file(s) -- falling back to the LLM so they are not left unscanned: ${skipped.join(', ')}`
+        )
       }
     }
     this.lastToolAvailability = 'unavailable-llm-fallback'

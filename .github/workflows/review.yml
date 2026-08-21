@@ -3,6 +3,17 @@ name: AI Code Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    # WHY skip docs-only PRs: this job runs the full 15-agent swarm sequentially against a local
+    # model, so it costs several minutes of the single self-hosted runner every time. Reviewing a
+    # markdown-only change buys nothing -- most agents have nothing to say about prose, and the
+    # ones that do are the weakest signal. Safe to skip entirely because `ai-review` is NOT a
+    # required status check (branch protection requires only `test`), so a PR that never triggers
+    # this workflow is still mergeable rather than stuck waiting on a check that will never report.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'memory-bank/**'
+      - LICENSE
 
 jobs:
   ai-review:
@@ -14,6 +25,20 @@ jobs:
     # since their head repo is this repo, not a fork.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: self-hosted # Requires Ollama on the runner
+    # WHY a job-level timeout, and why 45: without one this job inherits GitHub's 6-hour default.
+    # On 2026-08-21 a run hung for 43 minutes having never started step 1 -- the listener accepted
+    # the job and never spawned a Worker (no Worker log was written), so no step-level timeout
+    # could have fired; only a job-level one covers job-init hangs. It held the single self-hosted
+    # runner the whole time and queued every other PR behind it, and nothing failed or alerted --
+    # it simply looked slow.
+    #
+    # 45 is chosen against the tool's own bound, not intuition: the swarm runs 15 agents
+    # sequentially with agentTimeoutMs 180s scaling to 2x on large diffs, so a worst-case run is
+    # ~90 minutes, while every observed run here has been 4-8.5 minutes. 45 sits far above real
+    # runs and far below "wedged", accepting that a pathological max-size diff would be cut off --
+    # a visible failure, which is the point. It is a backstop, not a fix: the underlying cause is
+    # that the runner is not supervised (no service, no restart-on-failure).
+    timeout-minutes: 45
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
     permissions:

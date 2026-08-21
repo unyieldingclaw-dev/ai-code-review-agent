@@ -29,7 +29,16 @@ against Ollama across three separate agents and failed every time — for `licen
 it _worse_ (6/10 → 9/10) — matching what `secrets.ts` already recorded for
 `hasCredentialShapedValue`. Measurements and the review/audit rounds are in `progress.md`.
 
-**Verified state:** 717 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
+**Calibration is now falsifiable (2026-08-21).** The 21–22/22 score used to aggregate assertions of
+very different strength — three cases asserted on the agent's own domain vocabulary, and
+`DependenciesAgent` had **no** case that could fail (both were `expectEmpty`, so an agent returning
+`[]` passed). Added `dependencies-vulnerable` plus a per-case `projectPathFixture` so tool-backed
+cases run against their own materialised project instead of this repo's incidental state. Keyword
+strengthening is measured, not assumed: `calculateShippingCost` 5/5, `notifyWebhook` 4/4,
+`cancelOrder` 4/6 → reverted. Failing cases now print what the agent actually returned. Details in
+`progress.md`.
+
+**Verified state:** 726 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
 use `grep "orchestrator] dropped"` to tell a real filter regression from model variance.
 

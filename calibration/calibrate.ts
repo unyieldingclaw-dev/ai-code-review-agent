@@ -1,4 +1,6 @@
-import { readFileSync } from 'fs'
+import { readFileSync, mkdirSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { OllamaProvider } from '../src/core/llm/ollamaProvider.js'
 import { extractChangedFiles } from '../src/core/policyFilter.js'
 import { DEFAULT_CONFIG } from '../src/core/config.js'
@@ -29,6 +31,17 @@ interface CalibrationCase {
   // case (name must stay unique per case for the printed log line, agentMap keys don't).
   agentName?: string
   fixtureFile: string
+  // Names a committed lockfile fixture under calibration/fixtures/. When set, the runner
+  // materialises it into a temp directory as package.json + package-lock.json and passes THAT
+  // directory as projectPath instead of process.cwd().
+  //
+  // WHY this exists: cases that reach a real tool (npm audit, licenseFacts' lockfile lookup) were
+  // silently asserting against ACR'S OWN repo state, because projectPath was hardcoded to
+  // process.cwd(). That coupled their outcome to this repo's incidental dependency set -- the
+  // `dependencies` case only ever passed because the repo happened to be vulnerable, and broke
+  // when `npm audit` reached 0. Pointing a case at its own fixture project makes it test the
+  // mechanism instead of the repo.
+  projectPathFixture?: string
   // Either (expectedKeyword + baitKeyword) for "must find X, must not find Y", or expectEmpty
   // for "this fixture has nothing this agent should report on -- must return zero findings".
   expectedKeyword?: string
@@ -58,6 +71,61 @@ function printBox(lines: string[]): void {
   process.stderr.write('\n' + BORDER + '\n')
   for (const l of lines) process.stderr.write(`║  ${pad(l, 56)}║\n`)
   process.stderr.write(BORDER_BOT + '\n\n')
+}
+
+/** Prints what an agent actually returned, so a failing case is diagnosable from its own output. */
+function printFindings(findings: Finding[]): void {
+  if (findings.length === 0) {
+    console.log('     (agent returned zero findings)')
+    return
+  }
+  for (const f of findings.slice(0, 5)) {
+    console.log(`     - [${f.file}:${f.line}] ${f.title}`)
+    const detail = String(f.detail ?? '').replace(/\s+/g, ' ')
+    if (detail) console.log(`       ${detail.slice(0, 160)}`)
+  }
+  if (findings.length > 5) console.log(`     ... and ${findings.length - 5} more`)
+}
+
+/**
+ * Materialises a committed lockfile fixture into a temp directory as a real project, and returns
+ * that directory for use as a case's projectPath.
+ *
+ * WHY write to a temp dir instead of committing the fixture as package-lock.json: Dependabot
+ * security alerts key on the package-lock.json filename and scan every match in the repo,
+ * independent of .github/dependabot.yml. A committed vulnerable lockfile would raise standing
+ * alerts on a repo that deliberately holds `npm audit` at 0 -- degrading a live security signal to
+ * serve a fixture. Renaming on the way out keeps the fixture deterministic and reviewable in git
+ * while leaving the repo's own audit surface untouched.
+ *
+ * No `npm install` is needed: npm audit resolves advisories from the lockfile alone.
+ */
+function materializeFixtureProject(fixtureName: string): string {
+  const lockfile = readFileSync(join('calibration/fixtures', fixtureName), 'utf-8')
+  const parsed = JSON.parse(lockfile) as {
+    name?: string
+    version?: string
+    packages?: Record<string, { dependencies?: Record<string, string> }>
+  }
+  const dir = join(tmpdir(), `acr-calibration-${fixtureName.replace(/\W+/g, '-')}`)
+  mkdirSync(dir, { recursive: true })
+  // package.json is derived from the lockfile's root entry rather than committed separately, so
+  // the two can never drift into disagreeing about the dependency set.
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify(
+      {
+        name: parsed.name ?? 'acr-calibration-fixture',
+        version: parsed.version ?? '1.0.0',
+        private: true,
+        dependencies: parsed.packages?.['']?.dependencies ?? {},
+      },
+      null,
+      2
+    )
+  )
+  writeFileSync(join(dir, 'package-lock.json'), lockfile)
+  return dir
 }
 
 const CASES: CalibrationCase[] = [
@@ -116,6 +184,26 @@ const CASES: CalibrationCase[] = [
     agentName: 'dependencies',
     fixtureFile: 'calibration/fixtures/dependencies-clean.diff',
     expectEmpty: true,
+  },
+  {
+    // The falsifying case DependenciesAgent previously lacked entirely. Both of its other cases
+    // are expectEmpty, so an agent that returned [] unconditionally -- a dead npm-audit path, a
+    // crash swallowed into an empty array -- passed calibration with nothing to catch it. This is
+    // the only case that fails if the agent stops detecting anything.
+    //
+    // Runs against its own materialised fixture project rather than this repo, which is what the
+    // `dependencies` case above could not express: that one asserted against ACR's real npm audit
+    // output, passed only while the repo happened to be vulnerable, and had to be downgraded to
+    // expectEmpty when `npm audit` reached 0.
+    //
+    // No baitKeyword: this case never reaches the LLM. DependenciesAgent routes any
+    // manifest-touching diff with a projectPath through npm audit, so the finding set is exactly
+    // what the tool reports -- there is no false-positive-prone generation to bait.
+    name: 'dependencies-vulnerable',
+    agentName: 'dependencies',
+    fixtureFile: 'calibration/fixtures/dependencies-vulnerable.diff',
+    projectPathFixture: 'vulnerable-lockfile.json',
+    expectedKeyword: 'lodash',
   },
   {
     name: 'adversarial',
@@ -387,7 +475,9 @@ async function main() {
     try {
       const rawFindings: Finding[] = await agentMap[c.agentName ?? c.name].run({
         diff,
-        projectPath: process.cwd(),
+        projectPath: c.projectPathFixture
+          ? materializeFixtureProject(c.projectPathFixture)
+          : process.cwd(),
       })
       // Exercise the same file-existence and claim-support defenses runner.ts applies in real
       // usage, so calibration reflects actual end-to-end behavior, not just the raw agent's
@@ -457,6 +547,12 @@ async function main() {
       } else {
         if (!hasLegitimate) console.log(`  ❌ FAIL — missed '${c.expectedKeyword}'`)
         if (hasBait) console.log(`  ❌ FAIL — false positive '${c.baitKeyword}'`)
+        // WHY print the findings on failure: without them the log said only "missed 'X'", which
+        // cannot distinguish the two causes that need opposite fixes -- the agent found the right
+        // issue but worded it differently (assertion too strict) versus the agent missed it
+        // entirely (real regression). Diagnosing a failure previously meant re-running the agent
+        // by hand through the CLI to see its actual output.
+        printFindings(findings)
         failed++
       }
     } catch (err) {

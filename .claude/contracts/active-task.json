@@ -1,126 +1,20 @@
 {
-  "task": "Deterministic post-filters for review findings whose claimed defect mechanism is structurally absent from the diff. Grew during execution beyond the original injection/swallowed-exception scope, as each new class was measured: (1) injection + swallowed-exception claims (claimSupport.ts + filterUnsupportedClaims); (2) SQL NULL-raises-an-error claims; (3) fabricated license assertions contradicted by the project's own lockfile (licenseFacts.ts); plus two reporting fixes surfaced while diagnosing the above (corroboratingAgents was computed but never rendered; agent progress lines now say 'raw findings'). Follows the hasCredentialShapedValue precedent in secrets.ts: prompt-only fixes were measured live against Ollama across three separate agents and each time failed to reduce the rate -- for license it made it worse (6/10 -> 9/10). IDOR is explicitly out of scope, not being deterministically falsifiable.",
+  "task": "Close the remaining ACR-owned findings from the 2026-08-21 review-gate session: give DependenciesAgent a falsifying calibration case via per-case projectPath (runtime-materialised vulnerable project, so no scannable lockfile is committed and no permanent Dependabot alerts are created), decouple license-clean from ACR's own lockfile, make calibration failures diagnosable by printing actual findings, stop SecretsAgent reporting an unqualified 'used' when gitleaks silently skipped files it could not read, and bound the ai-review workflow with a timeout plus scoping off docs-only PRs.",
   "status": "complete",
-  "created_at": "2026-08-18T00:00:00Z",
-  "expires_at": "2026-08-18T08:00:00Z",
-  "approved_by": "user (ExitPlanMode approval of the deterministic-filter plan, after answering scope/disposition/branch design questions)",
+  "created_at": "2026-08-21T14:45:58Z",
+  "expires_at": "2026-08-21T22:45:58Z",
+  "approved_by": "user (explicit 'approved' after two rounds of scope review; the second round added the SecretsAgent partial-scan fix and downgraded expectedFile to measure-first)",
   "scope": [
-    {
-      "file": ".claude/contracts/active-task.json",
-      "op": "edit"
-    },
-    {
-      "file": "CHANGELOG.md",
-      "op": "edit"
-    },
-    {
-      "file": "calibration/calibrate.ts",
-      "op": "edit"
-    },
-    {
-      "file": "calibration/fixtures/license-clean.diff",
-      "op": "edit"
-    },
-    {
-      "file": "calibration/fixtures/sql-injection-clean.diff",
-      "op": "add"
-    },
-    {
-      "file": "calibration/fixtures/sql-injection-vulnerable.diff",
-      "op": "add"
-    },
-    {
-      "file": "memory-bank/activeContext.md",
-      "op": "edit"
-    },
-    {
-      "file": "memory-bank/progress.md",
-      "op": "edit"
-    },
-    {
-      "file": "src/cli/formatter.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/cli/index.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/agents/adversarial.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/agents/correctness.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/agents/design.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/agents/errorHandling.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/agents/licenseCompliance.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/agents/orchestrator.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/agents/security.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/claimSupport.ts",
-      "op": "add"
-    },
-    {
-      "file": "src/core/licenseFacts.ts",
-      "op": "add"
-    },
-    {
-      "file": "src/core/runner.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/schema.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/adversarialAgent.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/claimSupport.test.ts",
-      "op": "add"
-    },
-    {
-      "file": "tests/unit/correctnessAgent.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/designAgent.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/errorHandlingAgent.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/licenseFacts.test.ts",
-      "op": "add"
-    },
-    {
-      "file": "tests/unit/orchestrator.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/securityAgent.test.ts",
-      "op": "edit"
-    }
+    { "file": ".claude/contracts/active-task.json", "op": "edit" },
+    { "file": "calibration/calibrate.ts", "op": "edit" },
+    { "file": "calibration/fixtures/vulnerable-lockfile.json", "op": "create" },
+    { "file": "calibration/fixtures/dependencies-vulnerable.diff", "op": "create" },
+    { "file": "src/core/agents/secrets.ts", "op": "edit" },
+    { "file": "tests/unit/secretsAgent.test.ts", "op": "edit" },
+    { "file": ".github/workflows/review.yml", "op": "edit" },
+    { "file": "memory-bank/activeContext.md", "op": "edit" },
+    { "file": "memory-bank/progress.md", "op": "edit" }
   ],
-  "scope_note": "Scope was reconciled against the actual delivered diff at completion. The original declaration covered only the injection/swallowed-exception filter; the license and NULL filters and the reporting fixes were added during execution at the user's direction as each was measured. Timestamps: created_at/expires_at were written as round placeholder values rather than real clock stamps, and the work actually spanned 2026-08-18 into 2026-08-19, past the recorded expiry. Recorded here rather than back-dated to a fabricated-looking exact time."
+  "completion_note": "Delivered within the declared scope; no file outside it was written. expectedFile was NOT added: it was to be measured first, and the dependencies-vulnerable case turned out to make the falsifiability point without it, so adding a second assertion mode was unjustified on current evidence. license-clean decoupling was NOT done: the mechanism it needs (projectPathFixture) now exists, but a second fixture lockfile carrying license metadata is a file outside the declared scope, so it was left as a follow-up rather than widening scope mid-task. SecretsAgent's partial-scan fix routes to the LLM fallback rather than introducing a 'partial' ToolAvailability value, because that union is consumed by the markdown/SARIF/MCP formatters and schema.ts was not in scope. Note for the next session: memory-bank/progress.md is now at exactly 400/400 lines, the CI-enforced cap, so the next entry requires archiving to memory-bank/archive/ first.",
+  "scope_note": "expectedFile is deliberately NOT in scope as a deliverable. It was proposed as the durable fix for wording-dependent assertions but rests on a single observation that Finding.file is stable across runs -- the same one-observation confidence that produced a 4/6-flaky assertion earlier in the session. It will be measured first and only added if the measurement supports it; if it is added, calibrate.ts is already in scope. The vulnerable lockfile is committed under a non-lockfile filename (vulnerable-lockfile.json) and copied to package-lock.json in a temp directory at run time: Dependabot security alerts key on the package-lock.json filename, so this keeps the fixture deterministic and committed without degrading the repo's npm audit 0 signal."
 }
