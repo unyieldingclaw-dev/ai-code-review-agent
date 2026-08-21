@@ -6,6 +6,8 @@ import {
   hasDynamicConstruction,
   hasExceptionHandling,
   sliceDiffByFile,
+  sliceRemovedCodeByFile,
+  isPreImageOnlyEvidence,
   lookupFileSection,
   diffSectionCode,
   claimsNullRaisesError,
@@ -577,3 +579,122 @@ describe('claimsNullRaisesError / isSqlFile / sqlSectionCanRaise', () => {
     expect(sqlSectionCanRaise('select gid::uuid from t')).toBe(true)
   })
 })
+
+// A diff that FIXES an N+1: the loop exists only on '-' lines, and the post-image is clean.
+// Deliberately the shape that was measured misfiring 8/8 against a live model.
+const N_PLUS_ONE_REMOVED_DIFF = `diff --git a/src/users/service.ts b/src/users/service.ts
+--- a/src/users/service.ts
++++ b/src/users/service.ts
+@@ -1,8 +1,5 @@
+ export async function getUsersWithPosts(userIds: string[]) {
+-  const users = await db.query('SELECT * FROM users WHERE id = ANY($1)', [userIds])
+-  for (const user of users.rows) {
+-    user.posts = await db.query('SELECT * FROM posts WHERE user_id = $1', [user.id])
+-  }
+-  return users.rows
++  const rows = await db.query('SELECT u.*, p.title FROM users u LEFT JOIN posts p ON p.user_id = u.id WHERE u.id = ANY($1)', [userIds])
++  return groupPostsByUser(rows.rows)
+ }`
+
+describe('isPreImageOnlyEvidence', () => {
+  const removedOf = (d: string, f: string) => lookupFileSection(sliceRemovedCodeByFile(d), f) ?? ''
+  const postOf = (d: string, f: string) => lookupFileSection(sliceDiffByFile(d), f) ?? ''
+  const F = 'src/users/service.ts'
+
+  it('drops a finding whose evidence quotes only deleted lines', () => {
+    // The real shape, measured: the model renders a three-line loop as ONE line of evidence, so
+    // this only matches because whitespace is normalized before comparing.
+    const evidence =
+      "for (const user of users.rows) { user.posts = await db.query('SELECT * FROM posts WHERE user_id = $1', [user.id]) }"
+    expect(
+      isPreImageOnlyEvidence(
+        evidence,
+        removedOf(N_PLUS_ONE_REMOVED_DIFF, F),
+        postOf(N_PLUS_ONE_REMOVED_DIFF, F)
+      )
+    ).toBe(true)
+  })
+
+  it('keeps a finding whose evidence quotes added code (the counter-test that guards over-suppression)', () => {
+    const evidence = 'return groupPostsByUser(rows.rows)'
+    expect(
+      isPreImageOnlyEvidence(
+        evidence,
+        removedOf(N_PLUS_ONE_REMOVED_DIFF, F),
+        postOf(N_PLUS_ONE_REMOVED_DIFF, F)
+      )
+    ).toBe(false)
+  })
+
+  it('keeps a finding whose evidence is paraphrased rather than quoted (fail open)', () => {
+    // The filter is only ever a positive proof that the text was deleted. A model that describes
+    // the code instead of quoting it must not be filtered on a guess.
+    const evidence = 'The function loads related posts for each user inside a loop'
+    expect(
+      isPreImageOnlyEvidence(
+        evidence,
+        removedOf(N_PLUS_ONE_REMOVED_DIFF, F),
+        postOf(N_PLUS_ONE_REMOVED_DIFF, F)
+      )
+    ).toBe(false)
+  })
+
+  it('keeps a finding whose evidence survives into the post-image (a moved line)', () => {
+    // Both sides contain the text, so the code still exists after the diff -- dropping it would be
+    // a false negative, the direction that actually costs something.
+    const moved = `diff --git a/src/a.ts b/src/a.ts
+--- a/src/a.ts
++++ b/src/a.ts
+@@ -1,3 +1,3 @@
+-  const token = buildAuthorizationHeaderFromSecret(secretValue)
++  const token = buildAuthorizationHeaderFromSecret(secretValue)
+   return token`
+    const evidence = 'const token = buildAuthorizationHeaderFromSecret(secretValue)'
+    expect(
+      isPreImageOnlyEvidence(evidence, removedOf(moved, 'src/a.ts'), postOf(moved, 'src/a.ts'))
+    ).toBe(false)
+  })
+
+  it('keeps a finding whose evidence is too short to be a meaningful quote', () => {
+    // "return users.rows" appears only on a deleted line here, but a fragment that small can
+    // coincide with deleted text while the finding is really about the new code.
+    expect(
+      isPreImageOnlyEvidence(
+        'return users.rows',
+        removedOf(N_PLUS_ONE_REMOVED_DIFF, F),
+        postOf(N_PLUS_ONE_REMOVED_DIFF, F)
+      )
+    ).toBe(false)
+  })
+
+  it('keeps a finding with no evidence at all', () => {
+    expect(isPreImageOnlyEvidence(undefined, 'anything', 'anything')).toBe(false)
+  })
+
+  it('does not throw on a non-string evidence value', () => {
+    // parsing.ts sets `evidence: f.evidence ?? f.detail ?? ''`, and `??` only falls through on
+    // null/undefined -- so a finding whose evidence arrived as a NUMBER keeps that number. Without
+    // a typeof guard this threw "text.replace is not a function" from inside synthesize(), after
+    // every agent had already run: one malformed finding would fail the whole review.
+    expect(() =>
+      isPreImageOnlyEvidence(12345 as unknown as string, 'removed', 'post')
+    ).not.toThrow()
+    expect(isPreImageOnlyEvidence(12345 as unknown as string, 'removed', 'post')).toBe(false)
+  })
+})
+
+describe('sliceRemovedCodeByFile', () => {
+  it('returns the deleted lines, which sliceDiffByFile discards by construction', () => {
+    // This asymmetry is the bug that made the first version of the filter inert: the section
+    // sliceDiffByFile hands out is post-image, so a pre-image check fed from it can never fire.
+    const F2 = 'src/users/service.ts'
+    expect(postOfRemovedCheck(N_PLUS_ONE_REMOVED_DIFF, F2)).not.toContain('for (const user of')
+    expect(lookupFileSection(sliceRemovedCodeByFile(N_PLUS_ONE_REMOVED_DIFF), F2)).toContain(
+      'for (const user of'
+    )
+  })
+})
+
+function postOfRemovedCheck(d: string, f: string): string {
+  return lookupFileSection(sliceDiffByFile(d), f) ?? ''
+}

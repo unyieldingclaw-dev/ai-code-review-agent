@@ -963,3 +963,66 @@ new file mode 100644
     expect(result).toHaveLength(0)
   })
 })
+
+describe('OrchestratorAgent.synthesize — pre-image findings', () => {
+  // WHY this is an orchestrator-level test and not only a claimSupport unit test: the first
+  // version of this filter was WIRED wrong -- it was handed the section from sliceDiffByFile,
+  // which is post-image by construction, so it could never fire. Every unit test of the predicate
+  // passed anyway, because the predicate itself was correct. Only running findings through
+  // synthesize() exposes it. The bug was caught by replaying the real findings.json from PR #44's
+  // CI run through this path; this test pins that shape.
+  const N_PLUS_ONE_REMOVED_DIFF = `diff --git a/src/users/service.ts b/src/users/service.ts
+--- a/src/users/service.ts
++++ b/src/users/service.ts
+@@ -1,8 +1,5 @@
+ export async function getUsersWithPosts(userIds: string[]) {
+-  const users = await db.query('SELECT * FROM users WHERE id = ANY($1)', [userIds])
+-  for (const user of users.rows) {
+-    user.posts = await db.query('SELECT * FROM posts WHERE user_id = $1', [user.id])
+-  }
+-  return users.rows
++  const rows = await db.query('SELECT u.*, p.title FROM users u LEFT JOIN posts p ON p.user_id = u.id WHERE u.id = ANY($1)', [userIds])
++  return groupPostsByUser(rows.rows)
+ }`
+
+  it('drops a finding whose evidence quotes only lines the diff deletes', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const dropped: import('../../src/core/schema.js').DroppedHallucinatedFinding[] = []
+    const findings = [
+      finding({
+        id: 'performance-0',
+        agent: 'performance',
+        file: 'src/users/service.ts',
+        line: 3,
+        title: 'N+1 query pattern',
+        evidence:
+          "for (const user of users.rows) { user.posts = await db.query('SELECT * FROM posts WHERE user_id = $1', [user.id]) }",
+      }),
+    ]
+    const result = orch.synthesize(
+      findings,
+      ['src/users/service.ts'],
+      dropped,
+      N_PLUS_ONE_REMOVED_DIFF
+    )
+    expect(result).toHaveLength(0)
+    expect(dropped[0]?.reason).toBe('pre-image-only-evidence')
+  })
+
+  it('keeps a finding whose evidence quotes code the diff adds', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const findings = [
+      finding({
+        id: 'performance-0',
+        agent: 'performance',
+        file: 'src/users/service.ts',
+        line: 2,
+        title: 'Unbounded join',
+        evidence:
+          "const rows = await db.query('SELECT u.*, p.title FROM users u LEFT JOIN posts p ON p.user_id = u.id WHERE u.id = ANY($1)', [userIds])",
+      }),
+    ]
+    const result = orch.synthesize(findings, ['src/users/service.ts'], [], N_PLUS_ONE_REMOVED_DIFF)
+    expect(result).toHaveLength(1)
+  })
+})

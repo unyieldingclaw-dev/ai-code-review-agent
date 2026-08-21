@@ -18,6 +18,8 @@ import {
   sqlSectionCanRaise,
   sliceDiffByFile,
   lookupFileSection,
+  isPreImageOnlyEvidence,
+  sliceRemovedCodeByFile,
 } from '../claimSupport.js'
 
 // WHY only these two: DETERMINISTIC_SOURCES exempts a solo critical/high finding from the
@@ -209,6 +211,9 @@ export class OrchestratorAgent {
     dropped?: DroppedHallucinatedFinding[]
   ): Finding[] {
     const sections = sliceDiffByFile(diffText)
+    // Keyed the same way as `sections`, but holding each file's DELETED lines. Needed because
+    // `sections` is post-image by construction (see sliceRemovedCodeByFile's header).
+    const removedByFile = sliceRemovedCodeByFile(diffText)
     // Fail open when the diff couldn't be sliced at all (malformed/non-standard format), matching
     // the empty-changedFiles reasoning above: filtering against nothing would reject everything.
     if (sections.size === 0) return findings
@@ -225,6 +230,26 @@ export class OrchestratorAgent {
       // Fail open: a finding whose file has no section here can't be checked. filterNonexistentFiles
       // already rejects files absent from the diff, so this is the residual parse-mismatch case.
       if (section === undefined) return true
+
+      // Checked before CLAIM_RULES because it is claim-class agnostic: a finding quoting deleted
+      // code is wrong regardless of which mechanism it alleges, and every agent can produce one
+      // (measured on `performance`, which no CLAIM_RULE covers).
+      if (
+        isPreImageOnlyEvidence(f.evidence, lookupFileSection(removedByFile, f.file) ?? '', section)
+      ) {
+        dropped?.push({
+          agent: f.agent,
+          title: f.title,
+          file: f.file,
+          reason: 'pre-image-only-evidence',
+        })
+        console.error(
+          `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- its evidence quotes ` +
+            `lines ${f.file} DELETES and appears nowhere in the resulting code (the finding ` +
+            `describes the pre-image, not the change under review)`
+        )
+        return false
+      }
 
       const rule = CLAIM_RULES.find(
         (r) => (r.appliesTo?.(f.file) ?? true) && r.claims(f) && !r.evidence(section)

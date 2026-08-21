@@ -58,6 +58,11 @@ interface CalibrationCase {
   // asserting an invariant broader than what the filter actually guarantees; this asserts exactly
   // what it guarantees.
   expectNoInjectionOrExceptionClaims?: boolean
+  // Narrower than expectEmpty in the same spirit as the flag above: asserts no surviving finding
+  // mentions this keyword, while tolerating other findings. Needed for a fixture whose post-image
+  // is clean of ONE specific defect that the diff removes -- the agent may still say something
+  // legitimate about the code the diff ADDS, which expectEmpty would flag as a failure.
+  forbiddenKeyword?: string
 }
 
 const BORDER = '╔════════════════════════════════════════════════════════════╗'
@@ -140,6 +145,23 @@ const CASES: CalibrationCase[] = [
     fixtureFile: 'calibration/fixtures/performance.diff',
     expectedKeyword: 'N+1',
     baitKeyword: 'sumArray',
+  },
+  {
+    // The inverse of the case above, and the reason it is worth having: this diff REMOVES the same
+    // N+1 and replaces it with a batched join, so the post-image is clean. Measured 8/8 against a
+    // live model, the performance agent reported the deleted loop as a current defect, quoting the
+    // removed lines verbatim -- and on the real findings.json from PR #44's CI run it did the same
+    // thing for real, flagging a merge that PR removed and recommending, as the fix, the function
+    // that PR added. filterUnsupportedClaims now drops such findings.
+    //
+    // WHY forbiddenKeyword and not expectEmpty: the added batched query is a legitimate subject for
+    // other performance observations (an unbounded LEFT JOIN, for one), and expectEmpty would make
+    // this case flaky by asserting something broader than the filter actually guarantees -- the
+    // same reasoning security-sql-clean records for expectNoInjectionOrExceptionClaims.
+    name: 'performance-postimage-clean',
+    agentName: 'performance',
+    fixtureFile: 'calibration/fixtures/performance-postimage-clean.diff',
+    forbiddenKeyword: 'N+1',
   },
   {
     name: 'correctness',
@@ -517,6 +539,27 @@ async function main() {
         } else {
           console.log(
             `  ❌ FAIL — ${bad.length} injection/swallowed-exception claim(s) survived: ` +
+              bad.map((f) => `"${f.title}"`).join(', ')
+          )
+          failed++
+        }
+        continue
+      }
+
+      if (c.forbiddenKeyword) {
+        const kw = c.forbiddenKeyword.toLowerCase()
+        const bad = findings.filter(
+          (f) => f.title.toLowerCase().includes(kw) || f.detail.toLowerCase().includes(kw)
+        )
+        if (bad.length === 0) {
+          console.log(
+            `  ✅ PASS — no surviving "${c.forbiddenKeyword}" finding ` +
+              `(${findings.length} other finding(s) tolerated)`
+          )
+          passed++
+        } else {
+          console.log(
+            `  ❌ FAIL — ${bad.length} "${c.forbiddenKeyword}" finding(s) survived: ` +
               bad.map((f) => `"${f.title}"`).join(', ')
           )
           failed++

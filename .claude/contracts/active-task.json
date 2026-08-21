@@ -1,26 +1,63 @@
 {
   "task": "Fix ACR's mishandling of the diff pre-image, found by investigating two false findings on PR #44. Two independent bugs, shipped as two PRs: (A) finding file paths retain the diff's a/ prefix and point at files that do not exist, so SARIF and GitHub annotations land nowhere; (B) agents report deleted code as a current defect, citing the removed side of a diff and recommending the added side as the cure.",
-  "status": "in_progress",
+  "status": "complete",
   "created_at": "2026-08-21T20:00:00Z",
   "expires_at": "2026-08-22T04:00:00Z",
   "approved_by": "user ('Your call. Do what is best', delegating after being given the A+B vs A+B+D choice and the recommendation to defer D)",
   "scope_pr1_paths": [
-    { "file": ".claude/contracts/active-task.json", "op": "create" },
-    { "file": "src/core/agents/orchestrator.ts", "op": "edit" },
-    { "file": "tests/unit/orchestrator.test.ts", "op": "edit" }
+    {
+      "file": ".claude/contracts/active-task.json",
+      "op": "create"
+    },
+    {
+      "file": "src/core/agents/orchestrator.ts",
+      "op": "edit"
+    },
+    {
+      "file": "tests/unit/orchestrator.test.ts",
+      "op": "edit"
+    }
   ],
   "scope_pr2_preimage": [
-    { "file": "src/core/claimSupport.ts", "op": "edit" },
-    { "file": "src/core/agents/orchestrator.ts", "op": "edit" },
-    { "file": "src/core/agents/base.ts", "op": "edit (only if the prompt fix measures well)" },
-    { "file": "tests/unit/claimSupport.test.ts", "op": "edit" },
-    { "file": "calibration/fixtures/performance-postimage-clean.diff", "op": "create" },
-    { "file": "calibration/calibrate.ts", "op": "edit" },
-    { "file": "memory-bank/progress.md", "op": "edit" },
-    { "file": "memory-bank/activeContext.md", "op": "edit" },
-    { "file": "memory-bank/systemPatterns.md", "op": "edit" }
+    {
+      "file": "src/core/claimSupport.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/agents/orchestrator.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/agents/base.ts",
+      "op": "edit (only if the prompt fix measures well)"
+    },
+    {
+      "file": "tests/unit/claimSupport.test.ts",
+      "op": "edit"
+    },
+    {
+      "file": "calibration/fixtures/performance-postimage-clean.diff",
+      "op": "create"
+    },
+    {
+      "file": "calibration/calibrate.ts",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/progress.md",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/activeContext.md",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/systemPatterns.md",
+      "op": "edit"
+    }
   ],
   "measurements": "Taken before any code was written. (1) Pre-image reporting reproduces 8/8 on a fixture whose post-image is clean -- the agent quotes the deleted N+1 loop verbatim in its evidence field. (2) Counter-test: the same N+1 on the ADDED side is still detected 5/5 valid trials, so the agent is not simply blind. (3) Decisive test on real production output: the proposed rule applied to the real findings.json from PR #44's CI run drops exactly 1 of 15 findings -- the genuine pre-image one -- and keeps all 14 others. (4) The real performance finding's evidence is a verbatim quote of the deleted line, confirming the load-bearing assumption that the filter can anchor on evidence text. (5) 5 of 15 real findings (33%) carry an a/ prefix.",
   "design_notes": "PR1 fixes the path at orchestrator.filterNonexistentFiles rather than at parsing.ts ingestion, because that is the ONLY seam holding changedFiles -- and the strip must be conditional on the result matching a real changed file. An unconditional strip would corrupt paths in a repo that genuinely has a top-level a/ or b/ directory. Checking the unstripped form FIRST preserves such a repo's real paths; only a path that fails that check and succeeds stripped gets rewritten. PR2 anchors on the evidence field rather than the line number, because line numbers were measured unreliable (the same finding reported line 7, 5, 7 across three trials while the evidence text stayed byte-identical). The rule fires only when normalized evidence appears in removed lines AND NOT in added+context, so a paraphrased evidence string simply fails to match and the finding is kept -- fail-open by construction.",
-  "out_of_scope": "Bug C: breaking-change flagged a function-local const (verified indented, never exported at 8618c0f^) as a removed public API. A deterministic filter would have to prove a symbol was NEVER exported -- a negative, defeated by `export { X }` lists, re-exports and default exports -- and the harm direction is dropping a real breaking change. Recorded, not fixed. Bug D: same-agent duplicate findings survive dedup (5 real findings that should be 2; identical agent/title/file/line/evidence). orchestrator.ts:276 keeps same-agent same-location findings deliberately, since one agent can report two distinct issues on one line; the predicate is too coarse but tightening it touches the corroboration path that feeds severity escalation, so it gets its own PR and review rather than riding along."
+  "out_of_scope": "Bug C: breaking-change flagged a function-local const (verified indented, never exported at 8618c0f^) as a removed public API. A deterministic filter would have to prove a symbol was NEVER exported -- a negative, defeated by `export { X }` lists, re-exports and default exports -- and the harm direction is dropping a real breaking change. Recorded, not fixed. Bug D: same-agent duplicate findings survive dedup (5 real findings that should be 2; identical agent/title/file/line/evidence). orchestrator.ts:276 keeps same-agent same-location findings deliberately, since one agent can report two distinct issues on one line; the predicate is too coarse but tightening it touches the corroboration path that feeds severity escalation, so it gets its own PR and review rather than riding along.",
+  "completion_note": "Both PRs delivered. PR1 (#45, merged d781dcb) fixed the unresolvable a/ paths. PR2 adds the pre-image filter. Three things worth carrying forward. (1) The prompt fix was measured and REJECTED: 7/7 still reported the deleted defect under an explicit instruction, against 8/8 before -- and the prediction going in was that this case WOULD differ from the repo's three prior prompt failures, because the model looked to be missing a frame rather than reasoning badly. It did not differ. (2) The filter's first wiring was inert -- it was handed the sliceDiffByFile section, which is post-image by construction, so it could never fire. Every unit test of the predicate passed because the predicate was correct, and a scratch probe agreed because it reimplemented the extraction from the raw diff. Only replaying the real findings.json artifact through synthesize() exposed it; that is now pinned by an orchestrator-level test which fails on the exact miswiring while 109 unit tests still pass. (3) The calibration case is falsifiable end-to-end: PASS with the filter, FAIL without it (1 N+1 finding survived). 752 tests green. Bugs C (local const as breaking change) and D (same-agent duplicates surviving dedup) were found, verified, and deliberately left unfixed with reasons recorded in progress.md."
 }
