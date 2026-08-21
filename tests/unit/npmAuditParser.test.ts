@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'fs'
-import { parseNpmAuditOutput } from '../../src/core/npmAuditParser.js'
+import { isUsableAuditReport, parseNpmAuditOutput } from '../../src/core/npmAuditParser.js'
 
 describe('parseNpmAuditOutput', () => {
   it('maps moderate/high/critical vulnerabilities and drops low/info', () => {
@@ -71,5 +71,46 @@ describe('parseNpmAuditOutput', () => {
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('unexpected npm audit output shape')
     )
+  })
+})
+
+describe('isUsableAuditReport', () => {
+  // The load-bearing case: npm audit writes this to stdout and exits non-zero when it cannot
+  // reach the registry. Captured from a live run against an unreachable registry. Treating it as
+  // a usable report is what made a failed audit report "0 vulnerabilities, tool used".
+  const registryFailure = JSON.stringify({
+    message:
+      'request to https://registry.npmjs.org/-/npm/v1/security/advisories/bulk failed, reason: connect ECONNREFUSED 127.0.0.1:9',
+    error: { summary: '', detail: '' },
+  })
+
+  it('rejects the npm audit registry-failure error object', () => {
+    expect(isUsableAuditReport(registryFailure)).toBe(false)
+  })
+
+  it('rejects unparseable output', () => {
+    expect(isUsableAuditReport('not json')).toBe(false)
+    expect(isUsableAuditReport('')).toBe(false)
+  })
+
+  it('rejects a parseable object with no vulnerabilities key', () => {
+    expect(isUsableAuditReport('{"unexpected": "shape"}')).toBe(false)
+  })
+
+  it('rejects a non-object vulnerabilities value', () => {
+    expect(isUsableAuditReport('{"vulnerabilities": "none"}')).toBe(false)
+    expect(isUsableAuditReport('null')).toBe(false)
+  })
+
+  // The discrimination that matters: a genuine clean audit must stay usable, or fixing the
+  // registry-failure bug would push every healthy zero-vulnerability run into the LLM fallback.
+  it('accepts a genuine clean audit with an empty vulnerabilities object', () => {
+    expect(isUsableAuditReport('{"auditReportVersion":2,"vulnerabilities":{}}')).toBe(true)
+  })
+
+  it('accepts a report that contains vulnerabilities', () => {
+    expect(
+      isUsableAuditReport('{"vulnerabilities":{"lodash":{"severity":"high","via":[],"range":"*"}}}')
+    ).toBe(true)
   })
 })

@@ -1,7 +1,7 @@
 import { BaseAgent } from './base.js'
 import { runTool } from '../../utils/shell.js'
 import { extractChangedFiles } from '../policyFilter.js'
-import { parseNpmAuditOutput } from '../npmAuditParser.js'
+import { isUsableAuditReport, parseNpmAuditOutput } from '../npmAuditParser.js'
 import type { AgentName, Finding, ReviewInput } from '../schema.js'
 
 export class DependenciesAgent extends BaseAgent {
@@ -34,7 +34,15 @@ export class DependenciesAgent extends BaseAgent {
       // against whatever package.json is in this process's own cwd, not the reviewed project
       // (CLI --dir / MCP repo_path routinely differ from process.cwd()).
       const output = await runTool('npm', ['audit', '--json'], undefined, true, input.projectPath)
-      if (output !== null) {
+      // WHY the shape check and not just `output !== null`: an unreachable registry makes
+      // `npm audit --json` print a JSON error object to stdout and exit non-zero. runTool ignores
+      // exit codes on purpose (npm audit exits non-zero on genuine findings too), so that error
+      // object arrived here as ordinary output, was marked 'used', and parsed to zero findings --
+      // reporting "no dependency vulnerabilities, verified by npm-audit" from an audit that never
+      // ran, while skipping the LLM fallback meant for exactly this case. Treating an unusable
+      // report as tool-unavailable routes it to that fallback and surfaces the degraded state in
+      // ReviewResult.toolAvailability instead of silently claiming a clean audit.
+      if (output !== null && isUsableAuditReport(output)) {
         this.lastToolAvailability = 'used'
         return parseNpmAuditOutput(output, this.name)
       }

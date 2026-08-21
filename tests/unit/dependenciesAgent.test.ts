@@ -98,6 +98,46 @@ describe('DependenciesAgent npm-audit integration', () => {
     expect(agent.lastToolAvailability).toBe('used')
   })
 
+  // Regression: `npm audit --json` prints a JSON error object to stdout and exits non-zero when it
+  // cannot reach the registry. runTool ignores exit codes by design, so that object used to arrive
+  // as ordinary non-null output -- the agent marked the run 'used' and the parser mapped the
+  // unrecognised shape to [], reporting "0 dependency vulnerabilities, verified by npm-audit" from
+  // an audit that never ran. Offline operation is this tool's primary use case, so that path is
+  // reachable in normal use, not just under failure injection.
+  it('treats an npm audit registry failure as tool-unavailable, not as a clean audit', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockRunTool.mockResolvedValue(
+      JSON.stringify({
+        message:
+          'request to https://registry.npmjs.org/-/npm/v1/security/advisories/bulk failed, reason: connect ECONNREFUSED',
+        error: { summary: '', detail: '' },
+      })
+    )
+    const provider = makeProvider('[]')
+    const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
+
+    await agent.run({ diff: MANIFEST_DIFF, projectPath: '.' })
+
+    expect(agent.lastToolAvailability).toBe('unavailable-llm-fallback')
+    expect(provider.chat).toHaveBeenCalled()
+    errorSpy.mockRestore()
+  })
+
+  // Guards the other direction: a healthy audit that genuinely found nothing must stay 'used'.
+  // Without this, the fix above could push every clean run into the LLM fallback and nothing
+  // would fail.
+  it('keeps a genuine zero-vulnerability audit on the tool path', async () => {
+    mockRunTool.mockResolvedValue('{"auditReportVersion":2,"vulnerabilities":{}}')
+    const provider = makeProvider('[]')
+    const agent = new DependenciesAgent(provider, DEFAULT_CONFIG)
+
+    const findings = await agent.run({ diff: MANIFEST_DIFF, projectPath: '.' })
+
+    expect(agent.lastToolAvailability).toBe('used')
+    expect(provider.chat).not.toHaveBeenCalled()
+    expect(findings).toEqual([])
+  })
+
   it('skips the LLM (and npm audit) when the diff does not touch a manifest file, regardless of projectPath', async () => {
     // WHY this changed from "falls back to the LLM": the agent's own prompt already returns []
     // when the diff has no manifest changes, so paying a full LLM call for that guaranteed-empty
