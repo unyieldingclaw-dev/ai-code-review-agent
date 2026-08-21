@@ -92,8 +92,17 @@ upgrade above, not with a local edit.
 
 - **PMB 1.2.1 upgrade** — blocked on PMB's working tree being clean (see Current Focus). Fixes the
   `last-reviewed` breakage; nothing else here depends on it.
-- **Anthropic/Claude provider** (backlog): alternative to Ollama.
 - **Marketplace publish** (VS Code extension): explicitly DEFERRED.
+
+> Removed 2026-08-20: an "Anthropic/Claude provider (backlog)" item sat here contradicting three
+> higher-authority statements — `projectbrief.md` Non-Negotiable Constraints ("Ollama-only backend
+> — no Anthropic/OpenAI API calls in the review pipeline"), `systemPatterns.md` **Never Do This**,
+> and `systemPatterns.md`'s Sequential Execution rationale, which uses "no Anthropic/Claude API
+> integration" as a load-bearing premise ("no token-cost pressure to justify accepting this
+> reliability risk"). It also contradicts the shipped product identity — `package.json` says "zero
+> API costs", the README says no cloud API calls required. No decision authorizing it exists
+> anywhere in the archive. Reinstating it is a product decision requiring a projectbrief amendment
+> plus revisiting the parallel-vs-sequential rationale, not a backlog line.
 
 ## Environment Status
 
