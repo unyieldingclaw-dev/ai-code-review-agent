@@ -169,16 +169,32 @@ export class OrchestratorAgent {
     // finding's file field verbatim (see filePath.ts's normalizeFilePath/stripDiffPrefix, shared
     // with runner.ts's CoverageGap filter). changedFiles (from extractChangedFiles) never carries
     // an a/ or b/ prefix, so also try the finding's path with it stripped before rejecting it.
+    //
+    // WHY this REWRITES f.file rather than only using the stripped form for the membership test:
+    // it used to do the latter, so an echoed prefix was enough to keep the finding but never
+    // corrected it, and every downstream consumer received a path that does not exist. Measured on
+    // the real findings.json from PR #44's CI run: 5 of 15 findings (33%) carried an a/ prefix.
+    // SARIF's artifactLocation.uri and the GitHub annotations both take this value verbatim, so
+    // GitHub cannot map the result to a file and the annotation silently lands nowhere -- the run
+    // still exits normally, which is why this went unnoticed.
+    //
+    // WHY the unstripped form is tested FIRST, and why the strip is conditional on matching a real
+    // changed file: a repository can legitimately contain a top-level directory named `a` or `b`.
+    // There, `a/src/foo.ts` IS the real path and appears in changedFiles as-is, so it matches here
+    // and is returned untouched. Only a path that fails that check and succeeds once stripped is
+    // rewritten -- an unconditional strip would corrupt such a repo's paths.
     const changedSet = new Set(changedFiles.map((p) => normalizeFilePath(p)))
-    return findings.filter((f) => {
+    return findings.flatMap((f) => {
       const normalized = normalizeFilePath(f.file)
-      if (changedSet.has(normalized) || changedSet.has(stripDiffPrefix(normalized))) return true
+      if (changedSet.has(normalized)) return [{ ...f, file: normalized }]
+      const stripped = stripDiffPrefix(normalized)
+      if (changedSet.has(stripped)) return [{ ...f, file: stripped }]
       dropped?.push({ agent: f.agent, title: f.title, file: f.file })
       console.error(
         `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- references ` +
           `${f.file}, which is not in the reviewed diff (likely a hallucinated finding)`
       )
-      return false
+      return []
     })
   }
 

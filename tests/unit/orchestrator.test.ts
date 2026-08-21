@@ -359,6 +359,39 @@ describe('OrchestratorAgent', () => {
       const findings = [finding({ id: 'correctness-0', file: 'a/src/cart/calculator.ts' })]
       const result = orch.synthesize(findings, ['src/cart/calculator.ts'])
       expect(result).toHaveLength(1)
+      // Surviving the filter was never the whole job: this assertion is what was missing, and its
+      // absence is why the prefix reached SARIF and the GitHub annotations for so long.
+      expect(result[0]?.file).toBe('src/cart/calculator.ts')
+    })
+
+    it('rewrites the echoed prefix so the emitted path actually resolves', () => {
+      // Measured on the real findings.json from PR #44's CI run: 5 of 15 findings (33%) carried an
+      // a/ prefix. filterNonexistentFiles stripped it only for the membership test and never
+      // corrected the stored value, so SARIF's artifactLocation.uri and the GitHub annotations
+      // both received a path that does not exist -- GitHub cannot map it to a file, so the
+      // annotation silently lands nowhere while the run still exits normally.
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+      const findings = [
+        finding({ id: 'security-0', file: 'a/src/core/schema.ts' }),
+        finding({ id: 'security-1', file: 'b/src/mcp/formatter.ts' }),
+      ]
+      const result = orch.synthesize(findings, ['src/core/schema.ts', 'src/mcp/formatter.ts'])
+      expect(result.map((f) => f.file).sort()).toEqual([
+        'src/core/schema.ts',
+        'src/mcp/formatter.ts',
+      ])
+    })
+
+    it('leaves the path alone when a/ is a real top-level directory in the reviewed repo', () => {
+      // The strip is deliberately conditional. A repository may legitimately contain a top-level
+      // directory named `a` or `b`; there `a/src/foo.ts` IS the real path and appears in
+      // changedFiles as-is. Testing the unstripped form first keeps it intact -- an unconditional
+      // strip would rewrite it to a path that does not exist, causing the very bug being fixed.
+      const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+      const findings = [finding({ id: 'security-0', file: 'a/src/foo.ts' })]
+      const result = orch.synthesize(findings, ['a/src/foo.ts'])
+      expect(result).toHaveLength(1)
+      expect(result[0]?.file).toBe('a/src/foo.ts')
     })
 
     it('does not filter anything when changedFiles is an empty array (fail open, not fail closed)', () => {
