@@ -192,6 +192,40 @@ describe('SecretsAgent gitleaks integration', () => {
     expect(agent.lastToolAvailability).toBe('used')
   })
 
+  // Regression: gitleaks is invoked per file. When it succeeded on some files and produced no
+  // output for others (unreadable, locked, or a shape it rejects -- files are existence-filtered
+  // first, so absence is already excluded), gitleaksRan was true from the successes alone and the
+  // agent reported a COMPLETED secret scan. The file holding an actual credential may be one of
+  // the ones silently skipped, so a partial scan must not be presented as a finished one.
+  it('does not report a completed scan when gitleaks skipped some files', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const TWO_FILE_DIFF = `diff --git a/src/core/config.ts b/src/core/config.ts
+--- a/src/core/config.ts
++++ b/src/core/config.ts
+@@ -1,1 +1,1 @@
+-old
++new
+diff --git a/src/core/schema.ts b/src/core/schema.ts
+--- a/src/core/schema.ts
++++ b/src/core/schema.ts
+@@ -1,1 +1,1 @@
+-old
++new`
+    // First file scans clean, second produces no stdout (gitleaks failed on it).
+    mockRunTool.mockResolvedValueOnce('[]').mockResolvedValueOnce(null)
+    const provider = makeProvider('[]')
+    const agent = new SecretsAgent(provider, DEFAULT_CONFIG)
+
+    await agent.run({ diff: TWO_FILE_DIFF })
+
+    expect(agent.lastToolAvailability).not.toBe('used')
+    expect(provider.chat).toHaveBeenCalled()
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('falling back to the LLM so they are not left unscanned')
+    )
+    errorSpy.mockRestore()
+  })
+
   it('falls back to the LLM when gitleaks is not installed', async () => {
     mockRunTool.mockResolvedValue(null)
     const provider = makeProvider('[]')
