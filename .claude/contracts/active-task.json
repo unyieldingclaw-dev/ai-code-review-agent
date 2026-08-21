@@ -1,20 +1,24 @@
 {
-  "task": "Close the remaining ACR-owned findings from the 2026-08-21 review-gate session: give DependenciesAgent a falsifying calibration case via per-case projectPath (runtime-materialised vulnerable project, so no scannable lockfile is committed and no permanent Dependabot alerts are created), decouple license-clean from ACR's own lockfile, make calibration failures diagnosable by printing actual findings, stop SecretsAgent reporting an unqualified 'used' when gitleaks silently skipped files it could not read, and bound the ai-review workflow with a timeout plus scoping off docs-only PRs.",
+  "task": "Close the two items deferred from PR #42: add a 'partial' ToolAvailability value so SecretsAgent reports a partial gitleaks scan truthfully instead of claiming the tool was unavailable, and decouple the license-clean calibration case from ACR's own lockfile via a dedicated fixture lockfile carrying license metadata.",
   "status": "complete",
-  "created_at": "2026-08-21T14:45:58Z",
-  "expires_at": "2026-08-21T22:45:58Z",
-  "approved_by": "user (explicit 'approved' after two rounds of scope review; the second round added the SecretsAgent partial-scan fix and downgraded expectedFile to measure-first)",
+  "created_at": "2026-08-21T16:05:00Z",
+  "expires_at": "2026-08-22T00:05:00Z",
+  "approved_by": "user (explicit approval in the prior session, recorded in handoff.md; the contract JSON was never written before that session ended, so this file is written fresh rather than reactivated)",
   "scope": [
-    { "file": ".claude/contracts/active-task.json", "op": "edit" },
-    { "file": "calibration/calibrate.ts", "op": "edit" },
-    { "file": "calibration/fixtures/vulnerable-lockfile.json", "op": "create" },
-    { "file": "calibration/fixtures/dependencies-vulnerable.diff", "op": "create" },
+    { "file": ".claude/contracts/active-task.json", "op": "create" },
+    { "file": "src/core/schema.ts", "op": "edit" },
     { "file": "src/core/agents/secrets.ts", "op": "edit" },
+    { "file": "src/cli/formatter.ts", "op": "edit" },
     { "file": "tests/unit/secretsAgent.test.ts", "op": "edit" },
-    { "file": ".github/workflows/review.yml", "op": "edit" },
+    { "file": "tests/unit/formatters/markdown.test.ts", "op": "edit" },
+    { "file": "tests/unit/licenseFacts.test.ts", "op": "edit", "added_mid_task": true },
+    { "file": "calibration/fixtures/license-clean-lockfile.json", "op": "create" },
+    { "file": "calibration/calibrate.ts", "op": "edit" },
+    { "file": "memory-bank/archive/progress-history.md", "op": "edit" },
+    { "file": "memory-bank/progress.md", "op": "edit" },
     { "file": "memory-bank/activeContext.md", "op": "edit" },
-    { "file": "memory-bank/progress.md", "op": "edit" }
+    { "file": "handoff.md", "op": "delete" }
   ],
-  "completion_note": "Delivered within the declared scope; no file outside it was written. expectedFile was NOT added: it was to be measured first, and the dependencies-vulnerable case turned out to make the falsifiability point without it, so adding a second assertion mode was unjustified on current evidence. license-clean decoupling was NOT done: the mechanism it needs (projectPathFixture) now exists, but a second fixture lockfile carrying license metadata is a file outside the declared scope, so it was left as a follow-up rather than widening scope mid-task. SecretsAgent's partial-scan fix routes to the LLM fallback rather than introducing a 'partial' ToolAvailability value, because that union is consumed by the markdown/SARIF/MCP formatters and schema.ts was not in scope. Note for the next session: memory-bank/progress.md is now at exactly 400/400 lines, the CI-enforced cap, so the next entry requires archiving to memory-bank/archive/ first.",
-  "scope_note": "expectedFile is deliberately NOT in scope as a deliverable. It was proposed as the durable fix for wording-dependent assertions but rests on a single observation that Finding.file is stable across runs -- the same one-observation confidence that produced a 4/6-flaky assertion earlier in the session. It will be measured first and only added if the measurement supports it; if it is added, calibrate.ts is already in scope. The vulnerable lockfile is committed under a non-lockfile filename (vulnerable-lockfile.json) and copied to package-lock.json in a temp directory at run time: Dependabot security alerts key on the package-lock.json filename, so this keeps the fixture deterministic and committed without degrading the repo's npm audit 0 signal."
+  "completion_note": "Both deferred items delivered; every write landed inside the declared scope, nothing outside it. The PR #42 deferral rationale was re-checked rather than inherited and proved wrong -- the 'partial' ripple was one filter in formatter.ts, not the markdown/SARIF/MCP spread the code comment claimed; a clean typecheck after widening the union confirmed no exhaustive switch existed. Both new tests were verified to FAIL against pre-change behavior (the partial assertion failed with expected 'unavailable-llm-fallback' to be 'partial', exactly one test). The license fixture was verified by resolving allAddedDependenciesArePermissive against the materialised directory (commander=MIT) with an empty-directory control returning verified:false, proving the fixture rather than ambient repo state does the work. Archiving moved the 2026-08-18 section to archive/progress-history.md: progress.md 400 -> 216, activeContext 129 -> 139, both under the CI caps. Two working conventions from the handoff (write the review marker in a separate tool call from the push; verify a regression test fails against old code first) were recorded in activeContext.md rather than systemPatterns.md, which is their proper home but was outside this scope -- flagged to the user for promotion. SCOPE EXTENSION, user-approved mid-task: tests/unit/licenseFacts.test.ts was added to scope after an opponent audit found licenseCompliance.ts:35 short-circuits before reading the lockfile when the LLM returns zero findings, so the new fixture was exercised only on model-misfire runs of a weekly (non-PR-gating) calibration job -- nothing deterministic pinned it. The user was asked rather than assumed, chose to extend scope, and the added test was confirmed to fail when the fixture's license field is removed.",
+  "scope_note": "PR #42 deliberately deferred both items and recorded why in code comments: secrets.ts claimed the 'partial' ripple reached markdown/SARIF/MCP consumers. Verified in the handoff session that this was wrong -- formatter.ts:114 is the only site branching on the value; sarif.ts:109 and chunkRunner.ts:150 pass the object through opaquely, src/mcp/ never reads it, and no exhaustive switch exists. Those stale comments are removed as part of this change. ComplexityAgent is explicitly NOT given 'partial' handling: complexity.ts:58 passes all files to lizard in one invocation, so no per-file skip is possible there. handoff.md is deleted per the Handoff Protocol once its content is merged into the memory bank. memory-bank/progress.md sits at exactly 400/400 lines, the CI-enforced cap, so archiving precedes any new entry."
 }

@@ -245,19 +245,27 @@ const CASES: CalibrationCase[] = [
     // model could echo back as a fabricated finding on a diff with nothing to report. This
     // fixture only adds a permissive-licensed (MIT) package -- the agent must return nothing.
     //
-    // Uses `commander` specifically, NOT an arbitrary MIT package: it is a real dependency of this
-    // repo, so it resolves in package-lock.json and the deterministic ground-truth filter in
-    // licenseFacts.ts can actually verify it. The fixture previously added `lodash`, which is not
-    // a dependency here and therefore resolves nowhere -- that made this case a pure test of model
-    // recall, which measured 6/10 FAILING (the model asserted LGPL-3.0 for lodash with
+    // The fixture adds `commander`, NOT an arbitrary MIT package, so licenseFacts.ts's
+    // deterministic ground-truth filter can resolve it and actually verify the claim. It
+    // previously added `lodash`, which resolves nowhere here -- that made this a pure test of
+    // model recall, measured 6/10 FAILING (the model asserted LGPL-3.0 for lodash with
     // basis=VERIFIED, and in one trial named MIT correctly yet still filed a high-severity
-    // finding). With a resolvable package this asserts the real mechanism instead. NOTE: packages
-    // that resolve nowhere still fall back to model recall by design (licenseFacts.ts fails open
-    // so a genuine LGPL detection like license.diff's `node-lame` survives) -- that residual is
-    // mitigated by prompt wording only, not deterministically.
+    // finding).
+    //
+    // `commander` resolves against its OWN fixture lockfile rather than ACR's: the case used to
+    // pass only because commander happens to be a real dependency of this repo, i.e. it asserted
+    // against this repo's incidental dependency set instead of the mechanism, and dropping the
+    // dependency would have silently reverted it to the model-recall configuration above. Same
+    // root cause the `dependencies` case hit from the other direction, where the repo's state
+    // moving (npm audit reaching 0) broke a green case outright.
+    //
+    // NOTE: packages that resolve nowhere still fall back to model recall by design
+    // (licenseFacts.ts fails open so a genuine LGPL detection like license.diff's `node-lame`
+    // survives) -- that residual is mitigated by prompt wording only, not deterministically.
     name: 'license-clean',
     agentName: 'license',
     fixtureFile: 'calibration/fixtures/license-clean.diff',
+    projectPathFixture: 'license-clean-lockfile.json',
     expectEmpty: true,
   },
   {

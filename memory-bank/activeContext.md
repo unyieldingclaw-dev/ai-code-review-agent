@@ -16,7 +16,7 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-20
+**Last Updated**: 2026-08-21
 
 ## Current Focus
 
@@ -29,18 +29,34 @@ against Ollama across three separate agents and failed every time — for `licen
 it _worse_ (6/10 → 9/10) — matching what `secrets.ts` already recorded for
 `hasCredentialShapedValue`. Measurements and the review/audit rounds are in `progress.md`.
 
-**Calibration is now falsifiable (2026-08-21).** The 21–22/22 score used to aggregate assertions of
-very different strength — three cases asserted on the agent's own domain vocabulary, and
-`DependenciesAgent` had **no** case that could fail (both were `expectEmpty`, so an agent returning
-`[]` passed). Added `dependencies-vulnerable` plus a per-case `projectPathFixture` so tool-backed
-cases run against their own materialised project instead of this repo's incidental state. Keyword
-strengthening is measured, not assumed: `calculateShippingCost` 5/5, `notifyWebhook` 4/4,
-`cancelOrder` 4/6 → reverted. Failing cases now print what the agent actually returned. Details in
-`progress.md`.
+**Calibration is now falsifiable, and no case is coupled to this repo's own state (2026-08-21).**
+The 21–22/22 score used to aggregate assertions of very different strength — three cases asserted on
+the agent's own domain vocabulary, and `DependenciesAgent` had **no** case that could fail (both
+were `expectEmpty`, so an agent returning `[]` passed). Added `dependencies-vulnerable` plus a
+per-case `projectPathFixture` so tool-backed cases run against their own materialised project.
+`license-clean` was then moved onto its own `license-clean-lockfile.json` — it had passed only
+because `commander` happens to be an ACR dependency. Keyword strengthening is measured, not assumed:
+`calculateShippingCost` 5/5, `notifyWebhook` 4/4, `cancelOrder` 4/6 → reverted. Failing cases now
+print what the agent actually returned. Details in `progress.md`.
 
-**Verified state:** 726 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
+**`ToolAvailability` gained `'partial'` (2026-08-21).** A partial gitleaks scan used to report
+`'unavailable-llm-fallback'`, telling readers to install a tool that was already installed. The
+prior session deferred this believing it rippled into markdown/SARIF/MCP; **that was checked and was
+wrong** — `formatter.ts` is the only site branching on the value. Generalisable lesson: a deferral
+rationale recorded in a code comment is a claim, not a finding, and is worth re-checking before
+inheriting it.
+
+**Verified state:** 728 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
-use `grep "orchestrator] dropped"` to tell a real filter regression from model variance.
+use `grep "orchestrator] dropped"` to tell a real filter regression from model variance. Target one
+case with `CALIBRATION_CASE=name1,name2` rather than running all 21.
+
+**Two working conventions from this session** (belong in `systemPatterns.md` alongside the other
+review-gate rules; left here because that file was outside the approved contract scope):
+write the review marker in a **separate tool call** from the push — the PreToolUse hook checks
+before the command runs, so doing both in one call always fails. And verify a regression test
+actually FAILS against the old code before trusting it; every test added 2026-08-21 was confirmed
+that way.
 
 **Review-gate tooling investigation (2026-08-20).** Dogfooding `/code-review` and `/change-review`
 surfaced twelve defects in the PMB-owned hook scripts, all sharing one shape: the enforcement did
@@ -67,8 +83,18 @@ upgrade above, not with a local edit.
 
 - Claim matchers are regexes over model prose. Both audit rounds found false negatives there; the
   evidence side has produced none. That is the fragile half.
-- Two calibration cases were coupled to this repo's own state (`license-clean`, `dependencies`) —
-  worth auditing the rest for the same shape.
+- The two calibration cases coupled to this repo's own state (`license-clean`, `dependencies`) are
+  both closed. The remaining cases have not been audited for the same shape.
+- **MCP output ignores `toolAvailability` entirely** (`src/mcp/formatter.ts` reads only
+  `agentStatus`/`truncation`). A partial scan, a not-installed tool, and a clean tool run are
+  indistinguishable to a calling LLM — the reader least able to notice. Pre-existing, not caused by
+  `'partial'`; found by an opponent audit 2026-08-21.
+- `chunkRunner.ts:150` merges `toolAvailability` last-chunk-wins, so a `'partial'` first chunk
+  followed by a `'used'` one reports a complete scan. Opt-in `--chunk` only; its
+  accepted-simplification comment predates `'partial'` existing.
+- The `ai-review` CI runner can hang indefinitely (observed 43 min without starting step 1). This is
+  environment-side — the runner runs interactively via `run.cmd`, not as a supervised service, so
+  nothing restarts it. `review.yml`'s `timeout-minutes: 45` is a backstop, not a fix.
 
 > Prior session history: [`archive/activeContext-history.md`](archive/activeContext-history.md).
 
@@ -84,7 +110,7 @@ upgrade above, not with a local edit.
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, 20min timeout. Calibration is nondeterministic — 21–22/22
   is normal; a single failing case is usually model variance, not a regression.
-- **717 unit tests**; `npm audit` clean (prod + dev)
+- **728 unit tests**; `npm audit` clean (prod + dev)
 - `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
   LLM entirely; `ReviewResult.toolAvailability` surfaces degraded-mode fallback (markdown + SARIF)
 - `src/core/parsing.ts`: `validateAndNormalizeFindings()` extracted from BaseAgent (SRP)
@@ -115,15 +141,6 @@ upgrade above, not with a local edit.
 
 ## Environment Status
 
-**Infrastructure**: Ollama must be running on port 11434 for integration tests and calibration (not required for unit tests)
-
-**Git**: `main`, clean, at `v1.12.1`.
-
-## Key Commands
-
-```bash
-npm test                    # all unit tests (717 passing)
-npm run typecheck           # 0 errors
-npm run build               # compile to dist/
-node dist/cli/index.js --help   # smoke test CLI
-```
+**Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
+unit tests. **Git**: `main` at `v1.12.1`. Commands are in `techContext.md`; `npm run check` covers
+typecheck/build/format/lint/test in one pass.

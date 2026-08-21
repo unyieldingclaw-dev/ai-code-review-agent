@@ -113,6 +113,23 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
   const degradedTools = (Object.keys(TOOL_LABELS) as (keyof ToolAvailabilityMetadata)[]).filter(
     (t) => result.toolAvailability?.[t] === 'unavailable-llm-fallback'
   )
+  // WHY a separate note rather than folding 'partial' into the degraded list: the degraded message
+  // below says the tool is not installed and tells the reader to install it. For a partial scan
+  // that advice is wrong -- the tool is installed and did run; what needs attention is the files it
+  // could not cover, whose findings came from the model instead.
+  const partialTools = (Object.keys(TOOL_LABELS) as (keyof ToolAvailabilityMetadata)[]).filter(
+    (t) => result.toolAvailability?.[t] === 'partial'
+  )
+  if (partialTools.length > 0) {
+    const names = partialTools.map((t) => TOOL_LABELS[t]).join(', ')
+    lines.push(
+      `${useEmoji ? '🔧 ' : ''}Partial scan: ${names} ran but could not cover every changed ` +
+        `file — the affected agent(s) also ran the LLM over the diff so nothing was left ` +
+        `unscanned. Findings for the skipped files come from the model, not the tool.`
+    )
+    lines.push('')
+  }
+
   if (degradedTools.length > 0) {
     const names = degradedTools.map((t) => TOOL_LABELS[t]).join(', ')
     // WHY not "falling back to LLM-only": true for gitleaks/npm-audit (they replace the LLM call

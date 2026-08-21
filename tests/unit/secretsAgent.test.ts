@@ -218,7 +218,7 @@ diff --git a/src/core/schema.ts b/src/core/schema.ts
 
     await agent.run({ diff: TWO_FILE_DIFF })
 
-    expect(agent.lastToolAvailability).not.toBe('used')
+    expect(agent.lastToolAvailability).toBe('partial')
     expect(provider.chat).toHaveBeenCalled()
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('falling back to the LLM so they are not left unscanned')
@@ -226,6 +226,9 @@ diff --git a/src/core/schema.ts b/src/core/schema.ts
     errorSpy.mockRestore()
   })
 
+  // Also the falsifying counterpart to the 'partial' assertion above: gitleaks produced nothing on
+  // ANY file here, so nothing was scanned and 'unavailable-llm-fallback' is the truthful value.
+  // If the partial branch were widened to fire whenever any file was skipped, this would fail.
   it('falls back to the LLM when gitleaks is not installed', async () => {
     mockRunTool.mockResolvedValue(null)
     const provider = makeProvider('[]')
