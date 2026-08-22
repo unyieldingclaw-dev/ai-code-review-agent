@@ -43,6 +43,7 @@
     "test:watch": "vitest tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:coverage": "vitest run --coverage tests/unit",
+    "test:docker": "node scripts/test-docker.mjs",
     "calibrate": "tsx calibration/calibrate.ts",
     "calibrate:evidence": "tsx calibration/evidenceVerifierCalibration.ts",
     "diagnose:truncation": "tsx calibration/responseTruncationDiagnostic.ts",
