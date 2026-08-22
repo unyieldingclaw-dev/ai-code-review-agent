@@ -5,18 +5,82 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.13.0] — 2026-08-21 (honest reporting: partial scans, resolvable paths, pre-image findings)
+
+Every fix in this release closes a case where the tool reported something more favourable than
+what actually happened. None changed what the agents look for; they changed what the tool is
+willing to claim.
+
+### Fixed
+
+- **A partial gitleaks scan no longer reports as a completed one.** gitleaks runs per file, and
+  success on some files plus no output on others still claimed a finished scan. `ToolAvailability`
+  gains a `'partial'` value, distinct from `'unavailable-llm-fallback'` — the latter asserts the
+  tool never ran, which for a partial scan is false and points a reader at installing a tool they
+  already have instead of asking why files were skipped. Surfaced in markdown and SARIF, and
+  merged across `--chunk` runs so a partial first chunk is not masked by a clean second one.
+- **A failed `npm audit` no longer reports a clean dependency scan.** Offline, `npm audit --json`
+  writes a JSON error object to stdout and exits non-zero; `runTool` ignores exit codes by design,
+  so the agent marked the tool `'used'` and the parser mapped the error shape to zero
+  vulnerabilities. Offline is this tool's primary use case.
+- **Finding file paths now resolve.** `filterNonexistentFiles` stripped the diff's echoed `a/`
+  prefix only for its membership test and never corrected the stored value, so a surviving finding
+  still carried a path that does not exist. Measured on a real CI run: 5 of 15 findings (33%)
+  were affected. SARIF's `artifactLocation.uri` and the GitHub annotations take this field
+  verbatim, so GitHub could not map those results to a file and the annotations silently landed
+  nowhere. The strip is conditional — a repository with a genuine top-level `a/` or `b/` directory
+  keeps its real paths.
+- **MCP output now surfaces tool availability.** `formatMcpOutput` read only `agentStatus` and
+  `truncation`, so a partial scan, a missing tool, and a fully clean run were indistinguishable to
+  the calling LLM — the reader least able to notice, having no terminal output to fall back on.
+  A degraded tool does not downgrade the headline to "incomplete": the agent ran in a documented
+  degraded mode and returned a real result, unlike a failed agent or a truncated diff.
+- **Findings that report deleted code are dropped.** Agents cited the removed side of a diff as a
+  current defect — in one real case flagging a merge the diff removes and recommending, as the
+  fix, the function the same diff adds. A finding whose evidence is provably quoted from deleted
+  lines and absent from the resulting code is now filtered out. Fail-open by construction:
+  paraphrased evidence matches nothing and the finding is kept.
+
+### Changed
+
+- `TOOL_LABELS` moved to `src/core/schema.ts` beside `ToolAvailabilityMetadata`, keyed off
+  `keyof ToolAvailabilityMetadata`, so a new tool integration is a compile error until every
+  renderer accounts for it rather than silently drifting.
+
+### Internal
+
+- Calibration assertions are falsifiable. `DependenciesAgent` previously had no case that could
+  fail (both were `expectEmpty`, so an agent returning `[]` passed — proven by patching it to do
+  exactly that). Added `dependencies-vulnerable` and `performance-postimage-clean`, plus a
+  per-case `projectPathFixture` so tool-backed cases run against their own materialised project
+  instead of this repository's incidental state. `CALIBRATION_CASE=name1,name2` targets a subset.
+- `.claude/settings.json` denies commit-signing and hook bypass flags, and `gh pr merge`.
+- 753 unit tests (from 717).
+
 ### Security
 
-- `release.yml` now publishes to npm via Trusted Publishing (OIDC) instead of a long-lived
-  `NPM_TOKEN` secret — npm exchanges the workflow's existing `id-token: write` OIDC token for a
-  short-lived publish credential scoped to this exact repo/workflow, verified against a Trusted
-  Publisher relationship configured on npmjs.com. Requires npm CLI >= 11.5.1, so added an explicit
-  `npm install -g npm@latest` step rather than relying on whatever version `setup-node` bundles
-  with Node 24. Removed the now-dead `NODE_AUTH_TOKEN` env var, the expiry-reminder step, and
-  `scripts/setup-npm-token.ps1` (existed solely to bootstrap the token this replaces). No
-  `NPM_TOKEN` GitHub secret is required going forward.
+- `gitleaks-action` pinned from v2 to v3 (Node 20 → Node 24 runtime). The pinned v2 emitted a Node
+  20 deprecation warning on every release run, and Node 20 leaves GitHub-hosted runners
+  2026-09-16; the secret-scan step is not `continue-on-error`, so it would have hard-failed the
+  release pipeline. The `# Pinned to v2 tag SHA` comment above the new SHA was corrected in the
+  same round — in a supply-chain pin that comment is the only human-readable check that the opaque
+  SHA is what it claims to be.
 
 ## [1.12.1] — 2026-08-19 (agent-count accuracy, truncation hint)
+
+### Security
+
+- `release.yml` publishes to npm via Trusted Publishing (OIDC) instead of a long-lived `NPM_TOKEN`
+  secret — npm exchanges the workflow's existing `id-token: write` OIDC token for a short-lived
+  publish credential scoped to this exact repo/workflow, verified against a Trusted Publisher
+  relationship configured on npmjs.com. Requires npm CLI >= 11.5.1, so an explicit
+  `npm install -g npm@latest` step was added rather than relying on whatever version `setup-node`
+  bundles with Node 24. Removed the now-dead `NODE_AUTH_TOKEN` env var, the expiry-reminder step,
+  and `scripts/setup-npm-token.ps1` (existed solely to bootstrap the token this replaces). No
+  `NPM_TOKEN` GitHub secret is required going forward.
+  <br>_(Entry relocated in 1.13.0: this shipped as part of 1.12.1 — the change is an ancestor of
+  the `v1.12.1` tag and that release was itself published through it — but the note was left in
+  `[Unreleased]` when the tag was cut.)_
 
 ### Fixed
 
