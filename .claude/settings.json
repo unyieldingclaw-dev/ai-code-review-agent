@@ -95,6 +95,16 @@
     ]
   },
   "permissions": {
+    "deny": [
+      "Bash(git -c commit.gpgsign=false *)",
+      "Bash(git -c commit.gpgsign=0 *)",
+      "Bash(git -c commit.gpgSign=false *)",
+      "Bash(git commit --no-gpg-sign *)",
+      "Bash(git commit --no-verify *)",
+      "Bash(git push --no-verify *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh pr merge)"
+    ],
     "allow": [
       "Bash(git *)",
       "Bash(npm run *)",
