@@ -1026,3 +1026,67 @@ describe('OrchestratorAgent.synthesize — pre-image findings', () => {
     expect(result).toHaveLength(1)
   })
 })
+
+describe('OrchestratorAgent.synthesize — same-agent repeated findings', () => {
+  // Measured on the real findings.json from PR #44's CI run: `adversarial` emitted 5 findings at
+  // src/core/schema.ts:196 which are really 2 concerns repeated, so 3 redundant entries reached
+  // the report. deduplicate() kept them because same-agent same-location findings are preserved
+  // deliberately -- one agent can report two different issues on one line -- and the predicate
+  // could not tell that apart from one issue emitted several times.
+  const at = (over: Partial<Finding>) =>
+    finding({ agent: 'adversarial', file: 'src/core/schema.ts', line: 196, ...over })
+
+  it('collapses one agent repeating the same title at the same location', () => {
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const result = orch.synthesize([
+      at({ id: 'a-0', title: 'Null/undefined where not expected' }),
+      at({ id: 'a-2', title: 'Null/undefined where not expected' }),
+      at({ id: 'a-4', title: 'Null/undefined where not expected' }),
+    ])
+    expect(result).toHaveLength(1)
+  })
+
+  it('keeps two DISTINCT titles from the same agent at the same location', () => {
+    // The trap: all five real findings carried byte-identical evidence while splitting across two
+    // legitimate titles. Keying the collapse on evidence would merge these and delete a finding
+    // class outright -- a false negative, the direction that actually costs something.
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const result = orch.synthesize([
+      at({ id: 'a-0', title: 'Null/undefined where not expected', evidence: 'same text' }),
+      at({ id: 'a-1', title: 'Empty collections', evidence: 'same text' }),
+    ])
+    expect(result.map((f) => f.title).sort()).toEqual([
+      'Empty collections',
+      'Null/undefined where not expected',
+    ])
+  })
+
+  it('keeps the highest severity when repeats disagree, rather than the first or last', () => {
+    // The second trap: severity varied within a title group in the real sample (high, medium,
+    // medium). Taking the first or last would silently downgrade a high to a medium as a side
+    // effect of removing duplicates.
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const result = orch.synthesize([
+      at({ id: 'a-0', title: 'Null/undefined where not expected', severity: 'medium' }),
+      at({ id: 'a-2', title: 'Null/undefined where not expected', severity: 'high' }),
+      at({ id: 'a-4', title: 'Null/undefined where not expected', severity: 'medium' }),
+    ])
+    expect(result).toHaveLength(1)
+    expect(result[0]?.severity).toBe('high')
+  })
+
+  it('also collapses repeats in the multi-agent branch, where `kept` is a filter not a find', () => {
+    // `kept = group.filter(f => f.agent === bestAgent)` is plural, so a winning agent that
+    // repeated itself would otherwise still emit both copies after the cross-agent merge.
+    const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+    const result = orch.synthesize([
+      finding({ id: 's-0', agent: 'secrets', file: 'src/a.ts', line: 10, title: 'Hardcoded key' }),
+      finding({ id: 's-1', agent: 'secrets', file: 'src/a.ts', line: 10, title: 'Hardcoded key' }),
+      finding({ id: 'c-0', agent: 'coverage', file: 'src/a.ts', line: 10, title: 'No coverage' }),
+    ])
+    expect(result).toHaveLength(1)
+    expect(result[0]?.agent).toBe('secrets')
+    // The cross-agent merge must survive the collapse, not be read off one arbitrary member.
+    expect(result[0]?.corroboratingAgents).toContain('coverage')
+  })
+})

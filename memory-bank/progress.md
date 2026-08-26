@@ -16,9 +16,45 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-21
+**Last Updated**: 2026-08-26
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
+
+## ✅ Completed (2026-08-26)
+
+**Bug D closed — same-agent repeated findings no longer reach the report.** `deduplicate()` keeps
+same-agent same-location findings on purpose, since one agent can report two different issues on one
+line, but the predicate could not tell that apart from one issue emitted several times. Measured on
+the real `findings.json` from PR #44's CI run: `adversarial` produced 5 findings at
+`src/core/schema.ts:196` that are really 2 concerns repeated. After the fix that run goes 15 → 11
+findings with zero duplicates, both titles intact and the `high` severity preserved.
+
+**Two design decisions the real artifact forced, both of which the obvious implementation gets
+wrong:**
+
+- **Key on title, never on evidence.** All 5 findings carry byte-identical evidence while splitting
+  across two legitimate titles. An evidence-keyed collapse merges two distinct concerns and deletes
+  a finding class outright — a false negative, the direction that costs something.
+- **Keep the highest-severity member.** Severity varied _within_ a title group (high, medium,
+  medium). Taking the first or last silently downgrades a high to a medium as a side effect of
+  removing duplicates.
+
+**`basis` is in the collapse key, and an existing test is why.** The first implementation keyed on
+title alone and broke `excludes SPECULATIVE findings below high severity` — a SPECULATIVE high and a
+VERIFIED medium sharing a title collapsed into one, and since `collapseRepeats` runs _before_
+`applyPublicationFilter`, the survivor decided that finding's fate. Adding `basis` is strictly more
+conservative and costs no real coverage: every repeated group in the measured sample shares one
+basis. The failing test was a genuine signal, not a fixture artifact.
+
+**The deferral rationale was wrong and was corrected before implementing.** When deferring this the
+stated risk was that tightening the predicate "touches the corroboration path that feeds severity
+escalation." Investigation showed `corroboratingAgents`/`relatedFindings` are only ever _set_ in the
+multi-agent branch, and the fix unions them rather than discarding them. Blast radius smaller than
+claimed. The collapse also had to apply to **both** branches — `kept` in the multi-agent path is
+`group.filter(...)`, plural, so it leaked duplicates too.
+
+3 of 4 new tests fail against the old behaviour; the fourth (two distinct titles survive) passes
+under both by design — a guard against over-suppression, not regression coverage. **757 tests.**
 
 ## ✅ Completed (2026-08-21, fourth session)
 

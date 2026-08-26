@@ -299,10 +299,68 @@ export class OrchestratorAgent {
     })
   }
 
+  /**
+   * Collapses findings from ONE agent at ONE location that repeat the same title.
+   *
+   * WHY this is needed on top of deduplicate()'s cross-agent merge: keeping every same-agent
+   * finding at a location is deliberate -- one agent can legitimately report two different issues
+   * on one line -- but the predicate was too coarse to tell that apart from the same issue emitted
+   * several times. Measured on the real findings.json from PR #44's CI run: `adversarial` reported
+   * 5 findings at src/core/schema.ts:196, which are really 2 concerns repeated, so 3 redundant
+   * entries reached the report.
+   *
+   * WHY the key is the TITLE and not the evidence: in that same real sample all 5 findings carry
+   * byte-identical evidence while splitting across two legitimate titles ("Null/undefined where
+   * not expected" x3 and "Empty collections" x2). Keying on evidence would merge those two
+   * distinct concerns into one and silently delete a finding class -- a false negative, which is
+   * the direction that actually costs something.
+   *
+   * WHY the survivor is the highest-severity member and not simply the first: severity varies
+   * WITHIN a title group in that sample (high, medium, medium). Taking the first or last would
+   * quietly downgrade a high-severity finding to medium as a side effect of removing duplicates,
+   * which is exactly the kind of unearned reassurance this filter exists to prevent.
+   *
+   * corroboratingAgents/relatedFindings are unioned across the collapsed members rather than read
+   * off the survivor, so nothing the cross-agent merge recorded is lost.
+   */
+  private collapseRepeats(group: Finding[]): Finding[] {
+    if (group.length < 2) return group
+    const byTitle = new Map<string, Finding[]>()
+    for (const f of group) {
+      // `basis` is part of the key so two findings differing in evidential strength are never
+      // merged. Caught by an existing publication-filter test: without it, a SPECULATIVE high and
+      // a VERIFIED medium sharing a title collapsed into one, and since this runs BEFORE
+      // applyPublicationFilter the survivor decided that finding's fate. Real duplicates do not
+      // need the looser key -- every repeated group in the measured sample shares one basis.
+      const key = `${f.basis ?? ''}|${f.title.trim().toLowerCase()}`
+      byTitle.set(key, [...(byTitle.get(key) ?? []), f])
+    }
+
+    const out: Finding[] = []
+    for (const repeats of byTitle.values()) {
+      if (repeats.length === 1) {
+        out.push(repeats[0]!)
+        continue
+      }
+      const survivor = repeats.reduce((best, f) =>
+        SEVERITY_RANK[f.severity] > SEVERITY_RANK[best.severity] ? f : best
+      )
+      const corroborating = [...new Set(repeats.flatMap((f) => f.corroboratingAgents ?? []))]
+      const related = [...new Set(repeats.flatMap((f) => f.relatedFindings ?? []))]
+      out.push({
+        ...survivor,
+        ...(corroborating.length > 0 ? { corroboratingAgents: corroborating } : {}),
+        ...(related.length > 0 ? { relatedFindings: related } : {}),
+      })
+    }
+    return out
+  }
+
   private deduplicate(findings: Finding[]): Finding[] {
     // Group by file:line; within each group, if multiple different agents reported,
     // keep only the highest-priority agent's finding and record all other agents in
-    // corroboratingAgents. Same-agent findings at the same location are kept as-is.
+    // corroboratingAgents. Same-agent findings at the same location are kept -- but one
+    // agent repeating ITSELF verbatim is collapsed first (see collapseRepeats).
     const byLocation = new Map<string, Finding[]>()
     for (const f of findings) {
       const key = `${stripDiffPrefix(normalizeFilePath(f.file))}:${f.line}`
@@ -315,8 +373,7 @@ export class OrchestratorAgent {
     for (const group of byLocation.values()) {
       const agents = new Set(group.map((f) => f.agent))
       if (agents.size === 1) {
-        // All from same agent — keep all as-is
-        result.push(...group)
+        result.push(...this.collapseRepeats(group))
       } else {
         // Multiple agents at same location — keep highest-priority agent's finding,
         // merge all other agents into corroboratingAgents
@@ -329,7 +386,9 @@ export class OrchestratorAgent {
             bestAgent = agent
           }
         }
-        const kept = group.filter((f) => f.agent === bestAgent)
+        // collapseRepeats here too: `kept` is a filter, not a find, so a best-priority agent that
+        // reported the same title twice at this location would otherwise still emit both.
+        const kept = this.collapseRepeats(group.filter((f) => f.agent === bestAgent))
         const dropped = group.filter((f) => f.agent !== bestAgent)
         const droppedAgents = [...new Set(dropped.map((f) => f.agent))]
         const droppedIds = dropped.map((f) => f.id)
