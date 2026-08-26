@@ -37,7 +37,15 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
   if (truncation?.truncated) {
     lines.push(
       `${useEmoji ? '⚠️ ' : ''}Diff truncated: reviewed ${truncation.keptLines}/${truncation.originalLines} lines — ` +
-        `findings past this point were never analyzed. Raise --max-lines to review the full diff.`
+        // Advice deliberately matches runner.ts's stderr hint, which PR #33 corrected to recommend
+        // --chunk FIRST: chunking reviews the whole diff while keeping each pass at maxDiffLines,
+        // whereas raising --max-lines grows a single prompt, which on CPU-offloaded hardware is
+        // what pushes agents past their timeout. This copy was missed by that fix and still
+        // recommended the option that makes the other failure worse -- two hints in the same run
+        // giving opposite advice, three lines apart in the report.
+        `findings past this point were never analyzed. Use --chunk to review the whole diff in ` +
+        `same-size passes, or raise --max-lines to review it in one larger pass (slower per ` +
+        `agent, and more likely to time out).`
     )
     lines.push('')
   }
@@ -158,9 +166,19 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
       // warning above entirely. A real bug report: a 12,599-line diff truncated to 2,000
       // (--max-lines default) still ended in an unqualified "No issues found," reading as a clean
       // full pass when only ~16% of the diff was actually reviewed.
+      //
+      // WHY the glyph is ⚠️ and the line leads with INCOMPLETE rather than keeping ✅ with
+      // qualifying text after it: qualifying text was the first fix, and it was not enough. A
+      // second report (10,039-line diff, 2,000 reviewed) still read the result as a pass, because
+      // a green check is absorbed before the sentence next to it -- the glyph IS the verdict for a
+      // skimming reader, and it was contradicting its own caption. mcp/formatter.ts already refuses
+      // to render a truncated run as clean; this brings the CLI in line with it, so the same state
+      // does not report two different verdicts depending on which surface you read.
       lines.push(
         truncation?.truncated
-          ? `${useEmoji ? '✅ ' : ''}No issues found in the portion reviewed (${truncation.keptLines}/${truncation.originalLines} lines — diff was truncated).`
+          ? `${useEmoji ? '⚠️ ' : ''}INCOMPLETE — reviewed ${truncation.keptLines}/${truncation.originalLines} lines. ` +
+              `No issues found in that portion; the remaining ${truncation.originalLines - truncation.keptLines} ` +
+              `lines were never analyzed. Re-run with --chunk for full coverage.`
           : useEmoji
             ? '✅ No issues found.'
             : 'No issues found.'

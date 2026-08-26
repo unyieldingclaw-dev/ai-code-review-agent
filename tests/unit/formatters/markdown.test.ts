@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatMarkdown } from '../../../src/cli/formatter.js'
+import { formatMcpOutput } from '../../../src/mcp/formatter.js'
 import type { ReviewResult, Finding } from '../../../src/core/schema.js'
 
 function makeResult(overrides: Partial<ReviewResult> = {}): ReviewResult {
@@ -155,17 +156,45 @@ describe('formatMarkdown', () => {
     expect(output).not.toContain('truncated')
   })
 
-  it('qualifies "No issues found" as partial-coverage when the diff was truncated, not an unqualified clean pass', () => {
-    // Real bug report: a 12,599-line diff truncated to 2,000 (--max-lines default) still ended in
-    // an unqualified "✅ No issues found." -- easy to misread as a clean full pass when only ~16%
-    // of the diff was actually reviewed, especially since it's the last line a reader sees.
+  it('reports a truncated run as INCOMPLETE rather than as any kind of pass', () => {
+    // Two real bug reports, a week apart. The first (12,599 lines truncated to 2,000) ended in an
+    // unqualified "✅ No issues found." and was fixed by appending qualifying text. That was not
+    // enough: the second (10,039 lines truncated to 2,000) still read as a pass, because the green
+    // check is absorbed before the sentence beside it -- the glyph IS the verdict for a skimming
+    // reader. The headline now leads with the incompleteness instead of trailing it.
     const result = makeResult({
       findings: [],
       truncation: { truncated: true, originalLines: 12599, keptLines: 2000 },
     })
     const output = formatMarkdown(result)
-    expect(output).not.toMatch(/^✅ No issues found\.$/m)
-    expect(output).toContain('No issues found in the portion reviewed (2000/12599 lines')
+    expect(output).not.toContain('✅')
+    expect(output).toContain('INCOMPLETE — reviewed 2000/12599 lines')
+    expect(output).toContain('10599') // the unreviewed remainder, stated outright
+  })
+
+  it('does not render a truncated run as clean on ANY surface — CLI and MCP agree', () => {
+    // The CLI said ✅ while MCP said ⚠️ for the identical state, so the same run reported two
+    // different verdicts depending on which surface you read. Whichever is chosen, both must
+    // refuse to call a partial review clean.
+    const result = makeResult({
+      findings: [],
+      truncation: { truncated: true, originalLines: 10039, keptLines: 2000 },
+    })
+    expect(formatMarkdown(result)).not.toContain('✅')
+    expect(formatMcpOutput(result)).not.toContain('✅')
+  })
+
+  it('still reports an untruncated clean run as a pass', () => {
+    // Guard against over-correction: the incompleteness headline must not leak into a genuine
+    // full-coverage clean run.
+    const output = formatMarkdown(
+      makeResult({
+        findings: [],
+        truncation: { truncated: false, originalLines: 120, keptLines: 120 },
+      })
+    )
+    expect(output).toContain('✅ No issues found.')
+    expect(output).not.toContain('INCOMPLETE')
   })
 
   it('surfaces a hallucination-filter note when findings were dropped', () => {

@@ -24,11 +24,10 @@ lineage: []
 partial scans, resolvable finding paths, MCP tool visibility, pre-image findings. npm publishing runs
 on Trusted Publishing (OIDC); `NPM_TOKEN` is deleted from GitHub secrets entirely.
 
-Four hallucination classes now have deterministic backstops instead of prompt wording: injection,
-swallowed-exception, SQL NULL-error, and fabricated licenses. Prompt-only fixes were measured live
-against Ollama across three separate agents and failed every time — for `license` a prompt fix made
-it _worse_ (6/10 → 9/10) — matching what `secrets.ts` already recorded for
-`hasCredentialShapedValue`. Measurements and the review/audit rounds are in `progress.md`.
+Four hallucination classes have deterministic backstops instead of prompt wording: injection,
+swallowed-exception, SQL NULL-error, fabricated licenses. Prompt-only fixes were measured live across
+three agents and failed every time — for `license` one made it _worse_ (6/10 → 9/10). Details in
+`progress.md`.
 
 **Calibration is now falsifiable, and no case is coupled to this repo's own state (2026-08-21).**
 The 21–22/22 score used to aggregate assertions of very different strength — three cases asserted on
@@ -49,7 +48,7 @@ Generalisable lesson from the deferral that held `'partial'` back: **a rationale
 comment is a claim, not a finding** — re-check it before inheriting it. It asserted a
 markdown/SARIF/MCP ripple; only one site actually branched on the value.
 
-**Verified state:** 757 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
+**Verified state:** 759 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
 use `grep "orchestrator] dropped"` to tell a real filter regression from model variance. Target one
 case with `CALIBRATION_CASE=name1,name2` rather than running all 21.
@@ -63,8 +62,8 @@ reads a dead sensor; `pre-push-check.*` calls `mb validate`, folded into `mb doc
 ownership rule and the working conventions (keep `git push`/`git commit` out of command text; use
 `gh pr update-branch`, never a rebase, since force-push is blocked).
 
-**PMB 1.2.1 upgrade — on hold.** `mb upgrade` copies from `$MB_HOME/templates`, PMB's **working
-tree**, not a tag; that tree had uncommitted in-flight edits. Revisit once it is clean.
+**PMB 1.2.1 upgrade — on hold.** `mb upgrade` copies from PMB's **working tree**, not a tag, and that
+tree had uncommitted in-flight edits. Revisit once clean.
 
 **ACR was reviewing the wrong side of its own diffs (2026-08-21), and repeating itself
 (2026-08-26).** Four bugs from two false findings on PR #44; three fixed. Paths kept the diff's `a/`
@@ -75,22 +74,24 @@ mattered more than any single fix:** `gh run download` yields the real `ai-revie
 and replaying it through `synthesize()` caught a miswiring every unit test and a scratch probe both
 missed. See `systemPatterns.md`.
 
-**New PMB brief on ACR (2026-08-26), triaged but NOT yet acted on.** Three reported failures against
-a 10k-line diff. Verified: the truncation headline still prints `✅` in the CLI while MCP prints
-`⚠️` for the identical condition — a real inconsistency and the best next fix. The per-agent timeout
-(282,240 ms observed) is genuinely below legitimate agent runtimes (616 s) on CPU-only hosts. But two
-of their diagnoses are **wrong** and should not be chased: there is no fetch timeout separate from
-`--timeout` (`ollamaProvider.ts` uses the caller's signal when present), agents are sequential by
-default, and chunking preserves hunk headers byte-identically so the "chunk-relative line offsets"
-theory has no mechanism — line numbers are simply unreliable from the model (measured 7/5/7 across
-trials with no chunking). Their exit-code suggestion already exists.
+**New PMB brief on ACR (2026-08-26), partly actioned.** **Fixed:** the CLI truncation headline
+printed `✅` where MCP printed `⚠️` for the identical state; it now leads with `INCOMPLETE —
+reviewed N/M lines`. Qualifying text alone had been tried after an earlier report of the same bug and
+was not enough — the glyph is the verdict for a skimming reader. Also aligned `formatter.ts`'s
+truncation advice with `runner.ts` (PR #33 corrected the stderr copy to prefer `--chunk`; the report
+copy was missed and still recommended raising `--max-lines`, which makes timeouts worse).
+**Still open:** the per-agent timeout ceiling (282,240 ms) sits below legitimate agent runtimes
+(616 s) on CPU-only hosts. **Do not chase two of their diagnoses — both verified wrong:** there is no
+fetch timeout separate from `--timeout` (`ollamaProvider.ts` uses the caller's signal), agents are
+sequential by default, and chunking preserves hunk headers byte-identically, so the "chunk-relative
+line offsets" theory has no mechanism — line numbers are just unreliable from the model (7/5/7 across
+trials, unchunked). Their exit-code suggestion already exists.
 
 **Open risks, detailed in `progress.md`:**
 
 - Claim matchers are regexes over model prose. Both audit rounds found false negatives there; the
   evidence side has produced none. That is the fragile half.
-- The two calibration cases coupled to this repo's own state (`license-clean`, `dependencies`) are
-  both closed. The remaining cases have not been audited for the same shape.
+- `license-clean`/`dependencies` no longer couple to this repo's state; other cases unaudited.
 - `policy`, `filteredFiles`, and `context` are still last-chunk-wins in `chunkRunner`. That remains
   a deliberate, documented simplification — none of them asserts anything about coverage the way
   `toolAvailability` does, which is why only that field was promoted to a real merge.
@@ -112,7 +113,7 @@ trials with no chunking). Their exit-code suggestion already exists.
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, 20min timeout. Calibration is nondeterministic — 21–22/22
   is normal; a single failing case is usually model variance, not a regression.
-- **757 unit tests**; `npm audit` clean (prod + dev)
+- **759 unit tests**; `npm audit` clean (prod + dev)
 - `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
   LLM entirely; `ReviewResult.toolAvailability` surfaces degraded and partial runs (markdown, SARIF,
   and MCP), merged across chunks rather than last-chunk-wins
