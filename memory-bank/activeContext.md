@@ -16,12 +16,13 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-21
+**Last Updated**: 2026-08-26
 
 ## Current Focus
 
-**v1.12.1 published, npm publishing now runs on Trusted Publishing (OIDC) — no token in the repo
-at all.** `NPM_TOKEN` is deleted from GitHub secrets; `npm view ai-review-agent version` → `1.12.1`.
+**v1.13.0 published (2026-08-26)** — 13 commits that had accumulated unreleased, all honesty fixes:
+partial scans, resolvable finding paths, MCP tool visibility, pre-image findings. npm publishing runs
+on Trusted Publishing (OIDC); `NPM_TOKEN` is deleted from GitHub secrets entirely.
 
 Four hallucination classes now have deterministic backstops instead of prompt wording: injection,
 swallowed-exception, SQL NULL-error, and fabricated licenses. Prompt-only fixes were measured live
@@ -48,40 +49,41 @@ Generalisable lesson from the deferral that held `'partial'` back: **a rationale
 comment is a claim, not a finding** — re-check it before inheriting it. It asserted a
 markdown/SARIF/MCP ripple; only one site actually branched on the value.
 
-**Verified state:** 752 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
+**Verified state:** 757 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
 use `grep "orchestrator] dropped"` to tell a real filter regression from model variance. Target one
 case with `CALIBRATION_CASE=name1,name2` rather than running all 21.
 
-**Review-gate tooling investigation (2026-08-20).** Dogfooding `/code-review` and `/change-review`
-surfaced twelve defects in the PMB-owned hook scripts, all sharing one shape: the enforcement did
-not happen and the output said everything was fine. Findings and the recommended order were handed
-to the PMB session as verbiage — **none of it is fixable here.** Those scripts are `TEMPLATE_OWNED`
-and `mb upgrade` overwrites them unconditionally; see `systemPatterns.md` for the ownership rule
-and the two working conventions that came out of it (keep the literal strings `git push`/`git
-commit` out of command text; use `gh pr update-branch` rather than rebasing a pushed branch, since
-force-push is blocked here).
+**PMB-owned defects — none fixable here** (`TEMPLATE_OWNED`; `mb upgrade` overwrites them). Sixteen
+reported to the PMB session across two briefs, all one shape: the check's _result_ is disconnected
+from whether it ran. Live examples: `update-reviewed.*` reads a flat `.file_path` where the payload
+nests under `tool_input`, so `last-reviewed` is never stamped and `mb doctor`'s staleness detection
+reads a dead sensor; `pre-push-check.*` calls `mb validate`, folded into `mb doctor`, and prints its
+"use mb doctor" message as evidence of inconsistency on every push. See `systemPatterns.md` for the
+ownership rule and the working conventions (keep `git push`/`git commit` out of command text; use
+`gh pr update-branch`, never a rebase, since force-push is blocked).
 
-**Upgrade to PMB 1.2.1 — deliberately on hold.** It would fix a live breakage (see below), but
-`mb upgrade` copies from `$MB_HOME/templates`, i.e. PMB's **working tree**, not a tag or release.
-That tree currently has uncommitted in-flight edits, so upgrading now would import someone's
-half-finished work. Revisit once PMB's tree is clean and committed.
+**PMB 1.2.1 upgrade — on hold.** `mb upgrade` copies from `$MB_HOME/templates`, PMB's **working
+tree**, not a tag; that tree had uncommitted in-flight edits. Revisit once it is clean.
 
-**Live breakage inherited from 1.1.1 — `last-reviewed` is not being maintained.**
-`update-reviewed.*` reads a flat `.file_path` where the payload nests under `tool_input`, so it
-exits 0 on every call and never stamps the date. Verified: files edited 2026-08-20 still carry
-June/July dates. `mb doctor` reads those dates for staleness detection, so it is consuming a dead
-sensor and will report actively-edited files as months stale. Fixed in PMB 1.2.1 — arrives with the
-upgrade above, not with a local edit.
-
-**ACR was reviewing the wrong side of its own diffs (2026-08-21).** Two false findings on PR #44 led
-to four bugs. Fixed: finding paths kept the diff's `a/` prefix so 33% of real findings pointed at
-nonexistent files and their GitHub annotations landed nowhere (#45); and agents reported deleted
-code as a current defect (8/8 measured), now dropped by a `filterUnsupportedClaims` rule. A prompt
-fix for the latter measured 7/7 — no effect — and was reverted. **The method mattered more than
-either fix:** `gh run download` on the CI run yields the real `ai-review-findings` artifact, and
-replaying it through `synthesize()` caught a miswiring that every unit test and a scratch probe both
+**ACR was reviewing the wrong side of its own diffs (2026-08-21), and repeating itself
+(2026-08-26).** Four bugs from two false findings on PR #44; three fixed. Paths kept the diff's `a/`
+prefix so 33% of findings pointed at nonexistent files (#45); agents reported deleted code as current
+(#46); same-agent repeats survived dedup (Bug D — collapsed on agent+file+line+basis+title, keeping
+the highest severity; keying on _evidence_ would have merged two legitimate titles). **The method
+mattered more than any single fix:** `gh run download` yields the real `ai-review-findings` artifact,
+and replaying it through `synthesize()` caught a miswiring every unit test and a scratch probe both
 missed. See `systemPatterns.md`.
+
+**New PMB brief on ACR (2026-08-26), triaged but NOT yet acted on.** Three reported failures against
+a 10k-line diff. Verified: the truncation headline still prints `✅` in the CLI while MCP prints
+`⚠️` for the identical condition — a real inconsistency and the best next fix. The per-agent timeout
+(282,240 ms observed) is genuinely below legitimate agent runtimes (616 s) on CPU-only hosts. But two
+of their diagnoses are **wrong** and should not be chased: there is no fetch timeout separate from
+`--timeout` (`ollamaProvider.ts` uses the caller's signal when present), agents are sequential by
+default, and chunking preserves hunk headers byte-identically so the "chunk-relative line offsets"
+theory has no mechanism — line numbers are simply unreliable from the model (measured 7/5/7 across
+trials with no chunking). Their exit-code suggestion already exists.
 
 **Open risks, detailed in `progress.md`:**
 
@@ -110,7 +112,7 @@ missed. See `systemPatterns.md`.
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, 20min timeout. Calibration is nondeterministic — 21–22/22
   is normal; a single failing case is usually model variance, not a regression.
-- **752 unit tests**; `npm audit` clean (prod + dev)
+- **757 unit tests**; `npm audit` clean (prod + dev)
 - `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
   LLM entirely; `ReviewResult.toolAvailability` surfaces degraded and partial runs (markdown, SARIF,
   and MCP), merged across chunks rather than last-chunk-wins
