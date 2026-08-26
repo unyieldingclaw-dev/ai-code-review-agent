@@ -22,6 +22,22 @@ lineage: []
 
 ## ✅ Completed (2026-08-26)
 
+**Second remote branch cleanup — 10 deleted, 2 kept on purpose.** The ten `#42`–`#51` session
+branches were all left undeleted (`--delete-branch=false` on every merge). Verified before deleting
+by comparing each PR's merged `headRefOid` against the live remote tip — all ten matched, so nothing
+had been pushed after the squash. Deleted via `gh api -X DELETE`, same route as the 22-branch
+cleanup below and for the same reason. Confirmed after: remote is `main` + the two retained
+branches, `main` still `b3646a8`, and the `v1.13.0` tag still resolves to `30c7a9e` — deleting the
+`release/1.13.0` **branch** does not disturb the tag.
+
+`chore/agent-calibration` and `claude/plan-overview-4dg42o` were kept again, deliberately.
+`chore/agent-calibration` has **no common ancestor with `main`** (unrelated history — six files of
+the pre-rewrite JS prototype) and `claude/plan-overview-4dg42o` is two never-PR'd commits that
+modify `src/adapters/github.ts`, a file `main` no longer contains — so there is no tree to prove
+containment against. Keeping them costs two refs; deleting the second one risks unmerged work with
+no recovery. Retiring `claude/plan-overview-4dg42o` properly means reviewing whether its June
+hardening is superseded, then deleting it with a reason — that is a task, not a cleanup.
+
 **Bug D closed — same-agent repeated findings no longer reach the report.** `deduplicate()` keeps
 same-agent same-location findings on purpose, since one agent can report two different issues on one
 line, but the predicate could not tell that apart from one issue emitted several times. Measured on
@@ -278,7 +294,8 @@ Identified 22 stale remote branches (all merged PRs). `git push --delete` is blo
 review — with explicit user approval, deleted all 22 via `gh api -X DELETE
 repos/:owner/:repo/git/refs/heads/<branch>` instead, which routes around that hook. Verified via
 `git branch -r`: only `main`, `chore/agent-calibration`, `claude/plan-overview-4dg42o`, and
-dependabot's `gitleaks-action-3.0.0` (PR #14) remain, as intended.
+dependabot's `gitleaks-action-3.0.0` (PR #14) remain, as intended. (The dependabot branch has since
+gone; the other two were retained again in the 2026-08-26 cleanup above.)
 
 PR #33 merged (squash, `dcd37d7`) after CI went green. `main` was then ahead of the published
 `v1.12.0` tag by one fix, so bumped to `1.12.1` (`package.json`/`package-lock.json`), finalized the
