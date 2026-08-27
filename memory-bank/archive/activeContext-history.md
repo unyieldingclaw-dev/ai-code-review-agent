@@ -833,3 +833,27 @@ All 5 checks verified passing locally (295/295 tests) before the workflow was ad
 - 2026-07-25: v1.7.0 — attempted flipping `parallel` default to `true` after a promising small-scale test, then reverted after a deeper test at real scale (14 concurrent, realistic diff size) showed near-linear serialization and spurious-timeout risk. Kept the truncation-warning wording improvement. Separately: verified `devstral:latest` remains the correct configured model after more Ollama models were downloaded (measured GPU/CPU split for all of them); ran a "not made up" architecture deep-dive that found `format: 'json'` is unused, `--context-mode semantic` recomputes embeddings ~14x redundantly, and the sanitizer false-positives on real code (SRI hashes, common comments). 348 unit tests passing.
 - 2026-07-25: v1.8.0 — implemented `format: 'json'` (turned out to increase truncation frequency, not decrease it) plus a truncation-recovery stage in `parseFindings` that ended up doing the real reliability work; fixed a real gap where memory-bank context wasn't actually sanitized despite a comment claiming it was; dogfooding that fix on this repo's own memory-bank caught and fixed a live sanitizer false positive. 358 unit tests passing.
 - 2026-08-06: secrets/dependencies deterministic-tool integration (gitleaks/`npm audit` replace the LLM entirely when available) + adversarial/secrets prompt-tightening + `parseFindings` Stage 4 mislabeling fix + a real Windows-only `npm` spawn bug found and fixed via live calibration. 427 unit tests passing, 18/18 calibration. Honest result: `secrets` prompt-tightening 3/3→2/3 hallucinated; `adversarial` showed no measurable improvement (3/3→3/3), a known limitation since it has no deterministic-tool replacement.
+
+## Moved from activeContext.md, 2026-08-27
+
+Both shipped in v1.13.0 and their detailed records live in `progress.md`; these are the
+Current Focus summaries, moved during a deliberate archiving pass rather than deleted. The
+`toolAvailability` paragraph carried one lesson with no other home — that a rationale recorded in a
+code comment is a claim, not a finding — which was carried into `progress.md` rather than left here.
+
+**Calibration is now falsifiable, and no case is coupled to this repo's own state (2026-08-21).**
+The 21–22/22 score used to aggregate assertions of very different strength — three cases asserted on
+the agent's own domain vocabulary, and `DependenciesAgent` had **no** case that could fail (both
+were `expectEmpty`, so an agent returning `[]` passed). Added `dependencies-vulnerable` plus a
+per-case `projectPathFixture` so tool-backed cases run against their own materialised project.
+`license-clean` was then moved onto its own `license-clean-lockfile.json` — it had passed only
+because `commander` happens to be an ACR dependency. Keyword strengthening is measured, not assumed:
+`calculateShippingCost` 5/5, `notifyWebhook` 4/4, `cancelOrder` 4/6 → reverted. Failing cases now
+print what the agent actually returned. Details in `progress.md`.
+
+**`toolAvailability` is now honest end-to-end (2026-08-21).** `'partial'` was added, surfaced in
+MCP output (which had ignored the field, making a partial scan, a missing tool, and a clean run
+identical to a calling LLM), and merged across chunks rather than last-chunk-wins. `TOOL_LABELS`
+moved to `schema.ts` so formatters cannot drift. Generalisable lesson from the deferral that held
+`'partial'` back: **a rationale in a code comment is a claim, not a finding** — it asserted a
+markdown/SARIF/MCP ripple, but only one site branched on the value.

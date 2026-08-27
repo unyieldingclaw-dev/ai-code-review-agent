@@ -22,9 +22,9 @@ lineage: []
 
 **v1.13.1 published (2026-08-26)**, superseding v1.13.0 four days on — 16 honesty fixes between
 them. Publishing is OIDC Trusted Publishing; `NPM_TOKEN` is deleted from GitHub secrets entirely.
-**`main` is now 3 commits past that tag and unreleased** (#55, #58, #57).
+**v1.14.0 followed on 2026-08-27** (#55, #58, #57) — `main` and npm agree.
 
-**Evidence-location invariant landed (2026-08-26), unreleased.** A finding whose quoted evidence is
+**Evidence-location invariant shipped in v1.14.0.** A finding whose quoted evidence is
 not at its cited `file:line` is flagged on all four surfaces — markdown marker, annotation message
 caveat, SARIF `properties.locationCheck`, MCP heading. It reports only: correcting the line was
 tried and disproved (the same evidence string occurs 3× across 2 files in the 134-line diff that
@@ -38,24 +38,7 @@ swallowed-exception, SQL NULL-error, fabricated licenses. Prompt-only fixes were
 three agents and failed every time — for `license` one made it _worse_ (6/10 → 9/10). Details in
 `progress.md`.
 
-**Calibration is now falsifiable, and no case is coupled to this repo's own state (2026-08-21).**
-The 21–22/22 score used to aggregate assertions of very different strength — three cases asserted on
-the agent's own domain vocabulary, and `DependenciesAgent` had **no** case that could fail (both
-were `expectEmpty`, so an agent returning `[]` passed). Added `dependencies-vulnerable` plus a
-per-case `projectPathFixture` so tool-backed cases run against their own materialised project.
-`license-clean` was then moved onto its own `license-clean-lockfile.json` — it had passed only
-because `commander` happens to be an ACR dependency. Keyword strengthening is measured, not assumed:
-`calculateShippingCost` 5/5, `notifyWebhook` 4/4, `cancelOrder` 4/6 → reverted. Failing cases now
-print what the agent actually returned. Details in `progress.md`.
-
-**`toolAvailability` is now honest end-to-end (2026-08-21).** `'partial'` was added, surfaced in
-MCP output (which had ignored the field, making a partial scan, a missing tool, and a clean run
-identical to a calling LLM), and merged across chunks rather than last-chunk-wins. `TOOL_LABELS`
-moved to `schema.ts` so formatters cannot drift. Generalisable lesson from the deferral that held
-`'partial'` back: **a rationale in a code comment is a claim, not a finding** — it asserted a
-markdown/SARIF/MCP ripple, but only one site branched on the value.
-
-**Verified state:** 759 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
+**Verified state:** 789 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
 use `grep "orchestrator] dropped"` to tell a real filter regression from model variance. Target one
 case with `CALIBRATION_CASE=name1,name2` rather than running all 21.
@@ -111,7 +94,7 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
 - `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, 20min timeout (nondeterminism noted under Verified state).
-- **759 unit tests**; `npm audit` clean. `npm run test:docker` is the fallback when native modules
+- **789 unit tests**; `npm audit` clean. `npm run test:docker` is the fallback when native modules
   will not load (Smart App Control) or CI is unreliable.
 - `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
   LLM entirely; `ReviewResult.toolAvailability` surfaces degraded and partial runs (markdown, SARIF,
@@ -146,5 +129,5 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `main` at `fc7ba8c` = `v1.13.1` = npm latest. Commands are in
+unit tests. **Git**: `main` at `031210c` = `v1.14.0` = npm latest. Commands are in
 `techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass.
