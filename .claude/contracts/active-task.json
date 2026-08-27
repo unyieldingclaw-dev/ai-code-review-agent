@@ -1,24 +1,24 @@
 {
-  "task": "Carry the locationCheck signal into the SARIF and MCP surfaces, so an unverified line is not presented as reliable on any output. Mirrors the toolAvailability precedent, where a new field reached some formatters and not MCP.",
+  "task": "Release 1.14.0, publishing the evidence-location invariant (#55, #58, #57) across all four output surfaces. Minor rather than patch: adds the optional locationCheck field to the public Finding schema.",
   "status": "complete",
-  "created_at": "2026-08-27T01:58:40Z",
-  "expires_at": "2026-08-27T09:58:40Z",
-  "approved_by": "user (explicit 'approve' after a third-party review surfaced that sarif.ts and mcp/formatter.ts contain zero references to locationCheck)",
+  "created_at": "2026-08-27T13:36:01Z",
+  "expires_at": "2026-08-27T21:36:01Z",
+  "approved_by": "user (explicit 'approved' on the posted contract proposal)",
   "scope": [
     {
-      "file": "src/cli/formatters/sarif.ts",
+      "file": "package.json",
       "op": "edit"
     },
     {
-      "file": "src/mcp/formatter.ts",
+      "file": "package-lock.json",
       "op": "edit"
     },
     {
-      "file": "tests/unit/formatters/sarif.test.ts",
+      "file": "CHANGELOG.md",
       "op": "edit"
     },
     {
-      "file": "tests/unit/mcp/formatter.test.ts",
+      "file": "README.md",
       "op": "edit"
     }
   ]
