@@ -247,3 +247,71 @@ describe('formatGithubAnnotations', () => {
     expect(formatGithubAnnotations(result)).toBe('')
   })
 })
+
+describe('location-unverified findings', () => {
+  // WHY the line is kept rather than omitted: `line` defaults to 1 when absent, so omitting it
+  // repins the annotation to line 1 instead of detaching it -- and line 1 is usually outside the
+  // diff, where GitHub will not render the annotation inline at all.
+  it('keeps the cited line so the annotation still renders inside the diff', () => {
+    const result = makeResult({
+      findings: [makeFinding({ locationCheck: 'mismatch', line: 42, lineEnd: 44 })],
+    })
+    const out = formatGithubAnnotations(result)
+    expect(out).toContain('line=42')
+    expect(out).toContain('endLine=44')
+  })
+
+  it('warns in the message, leading with the caveat so clipping cannot hide it', () => {
+    const result = makeResult({ findings: [makeFinding({ locationCheck: 'mismatch' })] })
+    const out = formatGithubAnnotations(result)
+    const body = out.slice(out.indexOf('::', 2) + 2)
+    expect(body.startsWith('[Location unverified')).toBe(true)
+    // The finding is warned about, never dropped.
+    expect(out.split('\n').filter((l) => l.startsWith('::error'))).toHaveLength(1)
+  })
+
+  // Finding-3 style check: pin the whole annotation, not just fragments of it, so a structurally
+  // malformed command cannot pass on substring matches alone.
+  it('emits a well-formed annotation with properties in the documented order', () => {
+    const result = makeResult({
+      findings: [
+        makeFinding({
+          locationCheck: 'mismatch',
+          line: 42,
+          title: 'Hardcoded secret',
+          recommendation: 'Use env var',
+        }),
+      ],
+    })
+    expect(formatGithubAnnotations(result)).toBe(
+      '::error file=src/auth.ts,line=42,title=Hardcoded secret::' +
+        '[Location unverified — the quoted evidence was not found at this line; ' +
+        'treat the line number as unreliable.] Use env var'
+    )
+  })
+
+  it('leaves a verified finding completely untouched', () => {
+    const result = makeResult({
+      findings: [
+        makeFinding({
+          locationCheck: 'verified',
+          line: 42,
+          title: 'Hardcoded secret',
+          recommendation: 'Use env var',
+        }),
+      ],
+    })
+    expect(formatGithubAnnotations(result)).toBe(
+      '::error file=src/auth.ts,line=42,title=Hardcoded secret::Use env var'
+    )
+  })
+
+  it('adds no caveat when the check did not run or had no opinion', () => {
+    for (const lc of [undefined, 'unknown'] as const) {
+      const result = makeResult({ findings: [makeFinding({ locationCheck: lc, line: 42 })] })
+      const out = formatGithubAnnotations(result)
+      expect(out).toContain('line=42')
+      expect(out).not.toContain('Location unverified')
+    }
+  })
+})
