@@ -99,8 +99,14 @@ export function formatMcpOutput(result: ReviewResult): string {
 
 function renderFinding(f: Finding): string {
   const icon = SEVERITY_ICONS[f.severity as 'critical' | 'high']
+  // WHY the caveat sits in the heading, immediately after the location it qualifies: this output
+  // is consumed by an LLM with no terminal to cross-check against, which makes it the reader least
+  // able to notice that a line number is unreliable. toolAvailability had this exact gap -- it was
+  // added to the schema and rendered everywhere except here, leaving a partial scan, a missing
+  // tool and a clean run indistinguishable to a calling model. Same field, same surface, same fix.
+  const unlocated = f.locationCheck === 'mismatch' ? ' · ❓ location unverified' : ''
   const lines = [
-    `### ${icon} ${f.severity.toUpperCase()} · ${f.domain ?? f.agent} · \`${f.file}:${f.line}\``,
+    `### ${icon} ${f.severity.toUpperCase()} · ${f.domain ?? f.agent} · \`${f.file}:${f.line}\`${unlocated}`,
     `**${f.title}**`,
     f.detail,
   ]

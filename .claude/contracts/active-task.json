@@ -1,32 +1,24 @@
 {
-  "task": "Detect and surface findings whose quoted evidence does not occur at their cited file:line. Detection only -- never rewrite the location (guessing overclaims) and never drop the finding (false-negative direction).",
+  "task": "Carry the locationCheck signal into the SARIF and MCP surfaces, so an unverified line is not presented as reliable on any output. Mirrors the toolAvailability precedent, where a new field reached some formatters and not MCP.",
   "status": "complete",
-  "created_at": "2026-08-27T01:23:34Z",
-  "expires_at": "2026-08-27T09:23:34Z",
-  "approved_by": "user (explicit 'approved' after challenging the first design; naive relocation was disproved by the real PR #53 diff, where the evidence string occurs 3x across 2 files)",
+  "created_at": "2026-08-27T01:58:40Z",
+  "expires_at": "2026-08-27T09:58:40Z",
+  "approved_by": "user (explicit 'approve' after a third-party review surfaced that sarif.ts and mcp/formatter.ts contain zero references to locationCheck)",
   "scope": [
     {
-      "file": "src/core/evidenceLocation.ts",
-      "op": "create"
-    },
-    {
-      "file": "src/core/schema.ts",
+      "file": "src/cli/formatters/sarif.ts",
       "op": "edit"
     },
     {
-      "file": "src/core/agents/orchestrator.ts",
+      "file": "src/mcp/formatter.ts",
       "op": "edit"
     },
     {
-      "file": "src/cli/formatter.ts",
+      "file": "tests/unit/formatters/sarif.test.ts",
       "op": "edit"
     },
     {
-      "file": "tests/unit/evidenceLocation.test.ts",
-      "op": "create"
-    },
-    {
-      "file": "tests/unit/orchestrator.test.ts",
+      "file": "tests/unit/mcp/formatter.test.ts",
       "op": "edit"
     }
   ]

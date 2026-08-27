@@ -17,10 +17,24 @@ function severityToLevel(severity: Severity): 'error' | 'warning' | 'note' {
 }
 
 function findingToSarifResult(f: Finding) {
+  // WHY the region is still emitted for an unverified location: dropping it would leave the result
+  // with no physical location, which most SARIF consumers render as a file- or run-level result --
+  // the same disappearing act that omitting `line=` causes in GitHub annotations. The region stays
+  // and the doubt is recorded instead.
+  //
+  // The property bag carries the full tri-state because it is machine-read and a consumer may want
+  // to treat `unknown` differently from `verified`. The message prefix appears only for a genuine
+  // mismatch, because that string is human-read and `unknown` means the check had no opinion --
+  // prefixing every unparseable diff would be noise.
+  const unlocated = f.locationCheck === 'mismatch'
   return {
     ruleId: f.id,
     level: severityToLevel(f.severity),
-    message: { text: f.title },
+    message: {
+      text: unlocated
+        ? `[Location unverified — the quoted evidence was not found at this line] ${f.title}`
+        : f.title,
+    },
     locations: [
       {
         physicalLocation: {
@@ -39,6 +53,7 @@ function findingToSarifResult(f: Finding) {
       confidence: f.confidence ?? 70,
       impact: f.impact,
       recommendation: f.recommendation,
+      ...(f.locationCheck !== undefined ? { locationCheck: f.locationCheck } : {}),
     },
   }
 }
