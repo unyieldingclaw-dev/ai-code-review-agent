@@ -1090,3 +1090,57 @@ describe('OrchestratorAgent.synthesize — same-agent repeated findings', () => 
     expect(result[0]?.corroboratingAgents).toContain('coverage')
   })
 })
+
+describe('synthesize - evidence location stamping', () => {
+  const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+
+  // The removed line is load-bearing: it makes the post-image number (3) differ from the
+  // position in the diff body, which is precisely the drift that produced the real defect.
+  const diff = [
+    'diff --git a/src/auth.ts b/src/auth.ts',
+    '--- a/src/auth.ts',
+    '+++ b/src/auth.ts',
+    '@@ -1,4 +1,4 @@',
+    ' const a = 1',
+    ' const b = 2',
+    '-const token = OLD',
+    '+const token = NEW',
+    ' const c = 3',
+    '',
+  ].join('\n')
+
+  it('stamps mismatch when the evidence is not at the cited line', () => {
+    const result = orch.synthesize(
+      [finding({ file: 'src/auth.ts', line: 2, evidence: 'const token = NEW' })],
+      ['src/auth.ts'],
+      [],
+      diff
+    )
+    expect(result[0]?.locationCheck).toBe('mismatch')
+  })
+
+  it('stamps verified when the evidence really is at the cited line', () => {
+    const result = orch.synthesize(
+      [finding({ file: 'src/auth.ts', line: 3, evidence: 'const token = NEW' })],
+      ['src/auth.ts'],
+      [],
+      diff
+    )
+    expect(result[0]?.locationCheck).toBe('verified')
+  })
+
+  it('never drops a finding for a location mismatch', () => {
+    const result = orch.synthesize(
+      [finding({ file: 'src/auth.ts', line: 99, evidence: 'nowhere near' })],
+      ['src/auth.ts'],
+      [],
+      diff
+    )
+    expect(result).toHaveLength(1)
+  })
+
+  it('leaves locationCheck unset when no diff is supplied', () => {
+    const result = orch.synthesize([finding()])
+    expect(result[0]?.locationCheck).toBeUndefined()
+  })
+})

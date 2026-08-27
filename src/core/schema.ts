@@ -70,6 +70,12 @@ export type EvidenceSource =
   | 'git'
   | 'policy'
 
+/** Result of checking a finding's quoted evidence against the file:line it cites.
+ *  `unknown` means the question could not be answered (file absent from the diff, empty evidence,
+ *  unparseable diff, or a line the diff never displays) and must not be read as a pass.
+ *  See evidenceLocation.ts for why a mismatch is reported rather than silently corrected. */
+export type LocationCheck = 'verified' | 'mismatch' | 'unknown'
+
 export interface Finding {
   id: string
   agent: AgentName
@@ -89,6 +95,9 @@ export interface Finding {
   blocking: boolean
   source: EvidenceSource
   confidence?: number
+  /** Whether `evidence` was found at `file`:`line`. Optional: absent means the check did not run
+   *  (no diff available to the orchestrator), which is distinct from `'unknown'`. */
+  locationCheck?: LocationCheck
   relatedFindings?: string[]
   corroboratingAgents?: AgentName[]
 }
