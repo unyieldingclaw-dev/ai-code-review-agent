@@ -207,8 +207,20 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
       const corroborated = f.corroboratingAgents?.length
         ? ` | **Corroborated by:** ${f.corroboratingAgents.join(', ')}`
         : ''
+      // WHY mark the location rather than quietly leave a wrong one: the cited line is what a
+      // reader clicks and what SARIF and the GitHub annotations consume, and it has been measured
+      // wrong often -- one real run mis-cited all 6 of its findings, another 3 of 3, once naming a
+      // different file than its evidence came from. The finding may still be real, so it is
+      // neither dropped nor relocated (the same evidence string frequently occurs several times in
+      // one diff, so picking an occurrence would assert more than was established); the reader is
+      // simply told not to trust the number. Only 'mismatch' renders -- 'unknown' means the check
+      // had no opinion, and printing that would be noise on every unparseable diff.
+      const located =
+        f.locationCheck === 'mismatch'
+          ? ` | ${useEmoji ? '❓ ' : ''}**Location unverified** (evidence not found at this line)`
+          : ''
       lines.push(
-        `**Agent:** ${f.agent} | **Basis:** ${f.basis} | **Confidence:** ${conf}% | **File:** \`${f.file}:${f.line}\`${corroborated}`
+        `**Agent:** ${f.agent} | **Basis:** ${f.basis} | **Confidence:** ${conf}% | **File:** \`${f.file}:${f.line}\`${corroborated}${located}`
       )
       lines.push('')
       lines.push(f.detail)

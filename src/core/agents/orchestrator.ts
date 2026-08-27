@@ -21,6 +21,7 @@ import {
   isPreImageOnlyEvidence,
   sliceRemovedCodeByFile,
 } from '../claimSupport.js'
+import { annotateEvidenceLocation } from '../evidenceLocation.js'
 
 // WHY only these two: DETERMINISTIC_SOURCES exempts a solo critical/high finding from the
 // corroboration-required downgrade below (hallucinationCrossCheck), on the premise that a real
@@ -159,6 +160,14 @@ export class OrchestratorAgent {
     result = this.deduplicate(result)
     result = this.applyPublicationFilter(result)
     result = this.capAndSort(result)
+    // Last, and on the published set only: stamp each finding with whether its quoted evidence is
+    // actually at the file:line it cites. This annotates and never filters -- see
+    // evidenceLocation.ts for why a mismatch is surfaced rather than corrected or dropped. Running
+    // it after dedup/collapse matters because those merge findings, and the stamp must describe
+    // the finding the reader is handed.
+    if (diffText) {
+      result = annotateEvidenceLocation(result, diffText)
+    }
     return result
   }
 

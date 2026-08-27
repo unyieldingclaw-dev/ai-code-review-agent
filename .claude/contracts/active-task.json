@@ -1,24 +1,32 @@
 {
-  "task": "Prepare the 1.13.1 patch release bundling PRs #49-#51 so the duplicate-collapse (#50) and INCOMPLETE-headline (#51) fixes reach npm; main sits three commits past the v1.13.0 tag.",
+  "task": "Detect and surface findings whose quoted evidence does not occur at their cited file:line. Detection only -- never rewrite the location (guessing overclaims) and never drop the finding (false-negative direction).",
   "status": "complete",
-  "created_at": "2026-08-26T23:51:49Z",
-  "expires_at": "2026-08-27T07:51:49Z",
-  "approved_by": "user (explicit 'approved' on the posted contract proposal, after challenging whether shipping now beat batching with the timeout fix)",
+  "created_at": "2026-08-27T01:23:34Z",
+  "expires_at": "2026-08-27T09:23:34Z",
+  "approved_by": "user (explicit 'approved' after challenging the first design; naive relocation was disproved by the real PR #53 diff, where the evidence string occurs 3x across 2 files)",
   "scope": [
     {
-      "file": "package.json",
+      "file": "src/core/evidenceLocation.ts",
+      "op": "create"
+    },
+    {
+      "file": "src/core/schema.ts",
       "op": "edit"
     },
     {
-      "file": "package-lock.json",
+      "file": "src/core/agents/orchestrator.ts",
       "op": "edit"
     },
     {
-      "file": "CHANGELOG.md",
+      "file": "src/cli/formatter.ts",
       "op": "edit"
     },
     {
-      "file": "README.md",
+      "file": "tests/unit/evidenceLocation.test.ts",
+      "op": "create"
+    },
+    {
+      "file": "tests/unit/orchestrator.test.ts",
       "op": "edit"
     }
   ]
