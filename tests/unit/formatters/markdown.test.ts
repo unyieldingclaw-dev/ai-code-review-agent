@@ -421,3 +421,50 @@ describe('evidenceCheckFilter', () => {
     expect(output).toContain('none flagged')
   })
 })
+
+describe('location-unverified marker', () => {
+  it('marks a finding whose evidence was not found at its cited line', () => {
+    const result = makeResult({
+      findings: [makeFinding({ locationCheck: 'mismatch' })],
+      summary: {
+        totalFindings: 1,
+        bySeverity: { high: 1 },
+        byAgent: { security: 1 },
+        durationMs: 1,
+      },
+    })
+    const out = formatMarkdown(result)
+    expect(out).toContain('Location unverified')
+    // The finding itself must still be reported -- only its line is in doubt.
+    expect(out).toContain('Test finding')
+    expect(out).toContain('src/auth.ts:42')
+  })
+
+  it('stays silent when the location was verified', () => {
+    const result = makeResult({
+      findings: [makeFinding({ locationCheck: 'verified' })],
+      summary: {
+        totalFindings: 1,
+        bySeverity: { high: 1 },
+        byAgent: { security: 1 },
+        durationMs: 1,
+      },
+    })
+    expect(formatMarkdown(result)).not.toContain('Location unverified')
+  })
+
+  it('stays silent for unknown and for an absent check, which are not failures', () => {
+    for (const lc of [undefined, 'unknown'] as const) {
+      const result = makeResult({
+        findings: [makeFinding({ locationCheck: lc })],
+        summary: {
+          totalFindings: 1,
+          bySeverity: { high: 1 },
+          byAgent: { security: 1 },
+          durationMs: 1,
+        },
+      })
+      expect(formatMarkdown(result)).not.toContain('Location unverified')
+    }
+  })
+})

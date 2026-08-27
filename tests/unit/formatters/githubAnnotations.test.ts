@@ -247,3 +247,36 @@ describe('formatGithubAnnotations', () => {
     expect(formatGithubAnnotations(result)).toBe('')
   })
 })
+
+describe('location-unverified findings', () => {
+  it('omits line= so the annotation attaches to the file, not unrelated code', () => {
+    const result = makeResult({
+      findings: [makeFinding({ locationCheck: 'mismatch', line: 42, lineEnd: 44 })],
+    })
+    const out = formatGithubAnnotations(result)
+    expect(out).toContain('file=src/auth.ts,title=')
+    expect(out).not.toContain('line=42')
+    expect(out).not.toContain('endLine=44')
+  })
+
+  it('says why the line is missing rather than dropping the finding', () => {
+    const result = makeResult({ findings: [makeFinding({ locationCheck: 'mismatch' })] })
+    const out = formatGithubAnnotations(result)
+    expect(out).toContain('Location unverified')
+    expect(out.split(String.fromCharCode(10)).filter((l) => l.startsWith('::error'))).toHaveLength(
+      1
+    )
+  })
+
+  it('keeps line= when the location was verified', () => {
+    const result = makeResult({ findings: [makeFinding({ locationCheck: 'verified', line: 42 })] })
+    expect(formatGithubAnnotations(result)).toContain('line=42')
+  })
+
+  it('keeps line= when the check did not run or had no opinion', () => {
+    for (const lc of [undefined, 'unknown'] as const) {
+      const result = makeResult({ findings: [makeFinding({ locationCheck: lc, line: 42 })] })
+      expect(formatGithubAnnotations(result)).toContain('line=42')
+    }
+  })
+})

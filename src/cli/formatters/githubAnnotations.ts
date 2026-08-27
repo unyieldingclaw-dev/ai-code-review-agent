@@ -23,9 +23,25 @@ function escapeAnnotationValue(value: string): string {
 function findingToAnnotation(f: Finding): string {
   const level = severityToAnnotationLevel(f.severity)
   const title = escapeAnnotationValue(f.title)
-  const message = escapeAnnotationValue(f.recommendation || f.detail)
+
+  // WHY a mismatched location drops `line` instead of keeping it or dropping the annotation:
+  // an annotation is a mechanical file:line write, so a wrong line renders the finding on
+  // unrelated code -- a reader sees a security warning pinned to whatever happens to sit there.
+  // That is the same harm as the unresolvable paths fixed earlier, one level in: there the
+  // annotation landed nowhere, here it lands somewhere wrong, which is worse because it looks
+  // deliberate. Suppressing the annotation entirely would instead hide a finding that may well
+  // be real -- only its line is in doubt. GitHub accepts `file=` with no `line=` and attaches
+  // the annotation to the file, which says exactly what is known and nothing more.
+  const unlocated = f.locationCheck === 'mismatch'
+  const baseMessage = f.recommendation || f.detail
+  const message = escapeAnnotationValue(
+    unlocated
+      ? `${baseMessage} [Location unverified — the quoted evidence was not found at the cited line, so this is attached to the file rather than a line.]`
+      : baseMessage
+  )
   const endLine = f.lineEnd ? `,endLine=${f.lineEnd}` : ''
-  return `::${level} file=${f.file},line=${f.line}${endLine},title=${title}::${message}`
+  const location = unlocated ? '' : `,line=${f.line}${endLine}`
+  return `::${level} file=${f.file}${location},title=${title}::${message}`
 }
 
 export function formatGithubAnnotations(result: ReviewResult): string {
