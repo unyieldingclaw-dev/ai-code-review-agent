@@ -5,6 +5,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.14.0] — 2026-08-27 (findings admit when their line number is unreliable)
+
+Continues the theme of 1.13.x: the report is not allowed to claim more than the run established.
+This release turns one of the tool's oldest known weaknesses -- line numbers straight from the model
+are unreliable, measured 7/5/7 across three trials on a single finding -- from a silent problem into
+a stated one.
+
+### Added
+
+- **A finding whose quoted evidence is not at the line it cites is now flagged as such**, on every
+  output surface: the markdown report appends `❓ Location unverified`, the GitHub annotation leads
+  its message with the caveat, SARIF records `properties.locationCheck` and prefixes the result
+  message, and the MCP heading is marked beside the `file:line`. `Finding` gains an optional
+  `locationCheck` field (`'verified' | 'mismatch' | 'unknown'`); it is additive, so existing
+  consumers are unaffected.
+
+  Two independent real runs motivated this. A downstream consumer's review mis-cited **3 of 3**
+  findings, one of them naming a different file than its evidence came from. This project's own
+  release PR produced **6 findings that all cited wrong lines**, three of which quoted, as their
+  evidence, the very value they claimed was empty -- at `basis=VERIFIED, confidence=90`.
+
+  **It reports rather than corrects, deliberately.** Relocating the finding to where its evidence
+  actually sits was implemented first and then withdrawn: the same evidence string frequently occurs
+  more than once: in the 134-line diff that prompted this work, the string `"version": "1.13.1",`
+  occurs three times across two files. Every ambiguous case would have to guess, and a
+  confidently-wrong line is worse than a visibly wrong one, because the reader loses the signal that
+  anything is off. Nor is the finding dropped -- a real finding carrying bad metadata is still real,
+  and dropping is the false-negative direction.
+
+  Post-image line numbers are derived from hunk headers, advancing on context and added lines and
+  skipping removed ones. Counting offsets into the diff body instead looks correct on any hunk
+  without deletions and drifts by one per removed line -- the same shape as the defect being caught.
+
+  The check fails open to `'unknown'` when it cannot decide (file absent from the diff, empty
+  evidence, unparseable diff, or a cited line the diff never displays), so a parsing failure cannot
+  turn into a wall of false attribution warnings.
+
+### Fixed
+
+- **A GitHub annotation for an unlocatable finding keeps its line rather than dropping it.** An
+  earlier attempt omitted `line=` on the assumption that GitHub would then attach the annotation to
+  the file. It does not: every annotation property is optional, but `line` defaults to `1`, so
+  omitting it silently repins the annotation to line 1 -- usually outside the diff, where GitHub does
+  not render it inline at all. That reintroduced, by a different route, the "annotations silently
+  land nowhere" failure that resolvable finding paths fixed in 1.13.0.
+
 ## [1.13.1] — 2026-08-26 (duplicate findings collapsed, truncated runs no longer read as clean)
 
 Both fixes continue the theme of 1.13.0: the report is not allowed to claim more than the run
