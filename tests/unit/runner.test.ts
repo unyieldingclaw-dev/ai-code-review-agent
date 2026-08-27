@@ -200,6 +200,56 @@ describe('SwarmRunner', () => {
     warnSpy.mockRestore()
   })
 
+  it('does not retry a timeout -- the same budget cannot fix an exhausted budget', async () => {
+    let callCount = 0
+    const provider: LLMProvider = {
+      // Never resolves, so withTimeout is what ends the attempt.
+      chat: vi.fn().mockImplementation(() => {
+        callCount++
+        return new Promise(() => {})
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      agentTimeoutMs: 50,
+      timeoutScalingEnabled: false,
+      retryAttempts: 3,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = await runner.run({ diff: 'diff' })
+    // One attempt, not three: the retry loop breaks on a timeout.
+    expect(callCount).toBe(1)
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('retrying in'))
+    // Still reported honestly, and with the status the formatter has advice for.
+    expect(result.agentStatus?.security).toBe('timeout')
+    warnSpy.mockRestore()
+  }, 10000)
+
+  it('still retries a non-timeout failure the full number of attempts', async () => {
+    let callCount = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => {
+        callCount++
+        return Promise.reject(new Error('connection refused'))
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      retryAttempts: 3,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await runner.run({ diff: 'diff' })
+    expect(callCount).toBe(3)
+    warnSpy.mockRestore()
+  })
   it('skips agent after all retry attempts exhausted', async () => {
     const provider: LLMProvider = {
       chat: vi.fn().mockRejectedValue(new Error('always fails')),
