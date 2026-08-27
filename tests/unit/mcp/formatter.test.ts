@@ -288,3 +288,29 @@ describe('formatMcpOutput', () => {
     expect(result).toContain(finding.title)
   })
 })
+
+describe('locationCheck signalling', () => {
+  // This surface is read by an LLM with no terminal to cross-check against, so an unreliable
+  // line number that is not labelled here is one nothing downstream can catch.
+  it('marks an unverified location in the heading, beside the line it qualifies', () => {
+    const out = formatMcpOutput(
+      makeResult({
+        findings: [
+          makeFinding('critical', { locationCheck: 'mismatch', file: 'src/a.ts', line: 42 }),
+        ],
+      })
+    )
+    expect(out).toContain('location unverified')
+    // The finding and its location are still reported -- only the confidence in the line changes.
+    expect(out).toContain('src/a.ts:42')
+  })
+
+  it('stays silent for verified, unknown, and an absent check', () => {
+    for (const lc of [undefined, 'verified', 'unknown'] as const) {
+      const out = formatMcpOutput(
+        makeResult({ findings: [makeFinding('critical', { locationCheck: lc })] })
+      )
+      expect(out).not.toContain('location unverified')
+    }
+  })
+})

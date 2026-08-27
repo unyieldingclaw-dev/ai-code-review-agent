@@ -266,3 +266,39 @@ describe('formatSarif', () => {
     expect(notifications[0].message.text).not.toContain('"security"')
   })
 })
+
+describe('locationCheck signalling', () => {
+  it('prefixes the message and records the state when the location is unverified', () => {
+    const out = JSON.parse(
+      formatSarif(makeResult({ findings: [makeFinding({ locationCheck: 'mismatch' })] }))
+    )
+    const r = out.runs[0].results[0]
+    expect(r.message.text).toContain('Location unverified')
+    expect(r.properties.locationCheck).toBe('mismatch')
+  })
+
+  it('still emits a physical region, so the result does not lose its location', () => {
+    const out = JSON.parse(
+      formatSarif(makeResult({ findings: [makeFinding({ locationCheck: 'mismatch', line: 42 })] }))
+    )
+    const region = out.runs[0].results[0].locations[0].physicalLocation.region
+    expect(region.startLine).toBe(42)
+  })
+
+  it('carries the full tri-state in properties for machine consumers', () => {
+    for (const lc of ['verified', 'unknown'] as const) {
+      const out = JSON.parse(
+        formatSarif(makeResult({ findings: [makeFinding({ locationCheck: lc })] }))
+      )
+      const r = out.runs[0].results[0]
+      expect(r.properties.locationCheck).toBe(lc)
+      // Only a real mismatch touches the human-read message.
+      expect(r.message.text).not.toContain('Location unverified')
+    }
+  })
+
+  it('omits the property entirely when the check never ran', () => {
+    const out = JSON.parse(formatSarif(makeResult({ findings: [makeFinding()] })))
+    expect(out.runs[0].results[0].properties).not.toHaveProperty('locationCheck')
+  })
+})
