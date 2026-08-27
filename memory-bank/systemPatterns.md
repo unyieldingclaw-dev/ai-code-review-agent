@@ -20,9 +20,9 @@ lineage: []
 
 ## Architecture Patterns
 
-### 10-Agent Swarm (9 Specialists + 1 Orchestrator)
+### Agent Swarm (16 Specialists + 1 Orchestrator)
 
-**Decision**: One abstract `BaseAgent`, nine concrete specialist subclasses, one `Orchestrator`, driven by `SwarmRunner`.
+**Decision**: One abstract `BaseAgent`, sixteen concrete specialist subclasses (fifteen run by default, `testGen` is opt-in), one `Orchestrator`, driven by `SwarmRunner`.
 
 **Rationale**:
 
@@ -184,78 +184,6 @@ actually runs — pwsh is tried first, `.sh` is only a fallback). The matcher ca
   and the push marker must be recomputed **after** committing — the branch diff changes the moment
   a commit exists, so a marker written pre-commit no longer matches.
 
-### Stacked PRs, and Fields That Must Reach Every Formatter (learned 2026-08-26)
-
-- **Never `--delete-branch` while a stacked child exists.** GitHub closes a PR whose _base_ branch
-  is deleted rather than retargeting it (this killed #56). Merge the parent bare, retarget the child
-  with `gh pr edit N --base main`, then delete the branch.
-- **Such a PR can be neither reopened nor retargeted.** Open a fresh PR on `main` and merge `main`
-  in — the branch holds the parent's pre-squash commit, so otherwise the diff replays it entirely.
-- **A stacked PR never runs `test`** — `ci.yml` fires on `pull_request: branches: [main]` only, so
-  green on one means the check never ran, not that it passed.
-- **A new `Finding`/`ReviewResult` field must reach all four formatters** — `cli/formatter.ts`,
-  `cli/formatters/{sarif,githubAnnotations}.ts`, `mcp/formatter.ts`. `toolAvailability` missed MCP
-  and `locationCheck` missed SARIF+MCP, both caught post-merge by a reader. Check MCP first: its
-  reader is an LLM with no terminal to cross-check against.
-
-### Validate a Filter Through the Pipeline, Not a Probe (learned 2026-08-21)
-
-A standalone script that reimplements a check and reports it working proves the _idea_, not the
-_wiring_. `isPreImageOnlyEvidence` was first wired to the section from `sliceDiffByFile` — but that
-function stores `diffSectionCode(section)`, which is **post-image by construction**, so the filter
-could never fire. Every unit test of the predicate passed, because the predicate was correct. A
-scratch probe had also reported it working, because the probe extracted removed lines from the raw
-diff itself rather than going through `sliceDiffByFile`.
-
-It was caught only by replaying a real `findings.json` artifact through `OrchestratorAgent.synthesize`
-and seeing `dropped: 0` where the probe predicted 1.
-
-- **Replay real captured output through the real entry point.** `gh run download <run-id>` retrieves
-  the `ai-review-findings` artifact `review.yml` uploads; it is the highest-value test input this
-  project has, because it is what the tool actually produced rather than what a fixture author
-  imagined. It also revealed two bugs nobody was looking for (33% of findings carrying unresolvable
-  `a/` paths, and same-agent duplicates surviving dedup).
-- **A filter needs a test at the wiring seam, not only on its predicate.** The orchestrator-level
-  test pins this: reintroducing `isPreImageOnlyEvidence(f.evidence, section, section)` fails it while
-  all 109 `claimSupport` unit tests still pass.
-- **Watch for a probe that agrees with you.** If a scratch script and the real pipeline disagree,
-  the pipeline is right. Prefer importing the actual exported function over reimplementing it.
-
-### Prompt Wording Does Not Fix Measured Defect Rates Here (reconfirmed 2026-08-21)
-
-Fourth independent confirmation, and the first where the prediction was explicitly argued the other
-way first. The reasoning was: the three prior failures were _hallucination_ (the model inventing a
-mechanism, then rationalizing), whereas reporting deleted code looked like a _missing frame_ — the
-model had its facts right and nothing in the prompt said `-` lines were gone. Supplying genuinely
-absent information seemed different in kind, and worth measuring rather than dismissing by analogy.
-
-It was not different. An explicit instruction ("lines starting with '-' have been DELETED and are
-NOT in the resulting code — never report a problem that exists only on a '-' line") measured **7/7
-still reporting the deleted defect**, against 8/8 before. The instruction was reverted rather than
-kept as decoration.
-
-Measuring it was still correct — the datapoint is worth more than the assumption either way. But the
-prior stands: for a _measured_ defect rate in this project, reach for a deterministic filter and
-treat prompt wording as unproven until measured.
-
-### Verify a Regression Test Fails Before Trusting It (learned 2026-08-21)
-
-A regression test that passes against the unfixed code proves nothing, and this repo has shipped at
-least one assertion that could not fail (`DependenciesAgent`'s calibration cases were both
-`expectEmpty`, so an agent returning `[]` passed — proven by patching it to `return []`).
-
-Before trusting any new test: revert the fix, confirm the test fails **and that the failure message
-is the one you expect**, then restore. The message matters as much as the failure — it is what
-proves the test is exercising the mechanism rather than tripping on setup. Recent examples:
-`expected 'unavailable-llm-fallback' to be 'partial'`, `expected null to be 'MIT'`,
-`expected 'not-applicable' to be 'used'`.
-
-Watch for tests that pass under both old and new behavior by accident of ordering. A chunk-merge
-test with `not-applicable` in the last position passes under last-chunk-wins too; putting the
-substantive value last is what makes it falsifying. Check which of a batch actually fail — if
-fewer fail than you expected, the rest are guard tests, not regression tests, and should not be
-counted as evidence the bug is covered.
-
 **Confirmed defect (reproduced 2026-08-20):** `review-reminders-post.*` is supposed to reissue the
 marker when a gated command fails, but **PostToolUse does not fire when the tool call exits
 non-zero** — so the reissue never happens and the marker is lost. Proven by A/B on the same failing
@@ -287,6 +215,65 @@ actively-edited files as months stale. Fixed in PMB 1.2.1; this repo is on 1.1.1
 would reduce false trips, but the failure direction is _missing a real push_ (`xargs git push`, a
 push inside a loop) — silently disabling a security gate. Same rule as the `claimSupport.ts`
 filters: measure, don't inspect.
+
+### Stacked PRs, and Fields That Must Reach Every Formatter (learned 2026-08-26)
+
+- **Never `--delete-branch` while a stacked child exists.** GitHub closes a PR whose _base_ branch
+  is deleted rather than retargeting it (this killed #56). Merge the parent bare, retarget the child
+  with `gh pr edit N --base main`, then delete the branch.
+- **Such a PR can be neither reopened nor retargeted.** Open a fresh PR on `main` and merge `main`
+  in — the branch holds the parent's pre-squash commit, so otherwise the diff replays it entirely.
+- **A stacked PR never runs `test`** — `ci.yml` fires on `pull_request: branches: [main]` only, so
+  green on one means the check never ran, not that it passed.
+- **A new `Finding`/`ReviewResult` field must reach all four formatters** — `cli/formatter.ts`,
+  `cli/formatters/{sarif,githubAnnotations}.ts`, `mcp/formatter.ts`. `toolAvailability` missed MCP
+  and `locationCheck` missed SARIF+MCP, both caught post-merge by a reader. Check MCP first: its
+  reader is an LLM with no terminal to cross-check against.
+
+### Falsify Before You Trust It (2026-08-21, reconfirmed through 2026-08-27)
+
+Three findings that are one principle: **a claim you have not tried to disprove is not evidence.**
+It applies to filters, to prompts, and to the tests that are supposed to protect both.
+
+**A probe proves the idea, not the wiring.** `isPreImageOnlyEvidence` was first wired to the section
+from `sliceDiffByFile`, which stores `diffSectionCode(section)` — post-image by construction — so the
+filter could never fire. Every predicate unit test passed, because the predicate was correct, and a
+scratch probe agreed, because it read removed lines from the raw diff instead of going through
+`sliceDiffByFile`. Only replaying a real artifact through `OrchestratorAgent.synthesize` exposed it,
+showing `dropped: 0` where the probe predicted 1.
+
+- **Replay real captured output through the real entry point.** `gh run download <run-id>` retrieves
+  the `ai-review-findings` artifact `review.yml` uploads — the highest-value test input this project
+  has, because it is what the tool produced rather than what a fixture author imagined. It has twice
+  surfaced bugs nobody was looking for: 33% of findings carrying unresolvable `a/` paths, same-agent
+  duplicates surviving dedup, and later six findings all citing wrong lines.
+- **Test at the wiring seam, not only the predicate.** The orchestrator-level test pins it:
+  reintroducing `isPreImageOnlyEvidence(f.evidence, section, section)` fails while all 109
+  `claimSupport` unit tests still pass.
+- **Distrust a probe that agrees with you.** If a scratch script and the real pipeline disagree, the
+  pipeline is right. Import the actual exported function rather than reimplementing it.
+
+**Prompt wording does not move a measured defect rate here — four independent confirmations.** The
+fourth was argued the other way first: the prior three were _hallucination_, whereas reporting
+deleted code looked like a _missing frame_, and supplying genuinely absent information seemed
+different in kind. It was not. An explicit instruction ("lines starting with '-' have been DELETED
+… never report a problem that exists only on a '-' line") measured **7/7 still reporting** the
+deleted defect against 8/8 before, and was reverted rather than kept as decoration. Measuring was
+still right — the datapoint beats the assumption either way — but the prior stands: reach for a
+deterministic filter, and treat prompt wording as unproven until measured.
+
+**A regression test that passes against the unfixed code proves nothing.** This repo shipped an
+assertion that could not fail: `DependenciesAgent`'s calibration cases were both `expectEmpty`, so an
+agent returning `[]` passed — proven by patching it to `return []`.
+
+- **Revert the fix, confirm the test fails _and that the message is the one you expect_, restore.**
+  The message matters as much as the failure; it is what proves the test exercises the mechanism
+  rather than tripping on setup. Examples: `expected 'unavailable-llm-fallback' to be 'partial'`,
+  `expected null to be 'MIT'`, `expected 'not-applicable' to be 'used'`.
+- **Count how many of a batch actually fail.** If fewer fail than expected, the rest are guard tests,
+  not regression tests, and must not be counted as evidence the bug is covered. Ordering can hide
+  this — a chunk-merge test with `not-applicable` last passes under last-chunk-wins too; putting the
+  substantive value last is what makes it falsifying.
 
 ## Never Do This
 
