@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.13.1] — 2026-08-26 (duplicate findings collapsed, truncated runs no longer read as clean)
+
+Both fixes continue the theme of 1.13.0: the report is not allowed to claim more than the run
+actually established. Neither changes what the agents look for.
+
+### Fixed
+
+- **A truncated run no longer renders as a clean one.** The CLI headline printed `✅` for a state
+  the MCP formatter printed `⚠️` for, so the same truncated review looked passing in one surface
+  and incomplete in the other. It now leads with `INCOMPLETE — reviewed N/M lines`. Qualifying
+  text alone had already been tried against an earlier report of this same bug and was not
+  sufficient: the glyph is the verdict for a reader who skims, and no amount of adjacent prose
+  overrides it. The truncation advice in `formatter.ts` was also aligned with `runner.ts` — PR #33
+  corrected the stderr copy to prefer `--chunk`, but the report copy was missed and still
+  recommended raising `--max-lines`, which makes agent timeouts worse rather than better.
+- **Same-agent findings that repeat one title are collapsed.** `deduplicate()` deliberately keeps
+  same-agent findings at the same location, because one agent can legitimately report two
+  different issues on one line — but the predicate could not tell that apart from one issue
+  emitted several times. Measured against the real `findings.json` from PR #44's CI run:
+  `adversarial` returned 5 findings at a single location that were really 2 concerns repeated;
+  that run now reports 11 findings instead of 15, with both titles intact. Two details the
+  obvious implementation gets wrong, and which the real artifact forced: the collapse keys on
+  **title, never evidence** (all 5 findings carried byte-identical evidence while splitting across
+  two legitimate titles, so an evidence-keyed merge would delete a finding class outright), and it
+  **keeps the highest-severity member** (severity varied within a title group, so taking the first
+  or last silently downgrades a `high` to a `medium` as a side effect of removing duplicates).
+
+### Added
+
+- `npm run test:docker` runs the suite in a container, for hosts where the native test runner
+  cannot load its modules — Windows Smart App Control blocks them — and as a fallback when GitHub
+  CI is unavailable.
+
 ## [1.13.0] — 2026-08-21 (honest reporting: partial scans, resolvable paths, pre-image findings)
 
 Every fix in this release closes a case where the tool reported something more favourable than

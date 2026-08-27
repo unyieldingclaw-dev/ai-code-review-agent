@@ -1,32 +1,25 @@
 {
-  "task": "Bug D: collapse same-agent duplicate findings that survive deduplicate(). On the real findings.json from PR #44's CI run, 5 adversarial findings at one location render as 5 when they are really 2 distinct issues repeated -- 3 redundant entries reach the report.",
+  "task": "Prepare the 1.13.1 patch release bundling PRs #49-#51 so the duplicate-collapse (#50) and INCOMPLETE-headline (#51) fixes reach npm; main sits three commits past the v1.13.0 tag.",
   "status": "complete",
-  "created_at": "2026-08-26T12:00:00Z",
-  "expires_at": "2026-08-26T20:00:00Z",
-  "approved_by": "user (explicit 'Approve' on the posted contract proposal, then 'Bug D first' to sequence it ahead of the new PMB brief)",
+  "created_at": "2026-08-26T23:51:49Z",
+  "expires_at": "2026-08-27T07:51:49Z",
+  "approved_by": "user (explicit 'approved' on the posted contract proposal, after challenging whether shipping now beat batching with the timeout fix)",
   "scope": [
     {
-      "file": ".claude/contracts/active-task.json",
+      "file": "package.json",
       "op": "edit"
     },
     {
-      "file": "src/core/agents/orchestrator.ts",
+      "file": "package-lock.json",
       "op": "edit"
     },
     {
-      "file": "tests/unit/orchestrator.test.ts",
+      "file": "CHANGELOG.md",
       "op": "edit"
     },
     {
-      "file": "memory-bank/progress.md",
-      "op": "edit"
-    },
-    {
-      "file": "memory-bank/activeContext.md",
+      "file": "README.md",
       "op": "edit"
     }
-  ],
-  "design_notes": "Collapse key is agent + normalized file + line + TITLE, deliberately not evidence. Measured on the real artifact: all 5 findings at adversarial|src/core/schema.ts:196 share byte-identical evidence but split across two legitimate titles ('Null/undefined where not expected' x3, 'Empty collections' x2). An evidence-keyed collapse would merge those two distinct concerns into one and silently destroy a finding class. Severity varies WITHIN a title group (high, medium, medium), so the survivor must be the highest-severity member -- keeping the first or last would quietly downgrade a high to a medium, which is the same class of dishonesty this whole line of work exists to remove. The collapse applies to BOTH branches of deduplicate(): the agents.size === 1 branch is not the only leak, because `kept` in the multi-agent branch is group.filter(f => f.agent === bestAgent), which is plural and therefore also passes same-agent duplicates through. corroboratingAgents and relatedFindings are unioned across collapsed members rather than taken from the survivor, so the corroboration path that feeds severity escalation is preserved.",
-  "risk_note": "When deferring this, the stated worry was that tightening the predicate 'touches the corroboration path that feeds severity escalation'. Investigation showed the blast radius is smaller than claimed: corroboratingAgents/relatedFindings are only ever SET in the multi-agent branch, and this change merges them rather than discarding them. The correction was surfaced to the user before implementation rather than after.",
-  "completion_note": "Delivered within declared scope. Result on the real PR #44 artifact: 15 findings in, 11 out, zero duplicates, both distinct titles preserved and the high severity kept on the group that was high/medium/medium. Two corrections during implementation. (1) The first version keyed on title alone and broke an existing test, 'excludes SPECULATIVE findings below high severity' -- a SPECULATIVE high and a VERIFIED medium sharing a title collapsed into one, and because collapseRepeats runs BEFORE applyPublicationFilter the survivor decided that finding's fate. Adding basis to the key is strictly more conservative and costs no coverage: every repeated group in the measured sample shares one basis. The failing test was a real signal, not a fixture artifact. (2) The collapse had to apply to BOTH branches of deduplicate() -- `kept` in the multi-agent path is group.filter(), plural, so it leaked duplicates too; the agents.size === 1 branch was not the only hole. Falsification: 3 of 4 new tests fail against the old behaviour; the fourth (two distinct titles survive) passes under both by design and is guard coverage, not regression coverage. 757 tests, typecheck/build/format/lint green."
+  ]
 }
