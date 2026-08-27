@@ -85,6 +85,24 @@ async function withRetryTimeout<T>(
       return await withTimeout(fn, timeoutMs, agentName)
     } catch (err) {
       lastErr = err as Error
+      // WHY a timeout is not retried, while every other failure still is: a retry re-runs the
+      // agent with the *same* budget, so a timeout is the one failure a retry cannot plausibly
+      // fix -- the budget was already exhausted once. What it does instead is double the wall
+      // time before the user is told anything. Measured: a 100ms budget with the default
+      // retryAttempts: 2 reports back in 2217ms (100 + 2000 backoff + 100), and at the scaled
+      // 282s ceiling a CPU-only host waits ~566s per agent to be told the same thing it could
+      // have been told at 282s.
+      //
+      // Failing fast is only defensible because a timeout is already actionable: it classifies
+      // as 'timeout', and cli/formatter.ts answers that with "raise --timeout or reduce
+      // --max-lines". The user gets the remedy sooner rather than a longer wait to the same
+      // dead end.
+      //
+      // Accepted tradeoff: a *transient* stall that happens to consume the whole budget no
+      // longer gets a second chance. That is the cost of not paying 2x on the systematic case,
+      // which is the one measured in the wild. Classification is reused from parsing.ts rather
+      // than re-testing the message here, so the two definitions cannot drift apart.
+      if (classifyAgentError(lastErr) === 'timeout') break
       if (i < attempts - 1) {
         console.warn(
           `[ai-review] Agent ${agentName} failed (attempt ${i + 1}/${attempts}): ${lastErr.message} — retrying in ${backoffMs}ms`
