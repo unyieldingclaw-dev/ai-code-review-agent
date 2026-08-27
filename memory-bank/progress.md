@@ -20,6 +20,41 @@ lineage: []
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
+## ✅ Completed (2026-08-27)
+
+**The timeout-ceiling figure is unsourced, and the item is blocked on measurement rather than on
+effort.** This repo recorded, as a PMB finding, that on a CPU-only host reviewing a 10,039-line
+`--chunk` diff "agents legitimately ran 616 s" against a 282,240 ms ceiling, with 2/4 dying on
+`fetch failed` and ~46 min wall time. Asked to clarify one detail, PMB searched their entire record
+— `memory-bank/`, `docs/`, `docs/archive/`, the 1.13.1 brief — for `616`, `282,240`,
+`agentTimeoutMs` and `fetch failed`, and found **zero hits**. They hold no per-agent timings, no
+chunk count, and no record of whether the number was measured or derived, and they declined to
+reconstruct it from the formula on the grounds that it would be inventing the number we had already
+refused to guess. Their recommendation, adopted: treat it as unattributed, not as evidence.
+
+**The question it was blocking was never answerable as written.** 616 s is ambiguous between one
+agent invocation and the aggregate. The timeout is computed per `SwarmRunner.run()`, so under
+`--chunk` that is per chunk: 282,240 ms implies `ratio` 0.568, i.e. a ~1136-line chunk, and 10,039
+lines at `maxDiffLines` 2000 is ~5–9 chunks × 4 agents ≈ 20–36 invocations. On the aggregate
+reading, per-invocation sits well under the ceiling and there is nothing to raise. Only on the
+single-invocation reading does the ceiling matter — and then it matters a lot, because
+`TIMEOUT_SCALE_CAP` is 2, so the formula's absolute maximum is 360 s and no diff-size scaling can
+reach 616 s. The deciding variable would be inference speed, not diff size.
+
+**Instrument, do not argue** (PMB's suggestion): log elapsed time per `SwarmRunner.run()` call
+alongside `chunkLines`; per-invocation vs aggregate then falls out of the data with no
+interpretation. CPU-only is reproducible on this GPU box via `OLLAMA_NUM_GPU=0`.
+
+**Part of the symptom is already fixed.** A timed-out agent is no longer retried against the same
+exhausted budget — measured 2217 ms → 108 ms on a forced 100 ms timeout, so ~566 s → ~282 s per
+failing agent at the scaled ceiling. Some of the observed ~46 min was likely that, which is a
+further reason not to move the ceiling on an unsourced number.
+
+**Process note:** this is the same shape as the lesson already recorded here — a rationale inherited
+without checking its source is a claim, not a finding. It sat in `activeContext.md` for days reading
+as measured evidence, and the only reason it was caught is that acting on it required knowing which
+of two readings was meant.
+
 ## ✅ Completed (2026-08-26)
 
 **Evidence-location invariant shipped (#55, #58, #57).** A finding whose quoted evidence is not at

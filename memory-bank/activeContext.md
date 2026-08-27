@@ -110,12 +110,14 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
 
 ## Next Steps
 
-- **Per-agent timeout ceiling** (last open item from PMB's brief). On a CPU-only host reviewing a
-  10,039-line diff with `--chunk`, agents legitimately ran **616 s** against a **282,240 ms**
-  ceiling (`agentTimeoutMs` 180000 × ~1.568 scaling, working as designed); 2/4 agents died on
-  `fetch failed`. **Do not pick a new number by reasoning** — `progress.md` records that unmeasured
-  tuning here backfired. Measurement is reproducible on this GPU box via `OLLAMA_NUM_GPU=0`, at
-  ~46 min per trial; budget a half-day, not an afternoon.
+- **Per-agent timeout ceiling — blocked; the figure behind it is UNSOURCED (2026-08-27).** The
+  "616 s against a 282,240 ms ceiling" long recorded here as a PMB finding is not in PMB's record
+  at all — they grepped their whole repo and found zero hits, hold no per-agent timings or chunk
+  count, and declined to reconstruct it. **Do not raise the ceiling on those numbers.** The reading
+  was never settled either (616 s is ambiguous between one invocation and the aggregate over ~20–36
+  of them). To unblock, instrument rather than argue: log elapsed time per `SwarmRunner.run()`
+  alongside `chunkLines`, reproduce CPU-only via `OLLAMA_NUM_GPU=0`. Full analysis in
+  `progress.md`. **Do not pick a new number by reasoning** — unmeasured tuning here has backfired.
 - **PMB 1.2.1 upgrade** — on hold: `mb upgrade` copies from PMB's **working tree**, not a tag, and
   that tree had uncommitted in-flight edits. Fixes `last-reviewed`; nothing else depends on it.
 - **Marketplace publish** (VS Code extension): explicitly DEFERRED.
