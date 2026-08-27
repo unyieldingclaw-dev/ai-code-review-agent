@@ -62,9 +62,6 @@ reads a dead sensor; `pre-push-check.*` calls `mb validate`, folded into `mb doc
 ownership rule and the working conventions (keep `git push`/`git commit` out of command text; use
 `gh pr update-branch`, never a rebase, since force-push is blocked).
 
-**PMB 1.2.1 upgrade — on hold.** `mb upgrade` copies from PMB's **working tree**, not a tag, and that
-tree had uncommitted in-flight edits. Revisit once clean.
-
 **ACR was reviewing the wrong side of its own diffs (2026-08-21), and repeating itself
 (2026-08-26).** Four bugs from two false findings on PR #44; three fixed. Paths kept the diff's `a/`
 prefix so 33% of findings pointed at nonexistent files (#45); agents reported deleted code as current
@@ -113,7 +110,8 @@ trials, unchunked). Their exit-code suggestion already exists.
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, 20min timeout. Calibration is nondeterministic — 21–22/22
   is normal; a single failing case is usually model variance, not a regression.
-- **759 unit tests**; `npm audit` clean (prod + dev)
+- **759 unit tests**; `npm audit` clean (prod + dev). Local `vitest` works; `npm run test:docker`
+  is the fallback when native modules will not load (Smart App Control) or GitHub CI is unreliable.
 - `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
   LLM entirely; `ReviewResult.toolAvailability` surfaces degraded and partial runs (markdown, SARIF,
   and MCP), merged across chunks rather than last-chunk-wins
@@ -121,30 +119,32 @@ trials, unchunked). Their exit-code suggestion already exists.
 - `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
 - `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
-- **npm**: `ai-review-agent@1.12.1` published via Trusted Publishing (OIDC), provenance attached.
-  `release.yml` has no npm secret dependency at all — `id-token: write` + the Trusted Publisher
-  relationship configured on npmjs.com (GitHub Actions / `unyieldingclaw-dev` /
-  `ai-code-review-agent` / `release.yml`) is sufficient. `npm install -g npm@latest` runs early in
-  the workflow since OIDC publishing needs npm >= 11.5.1.
+- **npm**: `ai-review-agent@1.13.0` via Trusted Publishing (OIDC), provenance attached. **#49–#51
+  merged _after_ the `v1.13.0` tag; the user-facing pair is #50 (duplicate-collapse) and #51 (the
+  INCOMPLETE headline), so neither is on npm.** `release.yml`
+  has no npm secret dependency — `id-token: write` + the Trusted Publisher relationship on
+  npmjs.com is sufficient; `npm install -g npm@latest` runs early (OIDC needs npm >= 11.5.1).
 
 ## Next Steps
 
-- **PMB 1.2.1 upgrade** — blocked on PMB's working tree being clean (see Current Focus). Fixes the
-  `last-reviewed` breakage; nothing else here depends on it.
+- **Per-agent timeout ceiling** (last open item from PMB's brief). On a CPU-only host reviewing a
+  10,039-line diff with `--chunk`, agents legitimately ran **616 s** against a **282,240 ms**
+  ceiling (`agentTimeoutMs` 180000 × ~1.568 scaling, working as designed); 2/4 agents died on
+  `fetch failed`. **Do not pick a new number by reasoning** — `progress.md` records that unmeasured
+  tuning here backfired, and `maxDiffLines` stays at 2000 as a deliberate unmeasured tradeoff.
+  Measure on a CPU-only host first.
+- **PMB 1.2.1 upgrade** — on hold: `mb upgrade` copies from PMB's **working tree**, not a tag, and
+  that tree had uncommitted in-flight edits. Fixes `last-reviewed`; nothing else depends on it.
 - **Marketplace publish** (VS Code extension): explicitly DEFERRED.
 
-> Removed 2026-08-20: an "Anthropic/Claude provider (backlog)" item sat here contradicting three
-> higher-authority statements — `projectbrief.md` Non-Negotiable Constraints ("Ollama-only backend
-> — no Anthropic/OpenAI API calls in the review pipeline"), `systemPatterns.md` **Never Do This**,
-> and `systemPatterns.md`'s Sequential Execution rationale, which uses "no Anthropic/Claude API
-> integration" as a load-bearing premise ("no token-cost pressure to justify accepting this
-> reliability risk"). It also contradicts the shipped product identity — `package.json` says "zero
-> API costs", the README says no cloud API calls required. No decision authorizing it exists
-> anywhere in the archive. Reinstating it is a product decision requiring a projectbrief amendment
-> plus revisiting the parallel-vs-sequential rationale, not a backlog line.
+> Removed 2026-08-20: an "Anthropic/Claude provider (backlog)" item, contradicting `projectbrief.md`
+> ("Ollama-only backend"), `systemPatterns.md` **Never Do This**, and its Sequential Execution
+> rationale (which uses "no Anthropic/Claude API integration" as a load-bearing premise), plus the
+> shipped identity ("zero API costs"). No decision authorizing it exists. Reinstating it needs a
+> projectbrief amendment and a revisit of parallel-vs-sequential, not a backlog line.
 
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `main` at `v1.12.1`. Commands are in `techContext.md`; `npm run check` covers
-typecheck/build/format/lint/test in one pass.
+unit tests. **Git**: `main` at `b3646a8`, three commits past the `v1.13.0` tag. Commands are in
+`techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass.
