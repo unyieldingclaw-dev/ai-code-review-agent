@@ -22,38 +22,56 @@ lineage: []
 
 ## ✅ Completed (2026-08-26)
 
-**Second remote branch cleanup — 10 deleted, 2 kept on purpose.** The ten `#42`–`#51` session
-branches were all left undeleted (`--delete-branch=false` on every merge). Verified before deleting
-by comparing each PR's merged `headRefOid` against the live remote tip — all ten matched, so nothing
-had been pushed after the squash. Deleted via `gh api -X DELETE`, same route as the 22-branch
-cleanup below and for the same reason. Confirmed after: remote is `main` + the two retained
-branches, `main` still `b3646a8`, and the `v1.13.0` tag still resolves to `30c7a9e` — deleting the
-`release/1.13.0` **branch** does not disturb the tag.
+**v1.13.1 published** (npm serves it, SLSA v1 provenance, OIDC needed no npm secret). `main` sat
+three commits past `v1.13.0` with #50 (duplicate-collapse) and #51 (the INCOMPLETE headline)
+stranded, plus #49. The handoff said to batch them with the timeout fix; overturned on two measured
+facts — 2,185 downloads/month (749/week) were on a build where a truncated run renders `✅`, and the
+batch partner is **slow, not blocked**: the CPU-only measurement is reproducible here via
+`OLLAMA_NUM_GPU=0`, but ~46 min per trial over several trials makes it a half-day task.
 
-`chore/agent-calibration` and `claude/plan-overview-4dg42o` were kept again, deliberately.
-`chore/agent-calibration` has **no common ancestor with `main`** (unrelated history — six files of
-the pre-rewrite JS prototype) and `claude/plan-overview-4dg42o` is two never-PR'd commits that
-modify `src/adapters/github.ts`, a file `main` no longer contains — so there is no tree to prove
-containment against. Keeping them costs two refs; deleting the second one risks unmerged work with
-no recovery. Retiring `claude/plan-overview-4dg42o` properly means reviewing whether its June
-hardening is superseded, then deleting it with a reason — that is a task, not a cleanup.
+**ACR emits findings whose own evidence refutes them (2026-08-26).** The `ai-review` run on the
+release PR (`gh run download 33025650850`) returned 6 findings on a diff of four version strings and
+a changelog entry. Five are false; three are **self-refuting** at `basis=VERIFIED, confidence=90` —
+"Empty version string in package.json" cites as its evidence `"version": "1.13.1",`, and "Empty
+description" cites the full description. Two more carry only the `diff --git` header as evidence and
+recommend what the repo already has (`engines.node` at `package.json:24`).
+`toolVersion` was `1.13.0` — CI reviews with the _published_ build, not the PR's code. Both shapes
+are deterministically detectable, which is the only lever that has ever worked here (prompt wording
+has failed four times): flag an emptiness/absence claim whose evidence shows the field populated,
+and flag evidence that is only a `diff --git` header.
 
-**Bug D closed — same-agent repeated findings no longer reach the report.** `deduplicate()` keeps
-same-agent same-location findings on purpose, since one agent can report two different issues on one
-line, but the predicate could not tell that apart from one issue emitted several times. Measured on
-the real `findings.json` from PR #44's CI run: `adversarial` produced 5 findings at
-`src/core/schema.ts:196` that are really 2 concerns repeated. After the fix that run goes 15 → 11
-findings with zero duplicates, both titles intact and the `high` severity preserved.
+**PMB brief on 1.13.1 — triaged, one cause disproved.** On a 1769-line, 21-file `--profile security`
+run, PMB reports all 4 agents ran with real quoted evidence, but **all 3 findings cited a wrong
+`file:line`**, one attributing `tests/test-dangerous-commands.sh` content to
+`scripts/dangerous-commands.sh`. Their proposed cause — chunking losing the per-file frame — is
+**wrong**: `--chunk` is opt-in and was not passed, and 1769 < the 2000 `maxDiffLines` default, so it
+was one unchunked pass. This corroborates the standing conclusion (attribution is unreliable from
+the model itself) and extends it to _cross-file_. Their §3 is confirmed as behaviour:
+`src/cli/index.ts:422-437` checks `hasBlocker` (exit 1) before truncation (exit 3), so a truncated
+run with a blocker reports 1 and carries no coverage signal — deliberate and commented, so the
+consequence is new, not a bug. **Next task, needs its own contract:** their invariant — assert the
+quoted evidence occurs at the cited `file:line` before emitting. Their run fails it 3/3; the
+artifact above fails it too (`package.json:2` holds `"name"`).
+
+**Second remote branch cleanup — 10 deleted, 2 kept.** Each `#42`–`#51` branch verified by matching
+its PR's merged `headRefOid` to the live tip, then deleted via `gh api -X DELETE` (as below).
+Deleting a `release/*` **branch** does not disturb its **tag**. `chore/agent-calibration` (no common
+ancestor with `main`) and `claude/plan-overview-4dg42o` (never-PR'd, touches a file `main` lacks, so
+nothing proves containment) retained again, per the prior cleanup's intent. Merges now pass
+`--delete-branch`, so this stops recurring.
+
+**Bug D closed — same-agent repeated findings no longer reach the report** (shipped in 1.13.1).
+`deduplicate()` keeps same-agent same-location findings on purpose — one agent can report two
+different issues on one line — but could not tell that from one issue emitted repeatedly. Measured
+on PR #44's real `findings.json`: `adversarial` emitted 5 findings at `src/core/schema.ts:196` that
+were 2 concerns repeated; that run now yields 11 instead of 15, both titles intact, `high` preserved.
 
 **Two design decisions the real artifact forced, both of which the obvious implementation gets
-wrong:**
-
-- **Key on title, never on evidence.** All 5 findings carry byte-identical evidence while splitting
-  across two legitimate titles. An evidence-keyed collapse merges two distinct concerns and deletes
-  a finding class outright — a false negative, the direction that costs something.
-- **Keep the highest-severity member.** Severity varied _within_ a title group (high, medium,
-  medium). Taking the first or last silently downgrades a high to a medium as a side effect of
-  removing duplicates.
+wrong.** Key on **title, never evidence** — all 5 findings carried byte-identical evidence across two
+legitimate titles, so an evidence-keyed collapse deletes a finding class outright, a false negative
+and the direction that costs something. And **keep the highest-severity member** — severity varied
+_within_ a title group, so taking first-or-last silently downgrades a high to a medium as a side
+effect of "removing duplicates".
 
 **`basis` is in the collapse key, and an existing test is why.** The first implementation keyed on
 title alone and broke `excludes SPECULATIVE findings below high severity` — a SPECULATIVE high and a
@@ -276,51 +294,6 @@ scripts, all failing toward green. Delivered to the PMB session as verbiage; non
 `systemPatterns.md`. `mb upgrade` reads PMB's working tree rather than a tag, which is why the 1.2.1
 upgrade is on hold.
 
-## ✅ Completed (2026-08-19)
-
-**v1.12.0 published to npm** (provenance attached, GitHub release out) after PR #31 and #32 merged
-to `main`. Opened PR #33 (`fix/agent-count-and-maxlines`): agent-count announcement now uses the
-real post-policy total (was PMB's item 3a); truncation hint now recommends `--chunk` before
-`--max-lines`. 717 tests. Deliberately did not raise `maxDiffLines` from 2000 — unmeasured tradeoff
-against PMB's timeouts.
-
-Reviewing the deterministic-filter fixes found two of six were themselves defective — a
-`/code-review` opponent audit caught a regex that still dropped a real RLS finding after being
-called fixed (see the "Independent audit" entry below). Treat `claimSupport.ts` changes as
-security-relevant: measure, don't inspect.
-
-Identified 22 stale remote branches (all merged PRs). `git push --delete` is blocked by the same
-`/change-review` push-gate hook used for code changes, since a branch deletion has no diff to
-review — with explicit user approval, deleted all 22 via `gh api -X DELETE
-repos/:owner/:repo/git/refs/heads/<branch>` instead, which routes around that hook. Verified via
-`git branch -r`: only `main`, `chore/agent-calibration`, `claude/plan-overview-4dg42o`, and
-dependabot's `gitleaks-action-3.0.0` (PR #14) remain, as intended. (The dependabot branch has since
-gone; the other two were retained again in the 2026-08-26 cleanup above.)
-
-PR #33 merged (squash, `dcd37d7`) after CI went green. `main` was then ahead of the published
-`v1.12.0` tag by one fix, so bumped to `1.12.1` (`package.json`/`package-lock.json`), finalized the
-`CHANGELOG.md` entry, and updated `README.md`'s `toolVersion` example (PR #34) — same shape as the 1.11.0
-release PR (#30). `npm run check` equivalent (typecheck/format/lint) and 717/717 tests green.
-
-**Migrated npm publishing to Trusted Publishing (OIDC), closing out the `NPM_TOKEN` expiry risk**
-(PR #35). The token was an Automation token with "Bypass 2FA" set — a class npm is restricting for
-direct publishing in Jan 2027, and this one specifically expired 2026-09-08. `release.yml` already
-had `id-token: write`/`registry-url`/`--provenance`; only the `NODE_AUTH_TOKEN` env var still made
-it token-based. User configured the Trusted Publisher relationship on npmjs.com (GitHub Actions /
-`unyieldingclaw-dev` / `ai-code-review-agent` / `release.yml`, "Allow npm publish"), then removed
-`NODE_AUTH_TOKEN` and the expiry-reminder step, added `npm install -g npm@latest` (OIDC publishing
-needs npm >= 11.5.1, and `setup-node` just bundles whatever ships with Node 24), and deleted
-`scripts/setup-npm-token.ps1` (existed solely to bootstrap the token being replaced).
-
-**Verified live, not just reasoned about**: tagging and pushing `v1.12.1` triggered a real
-OIDC-based publish on the first attempt — `npm notice publish Signed provenance statement...`,
-package landed on the registry, GitHub release created, zero auth errors. Confirmed the one
-worrying-looking line in that run's log (`npm warn publish "bin[ai-review-agent]"... was invalid
-and removed`) is pre-existing npm normalization unrelated to the migration — `./dist/cli/index.js`
-→ `dist/cli/index.js`, identical on the already-published `1.12.0`, not a regression. After the
-live confirmation, `NPM_TOKEN` was deleted from GitHub secrets entirely — publishing now has no
-token in the loop at all.
-
 ## 📊 Metrics
 
 ### Test Coverage
@@ -381,3 +354,5 @@ token in the loop at all.
 | 1.0.1           | 2026-06-24    | Audit remediation: sanitizer multi-pattern fix, BaseAgent defaults tests, GitHub adapter tests, vitest coverage fix, CHANGELOG, JSDoc, contextBudgetChars, lineEnd clamp, AGENT_PRIORITY docs; 264 tests                                                                      |
 | 1.1.0           | 2026-06-25    | --no-emoji, --context-mode semantic (nomic-embed-text), --context-budget, .aiignore negation, ESLint (0 warnings), coverage parser fixed, orchestrator breaking-change escalation, vscode-extension v0.6.0 (profiles + context), migration-safety fixture expanded; 276 tests |
 | 1.2.0           | 2026-06-26    | SRP: parsing.ts extraction; semantic context warning; vscode-extension timeout; OllamaProvider SSRF hardening; MCP shutdown handlers; 295 tests; all 3-round audit findings resolved                                                                                          |
+| 1.3.0–1.13.0    | 2026-06–08    | Not tracked here — see `CHANGELOG.md`, which is authoritative for per-version detail. This table drifted from 1.2.0 and is kept only for the early history above.                                                                                                             |
+| 1.13.1          | 2026-08-26    | Truncated runs report INCOMPLETE rather than a checkmark (#51); same-agent findings repeating one title collapse, keyed on title and keeping the highest severity (#50); `npm run test:docker` (#49). SLSA v1 provenance via OIDC.                                            |
