@@ -11,6 +11,10 @@ deterministic-filter rounds that followed) came across the same way, because `pr
 reached exactly 400/400 lines — now the CI-enforced cap in `ci.yml`, not just README advice — and
 the next entry would have failed the build. Same content, moved, nothing deleted.
 
+Fourth move, 2026-08-27: the 2026-08-20 and the oldest 2026-08-21 sections came across during a deliberate archiving pass,
+rather than the usual scramble at the cap. `progress.md` and `activeContext.md` were both sitting
+at their limits with no room for the next entry. Same content, moved, nothing deleted.
+
 Third move, 2026-08-26: the 2026-08-19 section (v1.12.0/v1.12.1 releases, OIDC Trusted
 Publishing migration, and the review-gate investigation) came across when `progress.md` hit
 401/400 recording the v1.13.1 release and the self-refuting-evidence artifact. Same content,
@@ -1137,3 +1141,55 @@ and removed`) is pre-existing npm normalization unrelated to the migration — `
 → `dist/cli/index.js`, identical on the already-published `1.12.0`, not a regression. After the
 live confirmation, `NPM_TOKEN` was deleted from GitHub secrets entirely — publishing now has no
 token in the loop at all.
+
+## ✅ Completed (2026-08-20)
+
+**Dependabot PR #14 merged** — `gitleaks-action` v2 → v3 (`e0c47f4`), a Node 20 → Node 24 runtime
+migration. Not routine: the pinned v2 already emitted a Node 20 deprecation warning on every release
+run, and Node 20 leaves GitHub-hosted runners 2026-09-16 — the secret-scan step is not
+`continue-on-error`, so it would have hard-failed the release pipeline. PR #37 corrected the stale
+`# Pinned to v2 tag SHA` comment left above the new SHA; in a supply-chain pin that comment is the
+only human-readable check that the opaque SHA is what it claims to be.
+
+**Review-gate tooling investigation.** Dogfooding surfaced twelve defects in the PMB-owned hook
+scripts, all failing toward green. Delivered to the PMB session as verbiage; none fixable here
+(`TEMPLATE_OWNED`, overwritten by `mb upgrade`). Conventions and the ownership rule recorded in
+`systemPatterns.md`. `mb upgrade` reads PMB's working tree rather than a tag, which is why the 1.2.1
+upgrade is on hold.
+
+## ✅ Completed (2026-08-21)
+
+**Calibration made falsifiable.** The 21–22/22 score aggregated assertions of very different
+strength — three asserted on the agent's own domain vocabulary (`complexity` → `'complexity'`,
+`observability` → `'logging'`, `integration` → `'integration'`), proving the agent ran, not that it
+found anything. Strengthened where measured: `calculateShippingCost` 5/5, `notifyWebhook` 4/4.
+`observability` reverted (`cancelOrder` 4/6 — flaky enough to read as model variance); numbers kept
+in-file so it is not retried blind. Failing cases now print what the agent actually returned.
+
+**`DependenciesAgent` had no case that could fail** — both were `expectEmpty`, so an agent returning
+`[]` passed. Proven by patching it to `return []`: both still passed. Added
+`dependencies-vulnerable`, which fails in that scenario, running against its own materialised
+project via the new per-case `projectPathFixture` rather than this repo's incidental state. Its
+lockfile is committed as `vulnerable-lockfile.json`, since Dependabot alerts key on the
+`package-lock.json` filename and would otherwise raise standing alerts on a repo holding
+`npm audit` 0.
+
+**A failed `npm audit` reported a clean scan** (PR #41). Offline, `npm audit --json` writes a JSON
+error object to stdout and exits non-zero; `runTool` ignores exit codes by design, so the agent
+marked it `'used'` and the parser mapped the shape to `[]` — a clean report from an audit that never
+ran, LLM fallback skipped because output was non-null. Offline is this tool's primary use case. It
+was already half-identified in a parser comment whose response had been a stderr log — fixing the
+trace, not the claim.
+
+**`SecretsAgent` partial scans** no longer report as complete: gitleaks runs per file, and success
+on some plus no output on others still claimed a finished scan. Now falls through to the LLM so
+skipped files are examined. Deferred adding a `'partial'` `ToolAvailability` value on the belief it
+would ripple into the markdown/SARIF/MCP consumers — **that belief was checked later the same day
+and was wrong** (one call site, not three subsystems); see the section above.
+
+**All three `runTool` callers enumerated**, not sampled: `dependencies` and `secrets` fixed;
+`complexity` safe (lizard output is LLM context, never parsed into findings). **`review.yml`
+bounded:** `timeout-minutes: 45` (tool worst case ~90 min; observed 4–8.5) plus `paths-ignore` for
+docs-only PRs — backstops; root cause is an unsupervised runner, environment-side. Left open at the
+time: `license-clean` resolving `commander` from this repo's lockfile — **closed later the same day,
+see the section above.**
