@@ -24,24 +24,28 @@ function findingToAnnotation(f: Finding): string {
   const level = severityToAnnotationLevel(f.severity)
   const title = escapeAnnotationValue(f.title)
 
-  // WHY a mismatched location drops `line` instead of keeping it or dropping the annotation:
-  // an annotation is a mechanical file:line write, so a wrong line renders the finding on
-  // unrelated code -- a reader sees a security warning pinned to whatever happens to sit there.
-  // That is the same harm as the unresolvable paths fixed earlier, one level in: there the
-  // annotation landed nowhere, here it lands somewhere wrong, which is worse because it looks
-  // deliberate. Suppressing the annotation entirely would instead hide a finding that may well
-  // be real -- only its line is in doubt. GitHub accepts `file=` with no `line=` and attaches
-  // the annotation to the file, which says exactly what is known and nothing more.
+  // WHY a mismatched location keeps `line` and warns in the message, rather than omitting `line`:
+  // omitting it does NOT produce a file-level annotation. Every annotation property is optional,
+  // but `line` documents a default of 1 -- so dropping it silently repins the finding to line 1
+  // instead of detaching it. That is worse than leaving the model's line alone, because GitHub
+  // only renders an annotation inline when its line falls inside the diff: line 1 usually does
+  // not, so the annotation drops out of the Files-changed view into the Checks tab. That is
+  // exactly the "annotations silently land nowhere" harm that resolving finding paths fixed.
+  //
+  // So the line stays where the finding put it -- inside the diff, where the reader is looking --
+  // and the message says not to trust it. The caveat leads rather than trails because annotation
+  // messages are clipped in some views, and a warning the reader never scrolls to is not a
+  // warning. Suppressing the annotation was the third option and is worse still: the finding may
+  // be real, and only its line is in doubt.
   const unlocated = f.locationCheck === 'mismatch'
   const baseMessage = f.recommendation || f.detail
   const message = escapeAnnotationValue(
     unlocated
-      ? `${baseMessage} [Location unverified — the quoted evidence was not found at the cited line, so this is attached to the file rather than a line.]`
+      ? `[Location unverified — the quoted evidence was not found at this line; treat the line number as unreliable.] ${baseMessage}`
       : baseMessage
   )
   const endLine = f.lineEnd ? `,endLine=${f.lineEnd}` : ''
-  const location = unlocated ? '' : `,line=${f.line}${endLine}`
-  return `::${level} file=${f.file}${location},title=${title}::${message}`
+  return `::${level} file=${f.file},line=${f.line}${endLine},title=${title}::${message}`
 }
 
 export function formatGithubAnnotations(result: ReviewResult): string {
