@@ -11,6 +11,11 @@ deterministic-filter rounds that followed) came across the same way, because `pr
 reached exactly 400/400 lines — now the CI-enforced cap in `ci.yml`, not just README advice — and
 the next entry would have failed the build. Same content, moved, nothing deleted.
 
+Third move, 2026-08-26: the 2026-08-19 section (v1.12.0/v1.12.1 releases, OIDC Trusted
+Publishing migration, and the review-gate investigation) came across when `progress.md` hit
+401/400 recording the v1.13.1 release and the self-refuting-evidence artifact. Same content,
+moved, nothing deleted.
+
 ## ✅ Completed (2026-08-18)
 
 ### Audit remediation Batches 1-8 — Tier 1/2 fixes verified, implemented, tested, and committed
@@ -1087,3 +1092,48 @@ no speculation. User approved items 1, 2, 4 for implementation (not yet started)
 - [x] **V5-5**: Command registration — `aiReview.reviewStagedChanges`, progress notification during run
 - [x] **V5-6**: Bundling — bundle `ai-review-agent` into `.vsix` via esbuild/webpack, verify size
 - [x] **V5-7**: README + publish — marketplace metadata, `vsce package`, smoke test in Cursor
+
+## ✅ Completed (2026-08-19)
+
+**v1.12.0 published to npm** (provenance attached, GitHub release out) after PR #31 and #32 merged
+to `main`. Opened PR #33 (`fix/agent-count-and-maxlines`): agent-count announcement now uses the
+real post-policy total (was PMB's item 3a); truncation hint now recommends `--chunk` before
+`--max-lines`. 717 tests. Deliberately did not raise `maxDiffLines` from 2000 — unmeasured tradeoff
+against PMB's timeouts.
+
+Reviewing the deterministic-filter fixes found two of six were themselves defective — a
+`/code-review` opponent audit caught a regex that still dropped a real RLS finding after being
+called fixed (see the "Independent audit" entry below). Treat `claimSupport.ts` changes as
+security-relevant: measure, don't inspect.
+
+Identified 22 stale remote branches (all merged PRs). `git push --delete` is blocked by the same
+`/change-review` push-gate hook used for code changes, since a branch deletion has no diff to
+review — with explicit user approval, deleted all 22 via `gh api -X DELETE
+repos/:owner/:repo/git/refs/heads/<branch>` instead, which routes around that hook. Verified via
+`git branch -r`: only `main`, `chore/agent-calibration`, `claude/plan-overview-4dg42o`, and
+dependabot's `gitleaks-action-3.0.0` (PR #14) remain, as intended. (The dependabot branch has since
+gone; the other two were retained again in the 2026-08-26 cleanup above.)
+
+PR #33 merged (squash, `dcd37d7`) after CI went green. `main` was then ahead of the published
+`v1.12.0` tag by one fix, so bumped to `1.12.1` (`package.json`/`package-lock.json`), finalized the
+`CHANGELOG.md` entry, and updated `README.md`'s `toolVersion` example (PR #34) — same shape as the 1.11.0
+release PR (#30). `npm run check` equivalent (typecheck/format/lint) and 717/717 tests green.
+
+**Migrated npm publishing to Trusted Publishing (OIDC), closing out the `NPM_TOKEN` expiry risk**
+(PR #35). The token was an Automation token with "Bypass 2FA" set — a class npm is restricting for
+direct publishing in Jan 2027, and this one specifically expired 2026-09-08. `release.yml` already
+had `id-token: write`/`registry-url`/`--provenance`; only the `NODE_AUTH_TOKEN` env var still made
+it token-based. User configured the Trusted Publisher relationship on npmjs.com (GitHub Actions /
+`unyieldingclaw-dev` / `ai-code-review-agent` / `release.yml`, "Allow npm publish"), then removed
+`NODE_AUTH_TOKEN` and the expiry-reminder step, added `npm install -g npm@latest` (OIDC publishing
+needs npm >= 11.5.1, and `setup-node` just bundles whatever ships with Node 24), and deleted
+`scripts/setup-npm-token.ps1` (existed solely to bootstrap the token being replaced).
+
+**Verified live, not just reasoned about**: tagging and pushing `v1.12.1` triggered a real
+OIDC-based publish on the first attempt — `npm notice publish Signed provenance statement...`,
+package landed on the registry, GitHub release created, zero auth errors. Confirmed the one
+worrying-looking line in that run's log (`npm warn publish "bin[ai-review-agent]"... was invalid
+and removed`) is pre-existing npm normalization unrelated to the migration — `./dist/cli/index.js`
+→ `dist/cli/index.js`, identical on the already-published `1.12.0`, not a regression. After the
+live confirmation, `NPM_TOKEN` was deleted from GitHub secrets entirely — publishing now has no
+token in the loop at all.

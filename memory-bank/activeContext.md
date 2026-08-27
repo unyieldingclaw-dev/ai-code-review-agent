@@ -20,9 +20,10 @@ lineage: []
 
 ## Current Focus
 
-**v1.13.0 published (2026-08-26)** — 13 commits that had accumulated unreleased, all honesty fixes:
-partial scans, resolvable finding paths, MCP tool visibility, pre-image findings. npm publishing runs
-on Trusted Publishing (OIDC); `NPM_TOKEN` is deleted from GitHub secrets entirely.
+**v1.13.1 published (2026-08-26)**, superseding v1.13.0 four days on. Between them, 16 honesty
+fixes: partial scans, resolvable finding paths, MCP tool visibility, pre-image findings, duplicate
+collapse, and the INCOMPLETE headline. Publishing is OIDC Trusted Publishing; `NPM_TOKEN` is deleted
+from GitHub secrets entirely.
 
 Four hallucination classes have deterministic backstops instead of prompt wording: injection,
 swallowed-exception, SQL NULL-error, fabricated licenses. Prompt-only fixes were measured live across
@@ -39,14 +40,12 @@ because `commander` happens to be an ACR dependency. Keyword strengthening is me
 `calculateShippingCost` 5/5, `notifyWebhook` 4/4, `cancelOrder` 4/6 → reverted. Failing cases now
 print what the agent actually returned. Details in `progress.md`.
 
-**`toolAvailability` is now honest end-to-end (2026-08-21).** `'partial'` was added (a partial
-gitleaks scan used to claim the tool never ran), then surfaced in MCP output — which ignored the
-field entirely, so a partial scan, a missing tool, and a clean run were identical to a calling LLM —
-and merged across chunks rather than last-chunk-wins, which had re-created the same false "complete
-scan" claim one layer up. `TOOL_LABELS` moved to `schema.ts` so the formatters cannot drift.
-Generalisable lesson from the deferral that held `'partial'` back: **a rationale recorded in a code
-comment is a claim, not a finding** — re-check it before inheriting it. It asserted a
-markdown/SARIF/MCP ripple; only one site actually branched on the value.
+**`toolAvailability` is now honest end-to-end (2026-08-21).** `'partial'` was added, surfaced in
+MCP output (which had ignored the field, making a partial scan, a missing tool, and a clean run
+identical to a calling LLM), and merged across chunks rather than last-chunk-wins. `TOOL_LABELS`
+moved to `schema.ts` so formatters cannot drift. Generalisable lesson from the deferral that held
+`'partial'` back: **a rationale in a code comment is a claim, not a finding** — it asserted a
+markdown/SARIF/MCP ripple, but only one site branched on the value.
 
 **Verified state:** 759 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
@@ -71,18 +70,16 @@ mattered more than any single fix:** `gh run download` yields the real `ai-revie
 and replaying it through `synthesize()` caught a miswiring every unit test and a scratch probe both
 missed. See `systemPatterns.md`.
 
-**New PMB brief on ACR (2026-08-26), partly actioned.** **Fixed:** the CLI truncation headline
-printed `✅` where MCP printed `⚠️` for the identical state; it now leads with `INCOMPLETE —
-reviewed N/M lines`. Qualifying text alone had been tried after an earlier report of the same bug and
-was not enough — the glyph is the verdict for a skimming reader. Also aligned `formatter.ts`'s
-truncation advice with `runner.ts` (PR #33 corrected the stderr copy to prefer `--chunk`; the report
-copy was missed and still recommended raising `--max-lines`, which makes timeouts worse).
-**Still open:** the per-agent timeout ceiling (282,240 ms) sits below legitimate agent runtimes
-(616 s) on CPU-only hosts. **Do not chase two of their diagnoses — both verified wrong:** there is no
-fetch timeout separate from `--timeout` (`ollamaProvider.ts` uses the caller's signal), agents are
-sequential by default, and chunking preserves hunk headers byte-identically, so the "chunk-relative
-line offsets" theory has no mechanism — line numbers are just unreliable from the model (7/5/7 across
-trials, unchunked). Their exit-code suggestion already exists.
+**Two PMB briefs on ACR, both triaged (2026-08-26).** Shipped from them: the `INCOMPLETE` headline
+(the glyph is the verdict for a skimming reader — qualifying text alone had already failed once) and
+`formatter.ts`'s truncation advice realigned with `runner.ts` to prefer `--chunk`. **Four of their
+diagnoses are verified wrong — do not chase them:** no fetch timeout separate from `--timeout`
+(`ollamaProvider.ts` uses the caller's signal); agents are sequential by default; chunking preserves
+hunk headers byte-identically; and the second brief's cross-file misattribution cannot be a chunking
+artifact, since `--chunk` is opt-in and their 1769-line run never triggered it. Line attribution is
+unreliable from the model itself (7/5/7 across trials, unchunked), now including across files.
+Confirmed and open: the timeout ceiling, and exit 1 outranking exit 3 so a truncated run with a
+blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is what is new).
 
 **Open risks, detailed in `progress.md`:**
 
@@ -108,10 +105,9 @@ trials, unchunked). Their exit-code suggestion already exists.
 - Policy layer: `agentPolicy` per-agent include/exclude glob path filtering
 - `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
-- Calibration CI: self-hosted runner, 20min timeout. Calibration is nondeterministic — 21–22/22
-  is normal; a single failing case is usually model variance, not a regression.
-- **759 unit tests**; `npm audit` clean (prod + dev). Local `vitest` works; `npm run test:docker`
-  is the fallback when native modules will not load (Smart App Control) or GitHub CI is unreliable.
+- Calibration CI: self-hosted runner, 20min timeout (nondeterminism noted under Verified state).
+- **759 unit tests**; `npm audit` clean. `npm run test:docker` is the fallback when native modules
+  will not load (Smart App Control) or CI is unreliable.
 - `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
   LLM entirely; `ReviewResult.toolAvailability` surfaces degraded and partial runs (markdown, SARIF,
   and MCP), merged across chunks rather than last-chunk-wins
@@ -119,11 +115,10 @@ trials, unchunked). Their exit-code suggestion already exists.
 - `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
 - `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
-- **npm**: `ai-review-agent@1.13.0` via Trusted Publishing (OIDC), provenance attached. **#49–#51
-  merged _after_ the `v1.13.0` tag; the user-facing pair is #50 (duplicate-collapse) and #51 (the
-  INCOMPLETE headline), so neither is on npm.** `release.yml`
-  has no npm secret dependency — `id-token: write` + the Trusted Publisher relationship on
-  npmjs.com is sufficient; `npm install -g npm@latest` runs early (OIDC needs npm >= 11.5.1).
+- **npm**: `ai-review-agent@1.13.1` via Trusted Publishing (OIDC), SLSA v1 provenance attached;
+  `main` and npm are in sync. `release.yml` has no npm secret dependency — `id-token: write` + the
+  Trusted Publisher relationship on npmjs.com suffices; `npm install -g npm@latest` runs early
+  (OIDC needs npm >= 11.5.1).
 
 ## Next Steps
 
@@ -131,8 +126,13 @@ trials, unchunked). Their exit-code suggestion already exists.
   10,039-line diff with `--chunk`, agents legitimately ran **616 s** against a **282,240 ms**
   ceiling (`agentTimeoutMs` 180000 × ~1.568 scaling, working as designed); 2/4 agents died on
   `fetch failed`. **Do not pick a new number by reasoning** — `progress.md` records that unmeasured
-  tuning here backfired, and `maxDiffLines` stays at 2000 as a deliberate unmeasured tradeoff.
-  Measure on a CPU-only host first.
+  tuning here backfired. Measurement is reproducible on this GPU box via `OLLAMA_NUM_GPU=0`, at
+  ~46 min per trial; budget a half-day, not an afternoon.
+- **Evidence-location invariant** — assert a finding's quoted evidence actually occurs at its cited
+  `file:line` before emitting. Two independent artifacts motivate it: PMB's run mis-cited 3/3
+  findings (one across _files_), and ACR's own release-PR run emitted three findings whose evidence
+  refutes their title. Deterministic, and the only lever that has moved defect rates here. Needs
+  its own contract.
 - **PMB 1.2.1 upgrade** — on hold: `mb upgrade` copies from PMB's **working tree**, not a tag, and
   that tree had uncommitted in-flight edits. Fixes `last-reviewed`; nothing else depends on it.
 - **Marketplace publish** (VS Code extension): explicitly DEFERRED.
@@ -146,5 +146,5 @@ trials, unchunked). Their exit-code suggestion already exists.
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `main` at `b3646a8`, three commits past the `v1.13.0` tag. Commands are in
+unit tests. **Git**: `main` at `fc7ba8c` = `v1.13.1` = npm latest. Commands are in
 `techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass.
