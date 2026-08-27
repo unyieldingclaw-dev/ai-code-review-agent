@@ -184,6 +184,20 @@ actually runs — pwsh is tried first, `.sh` is only a fallback). The matcher ca
   and the push marker must be recomputed **after** committing — the branch diff changes the moment
   a commit exists, so a marker written pre-commit no longer matches.
 
+### Stacked PRs, and Fields That Must Reach Every Formatter (learned 2026-08-26)
+
+- **Never `--delete-branch` while a stacked child exists.** GitHub closes a PR whose _base_ branch
+  is deleted rather than retargeting it (this killed #56). Merge the parent bare, retarget the child
+  with `gh pr edit N --base main`, then delete the branch.
+- **Such a PR can be neither reopened nor retargeted.** Open a fresh PR on `main` and merge `main`
+  in — the branch holds the parent's pre-squash commit, so otherwise the diff replays it entirely.
+- **A stacked PR never runs `test`** — `ci.yml` fires on `pull_request: branches: [main]` only, so
+  green on one means the check never ran, not that it passed.
+- **A new `Finding`/`ReviewResult` field must reach all four formatters** — `cli/formatter.ts`,
+  `cli/formatters/{sarif,githubAnnotations}.ts`, `mcp/formatter.ts`. `toolAvailability` missed MCP
+  and `locationCheck` missed SARIF+MCP, both caught post-merge by a reader. Check MCP first: its
+  reader is an LLM with no terminal to cross-check against.
+
 ### Validate a Filter Through the Pipeline, Not a Probe (learned 2026-08-21)
 
 A standalone script that reimplements a check and reports it working proves the _idea_, not the

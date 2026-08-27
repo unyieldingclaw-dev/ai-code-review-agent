@@ -22,6 +22,40 @@ lineage: []
 
 ## ✅ Completed (2026-08-26)
 
+**Evidence-location invariant shipped (#55, #58, #57).** A finding whose quoted evidence is not at
+its cited `file:line` is now flagged on all four surfaces. `evidenceLocation.ts` builds a
+post-image line map from hunk headers — numbering from `+start`, skipping removed lines, because an
+offset-into-the-diff-body implementation passes the happy path and drifts one per deletion, the
+exact shape of the defect. `synthesize()` stamps `locationCheck` last, on the published set only.
+
+**It reports; it does not correct or drop.** Correcting was the first design and the real PR #53
+diff killed it: `"version": "1.13.1",` occurs 3× across 2 files in 134 lines, so all three
+self-refuting findings are ambiguous and a corrector would never have fired on the only evidence
+available. Picking an occurrence would assert a location more confidently than the model did.
+Dropping stays off the table as the false-negative direction.
+
+**A spec detail reversed the annotation design mid-flight.** The first attempt omitted `line=` on a
+mismatch, assuming GitHub would attach the annotation to the file. It does not: every property is
+optional but `line` **defaults to 1**, so omitting it repins to line 1 — usually outside the diff,
+where GitHub does not render inline. That is #45's "annotations land nowhere" by another route. The
+line now stays and the message leads with the caveat (messages get clipped; a warning nobody
+scrolls to is not one). SARIF keeps its region and records the tri-state in `properties`; MCP marks
+the heading.
+
+**Verified by replay, not by probe:** the real `findings.json` from run 33025650850, through
+`OrchestratorAgent.synthesize()`, stamps 6/6 mismatch with 0 dropped — and the same evidence at its
+true line returns `verified`, so the check discriminates rather than flagging everything. Across
+the three PRs, 8 of 14 new tests fail against their pre-change code; the other 6 are guards and are
+not counted as evidence.
+
+**A third-party reviewer prompted two of these fixes without being right about either.** Across two
+rounds it produced five findings: one factually wrong (it claimed the markdown formatter lacked the
+marker while citing the lines containing it), one whose classification was right but whose
+mechanism was wrong (`file-level annotation` vs the documented default of 1), one already fixed in
+a commit it had not seen, and two accurate citations that mattered — `sarif.ts` and
+`mcp/formatter.ts` had zero references to `locationCheck`. Useful as a prompt to verify; not usable
+as conclusions. Both rounds reviewed stale snapshots without saying so.
+
 **v1.13.1 published** (npm serves it, SLSA v1 provenance, OIDC needed no npm secret). `main` sat
 three commits past `v1.13.0` with #50 (duplicate-collapse) and #51 (the INCOMPLETE headline)
 stranded, plus #49. The handoff said to batch them with the timeout fix; overturned on two measured

@@ -20,10 +20,18 @@ lineage: []
 
 ## Current Focus
 
-**v1.13.1 published (2026-08-26)**, superseding v1.13.0 four days on. Between them, 16 honesty
-fixes: partial scans, resolvable finding paths, MCP tool visibility, pre-image findings, duplicate
-collapse, and the INCOMPLETE headline. Publishing is OIDC Trusted Publishing; `NPM_TOKEN` is deleted
-from GitHub secrets entirely.
+**v1.13.1 published (2026-08-26)**, superseding v1.13.0 four days on — 16 honesty fixes between
+them. Publishing is OIDC Trusted Publishing; `NPM_TOKEN` is deleted from GitHub secrets entirely.
+**`main` is now 3 commits past that tag and unreleased** (#55, #58, #57).
+
+**Evidence-location invariant landed (2026-08-26), unreleased.** A finding whose quoted evidence is
+not at its cited `file:line` is flagged on all four surfaces — markdown marker, annotation message
+caveat, SARIF `properties.locationCheck`, MCP heading. It reports only: correcting the line was
+tried and disproved (the same evidence string occurs 3× across 2 files in the 134-line diff that
+motivated it), and dropping remains the false-negative direction. Verified by replaying run
+33025650850 through `synthesize()`: 6/6 stamped, 0 dropped, and `verified` still returned when the
+line is right. Details and the annotation spec trap in `progress.md`; the stacked-PR and
+four-formatter rules in `systemPatterns.md`.
 
 Four hallucination classes have deterministic backstops instead of prompt wording: injection,
 swallowed-exception, SQL NULL-error, fabricated licenses. Prompt-only fixes were measured live across
@@ -61,14 +69,11 @@ reads a dead sensor; `pre-push-check.*` calls `mb validate`, folded into `mb doc
 ownership rule and the working conventions (keep `git push`/`git commit` out of command text; use
 `gh pr update-branch`, never a rebase, since force-push is blocked).
 
-**ACR was reviewing the wrong side of its own diffs (2026-08-21), and repeating itself
-(2026-08-26).** Four bugs from two false findings on PR #44; three fixed. Paths kept the diff's `a/`
-prefix so 33% of findings pointed at nonexistent files (#45); agents reported deleted code as current
-(#46); same-agent repeats survived dedup (Bug D — collapsed on agent+file+line+basis+title, keeping
-the highest severity; keying on _evidence_ would have merged two legitimate titles). **The method
-mattered more than any single fix:** `gh run download` yields the real `ai-review-findings` artifact,
-and replaying it through `synthesize()` caught a miswiring every unit test and a scratch probe both
-missed. See `systemPatterns.md`.
+**ACR was reviewing the wrong side of its own diffs, and repeating itself** — all shipped: `a/`-prefixed
+paths pointing 33% of findings at nonexistent files (#45), deleted code reported as current (#46),
+same-agent repeats surviving dedup (Bug D, #50). **The method mattered more than any single fix:**
+`gh run download` yields the real `ai-review-findings` artifact, and replaying it through
+`synthesize()` caught a miswiring every unit test and a scratch probe both missed.
 
 **Two PMB briefs on ACR, both triaged (2026-08-26).** Shipped from them: the `INCOMPLETE` headline
 (the glyph is the verdict for a skimming reader — qualifying text alone had already failed once) and
@@ -128,11 +133,6 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
   `fetch failed`. **Do not pick a new number by reasoning** — `progress.md` records that unmeasured
   tuning here backfired. Measurement is reproducible on this GPU box via `OLLAMA_NUM_GPU=0`, at
   ~46 min per trial; budget a half-day, not an afternoon.
-- **Evidence-location invariant** — assert a finding's quoted evidence actually occurs at its cited
-  `file:line` before emitting. Two independent artifacts motivate it: PMB's run mis-cited 3/3
-  findings (one across _files_), and ACR's own release-PR run emitted three findings whose evidence
-  refutes their title. Deterministic, and the only lever that has moved defect rates here. Needs
-  its own contract.
 - **PMB 1.2.1 upgrade** — on hold: `mb upgrade` copies from PMB's **working tree**, not a tag, and
   that tree had uncommitted in-flight edits. Fixes `last-reviewed`; nothing else depends on it.
 - **Marketplace publish** (VS Code extension): explicitly DEFERRED.
