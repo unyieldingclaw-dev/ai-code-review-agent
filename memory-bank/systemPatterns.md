@@ -184,16 +184,9 @@ actually runs — pwsh is tried first, `.sh` is only a fallback). The matcher ca
   and the push marker must be recomputed **after** committing — the branch diff changes the moment
   a commit exists, so a marker written pre-commit no longer matches.
 
-**Confirmed defect (reproduced 2026-08-20):** `review-reminders-post.*` is supposed to reissue the
-marker when a gated command fails, but **PostToolUse does not fire when the tool call exits
-non-zero** — so the reissue never happens and the marker is lost. Proven by A/B on the same failing
-push: with `; echo "EXIT=$?"` appended (overall exit 0) the marker is correctly reissued; bare
-(exit 1) it is not, and `.claude/.pending-push-presha` survives — the post-hook deletes that file
-unconditionally at entry, so its survival proves the hook never ran. Practical consequence: a
-failed push burns the marker and forces a pointless re-review.
-
-Separately latent: the ref-move check uses `git rev-parse '@{u}'`, which never moves for a **tag**
-push, so a successful tag push would read as a failure.
+**A failed gated command burns its marker and forces a pointless re-review** — the post-hook that
+should reissue it never fires, because PostToolUse does not run when the tool call exits non-zero.
+Reproduction and the latent tag-push variant: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 **Do not patch these scripts here.** `review-reminders*`, `pre-push-check*`, `dangerous-commands*`,
 `check-contract*`, and `update-reviewed*` are PMB-owned (`TEMPLATE_OWNED` in `mb.sh`), overwritten
@@ -202,14 +195,10 @@ A local fix is erased on the next upgrade. Report upstream instead. PMB has a st
 this defect (Layer 1 downgraded to peek-only, with the git hook as sole marker consumer) on an
 unmerged branch.
 
-**Live consequence in this repo — `last-reviewed` is not being maintained.** `update-reviewed.*`
-(PostToolUse on Write/Edit) reads a flat `.file_path` from the hook payload, but the real payload
-nests it under `tool_input`. The field is always null, so the script exits 0 on every call and
-never stamps the date. Verified 2026-08-20: three memory-bank files edited that day still carried
-`last-reviewed` dates from June and July. Consequence beyond the stale field — `mb doctor` uses
-those dates to detect stale memory-bank files, so it is reading a dead sensor and will report
-actively-edited files as months stale. Fixed in PMB 1.2.1; this repo is on 1.1.1
-(`.pmb-version`), so the fix arrives with `mb upgrade`, not with a local edit.
+**`last-reviewed` is never stamped, so `mb doctor`'s staleness check reads a dead sensor** —
+`update-reviewed.*` reads a flat `.file_path` where the payload nests it under `tool_input`. Fixed
+in PMB 1.2.1; this repo is on 1.1.1, so it arrives with `mb upgrade`, not a local edit. Diagnosis:
+[`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 **Do not "fix" this by loosening the matcher without measurement.** Anchoring to command position
 would reduce false trips, but the failure direction is _missing a real push_ (`xargs git push`, a
@@ -257,6 +246,16 @@ showing `dropped: 0` where the probe predicted 1.
   `claimSupport` unit tests still pass.
 - **Distrust a probe that agrees with you.** If a scratch script and the real pipeline disagree, the
   pipeline is right. Import the actual exported function rather than reimplementing it.
+- **Record the delta, not the level** (2026-08-27, from PMB). "This removed 20,953 bytes" stays
+  true; "the file is now 46,956 bytes" decays within hours, and did — three times on their side,
+  twice inside the branch that wrote it. Same root as the duration lesson below: a figure recorded
+  without the frame that makes it meaningful.
+- **When a review round's findings are mostly defects introduced by the previous round's fixes,
+  the change has had enough passes** (2026-08-27, named by PMB, and this repo is a clean instance).
+  Round 1 found retry-inflated elapsed; round 2's fix recorded the last attempt instead of the
+  longest, hiding a slow attempt behind a fast retry; round 3 caught that. Getting a thing wrong
+  from _opposite directions_ while fixing it is the signal to stop reviewing and ship, not to run
+  a fourth round.
 - **A duration is not a measurement until you say what it spans** (2026-08-27). Wall time
   covering retries, printed against a per-attempt ceiling, reads as exceeding a limit no
   attempt approached — measured at 611.7 s vs 354.7 s, all retry. State the span in the type.
