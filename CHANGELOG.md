@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.15.0] — 2026-08-27 (a timing number now says what it spans)
+
 ### Added
 
 - **Per-pass timing is measured and kept**, on stderr as each pass completes and in the
