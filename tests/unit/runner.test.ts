@@ -22,6 +22,7 @@ beforeEach(() => {
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs'
 import { join } from 'path'
 import { SwarmRunner, scaleAgentTimeout, recordToolAvailability } from '../../src/core/runner.js'
+import { formatRunTiming } from '../../src/core/timingReport.js'
 import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import { formatMarkdown } from '../../src/cli/formatter.js'
 import { BaseAgent } from '../../src/core/agents/base.js'
@@ -1298,5 +1299,201 @@ describe('evidence verification', () => {
     })
     expect(loweredResult.evidenceCheckFilter?.checkedCount).toBe(1)
     expect(verifierProvider.chat).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('SwarmRunner timing instrumentation', () => {
+  it('returns exactly one timings row carrying diffLines and the scaled ceiling', async () => {
+    const provider = makeProvider()
+    const config = { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[] }
+    const runner = new SwarmRunner(config, provider)
+    const diff = Array.from({ length: 40 }, (_, i) => `+line ${i}`).join('\n')
+
+    const result = await runner.run({ diff })
+
+    expect(result.timings).toHaveLength(1)
+    const t = result.timings![0]!
+    expect(t.diffLines).toBe(40)
+    expect(t.effectiveTimeoutMs).toBe(
+      scaleAgentTimeout(config.agentTimeoutMs, 40, config.maxDiffLines)
+    )
+    expect(t.durationMs).toBeGreaterThanOrEqual(0)
+    expect(t.agents.map((a) => a.name)).toEqual(['security'])
+    expect(t.agents[0]!.status).toBe('ok')
+  })
+
+  // REGRESSION, and the reason the recording proxy reads agentStatus rather than assuming 'ok':
+  // a timed-out agent's elapsedMs IS the ceiling, so recording it as 'ok' turns the timeout into
+  // what reads as a genuine completion time sitting right at the limit -- the precise misreading
+  // that raising a ceiling on an unsourced number depends on. Pins the ordering dependency too:
+  // every execution path assigns agentStatus BEFORE emitting its 'end' progress event.
+  it('records a timed-out agent as timeout, not ok', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => new Promise(() => {})),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const runner = new SwarmRunner(
+      {
+        ...DEFAULT_CONFIG,
+        agents: ['security'] as AgentName[],
+        agentTimeoutMs: 20,
+        timeoutScalingEnabled: false,
+        retryAttempts: 1,
+        retryDelayMs: 0,
+      },
+      provider
+    )
+
+    const result = await runner.run({ diff: '+a' })
+
+    expect(result.timings![0]!.agents).toEqual([
+      {
+        name: 'security',
+        elapsedMs: expect.any(Number),
+        attemptMs: expect.any(Number),
+        // One attempt: #63 established that a timeout is never retried, so a timed-out agent's
+        // attemptMs IS its ceiling. That is what makes the label on it meaningful.
+        attempts: 1,
+        status: 'timeout',
+      },
+    ])
+  })
+
+  it('writes the timing line to stderr only when the caller asked for progress', async () => {
+    const provider = makeProvider()
+    const runner = new SwarmRunner(
+      { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[] },
+      provider
+    )
+    const written: string[] = []
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      written.push(String(chunk))
+      return true
+    })
+    try {
+      await runner.run({ diff: '+a' })
+      expect(written.some((l) => l.includes('[ai-review] timing:'))).toBe(false)
+
+      await runner.run({ diff: '+a' }, () => {})
+      expect(written.some((l) => l.includes('[ai-review] timing:'))).toBe(true)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+})
+
+describe('timing under retries -- the defect the review caught', () => {
+  // REGRESSION. `startMs` sits outside withRetryTimeout, so elapsedMs spans every attempt plus
+  // the backoff between them, while effectiveTimeoutMs is the budget for ONE attempt. Before the
+  // fix this rendered as an agent that ran past its own ceiling and finished fine -- measured at
+  // 1015ms against a 300ms ceiling with status 'ok' -- which is exactly the "the ceiling is too
+  // low" misreading this field exists to prevent. attemptMs is the number the ceiling governs.
+  it('separates per-attempt time from wall time when an agent is retried', async () => {
+    let call = 0
+    const provider: LLMProvider = {
+      // Attempt 1 is unparseable (a parse-error IS retried); attempt 2 succeeds.
+      chat: vi.fn().mockImplementation(async () => (++call === 1 ? 'not json' : '[]')),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const runner = new SwarmRunner(
+      {
+        ...DEFAULT_CONFIG,
+        agents: ['security'] as AgentName[],
+        agentTimeoutMs: 5000,
+        timeoutScalingEnabled: false,
+        retryAttempts: 2,
+        retryDelayMs: 300,
+      },
+      provider
+    )
+
+    const t = (await runner.run({ diff: '+a' })).timings![0]!
+    const a = t.agents[0]!
+
+    expect(call).toBe(2)
+    expect(a.attempts).toBe(2)
+    expect(a.status).toBe('ok')
+    // Wall time carries the 300ms backoff; the attempt that produced 'ok' does not.
+    expect(a.elapsedMs).toBeGreaterThanOrEqual(300)
+    expect(a.attemptMs).toBeLessThan(a.elapsedMs)
+    // The whole point: the number compared against the ceiling stays under it.
+    expect(a.attemptMs).toBeLessThan(t.effectiveTimeoutMs)
+  })
+
+  // REGRESSION for longest-vs-last. The first fix for retry inflation recorded the LAST
+  // attempt, which hides the datapoint that matters: a slow attempt followed by a quick
+  // successful retry reported the quick one, so a reader following README's "compare attemptMs
+  // against effectiveTimeoutMs" concluded nothing came close to the ceiling when something had
+  // nearly hit it. That is the original misreading from the opposite direction.
+  it('keeps the slowest attempt when a later one is fast', async () => {
+    let call = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(async () => {
+        if (++call === 1) {
+          await new Promise((r) => setTimeout(r, 400))
+          return 'not json'
+        }
+        return '[]'
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const runner = new SwarmRunner(
+      {
+        ...DEFAULT_CONFIG,
+        agents: ['security'] as AgentName[],
+        agentTimeoutMs: 5000,
+        timeoutScalingEnabled: false,
+        retryAttempts: 2,
+        retryDelayMs: 5,
+      },
+      provider
+    )
+    const a = (await runner.run({ diff: '+a' })).timings![0]!.agents[0]!
+    expect(a.attempts).toBe(2)
+    expect(a.status).toBe('ok')
+    // The slow first attempt, not the fast second one that produced the status.
+    expect(a.attemptMs).toBeGreaterThanOrEqual(390)
+  })
+
+  it('tells the reader an agent retried, so the parts of the line reconcile', async () => {
+    let call = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(async () => (++call === 1 ? 'not json' : '[]')),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const runner = new SwarmRunner(
+      {
+        ...DEFAULT_CONFIG,
+        agents: ['security'] as AgentName[],
+        retryAttempts: 2,
+        retryDelayMs: 10,
+      },
+      provider
+    )
+    const line = formatRunTiming((await runner.run({ diff: '+a' })).timings![0]!)
+    expect(line).toContain('retried: security x2')
+  })
+
+  // The ordering the recorder depends on was previously pinned only on the sequential path.
+  it('records the right status on the parallel path too', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => new Promise(() => {})),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const runner = new SwarmRunner(
+      {
+        ...DEFAULT_CONFIG,
+        agents: ['security', 'correctness'] as AgentName[],
+        parallel: true,
+        agentTimeoutMs: 20,
+        timeoutScalingEnabled: false,
+        retryAttempts: 1,
+        retryDelayMs: 0,
+      },
+      provider
+    )
+    const t = (await runner.run({ diff: '+a' })).timings![0]!
+    expect(t.agents).toHaveLength(2)
+    expect(t.agents.every((a) => a.status === 'timeout')).toBe(true)
   })
 })

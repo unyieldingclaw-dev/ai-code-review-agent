@@ -237,6 +237,66 @@ export function toolsWithAvailability(
 
 export type AgentStatus = 'ok' | 'timeout' | 'parse-error' | 'error'
 
+// Timing for one agent within one review pass.
+//
+// Three durations would be one too many, so note what each of these is FOR:
+//
+// `elapsedMs` is wall time -- how long the operator actually waited, spanning every retry
+// attempt and the backoff between them. It is what the progress line has always printed.
+//
+// `attemptMs` is the LONGEST single attempt, and it is the ONLY one of the two comparable to
+// `RunTiming.effectiveTimeoutMs`, because that ceiling is applied per attempt by withTimeout,
+// not per agent. When `attempts` is 1 the two are the same; when it is more they can differ by
+// more than the ceiling itself. Longest rather than last, so that a slow attempt followed by a
+// quick successful retry still shows the slow one -- that is the datapoint about the ceiling.
+//
+// `attempts` is 0 when the agent produced a result without calling the model at all (a testgen
+// run with no coverage gaps), which is why it is a count and not a boolean.
+//
+// Both are kept because reporting either alone is a way to mislead. Reporting only wall time
+// lets a parse-error-then-success render as an agent that ran past its own ceiling and finished
+// fine -- the "the ceiling is too low" misreading this whole field exists to prevent. Reporting
+// only the attempt hides that the operator waited several times longer than the number shown.
+// Both directions are demonstrated by the tests in `runner.test.ts` under "timing under
+// retries"; no figure is quoted here that a reader cannot re-run.
+//
+// `status` is stored rather than inferred from the durations for the mirror-image reason: on a
+// timeout `attemptMs` IS the ceiling, so without the label it reads as a real completion time
+// that happens to land exactly on the limit.
+export interface AgentTiming {
+  name: AgentName
+  elapsedMs: number
+  attemptMs: number
+  attempts: number
+  status: AgentStatus
+}
+
+// Timings for ONE SwarmRunner.run() call. Under --chunk there is one of these per chunk;
+// without it there is exactly one per review.
+//
+// WHY a per-run record rather than a single total: `summary.durationMs` already exists, but
+// chunkRunner SUMS it across chunks, so a chunked run reports only the aggregate. An aggregate
+// cannot answer the question this field exists for -- whether any single agent invocation
+// approached `effectiveTimeoutMs` -- because the timeout is applied per invocation, not per
+// review. Keeping the rows separate makes that distinction fall out of the data instead of
+// requiring interpretation. See the CHANGELOG entry for the unsourced figure that motivated it.
+//
+// `effectiveTimeoutMs` is the post-scaling ceiling this run's agents were held to (see
+// scaleAgentTimeout), not the configured base: it varies with `diffLines`, so a chunked run
+// legitimately shows a different ceiling per row. Elapsed without the ceiling it was measured
+// against just relocates the ambiguity.
+//
+// `diffLines` is named for what it is on every run -- the number of diff lines the agents were
+// actually given (post-ignore-filter, post-truncation) -- rather than "chunkLines", which would
+// be a lie on the far more common unchunked run, and which disagreed with how every renderer
+// already printed it.
+export interface RunTiming {
+  diffLines: number
+  effectiveTimeoutMs: number
+  durationMs: number
+  agents: AgentTiming[]
+}
+
 export interface ReviewResult {
   schemaVersion?: 'ai-review-agent/v1'
   toolVersion?: string
@@ -265,6 +325,13 @@ export interface ReviewResult {
   coverageGapFilter?: CoverageGapFilterMetadata
   evidenceCheckFilter?: EvidenceCheckFilterMetadata
   toolAvailability?: ToolAvailabilityMetadata
+  // One row per SwarmRunner.run() call -- concatenated across chunks, never summed.
+  //
+  // Optional in the type but set by both producers on every path, so any result this tool
+  // produces has it. It stays optional because results that predate it are real inputs: an
+  // archived findings.json from CI, or a hand-built fixture. Renderers must therefore treat
+  // absent and empty as the same "nothing measured" case rather than reaching for `!`.
+  timings?: RunTiming[]
 }
 
 export const SEVERITY_RANK: Record<Severity, number> = {
@@ -283,6 +350,11 @@ export interface AgentProgressEvent {
   index: number
   total: number
   findings?: Finding[]
+  // Set on 'end' only. `elapsedMs` spans every retry attempt plus backoff; `attemptMs` is the
+  // single attempt that produced the agent's status, and is the one comparable to the timeout.
+  // See AgentTiming above for why both exist.
   elapsedMs?: number
+  attemptMs?: number
+  attempts?: number
   earlyExit?: boolean
 }

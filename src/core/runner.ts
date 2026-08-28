@@ -16,8 +16,11 @@ import type {
   DroppedCoverageGap,
   ToolAvailabilityMetadata,
   EvidenceCheckFilterMetadata,
+  AgentTiming,
+  RunTiming,
 } from './schema.js'
 import { SEVERITY_RANK } from './schema.js'
+import { formatRunTiming } from './timingReport.js'
 import { classifyAgentError } from './parsing.js'
 import { runEvidenceChecks } from './evidenceVerifier.js'
 import { loadAgentContext, loadAgentContextSemantic } from './contextLoader.js'
@@ -72,17 +75,53 @@ function withTimeout<T>(
   return Promise.race([fn(controller.signal), timeoutPromise]).finally(() => clearTimeout(timer))
 }
 
+// What the caller needs to interpret a duration, filled in by withRetryTimeout as it goes.
+//
+// WHY this exists at all: the wall time a caller measures around withRetryTimeout spans EVERY
+// attempt plus the backoff between them, while `timeoutMs` is the budget for a SINGLE attempt.
+// Rendering those two side by side invites the exact misreading this instrumentation was built
+// to stop -- an agent that parse-errored once and then succeeded shows an elapsed larger than
+// its own ceiling with status 'ok', which reads as "the ceiling is too low" when no attempt came
+// near it. Measured before the fix: a 300 ms ceiling, 1015 ms elapsed, status 'ok'.
+//
+// `maxAttemptMs` is the LONGEST single attempt, and the choice of longest-over-last is the
+// whole point. The question this feeds is "did any attempt approach the ceiling", so the answer
+// has to survive a later attempt that was quick. Recording the last attempt instead loses
+// exactly the evidence worth having: an agent that runs most of its budget, returns unparseable
+// JSON, then succeeds quickly on retry would report only the quick attempt -- and a reader
+// following README's "compare attemptMs against effectiveTimeoutMs" concludes nothing came
+// close, when something nearly hit the ceiling. That is the original misreading arrived at from
+// the opposite direction, and the first version of this fix traded one for the other.
+//
+// There is no `lastAttemptMs` because nothing needs it: `status` is set by the caller from the
+// success or the thrown error, not from here. And since #63 stopped retrying timeouts, a
+// timed-out agent has exactly one attempt, so for it longest and last are the same value.
+interface AttemptStats {
+  attempts: number
+  maxAttemptMs: number
+}
+
 async function withRetryTimeout<T>(
   fn: (signal: AbortSignal) => Promise<T>,
   timeoutMs: number,
   agentName: string,
   attempts: number,
-  backoffMs: number
+  backoffMs: number,
+  stats: AttemptStats
 ): Promise<T> {
   let lastErr: Error = new Error('no attempts made')
   for (let i = 0; i < attempts; i++) {
+    const attemptStart = Date.now()
     try {
-      return await withTimeout(fn, timeoutMs, agentName)
+      // `finally` rather than a write on each branch: "recorded on success AND failure, never
+      // stale" is the property the per-attempt figure rests on, and this makes it structural
+      // instead of two copies a later edit can silently desynchronise.
+      try {
+        return await withTimeout(fn, timeoutMs, agentName)
+      } finally {
+        stats.attempts = i + 1
+        stats.maxAttemptMs = Math.max(stats.maxAttemptMs, Date.now() - attemptStart)
+      }
     } catch (err) {
       lastErr = err as Error
       // WHY a timeout is not retried, while every other failure still is: a retry re-runs the
@@ -315,13 +354,15 @@ export class SwarmRunner {
 
     onProgress?.({ phase: 'start', name: 'coverage', index, total })
     const startMs = Date.now()
+    const stats: AttemptStats = { attempts: 0, maxAttemptMs: 0 }
     try {
       const coverageResult = await withRetryTimeout(
         async (signal) => agent.runForCoverage(await ctx('coverage'), signal),
         timeout,
         'coverage',
         retryAttempts,
-        retryDelayMs
+        retryDelayMs,
+        stats
       )
       const findings = coverageResult.findings
       const gaps = coverageResult.gaps
@@ -334,6 +375,8 @@ export class SwarmRunner {
         total,
         findings,
         elapsedMs: Date.now() - startMs,
+        attempts: stats.attempts,
+        attemptMs: stats.maxAttemptMs,
         earlyExit,
       })
       return { findings, gaps, earlyExit }
@@ -347,6 +390,8 @@ export class SwarmRunner {
         total,
         findings: [],
         elapsedMs: Date.now() - startMs,
+        attempts: stats.attempts,
+        attemptMs: stats.maxAttemptMs,
       })
       return { findings: [], gaps: [], earlyExit: false }
     }
@@ -374,13 +419,15 @@ export class SwarmRunner {
       index++
       onProgress?.({ phase: 'start', name: agent.name, index, total })
       const startMs = Date.now()
+      const stats: AttemptStats = { attempts: 0, maxAttemptMs: 0 }
       try {
         const agentFindings = await withRetryTimeout(
           async (signal) => agent.run(await ctx(agent.name), signal),
           timeout,
           agent.name,
           retryAttempts,
-          retryDelayMs
+          retryDelayMs,
+          stats
         )
         findings.push(...agentFindings)
         recordToolAvailability(agent, toolAvailability)
@@ -393,6 +440,8 @@ export class SwarmRunner {
           total,
           findings: agentFindings,
           elapsedMs: Date.now() - startMs,
+          attempts: stats.attempts,
+          attemptMs: stats.maxAttemptMs,
           earlyExit: shouldStop,
         })
         if (shouldStop) {
@@ -411,6 +460,8 @@ export class SwarmRunner {
           total,
           findings: [],
           elapsedMs: Date.now() - startMs,
+          attempts: stats.attempts,
+          attemptMs: stats.maxAttemptMs,
         })
       }
     }
@@ -442,13 +493,17 @@ export class SwarmRunner {
       agents.map(async (agent, i) => {
         const agentIndex = baseIndex + i + 1
         const startMs = Date.now()
+        // Declared per iteration, so concurrent agents cannot share or clobber one another's
+        // counts -- the whole point of measuring per invocation.
+        const stats: AttemptStats = { attempts: 0, maxAttemptMs: 0 }
         try {
           const agentFindings = await withRetryTimeout(
             async (signal) => agent.run(await ctx(agent.name), signal),
             timeout,
             agent.name,
             retryAttempts,
-            retryDelayMs
+            retryDelayMs,
+            stats
           )
           findings.push(...agentFindings)
           recordToolAvailability(agent, toolAvailability)
@@ -460,6 +515,8 @@ export class SwarmRunner {
             total,
             findings: agentFindings,
             elapsedMs: Date.now() - startMs,
+            attempts: stats.attempts,
+            attemptMs: stats.maxAttemptMs,
           })
         } catch (err) {
           agentStatus[agent.name] = classifyAgentError(err)
@@ -473,6 +530,8 @@ export class SwarmRunner {
             total,
             findings: [],
             elapsedMs: Date.now() - startMs,
+            attempts: stats.attempts,
+            attemptMs: stats.maxAttemptMs,
           })
         }
       })
@@ -550,6 +609,40 @@ export class SwarmRunner {
     let testFiles: GeneratedTestFile[] = []
     const agentStatus: Partial<Record<AgentName, AgentStatus>> = {}
     const toolAvailability: ToolAvailabilityMetadata = {}
+
+    // Per-agent timing, captured by tapping the progress channel rather than adding a second
+    // timer. Every execution path -- coverage, sequential, parallel, testgen -- already measured
+    // wall time and emitted it on the `end` event, on both the success and the failure branch,
+    // so the `elapsedMs` half needed no changes to any of them. (The per-attempt half did: each
+    // path now declares an AttemptStats and passes it down.) What the channel could NOT do is
+    // persist anything -- it is a fire-and-forget callback, so the numbers reached stderr and
+    // nowhere else, and a run's timings could not be read back after the fact.
+    //
+    // `emit` is a named local rather than a reassignment of the `onProgress` parameter: the tap
+    // works either way, but shadowing meant a reader hundreds of lines below could not tell which
+    // of the two channels a call site used without scrolling back to find out.
+    //
+    // ORDERING, load-bearing: this reads `agentStatus[event.name]`, and all four paths assign
+    // that BEFORE emitting `end` -- including in their catch blocks. Emitting before assigning
+    // would fall through to the `?? 'ok'` below and silently record a failed agent as a clean
+    // one, turning a timed-out agent's attemptMs (which is just the ceiling) into what reads as
+    // a real completion time. The fallback is deliberate but is a silent default, which is why
+    // the ordering is pinned by tests rather than left to the type. Tests cover the sequential
+    // and parallel paths; coverage and testgen share the same shape but are not pinned.
+    const agentTimings: AgentTiming[] = []
+    const callerProgress = onProgress
+    const emit = (event: AgentProgressEvent) => {
+      if (event.phase === 'end') {
+        agentTimings.push({
+          name: event.name,
+          elapsedMs: event.elapsedMs ?? 0,
+          attemptMs: event.attemptMs ?? event.elapsedMs ?? 0,
+          attempts: event.attempts ?? 1,
+          status: agentStatus[event.name] ?? 'ok',
+        })
+      }
+      callerProgress?.(event)
+    }
 
     // Context tracking — accumulate across all agents for the final metadata block
     const allFilesLoaded: string[] = []
@@ -696,7 +789,7 @@ export class SwarmRunner {
         index,
         agentStatus,
         effectiveTimeoutMs,
-        onProgress
+        emit
       )
       allFindings.push(...coverageResult.findings)
       // WHY require non-empty changedFiles: matches filterNonexistentFiles's fail-open
@@ -722,7 +815,7 @@ export class SwarmRunner {
           agentStatus,
           toolAvailability,
           effectiveTimeoutMs,
-          onProgress
+          emit
         )
         allFindings.push(...parallelFindings)
         index += agents.length
@@ -735,7 +828,7 @@ export class SwarmRunner {
           agentStatus,
           toolAvailability,
           effectiveTimeoutMs,
-          onProgress
+          emit
         )
         allFindings.push(...seqResult.findings)
         index = baseIndex + agents.length
@@ -746,8 +839,9 @@ export class SwarmRunner {
     // Run TestGen if enabled — skip entirely on early exit
     if (!earlyExitAgent && hasTestgen) {
       index++
-      onProgress?.({ phase: 'start', name: 'testgen', index, total })
+      emit({ phase: 'start', name: 'testgen', index, total })
       const startMs = Date.now()
+      const stats: AttemptStats = { attempts: 0, maxAttemptMs: 0 }
       if (coverageGaps.length > 0) {
         try {
           const testResult = await withRetryTimeout(
@@ -756,7 +850,8 @@ export class SwarmRunner {
             effectiveTimeoutMs,
             'testgen',
             this.config.retryAttempts,
-            this.config.retryDelayMs
+            this.config.retryDelayMs,
+            stats
           )
           testFiles = testResult.testFiles
           agentStatus.testgen = 'ok'
@@ -769,13 +864,15 @@ export class SwarmRunner {
         // no-op, not a failure, so it must still be recorded as 'ok'.
         agentStatus.testgen = 'ok'
       }
-      onProgress?.({
+      emit({
         phase: 'end',
         name: 'testgen',
         index,
         total,
         findings: [],
         elapsedMs: Date.now() - startMs,
+        attempts: stats.attempts,
+        attemptMs: stats.maxAttemptMs,
       })
     }
 
@@ -796,10 +893,29 @@ export class SwarmRunner {
           )
         : undefined
 
+    const timing: RunTiming = {
+      diffLines: truncationMeta.keptLines,
+      effectiveTimeoutMs,
+      durationMs: Date.now() - start,
+      agents: agentTimings,
+    }
+    // Emitted here rather than from the CLI after the run returns, because under --chunk this is
+    // the only place a row can reach the operator WHILE the review is still going. A chunked
+    // CPU-only run takes tens of minutes; if it dies on chunk 4 of 9, a caller printing from the
+    // merged result prints nothing at all -- losing the measurement exactly the way it was lost
+    // before.
+    //
+    // The gate is coarse and only rules out one caller: the CLI builds an onProgress
+    // unconditionally, so it always gets this line (harmless under --format json, which writes
+    // to stdout), while the MCP server passes none and so stays quiet on a channel its caller
+    // cannot read. `timings` in the returned envelope is what serves that caller instead -- and
+    // it carries strictly more than this line does, which renders only the run-level summary.
+    if (callerProgress) process.stderr.write(formatRunTiming(timing))
+
     return {
       findings,
       testFiles,
-      summary: this.buildSummary(findings, Date.now() - start),
+      summary: this.buildSummary(findings, timing.durationMs),
       ...(earlyExitAgent ? { earlyExit: { stoppedAt: earlyExitAgent } } : {}),
       ...(contextMode === 'memory-bank'
         ? {
@@ -824,6 +940,7 @@ export class SwarmRunner {
         : {}),
       ...(Object.keys(toolAvailability).length > 0 ? { toolAvailability } : {}),
       ...(evidenceCheckFilter ? { evidenceCheckFilter } : {}),
+      timings: [timing],
     }
   }
 }

@@ -5,6 +5,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Per-pass timing is measured and kept**, on stderr as each pass completes and in the
+  `ReviewResult` envelope as a new optional `timings` array — so the numbers survive into the
+  `ai-review-findings` CI artifact rather than scrolling past in a terminal. Each row carries
+  `diffLines`, the `effectiveTimeoutMs` that pass's agents were actually held to, the pass's
+  `durationMs`, and every agent's `elapsedMs` paired with its `status`. Rendered in the markdown
+  report, in SARIF `properties.timings`, and in the MCP output; deliberately not emitted as a
+  GitHub annotation (see the comment above `formatGithubAnnotations` for why).
+
+  **This exists because a timing number without its scope is unusable.** A figure long recorded
+  here as evidence that the per-agent timeout ceiling was too low — "616 s against a 282,240 ms
+  ceiling" — turned out to have no source, and was ambiguous besides: 616 s could have been one
+  agent invocation or the sum across twenty-odd of them, and the two readings pointed at opposite
+  conclusions. The timeout applies per `SwarmRunner.run()` call, so under `--chunk` that is per
+  chunk. `timings` therefore keeps **one row per pass, concatenated and never summed**;
+  `summary.durationMs` continues to report the aggregate for anyone who wants it. Per-invocation
+  versus aggregate now falls out of the data instead of needing interpretation.
+
+  Per-agent elapsed was already being measured and printed — `AgentProgressEvent.elapsedMs` — but
+  the progress channel is a fire-and-forget callback, so nothing persisted it. The runner taps that
+  channel rather than adding a second timer.
+
+  **Each agent carries two durations, and conflating them was the first version's bug.**
+  `elapsedMs` is wall time, spanning every retry attempt plus the backoff between them;
+  `attemptMs` is the longest single attempt, and is the only one
+  comparable to `effectiveTimeoutMs`, since the timeout is applied per attempt by `withTimeout`.
+  Reporting wall time alone let a parse-error-then-success render as an agent that ran past its
+  own ceiling and finished fine — measured at 1015 ms against a 300 ms ceiling with `status: 'ok'`
+  — which is the same "the ceiling is too low" misreading the field exists to prevent. A retried
+  agent is now named in the rendered line so the parts of the sentence reconcile.
+
 ## [1.14.0] — 2026-08-27 (findings admit when their line number is unreliable)
 
 Continues the theme of 1.13.x: the report is not allowed to claim more than the run established.

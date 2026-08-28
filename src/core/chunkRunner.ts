@@ -44,6 +44,7 @@ import type {
   ReviewInput,
   ReviewResult,
   AgentProgressEvent,
+  RunTiming,
   GeneratedTestFile,
   AgentName,
   AgentStatus,
@@ -56,6 +57,14 @@ import { splitByFileBoundary } from './diffSplit.js'
 
 // Re-exported for the existing chunkRunner.test.ts contract tests; defined in diffSplit.ts so
 // leaf consumers (claimSupport) need not import this orchestration module.
+//
+// Merge policy across chunks is per-field, and the reason differs per field -- see each
+// helper's own comment rather than inferring a rule from the grouping. The shapes in use:
+//   last-chunk-wins  policy, filteredFiles, context, coverageGapFilter
+//   merged           agentStatus, toolAvailability, evidenceCheckFilter
+//   concatenated     hallucinationFilter.dropped, timings
+//   summed           summary.durationMs, sanitizer.redactedLines
+//   concat + re-cap  findings (via capAndSort, to restore the global ordering invariant)
 export { splitByFileBoundary }
 
 export async function runChunked(
@@ -134,6 +143,15 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
     droppedAcrossChunks.length > 0 ? { dropped: droppedAcrossChunks } : undefined
   const mergedToolAvailability = mergeToolAvailability(results)
 
+  // CONCATENATED, never summed -- and this is the one line the whole field depends on.
+  // `durationMs` (summed at the top of this function) is correct for a "how long did the review
+  // take" total but destroys the only question timings exist to answer. The agent timeout applies
+  // per run() call, so whether any invocation approached its ceiling is a per-row fact; summing N
+  // chunks produces a number larger than any ceiling that no single agent ever spent, which reads
+  // as a timeout problem whether or not one exists. Keeping one row per run() call means the
+  // reader never has to guess. Same shape as `droppedAcrossChunks` above, for the same reason.
+  const timings: RunTiming[] = results.flatMap((r) => r.timings ?? [])
+
   return {
     findings,
     testFiles,
@@ -156,6 +174,7 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
     ...(mergedToolAvailability ? { toolAvailability: mergedToolAvailability } : {}),
     ...(mergedEvidenceCheckFilter ? { evidenceCheckFilter: mergedEvidenceCheckFilter } : {}),
     ...(last.filteredFiles ? { filteredFiles: last.filteredFiles } : {}),
+    ...(timings.length > 0 ? { timings } : {}),
   }
 }
 

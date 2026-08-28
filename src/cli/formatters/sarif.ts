@@ -125,6 +125,12 @@ export function formatSarif(result: ReviewResult): string {
           ...(result.evidenceCheckFilter
             ? { evidenceCheckFilter: result.evidenceCheckFilter }
             : {}),
+          // Machine-read, and deliberately the whole per-run array rather than a rendered
+          // summary: a consumer gating on "did any agent approach its ceiling" needs the rows
+          // separately, since the ceiling applies per run() call. Not folded into
+          // invocations[].startTimeUtc/endTimeUtc -- those are absolute timestamps, and what is
+          // measured here are durations, so filling them in would mean inventing a wall clock.
+          ...(result.timings && result.timings.length > 0 ? { timings: result.timings } : {}),
         },
       },
     ],

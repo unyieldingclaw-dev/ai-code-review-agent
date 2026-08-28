@@ -1,5 +1,6 @@
 import type { Finding, ReviewResult } from '../core/schema.js'
 import { TOOL_LABELS, toolsWithAvailability } from '../core/schema.js'
+import { timingLabel, timingSentence } from '../core/timingReport.js'
 
 // Only critical and high are rendered — medium/low appear in the tail only.
 const SEVERITY_ICONS: Record<'critical' | 'high', string> = {
@@ -61,7 +62,20 @@ export function formatMcpOutput(result: ReviewResult): string {
     )
   }
 
-  const notices = [...warnings, ...toolNotes]
+  // A THIRD array, not an entry in `warnings`, for the same reason toolNotes is separate: a slow
+  // run is not an incomplete one, and folding timing into the headline gate would mark every
+  // review "incomplete". It renders in the body instead.
+  //
+  // WHY the MCP surface carries it at all, when the numbers are already in the JSON envelope: the
+  // caller here is an LLM with no terminal and no artifact to open. Asked "did anything time
+  // out?", it can answer only from what this string contains. This surface has been the one left
+  // out twice -- `ReviewResult.toolAvailability` missed it, and `Finding.locationCheck` missed
+  // it and SARIF both -- each time leaving the reader least able to notice as the one not told.
+  const timingNotes = (result.timings ?? []).map((t, i, all) => {
+    return `⏱️ ${timingLabel(i, all.length)}: ${timingSentence(t)}`
+  })
+
+  const notices = [...warnings, ...toolNotes, ...timingNotes]
   const warningBlock = notices.length > 0 ? notices.join('\n') + '\n\n' : ''
 
   if (findings.length === 0) {
@@ -70,7 +84,12 @@ export function formatMcpOutput(result: ReviewResult): string {
     if (warnings.length > 0) {
       return `## AI Code Review — ⚠️ No findings, but the review was incomplete\n\n${warningBlock}`
     }
-    if (toolNotes.length > 0) {
+    // `notices` rather than `toolNotes`: a clean run still has timing to report, and without
+    // this the timing block was dropped on exactly the run where "0 findings" most needs
+    // qualifying. (Not the only clean-run path -- a run whose agents failed returns above, on
+    // `warnings`.) The bare return below now fires only for a result with no timings at all:
+    // an archived findings.json from before this field, or a hand-built one.
+    if (notices.length > 0) {
       return `## AI Code Review — ✅ No findings\n\n${warningBlock}`
     }
     return '## AI Code Review — ✅ No findings\n'
