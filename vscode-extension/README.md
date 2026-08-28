@@ -8,10 +8,23 @@ Run a **15-agent** local AI code review swarm on your staged git changes, direct
 
 ## Install
 
-### From .vsix (manual install)
+### Build and install the .vsix
 
-1. Download `ai-review-agent-0.6.0.vsix` from the [GitHub Releases](https://github.com/unyieldingclaw-dev/ai-code-review-agent/releases) page.
-2. In Cursor or VS Code: open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) → **Extensions: Install from VSIX…** → select the downloaded file.
+The extension is not currently distributed anywhere -- no GitHub Release has ever carried a `.vsix`
+asset, and Marketplace publishing is deferred -- so build it from this directory:
+
+```bash
+cd vscode-extension
+npm install
+npm run compile        # esbuild -> dist/extension.js, which package.json's `main` points at
+npm run package        # vsce package -> ai-review-agent-<version>.vsix
+```
+
+`npm run compile` is a separate step because there is no `vscode:prepublish` script, so
+`vsce package` will not build for you.
+
+Then, in Cursor or VS Code: open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) →
+**Extensions: Install from VSIX…** → select the file you just built.
 
 ### Prerequisites
 
