@@ -75,8 +75,8 @@ against 826, 20 commits against 456. Fixed the way the threshold was: **the sect
 restates state**, it points at `npm test`, `git`, and `progress.md`. A stale per-file test table and
 a hardcoded test count in the scripts block went the same way.
 
-**And the cap pressure is structurally resolved, not trimmed.** Moving the upgrade *procedure* next
-to the upgrade *mechanics* in `techContext.md`, and the `BaseAgent` parse-stage mechanics and agent
+**And the cap pressure is structurally resolved, not trimmed.** Moving the upgrade _procedure_ next
+to the upgrade _mechanics_ in `techContext.md`, and the `BaseAgent` parse-stage mechanics and agent
 thinking config out of `systemPatterns.md`, took `activeContext.md` from 149/150 to 122 and
 `systemPatterns.md` from 299/300 to 276. Both now have real headroom. Neither is inside the target
 range in `README.md`, and closing that gap further would mean removing live operational rules — a
