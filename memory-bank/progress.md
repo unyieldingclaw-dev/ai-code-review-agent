@@ -22,6 +22,30 @@ lineage: []
 
 ## ✅ Completed (2026-08-27, third session)
 
+**The PMB 1.2.1 upgrade was never going to resolve, and the next-step said otherwise.** Verified
+directly in PMB's checkout rather than inherited: `mb upgrade` resolves
+`TEMPLATES_DIR="$REPO_ROOT/templates"` from the local working directory and `mb.sh` contains **zero**
+`git fetch|checkout|archive|clone|describe|tag` calls in 2,939 lines — so it distributes a snapshot
+of whatever is on disk, never a release. Their tree is currently dirty on a feature branch with five
+`templates/` files modified, which is exactly the source directory.
+
+**There is also no release to wait for.** Latest tag is `v1.0.4`; PMB's `VERSION` reads `1.2.1` and
+both `.pmb-version` files read `1.1.1` — three numbers, nothing tagged since 1.0.4. "Blocked on
+upstream release" and "upstream has no release mechanism" are different states, and only the second
+tells a successor to stop waiting. Recorded as the second.
+
+Reported upstream. **A fix we proposed was withdrawn on evidence:** `git archive <tag>` is useless
+when no tag exists, so the real ask is _cut releases first_. PMB confirmed independently and asked
+us not to upgrade until they signal work reached `main` — only that signal is actionable.
+
+**Consequence meanwhile:** `last-reviewed` stays unstamped, so `mb doctor`'s staleness check reports
+actively-edited files as months stale. Not fixable locally (`TEMPLATE_OWNED`).
+
+**One inbound claim held pending, not logged as done:** PMB earlier said the ACR provenance gap was
+closed in their record. They corrected it — the entry is written, with our hedge preserved verbatim
+(611.7 s as a retry artifact; the 616 s resemblance recorded as _not confirmed_), but uncommitted in
+the dirty tree above. Do not treat it as landed until they confirm.
+
 **v1.15.0 released, and the repo's outward-facing information audited against the binary.** Eight
 PRs (#65–#72). Releasing was the point rather than tidiness: `review.yml` installs the _published_
 package, so until 1.15.0 shipped every CI run emitted a `findings.json` with no `timings`. The
