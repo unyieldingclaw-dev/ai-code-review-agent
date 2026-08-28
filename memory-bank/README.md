@@ -55,6 +55,22 @@ At 80% context, type "Handoff" and the AI will:
 | activeContext.md  | 50-100 lines  | 150 |
 | progress.md       | 100-250 lines | 400 |
 
+**These maxima are enforced by CI**, not advice — `ci.yml`'s "Memory bank size limits" step fails
+the build on overflow. `archive/` is excluded, which is what it exists for: move the evidence there
+and keep the rule in the live file.
+
+**Leave headroom; do not land on the cap.** A file sitting at its limit forces the next session to
+refactor before it can record anything, and that session is usually the one with the least context
+to spare. Aim for the target column, not the max.
+
+**Archive; do not compress.** This rule was written on 2026-08-28 because the opposite was tried
+that day. With `activeContext.md` at 149/150 and `systemPatterns.md` at 299/300, a handoff merge
+compressed prose to fit — and silently deleted five substantive fragments, two of them corrections a
+previous PR existed to make. A review caught it; nothing else would have. **Moving text to
+`archive/` is lossless and compressing is not**, so when a file is full, move a section out or
+relocate it to the file it actually belongs in. If a section is not focus, blockers, or next steps,
+it does not belong in `activeContext.md` at all.
+
 ## More Information
 
 See the full [Memory Bank Standard](https://github.com/unyieldingclaw-dev/personal-memory-bank) for detailed documentation.
