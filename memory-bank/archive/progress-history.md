@@ -26,6 +26,9 @@ Fifth move, 2026-08-27: the last 2026-08-21 section came across when `progress.m
 Sixth move, 2026-08-27: the 2026-08-21 third-session entry came across when `progress.md`
 reached 402/400 recording the code-review remediation. Same content, moved, nothing deleted.
 
+Seventh move, 2026-08-28: the 2026-08-21 fourth-session entry, archived to make room for a
+correction to the PMB version claim. Same content, moved, nothing deleted.
+
 ## ✅ Completed (2026-08-18)
 
 ### Audit remediation Batches 1-8 — Tier 1/2 fixes verified, implemented, tested, and committed
@@ -1305,3 +1308,54 @@ home for stable rules): the `PreToolUse` marker-timing rule, the fact that the c
 markers are distinct and the push marker must be recomputed _after_ committing, and a new section on
 verifying a regression test fails — including the ordering trap above and the point that the failure
 _message_ matters as much as the failure.
+
+## ✅ Completed (2026-08-21, fourth session)
+
+**ACR was reviewing the wrong side of its own diffs.** Investigating two false findings that
+`ai-review` produced on PR #44 turned up not one bug but four, of which two were fixed (#45, and the
+pre-image filter). The investigation's most useful move was `gh run download` on the CI run to get
+the real `ai-review-findings` artifact — what the tool actually emitted, rather than what a fixture
+author imagined. That single file exposed two bugs nobody was looking for.
+
+**(A) Finding paths did not resolve — PR #45, merged `d781dcb`.** `filterNonexistentFiles` stripped
+the echoed `a/` diff-header prefix only for its membership test and never corrected the stored
+value. **5 of 15 real findings (33%)** carried an `a/` prefix; SARIF's `artifactLocation.uri` and
+the GitHub annotations take `finding.file` verbatim, so GitHub could not map those results to a file
+and **the annotations silently landed nowhere** while the run exited normally. The strip is
+deliberately conditional — a repo may genuinely have a top-level `a/` directory, so the unstripped
+form is tested first. The pre-existing test asserted the finding _survived_ but never that the path
+was _correct_, which is exactly why this shipped.
+
+**(B) Agents reported deleted code as a current defect.** Measured 8/8 on a fixture whose post-image
+is clean: the `performance` agent reported the removed N+1 loop, quoting the deleted lines verbatim.
+On the real PR #44 artifact it did the same for real — flagged the last-chunk-wins merge that the
+diff _removes_, and recommended as the fix the function the diff _adds_. `filterUnsupportedClaims`
+now drops findings whose evidence is provably quoted from deleted lines and absent from the
+resulting code. Fail-open by construction: paraphrased evidence matches nothing and is kept.
+
+**The prompt fix was measured and rejected — and the prediction going in was wrong.** The argument
+for trying it: the three prior prompt failures in this project were _hallucination_, whereas this
+looked like a _missing frame_ the prompt could supply. An explicit instruction measured **7/7 still
+reporting the deleted defect**. Reverted rather than kept as decoration. Recorded in
+`systemPatterns.md` as the fourth confirmation.
+
+**The filter's first wiring was inert, and unit tests could not see it.** It was handed the section
+from `sliceDiffByFile`, which stores `diffSectionCode(section)` — post-image by construction — so it
+could never fire. The predicate was correct, so all its unit tests passed; a scratch probe also
+reported success because it extracted removed lines from the raw diff instead of going through
+`sliceDiffByFile`. Only replaying the real artifact through `synthesize()` showed `dropped: 0`.
+Fixed with a parallel `sliceRemovedCodeByFile` (additive — changing what `sliceDiffByFile` returns
+would silently alter what every existing CLAIM_RULE matches against) and pinned with an
+orchestrator-level test that fails on the exact miswiring while 109 unit tests still pass.
+
+**Two bugs found and deliberately NOT fixed**, both recorded rather than guessed at:
+
+- `breaking-change` flagged a **function-local** const as a removed public API (verified indented,
+  never exported at `8618c0f^`). A filter would have to prove a symbol was _never_ exported — a
+  negative, defeated by `export { X }` lists, re-exports and default exports — and the harm
+  direction is dropping a real breaking change.
+- **Same-agent duplicates survive dedup**: 5 real findings that should be 2, with identical agent,
+  title, file, line, and evidence. `orchestrator.ts` keeps same-agent same-location findings
+  deliberately, since one agent can report two distinct issues on one line; the predicate is too
+  coarse, but tightening it touches the corroboration path feeding severity escalation, so it wants
+  its own PR and review.

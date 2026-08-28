@@ -131,8 +131,8 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
 - **VS Code extension has no distribution channel — an open product decision.** No release has
   ever carried a `.vsix`, `release.yml` has no upload step, Marketplace is deferred. #68 documented
   the truth (build from source) rather than choosing; docs match reality either way.
-- **PMB upgrade — cannot resolve by waiting; not a pending item.** No release mechanism: latest
-  tag `v1.0.4`, their `VERSION` reads `1.2.1`, both `.pmb-version` files `1.1.1`. `mb upgrade`
+- **PMB upgrade — cannot resolve by waiting; not a pending item.** No release mechanism: `VERSION`
+  reads `1.2.1` but nothing is tagged past `v1.0.4`, so the version names no artifact. `mb upgrade`
   copies their working tree. Details in `progress.md`; act only on PMB's "reached `main`" signal.
 - **Marketplace publish** (VS Code extension): explicitly DEFERRED.
 
