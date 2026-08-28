@@ -77,9 +77,10 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
 - `policy`, `filteredFiles`, and `context` are still last-chunk-wins in `chunkRunner`. That remains
   a deliberate, documented simplification — none of them asserts anything about coverage the way
   `toolAvailability` does, which is why only that field was promoted to a real merge.
-- The `ai-review` CI runner can hang indefinitely (observed 43 min without starting step 1). This is
-  environment-side — the runner runs interactively via `run.cmd`, not as a supervised service, so
-  nothing restarts it. `review.yml`'s `timeout-minutes: 45` is a backstop, not a fix.
+- `ai-review` is **slow, not broken**: 8 consecutive runs to 2026-08-27 succeeded (6m43s–44m53s);
+  `mizzo-local` is online. It hung once (43 min, no step 1) — environment-side, `run.cmd` is
+  interactive, and `timeout-minutes: 45` is a backstop. A docs PR showing no `ai-review` check is
+  by design: `review.yml` `paths-ignore`s `**/*.md`, and it is not a required check.
 
 > Prior session history: [`archive/activeContext-history.md`](archive/activeContext-history.md).
 

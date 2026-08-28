@@ -53,27 +53,17 @@ SwarmRunner
 **Decision**: Agents run one-at-a-time by default. `--parallel` is available as an explicit,
 off-by-default opt-in for hardware that's been verified to benefit from it.
 
-**Rationale**: Ollama serializes `devstral:latest` inference on this hardware — confirmed
-directly, not assumed. A 2026-07-25 investigation (prompted by a real bug report about slow
-security-profile runs) tried flipping this default to parallel-by-default. An initial test (4
-concurrent requests, a trivial short prompt) showed a ~1.63x wall-clock speedup and looked
-promising, but that result didn't hold at the scale and prompt size the default swarm actually
-uses. A follow-up test at real scale — 14 concurrent requests (matching the default agent count)
-with a realistic ~30KB diff prompt — showed near-linear serialization instead: completions at
-58.7s, 91.5s, 120.6s, 172.7s, 235.0s, 305.7s, then a header-timeout failure past 300s for a
-still-pending request. Reproduced with `curl` directly (bypassing Node's fetch client) using the
-short prompt to rule out a client-side connection-pool artifact — same staggered pattern. Since
-each queued request's client-side timeout clock starts the moment it's dispatched (not when
-Ollama actually begins generating for it), firing the full default swarm concurrently would have
-caused most agents to spuriously time out purely from queue wait — reproducing the exact
-"everything times out, 0 findings" failure mode this tool exists to prevent. The original
-"parallel requests queue anyway and add overhead" rationale was correct; the parallel-by-default
-change was reverted before shipping (`config.ts`'s `parallel: false` has the short version of
-this note). `ai-review-agent` has no Anthropic/Claude API integration — every review run is 100%
-local Ollama inference, so there's no token-cost pressure to justify accepting this reliability
-risk for a modest, hardware-dependent wall-clock speedup. `--parallel` remains available for
-users who've verified their own Ollama setup (e.g. more VRAM headroom, `OLLAMA_NUM_PARALLEL` > 1)
-actually benefits from it.
+**Rationale**: Ollama serializes `devstral:latest` inference on this hardware — measured, not
+assumed. A 2026-07-25 attempt to make parallel the default looked good on a small test and failed
+at real scale: 14 concurrent requests served near-linearly, and because each queued request's
+timeout clock starts when it is _dispatched_ rather than when Ollama begins generating, most
+agents would have timed out purely from queue wait — reproducing the "everything times out, 0
+findings" failure this tool exists to prevent. Reverted before shipping.
+
+Load-bearing premise: there is no Anthropic/Claude integration, so every run is local inference
+and there is no token-cost pressure to trade reliability for a hardware-dependent speedup.
+`--parallel` stays available for setups verified to benefit (more VRAM, `OLLAMA_NUM_PARALLEL` > 1).
+Full measurements: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 ### Option B — Coexistence with PMB `/code-review`
 
@@ -218,9 +208,18 @@ filters: measure, don't inspect.
   `cli/formatters/{sarif,githubAnnotations}.ts`, `mcp/formatter.ts`. `toolAvailability` missed MCP
   and `locationCheck` missed SARIF+MCP, both caught post-merge by a reader. Check MCP first: its
   reader is an LLM with no terminal to cross-check against.
-- **Tag only AFTER the release PR merges** (2026-08-27). `v1.14.0` was tagged from the release
-  branch, so its provenance attests a commit that is not on `main`. Content is identical and it is
-  not worth fixing, but a pushed tag publishes irreversibly — do not repeat it.
+- **Tag only AFTER the release PR merges, and verify the version before tagging** (2026-08-27).
+  Three failures now: `v1.14.0` tagged from its release branch (provenance attests a commit not on
+  `main`), and `v1.15.0` tagged onto `main` after a merge that branch protection had _rejected_ —
+  so the tag pointed at a commit still reading `1.14.0`. Only npm's refusal to republish an
+  existing version stopped that one; a tag naming an unpublished version would have shipped wrong
+  content irreversibly. The rule as prose did not help, because a command already pasted does not
+  re-read it. Tag with the guard instead:
+
+  ```powershell
+  git checkout main; git pull; if ((node -p "require('./package.json').version") -eq "X.Y.Z") { git tag vX.Y.Z; git push origin vX.Y.Z } else { "ABORT: main is not at X.Y.Z" }
+  ```
+
 - **`gh pr merge` is denied to Claude** (`permissions.deny` in `.claude/settings.json`) and this is
   intentional. The user merges. Do not route around a denial; stop and ask.
 
