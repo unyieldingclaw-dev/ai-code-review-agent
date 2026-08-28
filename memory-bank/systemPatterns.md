@@ -16,7 +16,7 @@ lineage: []
 
 # System Patterns & Architecture Decisions
 
-**Last Updated**: 2026-07-26
+**Last Updated**: 2026-08-28
 
 ## Architecture Patterns
 
@@ -35,18 +35,13 @@ lineage: []
 ```
 SwarmRunner
   └─ ping check (Ollama live?)
-  └─ sequential: Agent[] → Finding[][]
-       ├─ SecurityAgent
-       ├─ PerformanceAgent
-       ├─ CorrectnessAgent
-       ├─ DesignAgent
-       ├─ DependenciesAgent
-       ├─ AdversarialAgent
-       ├─ IntegrationScoutAgent
-       ├─ CoverageAnalystAgent   (returns gaps + findings)
-       └─ TestGenAgent           (produces test file content)
+  └─ sequential: Agent[] → Finding[][]     15 default + TestGenAgent (opt-in)
   └─ Orchestrator → deduplicated Finding[]
 ```
+
+The canonical agent list is `DEFAULT_CONFIG.agents` in `src/core/config.ts:58` — read it there. An
+enumeration here previously named 9 of the 16 under a heading claiming 16, which is the failure this
+file's own "record the delta, not the level" rule warns about.
 
 ### Sequential Execution
 
@@ -54,44 +49,32 @@ SwarmRunner
 off-by-default opt-in for hardware that's been verified to benefit from it.
 
 **Rationale**: Ollama serializes `devstral:latest` inference on this hardware — measured, not
-assumed. A 2026-07-25 attempt to make parallel the default looked good on a small test and failed
-at real scale: 14 concurrent requests served near-linearly, and because each queued request's
-timeout clock starts when it is _dispatched_ rather than when Ollama begins generating, most
-agents would have timed out purely from queue wait — reproducing the "everything times out, 0
-findings" failure this tool exists to prevent. Reverted before shipping.
+assumed. A 2026-07-25 attempt to default to parallel looked good small and failed at real scale:
+a queued request's timeout clock starts when it is _dispatched_, not when Ollama begins generating,
+so most agents would time out on queue wait alone — the "everything times out, 0 findings" failure
+this tool exists to prevent. Reverted before shipping.
 
-Load-bearing premise: there is no Anthropic/Claude integration, so every run is local inference
-and there is no token-cost pressure to trade reliability for a hardware-dependent speedup.
-`--parallel` stays available for setups verified to benefit (more VRAM, `OLLAMA_NUM_PARALLEL` > 1).
-Full measurements: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
+Load-bearing premise: no Anthropic/Claude integration, so every run is local inference and there is
+no token-cost pressure to trade reliability for a hardware-dependent speedup. `--parallel` stays
+available for setups verified to benefit. Measurements:
+[`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 ### Option B — Coexistence with PMB `/code-review`
 
-**Decision**: `/ai-review` is a separate slash command that does NOT replace `/code-review`.
-
-**Rationale**: PMB's `/code-review` spawns cloud subagents. `/ai-review` is local-only. Different tradeoffs; keep both.
+`/ai-review` is a separate slash command that does **not** replace `/code-review`: PMB's spawns
+cloud subagents, ours is local-only. Different tradeoffs; keep both. Final — see **Never Do This**.
 
 ## Code Patterns
 
 ### BaseAgent — 4-Stage JSON Parse (2026-07-25)
 
-LLMs produce messy output. `BaseAgent.parseFindings` tries, in order:
+LLMs produce messy output, so `BaseAgent.parseFindings` degrades through four stages: whole-response
+parse, wrapped-object parse, balanced-bracket extraction, then truncation recovery that salvages
+whatever complete `{...}` objects exist even if no enclosing array ever closed. Stage mechanics and
+the two shared `src/core/parsing.ts` helpers:
+[`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
-1. Parse entire response as a JSON array (or a `{"findings": [...]}` wrapped object)
-2. Parse `{"findings": [...]}` wrapped object (same try block as stage 1)
-3. Balanced-bracket extraction — find the first `[...]` span and require it to actually close,
-   handling trailing prose/code fences around the array
-4. Truncation recovery — scan the whole response for whatever complete `{...}` objects exist,
-   regardless of whether the enclosing array or a wrapper object around it ever closed. Salvages
-   findings the model finished before getting cut off instead of discarding all of them.
-
-Stages 3 and 4 share two helpers exported from `src/core/parsing.ts` — `extractBalancedSpan`
-(single balanced span) and `extractCompleteObjects` (every complete `{...}` object anywhere in
-the text, at any nesting depth, via a stack of open-brace positions rather than a depth counter
-so a stray unmatched `}` can't desync the rest of the scan). `CoverageAnalystAgent` reuses the
-same two helpers for its own two-stage parse (its schema is `{"findings":[...],"gaps":[...]}`,
-one level of nesting deeper, which is exactly why it needs `extractCompleteObjects` rather than
-`extractBalancedSpan` alone to recover anything once the outer wrapper object is truncated).
+The rules that govern the behaviour are what matter here, and they are not optional.
 
 Every stage's recovered/parsed items still go through the same schema validation
 (`validateAndNormalizeFindings`) before being accepted. **Never** silently resolve to "0
@@ -112,26 +95,15 @@ stage 4 exists and why every `format:'json'` call site needs equivalent recovery
 
 `devstral` emits `<think>...</think>` blocks before the JSON answer. Strip these before any parse attempt. Adapted from `Google-Organizer/src/workers/ollamaClient.ts`.
 
-### Agent Config
-
-All agents request `think: true`, but `OllamaProvider.supportsThinking()` only honors it for
-models whose name starts with `qwen` or `deepseek-r1` — it's silently a no-op for the actual
-configured default (`devstral`), which doesn't support it. Unlike Google-Organizer (which uses
-`think: false` unconditionally), the intent is that reasoning depth matters for code review
-quality on models that support it.
-
 ### Finding Schema
 
 All agents return `Finding[]`. Key fields: `severity`, `category`, `file`, `line`, `message`, `suggestion`. Defined in `src/core/schema.ts`.
 
 ## Data Flow
 
-1. User runs `ai-review` on a git diff
-2. SwarmRunner pings Ollama (fail fast if down)
-3. Each specialist agent receives the diff + its system prompt
-4. Agent calls OllamaProvider, strips think-tags, 3-stage parses JSON
-5. Orchestrator deduplicates across agents, applies cap, escalates cross-references
-6. Formatter renders findings as markdown or JSON
+`ai-review` on a diff → `SwarmRunner` pings Ollama (fail fast) → each specialist gets the diff plus
+its own system prompt → `OllamaProvider`, think-tag strip, 4-stage parse → `Orchestrator` dedups,
+caps, escalates cross-references → formatter renders (all four — see the formatter rule below).
 
 ## Git & Version Control
 
@@ -157,7 +129,8 @@ actually runs — pwsh is tried first, `.sh` is only a fallback). The matcher ca
 - **Keep the literal strings `git push` / `git commit` out of command text.** A PR-body heredoc
   mentioning `git push --delete`, or a `grep "git push"` pattern, trips the gate and burns the
   marker — forcing a pointless re-review. Hyphenate, reword ("pushing"), or write prose to a file
-  instead of inlining it in the command.
+  instead of inlining it in the command. Commit messages accordingly go in a file passed with
+  `-F`, never inline with `-m`. Hit twice on 2026-08-27, so treat it as a habit, not a caution.
 - **A stale PR branch is updated with `gh pr update-branch`, never a rebase.** Force-push is
   hard-blocked in this environment, so rebasing an already-pushed branch is a dead end (you cannot
   publish the rewritten history). `gh pr update-branch` merges the base branch in server-side and
@@ -179,10 +152,13 @@ Reproduction and the latent tag-push variant: [`archive/systemPatterns-history.m
 
 **Do not patch these scripts here.** `review-reminders*`, `pre-push-check*`, `dangerous-commands*`,
 `check-contract*` and `update-reviewed*` are PMB-owned (`TEMPLATE_OWNED` in `mb.sh`) and overwritten
-by `mb upgrade`, so a local fix is erased on the next upgrade. Report upstream instead.
+by `mb upgrade`, so a local fix is erased on the next upgrade. Report upstream instead. **The
+converse also holds:** `ADVISORY_CREATE` files (every `standards/*.md`) are copied **only when
+absent**, so an upgrade can land a rule change without its rationale. Never assume an upgrade
+reconciled a file it merely printed a line about — mechanics in `techContext.md`.
 
-**`last-reviewed` is never stamped, so `mb doctor`'s staleness check reads a dead sensor.** Fixed
-in PMB 1.2.1; this repo is on 1.1.1, so it arrives with `mb upgrade`, not a local edit. Diagnosis:
+**`last-reviewed` is never stamped, so `mb doctor`'s staleness check reads a dead sensor.** Arrives
+with `mb upgrade` (fixed in PMB 1.2.1, this repo is on 1.1.1), never a local edit; diagnosis in
 [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 **Do not "fix" this by loosening the matcher without measurement.** Anchoring to command position
@@ -203,18 +179,14 @@ security gate. Same rule as the `claimSupport.ts` filters: measure, don't inspec
   and `locationCheck` missed SARIF+MCP, both caught post-merge by a reader. Check MCP first: its
   reader is an LLM with no terminal to cross-check against.
 - **Release tagging: tag only after the release PR merges, verify the version first, and re-check
-  a cleanup command against current state before re-running it** (2026-08-27). Three incidents,
-  one session: `v1.14.0` tagged from its release branch (provenance attests a commit not on
-  `main`); `v1.15.0` tagged onto `main` after a merge branch protection had _rejected_, naming a
-  commit still reading `1.14.0`; then the **good** `v1.15.0` tag deleted by re-running the cleanup
-  written minutes earlier for the bad one, flipping the published Release back to a draft.
-
-  **npm's refusal to republish an existing version limited the damage twice** — the registry
-  compensating for the process, not the process working; a tag naming an as-yet unpublished
-  version would have shipped wrong content irreversibly. Prose prevented none of them: a command
-  already pasted does not re-read the rule it violates, and **a remediation correct five minutes
-  ago is not self-evidently correct now**. Tag with the guard, which covers the version but not
-  the delete:
+  a cleanup command against current state before re-running it** (2026-08-27). Three incidents in
+  one session, and **the third is a different shape from the first two** — 1 and 2 were tagging
+  before the version was real; 3 was re-running a stale remediation, giving the separate rule that
+  **a remediation correct five minutes ago is not self-evidently correct now.** npm's refusal to
+  republish an existing version limited the damage twice — the registry compensating for the
+  process, not the process working.
+  Narrative: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
+  Tag with the guard, which covers the version but not the delete:
 
   ```powershell
   git checkout main; git pull; if ((node -p "require('./package.json').version") -eq "X.Y.Z") { git tag vX.Y.Z; git push origin vX.Y.Z } else { "ABORT: main is not at X.Y.Z" }
@@ -229,17 +201,18 @@ security gate. Same rule as the `claimSupport.ts` filters: measure, don't inspec
 - **`gh pr merge` is denied to Claude** (`permissions.deny` in `.claude/settings.json`) and this is
   intentional. The user merges. Do not route around a denial; stop and ask.
 
+- **Memory-bank line caps are CI-enforced** (`ci.yml`, "Memory bank size limits"), so an
+  overflowing edit fails the build. Archive the evidence, keep the rule, and **leave headroom** —
+  rationale in [`README.md`](README.md).
+
 ### Falsify Before You Trust It (2026-08-21, reconfirmed through 2026-08-27)
 
 Three findings that are one principle: **a claim you have not tried to disprove is not evidence.**
 It applies to filters, to prompts, and to the tests that are supposed to protect both.
 
-**A probe proves the idea, not the wiring.** `isPreImageOnlyEvidence` was first wired to the section
-from `sliceDiffByFile`, which stores `diffSectionCode(section)` — post-image by construction — so the
-filter could never fire. Every predicate unit test passed, because the predicate was correct, and a
-scratch probe agreed, because it read removed lines from the raw diff instead of going through
-`sliceDiffByFile`. Only replaying a real artifact through `OrchestratorAgent.synthesize` exposed it,
-showing `dropped: 0` where the probe predicted 1.
+**A probe proves the idea, not the wiring.** `isPreImageOnlyEvidence` passed every predicate unit
+test and a scratch probe while being wired so it could never fire; only a real-artifact replay
+exposed it. Case: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 - **Replay real captured output through the real entry point.** `gh run download <run-id>` retrieves
   the `ai-review-findings` artifact `review.yml` uploads — the highest-value test input this project
@@ -251,16 +224,20 @@ showing `dropped: 0` where the probe predicted 1.
   `claimSupport` unit tests still pass.
 - **Distrust a probe that agrees with you.** If a scratch script and the real pipeline disagree, the
   pipeline is right. Import the actual exported function rather than reimplementing it.
+- **A line-wise `grep` over prose reports false _absences_** (2026-08-27). Hand-wrapped markdown
+  splits a phrase across lines, so the text is present and the pattern still misses. Verify
+  whitespace-normalised. Not prettier's doing — `.prettierrc` sets no `proseWrap`, so the default
+  `preserve` applies and it rewraps nothing (checked 2026-08-28); the wrapping is ours.
 - **Record the delta, not the level** (2026-08-27, from PMB). "This removed 20,953 bytes" stays
   true; "the file is now 46,956 bytes" decays within hours, and did — three times on their side,
   twice inside the branch that wrote it. Same root as the duration lesson below: a figure recorded
   without the frame that makes it meaningful.
 - **When a review round's findings are mostly defects introduced by the previous round's fixes,
-  the change has had enough passes** (2026-08-27, named by PMB, and this repo is a clean instance).
-  Round 1 found retry-inflated elapsed; round 2's fix recorded the last attempt instead of the
-  longest, hiding a slow attempt behind a fast retry; round 3 caught that. Getting a thing wrong
-  from _opposite directions_ while fixing it is the signal to stop reviewing and ship, not to run
-  a fourth round.
+  the change has had enough passes** (2026-08-27, named by PMB). The `elapsedMs` rounds are the
+  instance, and the middle one is the whole point: round 1 found retry-inflated elapsed; round 2's
+  fix recorded the _last_ attempt instead of the _longest_, hiding a slow attempt behind a fast
+  retry; round 3 caught that. Getting a thing wrong from **opposite directions** while fixing it is
+  the signal to ship, not to run a fourth round.
 - **A duration is not a measurement until you say what it spans** (2026-08-27). Wall time
   covering retries, printed against a per-attempt ceiling, reads as exceeding a limit no
   attempt approached — measured at 611.7 s vs 354.7 s, all retry. State the span in the type.

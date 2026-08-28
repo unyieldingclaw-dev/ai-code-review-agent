@@ -273,13 +273,15 @@ These two tools load memory-bank rules differently — the difference matters fo
 
 `CLAUDE.md` loads **once at session start** as part of the system prompt. It is NOT re-injected after auto-compaction.
 
-Claude Code auto-compacts at approximately **50% context** (via `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50` in settings.json; default without override is ~95%) — silently, with no hook or notification to the agent. The session continues with a compressed summary; detailed history is lost.
+Claude Code auto-compacts at the percentage set by `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` in `.claude/settings.json` (without an override, ~95%) — silently, with no hook or notification to the agent. The session continues with a compressed summary; detailed history is lost.
+
+**Read that percentage from `settings.json`, not from this file.** An earlier revision hardcoded `=50` here and in the two places below. The real setting moved to 65 and the prose did not, because nothing compares a restated constant against the config it claims to describe. A configured value belongs in one place; everything else points at it.
 
 ### Implications for Handoff Thresholds
 
 | Tool        | Handoff Threshold | Why                                                     |
 | ----------- | ----------------- | ------------------------------------------------------- |
-| Claude Code | **40%**           | Manual compact before 50% auto-compact fires            |
+| Claude Code | **40%**           | Manual compact before the configured auto-compact fires |
 | Cursor      | **80%**           | Rules re-inject automatically; compaction less critical |
 
 ### Post-Compaction Recovery (Claude Code)
@@ -300,7 +302,7 @@ When context fills up (user reports 40% in Claude Code, 80% in Cursor), create a
 
 - User types "Handoff"
 - User reports context >= 40% (Claude Code) or >= 80% (Cursor)
-  - Claude Code auto-compacts at ~50%; 40% fires before that
+  - Claude Code auto-compacts at the configured override (see above); 40% fires well before it
   - Cursor rules re-inject on every response; 80% is safe
 
 ### Agent Actions

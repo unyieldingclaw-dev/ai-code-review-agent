@@ -857,3 +857,43 @@ identical to a calling LLM), and merged across chunks rather than last-chunk-win
 moved to `schema.ts` so formatters cannot drift. Generalisable lesson from the deferral that held
 `'partial'` back: **a rationale in a code comment is a claim, not a finding** — it asserted a
 markdown/SARIF/MCP ripple, but only one site branched on the value.
+
+## Moved 2026-08-28 — merging `handoff.md` into a file at 149/150
+
+Two blocks moved out of `activeContext.md` to make room for the handoff merge. Both describe
+shipped work or a past removal rather than current state, which is what this archive is for. The
+durable rules they establish stay upstream in `systemPatterns.md`.
+
+**ACR was reviewing the wrong side of its own diffs, and repeating itself** — all shipped:
+`a/`-prefixed paths pointing 33% of findings at nonexistent files (#45), deleted code reported as
+current (#46), same-agent repeats surviving dedup (Bug D, #50). **The method mattered more than any
+single fix:** `gh run download` yields the real `ai-review-findings` artifact, and replaying it
+through `synthesize()` caught a miswiring every unit test and a scratch probe both missed. (The
+method survives upstream as "Replay real captured output through the real entry point".)
+
+**Removed 2026-08-20 from Next Steps:** an "Anthropic/Claude provider (backlog)" item, contradicting
+`projectbrief.md` ("Ollama-only backend"), `systemPatterns.md` **Never Do This**, and its Sequential
+Execution rationale (which uses "no Anthropic/Claude API integration" as a load-bearing premise),
+plus the shipped identity ("zero API costs"). No decision authorizing it exists. Reinstating it
+needs a projectbrief amendment and a revisit of parallel-vs-sequential, not a backlog line.
+
+## Moved 2026-08-28 (second pass) — the 2026-08-26 PMB-brief triage narrative
+
+Archived during the handoff merge's review, which found that the first pass had _compressed_ this
+material rather than moving it, dropping substance in the process. Everything below is preserved
+verbatim; the live rules it supports stay in `activeContext.md`.
+
+**Two PMB briefs on ACR, both triaged (2026-08-26).** Shipped from them: the `INCOMPLETE` headline —
+the glyph is the verdict for a skimming reader, and qualifying text alone had already failed once —
+and `formatter.ts`'s truncation advice realigned with `runner.ts` to prefer `--chunk`.
+
+Their four wrong diagnoses, kept here with the reasons they were rejected: no fetch timeout separate
+from `--timeout` (`ollamaProvider.ts` uses the caller's signal); agents are sequential by default;
+chunking preserves hunk headers byte-identically; and the second brief's cross-file misattribution
+cannot be a chunking artifact, since `--chunk` is opt-in and their 1769-line run never triggered it.
+
+**The second PMB-owned defect example**, dropped from the live file by over-compression and restored
+here: `pre-push-check.*` calls `mb validate`, which was folded into `mb doctor`, and prints its "use
+mb doctor" message as evidence of inconsistency on every push. This is the second of the two live
+examples supporting the claim that all sixteen reported defects share one shape — the check's result
+being disconnected from whether it ran. One example does not establish a shape; two do.

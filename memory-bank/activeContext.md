@@ -16,25 +16,24 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-26
+**Last Updated**: 2026-08-28
 
 ## Current Focus
+
+**The session that shipped v1.15.0 closed clean (2026-08-28), and nothing is pending.** Twelve PRs
+merged (#65–#76), working tree clean, no open PRs, 826 tests green. **Do not go looking for work
+here**, and do not wait on the PMB upgrade — it is blocked on unscheduled work, not on a signal.
 
 **v1.15.0 published (2026-08-27)** — per-pass timing instrumentation (#65), the release that made
 the ceiling question answerable from CI artifacts rather than local trials. Publishing is OIDC
 Trusted Publishing; `NPM_TOKEN` is deleted from GitHub secrets entirely.
 
-**Evidence-location invariant shipped in v1.14.0.** A finding whose quoted evidence is not at its
-cited `file:line` is flagged on all four surfaces. It reports only: correcting was tried and
-disproved (the same evidence string occurs 3× across 2 files in the diff that motivated it), and
-dropping remains the false-negative direction. Verified by replaying run 33025650850 through
-`synthesize()`: 6/6 stamped, 0 dropped, `verified` still returned when the line is right. Details
-in `progress.md`; the four-formatter rule in `systemPatterns.md`.
-
-Four hallucination classes have deterministic backstops instead of prompt wording: injection,
-swallowed-exception, SQL NULL-error, fabricated licenses. Prompt-only fixes were measured live across
-three agents and failed every time — for `license` one made it _worse_ (6/10 → 9/10). Details in
-`progress.md`.
+**Two shipped invariants worth not re-deriving.** The evidence-location check (v1.14.0) flags —
+never corrects or drops — a finding whose quoted evidence is not at its cited `file:line`, on all
+four surfaces — detail in `progress.md`. And four hallucination classes have deterministic backstops
+rather than prompt wording, because prompt-only fixes were measured across three agents and failed
+every time — that detail is in
+[`archive/progress-history.md`](archive/progress-history.md), not `progress.md`.
 
 **Verified state:** 826 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
@@ -42,30 +41,20 @@ use `grep "orchestrator] dropped"` to tell a real filter regression from model v
 case with `CALIBRATION_CASE=name1,name2` rather than running all 21.
 
 **PMB-owned defects — none fixable here** (`TEMPLATE_OWNED`; `mb upgrade` overwrites them). Sixteen
-reported to the PMB session across two briefs, all one shape: the check's _result_ is disconnected
-from whether it ran. Live examples: `update-reviewed.*` reads a flat `.file_path` where the payload
-nests under `tool_input`, so `last-reviewed` is never stamped and `mb doctor`'s staleness detection
-reads a dead sensor; `pre-push-check.*` calls `mb validate`, folded into `mb doctor`, and prints its
-"use mb doctor" message as evidence of inconsistency on every push. See `systemPatterns.md` for the
-ownership rule and the working conventions (keep `git push`/`git commit` out of command text; use
-`gh pr update-branch`, never a rebase, since force-push is blocked).
+reported across two briefs, all one shape: the check's _result_ is disconnected from whether it ran.
+Two live examples, and it takes two to establish a shape — `update-reviewed.*` reads a flat
+`.file_path` where the payload nests under `tool_input`, so `last-reviewed` is never stamped and
+`mb doctor` reads a dead sensor; `pre-push-check.*` calls `mb validate`, folded into `mb doctor`, and
+prints its "use mb doctor" message as evidence of inconsistency on every push.
 
-**ACR was reviewing the wrong side of its own diffs, and repeating itself** — all shipped: `a/`-prefixed
-paths pointing 33% of findings at nonexistent files (#45), deleted code reported as current (#46),
-same-agent repeats surviving dedup (Bug D, #50). **The method mattered more than any single fix:**
-`gh run download` yields the real `ai-review-findings` artifact, and replaying it through
-`synthesize()` caught a miswiring every unit test and a scratch probe both missed.
-
-**Two PMB briefs on ACR, both triaged (2026-08-26).** Shipped from them: the `INCOMPLETE` headline
-(the glyph is the verdict for a skimming reader — qualifying text alone had already failed once) and
-`formatter.ts`'s truncation advice realigned with `runner.ts` to prefer `--chunk`. **Four of their
-diagnoses are verified wrong — do not chase them:** no fetch timeout separate from `--timeout`
-(`ollamaProvider.ts` uses the caller's signal); agents are sequential by default; chunking preserves
-hunk headers byte-identically; and the second brief's cross-file misattribution cannot be a chunking
-artifact, since `--chunk` is opt-in and their 1769-line run never triggered it. Line attribution is
-unreliable from the model itself (7/5/7 across trials, unchunked), now including across files.
-Confirmed and open: the timeout ceiling, and exit 1 outranking exit 3 so a truncated run with a
-blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is what is new).
+**From the two 2026-08-26 PMB briefs — four diagnoses are verified wrong, do not chase them:** a
+fetch timeout separate from `--timeout`; parallel-by-default agents; chunking damaging hunk headers;
+and cross-file misattribution as a chunking artifact. Each was disproved; reasons in
+[`archive/activeContext-history.md`](archive/activeContext-history.md). What survives: line
+attribution is unreliable from the model itself (7/5/7 across trials, unchunked), now including
+across files. Their timeout-ceiling item is measured and closed (below). Still open is exit 1
+outranking exit 3, so a truncated run with a blocker reports 1 (`src/cli/index.ts:422-437`,
+deliberate — the consequence is what is new).
 
 **Open risks, detailed in `progress.md`:**
 
@@ -76,74 +65,58 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
   a deliberate, documented simplification — none of them asserts anything about coverage the way
   `toolAvailability` does, which is why only that field was promoted to a real merge.
 - `ai-review` is **slow, not broken**: 8 consecutive runs to 2026-08-27 succeeded (6m43s–44m53s);
-  `mizzo-local` is online. It hung once (43 min, no step 1) — environment-side, `run.cmd` is
-  interactive, and `timeout-minutes: 45` is a backstop. A docs PR showing no `ai-review` check is
-  by design: `review.yml` `paths-ignore`s `**/*.md`, and it is not a required check.
+  `mizzo-local` is online. It hung once (43 min, no step 1) — environment-side, because `run.cmd` is
+  interactive, and `timeout-minutes: 45` is the backstop. A docs PR showing no `ai-review` check is
+  by design: `review.yml` `paths-ignore`s `**/*.md`, **and it is not a required check** (both
+  clauses restored — #69 added them and a later compression dropped them).
 
 > Prior session history: [`archive/activeContext-history.md`](archive/activeContext-history.md).
 
 ## What's Working
 
-- Full 16-agent swarm (15 default + testgen opt-in): all specialists + OrchestratorAgent
-- `SwarmRunner` with policy filtering, context injection, sanitizer, sequential/parallel execution
-- CLI: `--profile`, `--context`, `--context-mode`, `--context-budget`, `--format` (markdown/json/sarif/github-annotations), `--no-emoji`, `--agents`, `--dir`, `--ignore`, `--no-sanitize`, `--suggest-tests`, `--write-tests`
-- Finding schema: domain, evidence, impact, recommendation, blocking, source, lineEnd (MB/PMB-aligned)
-- Semantic context: `--context-mode semantic` uses nomic-embed-text to rank memory-bank files by diff similarity
-- Policy layer: `agentPolicy` per-agent include/exclude glob path filtering
-- `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
-- ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
-- Calibration CI: self-hosted runner, 20min timeout (nondeterminism noted under Verified state).
-- **826 unit tests**; `npm audit` clean. `npm run test:docker` is the fallback when native modules
-  will not load (Smart App Control) or CI is unreliable.
-- `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
-  LLM entirely; `ReviewResult.toolAvailability` surfaces degraded and partial runs (markdown, SARIF,
-  and MCP), merged across chunks rather than last-chunk-wins
-- `src/core/parsing.ts`: `validateAndNormalizeFindings()` extracted from BaseAgent (SRP)
-- `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
-- `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable
-- **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
-- **npm**: `ai-review-agent@1.15.0` via Trusted Publishing (OIDC), SLSA v1 provenance attached;
-  `main` and npm are in sync. `release.yml` has no npm secret dependency — `id-token: write` + the
-  Trusted Publisher relationship on npmjs.com suffices; `npm install -g npm@latest` runs early
-  (OIDC needs npm >= 11.5.1).
+The standing capability inventory moved to `techContext.md` ("Shipped Capabilities") on
+2026-08-28 — it is what exists, not what this session is doing, and it was the bulk of this file.
 
 ## Next Steps
 
-- **Per-agent timeout ceiling — MEASURED, CLOSED (2026-08-27). Do not raise it.** Numbers sent to
-  the PMB session, which recorded them at our confidence level and instructed its next session not
-  to upgrade the 616 s hedge when writing the durable record. 12 invocations over a
-  4,703-line diff, `--profile security`, `--chunk`, devstral on GPU. Eleven ran well under budget
-  (slowest real attempt 213.2 s against a 315.4 s ceiling, 68%). The twelfth _appeared_ to exceed
-  its ceiling — `adversarial` 611.7 s against 354.7 s — and that row is a **measurement artifact,
-  not an agent running long**: stderr shows `failed (attempt 1/2): fetch failed — retrying`, so
-  611.7 s is wall time across two attempts plus backoff. No single invocation came near its
-  ceiling. The real fault in that row is `fetch failed` (Ollama dropping the connection under
-  load), which is resource pressure, already recorded as separate from our abort path.
-  Sent to PMB, who hold it at our confidence. The correspondence with their unsourced "616 s" is
-  **suggestive, not established**, and must not be upgraded to "resolved" — the original has no
-  source, so a resemblance cannot promote it.
-  Still untested: true CPU-only. `OllamaProvider` forwards no `options`, so `num_gpu: 0` is not
-  reachable per-request; it needs an Ollama server restart with `OLLAMA_NUM_GPU=0`.
+- **Per-agent timeout ceiling — MEASURED, CLOSED (2026-08-27). Do not raise it, do not re-derive
+  it.** 12 invocations over a 4,703-line diff, `--profile security`, `--chunk`, devstral on GPU.
+  Eleven ran well under budget (slowest real attempt 213.2 s against a 315.4 s ceiling, 68%). The
+  twelfth _appeared_ to exceed its ceiling — `adversarial` 611.7 s against 354.7 s — and that row
+  is a **measurement artifact, not an agent running long**: stderr shows
+  `failed (attempt 1/2): fetch failed — retrying`, so 611.7 s is wall time across two attempts plus
+  backoff. No single invocation came near its ceiling; the real fault in that row is `fetch failed`,
+  which is resource pressure, separate from our abort path. Sent to PMB, who hold it at our
+  confidence level and instructed their next session not to upgrade the 616 s hedge. That
+  correspondence is **suggestive, not established** and must not be promoted to "resolved" — the
+  original has no source. Still untested: true CPU-only, which needs an Ollama restart with
+  `OLLAMA_NUM_GPU=0` (`OllamaProvider` forwards no `options`, so `num_gpu: 0` is unreachable
+  per-request).
 - **`fetch failed` — the one open technical thread, deliberately passive.** One invocation in
   twelve (Ollama dropping the connection under load). **n=1: do not act on it.** Since `review.yml`
   installs the published build, every non-docs CI run now deposits `timings` rows into
   `findings.json` — the sample accumulates for free.
-- **VS Code extension has no distribution channel — an open product decision.** No release has
-  ever carried a `.vsix`, `release.yml` has no upload step, Marketplace is deferred. #68 documented
-  the truth (build from source) rather than choosing; docs match reality either way.
-- **PMB upgrade — now has a path. Wait for a TAG, not a merge.** PMB decided (2026-08-28) to cut
-  releases. Once `v1.2.1` exists: `git checkout v1.2.1 && mb upgrade` from a clean tree at a known
-  ref — no dirty-tree guard or ref-sourcing needed for our case. Details in `progress.md`.
-- **Marketplace publish** (VS Code extension): explicitly DEFERRED.
-
-> Removed 2026-08-20: an "Anthropic/Claude provider (backlog)" item, contradicting `projectbrief.md`
-> ("Ollama-only backend"), `systemPatterns.md` **Never Do This**, and its Sequential Execution
-> rationale (which uses "no Anthropic/Claude API integration" as a load-bearing premise), plus the
-> shipped identity ("zero API costs"). No decision authorizing it exists. Reinstating it needs a
-> projectbrief amendment and a revisit of parallel-vs-sequential, not a backlog line.
+- **VS Code extension has no distribution channel — an open product call, not a task.** No release
+  has ever carried a `.vsix`, `release.yml` has no upload step, and Marketplace publish is
+  explicitly DEFERRED. #68 documented the truth (build from source) rather than choosing, so docs
+  match reality either way and nothing degrades while this sits.
+- **PMB upgrade — blocked on work nobody has started. This is _not_ "awaiting a tag."** The release
+  policy (tag → dirty-tree guard → ref-sourcing) is **approved but not implemented**: it needs its
+  own PMB contract, and scheduling it is the user's call. Verified in PMB's checkout 2026-08-28 —
+  newest tag `v1.0.4`, nothing for 1.1.x or 1.2.x, `VERSION` 1.2.1, `.pmb-version` 1.1.1. **Waiting
+  cannot resolve this**; only scheduling the PMB work can, so do not poll and do not treat the tag
+  as in flight. Two signals arrive separately when each becomes true: "reached `main`" and "tag
+  exists". **The procedure lives in `techContext.md`** ("`mb upgrade` — what it actually
+  overwrites"), next to the mechanics that explain why each step is there: two repos, full `cd`
+  paths, PMB's tree clean before anything else. Do not reconstruct it from memory.
+  PMB's ACR-provenance entry is **committed but not landed** (`2052c3c`, on their
+  `fix/block-tier-case-sensitivity`, unmerged). Background in `progress.md`.
 
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `main` at `e3e3ec6`, clean, zero open PRs, `main` the only local branch. `v1.15.0` tagged at `6e2ed34` (the release commit, on `main`) and published; `Unreleased` is empty. Commands are in
-`techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass.
+unit tests. **Git**: `main` at `c284d57`, clean, in sync, zero open PRs, no stashes, `main` the only
+local branch. Remote holds `main` plus the two long-retained orphans (`chore/agent-calibration`,
+`claude/plan-overview-4dg42o`) — containment cannot be proven for either, so both stay. `v1.15.0`
+tagged at `6e2ed34` (the release commit, on `main`) and published; `Unreleased` is empty. Commands
+are in `techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass.

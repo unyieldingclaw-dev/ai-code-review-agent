@@ -16,9 +16,94 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-27
+**Last Updated**: 2026-08-28
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
+
+## ✅ Corrections from PMB, verified in their checkout (2026-08-28)
+
+Two peer sessions (PMB, and the outgoing ACR session) sent the same three corrections after
+`handoff.md` was written. **All verified directly in PMB's repo rather than accepted on assertion**
+— the standing rule here, and both sides have been wrong before.
+
+- **"Awaiting the v1.2.1 tag" was the wrong frame, and it invited polling.** The release policy is
+  approved but **not implemented**; it needs its own PMB contract and is the user's call to
+  schedule. Confirmed: newest tag `v1.0.4`, nothing for 1.1.x or 1.2.x. Blocked on work nobody has
+  started, not work in flight — a distinction that changes what a successor should do with it.
+- **The ACR-provenance entry is committed but not landed** — `2052c3c` on PMB's
+  `fix/block-tier-case-sensitivity`, 3 commits ahead of `main`, unmerged. Our 616 s hedge survived:
+  the entry records that we decline to call the resemblance confirmed, because a resemblance cannot
+  promote an unsourced number to evidence. **One wording drift flagged back to them and accepted:**
+  their entry said we judge the resemblance _strong_, an adjective we never used, where our record
+  says _suggestive, not established_. PMB corrected it and left the correction visible rather than
+  overwriting silently — **their stated reason**, from their message: a silent fix "would have
+  erased the evidence that cross-project wording drifts, which is the thing worth keeping."
+  **Their fix is uncommitted** — `2052c3c` still reads "strong" (verified); they will name the
+  commit when it lands. Operative hedge was intact throughout; only the adjective was wrong.
+- **`mb upgrade` synchronises less than it prints** — read in `scripts/mb.sh`. `ADVISORY_CREATE`
+  (all 15 `standards/*.md`) is copied only when absent. Mechanics and the specific file pair this
+  will desynchronise on our next upgrade: `techContext.md`.
+
+## ✅ Follow-up: the four "known, not fixed" items (2026-08-28)
+
+Two turned out to be **PMB's, and neither can reach us** — reported upstream as one defect, which
+PMB confirmed in their own tree and extended:
+
+- Their `templates/memory-bank/README.md` handoff-threshold fix (80% → 40%, in `2052c3c`) is in
+  **neither** ownership array. `memory-bank/*` is init-only, so it reaches new projects only —
+  silently, with no diff notice. Our copy will read 80% against a `CLAUDE.md` reading 40%
+  indefinitely.
+- Their `standards/MEMORY-BANK.md` `=50` fix is real and correct upstream, and `ADVISORY_CREATE`
+  means it can never arrive either. We fixed our copy independently the same day; **two correct
+  fixes that cannot meet.**
+
+**Root cause, agreed with PMB:** ownership class answers "may the adopter customize this file" and
+is being asked to also answer "how does a correction reach them". Those are orthogonal, and
+collapsing them is why the `=50` drift survived however many upgrades. PMB added a fourth case we
+had missed (`templates/AGENTS.md`, no distribution path at all) and confirmed the
+`memory-bank-size.yml` collision guard is **filename-based**, so its stated intent — "a project with
+its own CI keeps it" — does not hold for us, whose gate is `ci.yml`. Delivery table in
+`techContext.md`. Not ours to fix; surfaced to the operator with our reasoning attached.
+
+**One finding retracted on evidence.** We had filed `standards/MEMORY-BANK.md` pointing at
+`docs/archive/` as staleness. It is correct upstream — PMB uses `docs/archive/` consistently and has
+no `memory-bank/archive/`. **We** are the divergence. Retracted to PMB directly.
+
+**The two genuinely ours are fixed.** `techContext.md` claimed the remote branch was `master` (it is
+`main`) inside a "Current State (as of 2026-06-06)" block whose every line had rotted — 19 tests
+against 826, 20 commits against 456. Fixed the way the threshold was: **the section no longer
+restates state**, it points at `npm test`, `git`, and `progress.md`. A stale per-file test table and
+a hardcoded test count in the scripts block went the same way.
+
+**And the cap pressure is structurally resolved, not trimmed.** Moving the upgrade _procedure_ next
+to the upgrade _mechanics_ in `techContext.md`, and the `BaseAgent` parse-stage mechanics and agent
+thinking config out of `systemPatterns.md`, took `activeContext.md` from 149/150 to 122 and
+`systemPatterns.md` from 299/300 to 276. Both now have real headroom. Neither is inside the target
+range in `README.md`, and closing that gap further would mean removing live operational rules — a
+judgment call left open rather than made quietly.
+
+## ✅ Session closed (2026-08-28)
+
+**Twelve PRs merged (#65–#76), `main` at `c284d57`, nothing half-done.** `npm run check` green, 826
+tests across 47 files, `npm audit` clean, no open PRs, no stashes. Eight of the twelve were the
+v1.15.0 release and docs audit (#65–#72); the remaining four were memory-bank corrections (#73–#76),
+recorded below. `handoff.md` was merged into the memory bank and deleted on 2026-08-28.
+
+**Merging it required archiving first, and the first attempt at that went wrong.**
+`activeContext.md` was at 149/150 and `systemPatterns.md` at 299/300, so material had to move before
+anything new could land. The first pass **compressed instead of moving**, and a five-lens review
+caught it deleting substance outright: `pre-push-check.*` as the second PMB-defect example, `#69`'s
+`run.cmd`-is-interactive and not-a-required-check clauses, the `INCOMPLETE` glyph rationale, and the
+middle `elapsedMs` round — the one that carries the rule's whole point. All restored, to `archive/`
+where historical and to the live file where still operative.
+
+**The structural fix was moving the standing capability inventory out of `activeContext.md`** into
+`techContext.md`, which is where an inventory of what exists belongs; that file's frontmatter scopes
+it to focus, blockers and next steps. That moved 22 lines out of `activeContext.md`; archiving the
+2026-08-26 section moved 104 out of `progress.md`. Deltas, not levels — the levels decay, and this
+file's own rule says so. **Cap pressure was the cause
+of the deletions, not an unrelated inconvenience** — compressing to fit is how substance gets lost,
+which is why the rule in `memory-bank/README.md` says archive rather than trim.
 
 ## ✅ Completed (2026-08-27, third session)
 
@@ -33,7 +118,9 @@ of whatever is on disk, never a release. Their tree is currently dirty on a feat
 `v1.0.4` — the version names no tag, commit or artifact. "Blocked on upstream release" and "upstream
 has no release mechanism" are different states; only the second tells a successor to stop waiting.
 
-**Resolved 2026-08-28 — PMB will cut releases, and tagging alone unblocks us.** The operator
+**Resolved 2026-08-28 — PMB will cut releases, and tagging alone unblocks us.** _[Superseded later
+the same day: the policy is approved but unimplemented and unscheduled. See "Corrections from PMB"
+at the top. Everything below describes the decision, not its delivery.]_ The operator
 decided all three open questions. Releases: **yes**, and the decisive argument was `TEMPLATE_OWNED`
 — PMB forbids adopters from patching those files locally, so "you may not fix this yourself" and
 "you get whatever was on my desk" cannot both hold. Working-tree sourcing: **not deliberate, just
@@ -41,8 +128,11 @@ unfinished** (zero git-ref calls and no `# WHY` comment on a load-bearing distri
 repo carrying 180 of them); it becomes a dev-mode flag rather than the default. Dirty-tree guard:
 **refuse, with `--allow-dirty`** — warn-only was rejected as another advisory layer.
 
-**For us the tag is the actionable event, not the merge.** Once `v1.2.1` exists we
-`git checkout v1.2.1 && mb upgrade` from a clean tree at a known ref. The guard and ref-sourcing are
+**For us the tag is the actionable event, not the merge.** _[Superseded 2026-08-28: true of which
+event to act on, misleading about timing — no tag exists and none is scheduled, so this must not be
+read as "wait for it."]_ Once `v1.2.1` exists, PMB is checked out at the tag and `mb upgrade` runs
+here — **two repos, and the `cd` paths matter**; exact commands in `activeContext.md`. The guard and
+ref-sourcing are
 hardening for the general case, not prerequisites for us — so our unblock costs one `git tag`
 upstream and zero code either side. Sequencing PMB approved: tag first, guard second, ref-sourcing
 third; "releases eventually, guard now" was rejected once the release half turned out to be the
@@ -50,6 +140,8 @@ cheap half.
 
 **Still holding both signals:** the ACR provenance entry is still uncommitted, and nothing has
 reached `main`. PMB will signal the tag separately from the merge, since the tag is what we act on.
+**Superseded 2026-08-28 —** the entry is now committed (unmerged), and "wait for the tag" was the
+wrong frame: the release work is unscheduled. See the corrections section at the top of this file.
 
 **Corrected 2026-08-28, PMB caught it:** we also claimed `VERSION` and `.pmb-version` contradicted
 each other. They do not — `VERSION` is PMB's own version, `.pmb-version` records which version a
@@ -61,6 +153,8 @@ PMB downstream of itself.
 Reported upstream. **A fix we proposed was withdrawn on evidence:** `git archive <tag>` is useless
 when no tag exists, so the real ask is _cut releases first_. PMB confirmed independently and asked
 us not to upgrade until they signal work reached `main` — only that signal is actionable.
+_[Superseded 2026-08-28: there are **two** signals, "reached `main`" and "tag exists", and PMB sends
+them separately. Neither has arrived.]_
 
 **Consequence meanwhile:** `last-reviewed` stays unstamped, so `mb doctor`'s staleness check reports
 actively-edited files as months stale. Not fixable locally (`TEMPLATE_OWNED`).
@@ -68,7 +162,8 @@ actively-edited files as months stale. Not fixable locally (`TEMPLATE_OWNED`).
 **One inbound claim held pending, not logged as done:** PMB earlier said the ACR provenance gap was
 closed in their record. They corrected it — the entry is written, with our hedge preserved verbatim
 (611.7 s as a retry artifact; the 616 s resemblance recorded as _not confirmed_), but uncommitted in
-the dirty tree above. Do not treat it as landed until they confirm.
+the dirty tree above. Do not treat it as landed until they confirm. **Superseded 2026-08-28:** now
+committed as `2052c3c`, still unmerged — see the corrections section at the top.
 
 **v1.15.0 released, and the repo's outward-facing information audited against the binary.** Eight
 PRs (#65–#72). Releasing was the point rather than tidiness: `review.yml` installs the _published_
@@ -163,157 +258,16 @@ verification harness is a harness bug until proven otherwise -- the same rule as
 that agrees with you, in the direction that would have discarded good tests instead of keeping bad
 ones.
 
-## ✅ Completed (2026-08-27)
-
-**The timeout-ceiling figure is unsourced, and the item is blocked on measurement rather than on
-effort.** This repo recorded, as a PMB finding, that on a CPU-only host reviewing a 10,039-line
-`--chunk` diff "agents legitimately ran 616 s" against a 282,240 ms ceiling, with 2/4 dying on
-`fetch failed` and ~46 min wall time. Asked to clarify one detail, PMB searched their entire record
-— `memory-bank/`, `docs/`, `docs/archive/`, the 1.13.1 brief — for `616`, `282,240`,
-`agentTimeoutMs` and `fetch failed`, and found **zero hits**. They hold no per-agent timings, no
-chunk count, and no record of whether the number was measured or derived, and they declined to
-reconstruct it from the formula on the grounds that it would be inventing the number we had already
-refused to guess. Their recommendation, adopted: treat it as unattributed, not as evidence.
-
-**The question it was blocking was never answerable as written.** 616 s is ambiguous between one
-agent invocation and the aggregate. The timeout is computed per `SwarmRunner.run()`, so under
-`--chunk` that is per chunk: 282,240 ms implies `ratio` 0.568, i.e. a ~1136-line chunk, and 10,039
-lines at `maxDiffLines` 2000 is ~5–9 chunks × 4 agents ≈ 20–36 invocations. On the aggregate
-reading, per-invocation sits well under the ceiling and there is nothing to raise. Only on the
-single-invocation reading does the ceiling matter — and then it matters a lot, because
-`TIMEOUT_SCALE_CAP` is 2, so the formula's absolute maximum is 360 s and no diff-size scaling can
-reach 616 s. The deciding variable would be inference speed, not diff size.
-
-**Instrument, do not argue** (PMB's suggestion): log elapsed time per `SwarmRunner.run()` call
-alongside `chunkLines`; per-invocation vs aggregate then falls out of the data with no
-interpretation. CPU-only is reproducible on this GPU box via `OLLAMA_NUM_GPU=0`.
-
-**Part of the symptom is already fixed.** A timed-out agent is no longer retried against the same
-exhausted budget — measured 2217 ms → 108 ms on a forced 100 ms timeout, so ~566 s → ~282 s per
-failing agent at the scaled ceiling. Some of the observed ~46 min was likely that, which is a
-further reason not to move the ceiling on an unsourced number.
-
-**v1.14.0 shipped, and the session closed clean.** PRs #61–#64 merged; `main` at `10355d6` with
-zero open PRs and `npm` agreeing at `1.14.0`. **791 tests**, `npm run check` green. The tag was
-pushed from the release branch before #60 merged, so its provenance attests a commit not on `main`
-— identical content, not worth fixing, recorded in `systemPatterns.md` so it is not repeated.
-
-**Process note:** this is the same shape as the lesson already recorded here — a rationale inherited
-without checking its source is a claim, not a finding. It sat in `activeContext.md` for days reading
-as measured evidence, and the only reason it was caught is that acting on it required knowing which
-of two readings was meant.
-
-## ✅ Completed (2026-08-26)
-
-**Evidence-location invariant shipped (#55, #58, #57).** A finding whose quoted evidence is not at
-its cited `file:line` is now flagged on all four surfaces. `evidenceLocation.ts` builds a
-post-image line map from hunk headers — numbering from `+start`, skipping removed lines, because an
-offset-into-the-diff-body implementation passes the happy path and drifts one per deletion, the
-exact shape of the defect. `synthesize()` stamps `locationCheck` last, on the published set only.
-
-**It reports; it does not correct or drop.** Correcting was the first design and the real PR #53
-diff killed it: `"version": "1.13.1",` occurs 3× across 2 files in 134 lines, so all three
-self-refuting findings are ambiguous and a corrector would never have fired on the only evidence
-available. Picking an occurrence would assert a location more confidently than the model did.
-Dropping stays off the table as the false-negative direction.
-
-**A spec detail reversed the annotation design mid-flight.** The first attempt omitted `line=` on a
-mismatch, assuming GitHub would attach the annotation to the file. It does not: every property is
-optional but `line` **defaults to 1**, so omitting it repins to line 1 — usually outside the diff,
-where GitHub does not render inline. That is #45's "annotations land nowhere" by another route. The
-line now stays and the message leads with the caveat (messages get clipped; a warning nobody
-scrolls to is not one). SARIF keeps its region and records the tri-state in `properties`; MCP marks
-the heading.
-
-**Verified by replay, not by probe:** the real `findings.json` from run 33025650850, through
-`OrchestratorAgent.synthesize()`, stamps 6/6 mismatch with 0 dropped — and the same evidence at its
-true line returns `verified`, so the check discriminates rather than flagging everything. Across
-the three PRs, 8 of 14 new tests fail against their pre-change code; the other 6 are guards and are
-not counted as evidence.
-
-**A third-party reviewer prompted two of these fixes without being right about either.** Across two
-rounds it produced five findings: one factually wrong (it claimed the markdown formatter lacked the
-marker while citing the lines containing it), one whose classification was right but whose
-mechanism was wrong (`file-level annotation` vs the documented default of 1), one already fixed in
-a commit it had not seen, and two accurate citations that mattered — `sarif.ts` and
-`mcp/formatter.ts` had zero references to `locationCheck`. Useful as a prompt to verify; not usable
-as conclusions. Both rounds reviewed stale snapshots without saying so.
-
-**v1.13.1 published** (npm serves it, SLSA v1 provenance, OIDC needed no npm secret). `main` sat
-three commits past `v1.13.0` with #50 (duplicate-collapse) and #51 (the INCOMPLETE headline)
-stranded, plus #49. The handoff said to batch them with the timeout fix; overturned on two measured
-facts — 2,185 downloads/month (749/week) were on a build where a truncated run renders `✅`, and the
-batch partner is **slow, not blocked**: the CPU-only measurement is reproducible here via
-`OLLAMA_NUM_GPU=0`, but ~46 min per trial over several trials makes it a half-day task.
-
-**ACR emits findings whose own evidence refutes them (2026-08-26).** The `ai-review` run on the
-release PR (`gh run download 33025650850`) returned 6 findings on a diff of four version strings and
-a changelog entry. Five are false; three are **self-refuting** at `basis=VERIFIED, confidence=90` —
-"Empty version string in package.json" cites as its evidence `"version": "1.13.1",`, and "Empty
-description" cites the full description. Two more carry only the `diff --git` header as evidence and
-recommend what the repo already has (`engines.node` at `package.json:24`).
-`toolVersion` was `1.13.0` — CI reviews with the _published_ build, not the PR's code. Both shapes
-are deterministically detectable, which is the only lever that has ever worked here (prompt wording
-has failed four times): flag an emptiness/absence claim whose evidence shows the field populated,
-and flag evidence that is only a `diff --git` header.
-
-**PMB brief on 1.13.1 — triaged, one cause disproved.** On a 1769-line, 21-file `--profile security`
-run, PMB reports all 4 agents ran with real quoted evidence, but **all 3 findings cited a wrong
-`file:line`**, one attributing `tests/test-dangerous-commands.sh` content to
-`scripts/dangerous-commands.sh`. Their proposed cause — chunking losing the per-file frame — is
-**wrong**: `--chunk` is opt-in and was not passed, and 1769 < the 2000 `maxDiffLines` default, so it
-was one unchunked pass. This corroborates the standing conclusion (attribution is unreliable from
-the model itself) and extends it to _cross-file_. Their §3 is confirmed as behaviour:
-`src/cli/index.ts:422-437` checks `hasBlocker` (exit 1) before truncation (exit 3), so a truncated
-run with a blocker reports 1 and carries no coverage signal — deliberate and commented, so the
-consequence is new, not a bug. **Next task, needs its own contract:** their invariant — assert the
-quoted evidence occurs at the cited `file:line` before emitting. Their run fails it 3/3; the
-artifact above fails it too (`package.json:2` holds `"name"`).
-
-**Second remote branch cleanup — 10 deleted, 2 kept.** Each `#42`–`#51` branch verified by matching
-its PR's merged `headRefOid` to the live tip, then deleted via `gh api -X DELETE` (as below).
-Deleting a `release/*` **branch** does not disturb its **tag**. `chore/agent-calibration` (no common
-ancestor with `main`) and `claude/plan-overview-4dg42o` (never-PR'd, touches a file `main` lacks, so
-nothing proves containment) retained again, per the prior cleanup's intent. Merges now pass
-`--delete-branch`, so this stops recurring.
-
-**Bug D closed — same-agent repeated findings no longer reach the report** (shipped in 1.13.1).
-`deduplicate()` keeps same-agent same-location findings on purpose — one agent can report two
-different issues on one line — but could not tell that from one issue emitted repeatedly. Measured
-on PR #44's real `findings.json`: `adversarial` emitted 5 findings at `src/core/schema.ts:196` that
-were 2 concerns repeated; that run now yields 11 instead of 15, both titles intact, `high` preserved.
-
-**Two design decisions the real artifact forced, both of which the obvious implementation gets
-wrong.** Key on **title, never evidence** — all 5 findings carried byte-identical evidence across two
-legitimate titles, so an evidence-keyed collapse deletes a finding class outright, a false negative
-and the direction that costs something. And **keep the highest-severity member** — severity varied
-_within_ a title group, so taking first-or-last silently downgrades a high to a medium as a side
-effect of "removing duplicates".
-
-**`basis` is in the collapse key, and an existing test is why.** The first implementation keyed on
-title alone and broke `excludes SPECULATIVE findings below high severity` — a SPECULATIVE high and a
-VERIFIED medium sharing a title collapsed into one, and since `collapseRepeats` runs _before_
-`applyPublicationFilter`, the survivor decided that finding's fate. Adding `basis` is strictly more
-conservative and costs no real coverage: every repeated group in the measured sample shares one
-basis. The failing test was a genuine signal, not a fixture artifact.
-
-**The deferral rationale was wrong and was corrected before implementing.** When deferring this the
-stated risk was that tightening the predicate "touches the corroboration path that feeds severity
-escalation." Investigation showed `corroboratingAgents`/`relatedFindings` are only ever _set_ in the
-multi-agent branch, and the fix unions them rather than discarding them. Blast radius smaller than
-claimed. The collapse also had to apply to **both** branches — `kept` in the multi-agent path is
-`group.filter(...)`, plural, so it leaked duplicates too.
-
-3 of 4 new tests fail against the old behaviour; the fourth (two distinct titles survive) passes
-under both by design — a guard against over-suppression, not regression coverage. **757 tests.**
+> Completed work through 2026-08-26 is in [`archive/progress-history.md`](archive/progress-history.md).
 
 ## 📊 Metrics
 
 ### Test Coverage
 
-- **Unit Tests**: 810 passing across 46 test files (run `npm test` for current count)
+- **Unit Tests**: 826 passing across 47 test files, verified 2026-08-28 (run `npm test` for current
+  count)
 - **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
-- **Total**: 810
+- **Total**: 826
 
 ### Implementation Progress
 
@@ -348,25 +302,26 @@ under both by design — a guard against over-suppression, not regression covera
 
 ## 📈 Version History
 
-| Version         | Date          | Changes                                                                                                                                                                                                                                                                       |
-| --------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0.1.0-dev       | 2026-06-04    | Tasks 1–5: scaffolding, types, config, Ollama, BaseAgent                                                                                                                                                                                                                      |
-| 0.1.0-dev       | 2026-06-05    | Tasks 6–10: all 10 agents, orchestrator, SwarmRunner (19 tests)                                                                                                                                                                                                               |
-| 0.1.0           | 2026-06-06    | Tasks 11–16: CLI, GitHub Actions, slash command, calibration, e2e test, final verification                                                                                                                                                                                    |
-| 0.1.1           | 2026-06-06    | Guardrails G1–G6: hallucination check, diff size guard, dedup merge, timeouts, severity gate, path exclusions (37 tests)                                                                                                                                                      |
-| 0.2.0           | 2026-06-06    | Phase 2: CLI consolidation, sanitizer, BreakingChangeAgent, LicenseComplianceAgent, confidence scoring, calibration CI (62 tests)                                                                                                                                             |
-| 0.3.0           | 2026-06-10    | npm distribution: package renamed `ai-review-agent`, release workflow, Node.js 24, published to npm                                                                                                                                                                           |
-| 0.4.0           | 2026-06-11    | prompt tuning + calibration expansion: `confidence` on all 10 agents, calibrate.ts covers all 11, new breaking-change + license fixtures                                                                                                                                      |
-| 0.5.0           | 2026-06-11    | Cursor/VS Code extension: subprocess architecture, bundled install, command palette trigger, DiagnosticCollection + OutputChannel (V5-1–V5-7)                                                                                                                                 |
-| 0.5.0 (cleanup) | 2026-06-12    | vscode-extension dep → `^0.4.0` (npm), tarball removed from repo, `.gitignore` stale exception removed                                                                                                                                                                        |
-| 0.6.0           | 2026-06-12    | MCP server: `ai-review-mcp` binary, `review_diff` tool, stdio transport, A+C hybrid output, 10 agents (no testgen), `.cursor/mcp.json`, 77 unit tests                                                                                                                         |
-| 0.7.0           | 2026-06-13    | Configurable retry logic: `withRetryTimeout` wrapper, `retryAttempts`/`retryDelayMs` config fields, `--retry-attempts`/`--retry-delay` CLI flags, 3 new retry tests (80 total)                                                                                                |
-| 0.8.0           | 2026-06-15    | 5 new specialist agents: ErrorHandlingAgent, ObservabilityAgent, MigrationSafetyAgent, SecretsAgent, ComplexityAgent; shell.ts runTool(); conditional MigrationSafety skip; 32 new unit tests (112 total); 5 calibration fixtures; README + config updated                    |
-| 0.9.0–0.9.4     | 2026-06-18–19 | --fail-fast, progress events, calibration tuning, --parallel flag; 120 unit tests                                                                                                                                                                                             |
-| 1.0.0           | 2026-06-24    | --profile (6 presets), --context memory-bank, --format sarif/github-annotations, policy layer (agentPolicy), extended Finding schema (domain/evidence/impact/recommendation/blocking/source), 15 agent prompts updated, 16/16 calibration, 248 tests                          |
-| 1.0.1           | 2026-06-24    | Audit remediation: sanitizer multi-pattern fix, BaseAgent defaults tests, GitHub adapter tests, vitest coverage fix, CHANGELOG, JSDoc, contextBudgetChars, lineEnd clamp, AGENT_PRIORITY docs; 264 tests                                                                      |
-| 1.1.0           | 2026-06-25    | --no-emoji, --context-mode semantic (nomic-embed-text), --context-budget, .aiignore negation, ESLint (0 warnings), coverage parser fixed, orchestrator breaking-change escalation, vscode-extension v0.6.0 (profiles + context), migration-safety fixture expanded; 276 tests |
-| 1.2.0           | 2026-06-26    | SRP: parsing.ts extraction; semantic context warning; vscode-extension timeout; OllamaProvider SSRF hardening; MCP shutdown handlers; 295 tests; all 3-round audit findings resolved                                                                                          |
-| 1.3.0–1.13.0    | 2026-06–08    | Not tracked here — see `CHANGELOG.md`, which is authoritative for per-version detail. This table drifted from 1.2.0 and is kept only for the early history above.                                                                                                             |
-| 1.13.1          | 2026-08-26    | Truncated runs report INCOMPLETE rather than a checkmark (#51); same-agent findings repeating one title collapse, keyed on title and keeping the highest severity (#50); `npm run test:docker` (#49). SLSA v1 provenance via OIDC.                                            |
-| 1.14.0          | 2026-08-27    | Evidence-location invariant on all four surfaces — a finding whose quoted evidence is not at its cited `file:line` is flagged, never corrected or dropped (#55, #58, #57); a timed-out agent is no longer retried against the same exhausted budget (#63).                    |
+| Version         | Date          | Changes                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0.1.0-dev       | 2026-06-04    | Tasks 1–5: scaffolding, types, config, Ollama, BaseAgent                                                                                                                                                                                                                                                                                                                                  |
+| 0.1.0-dev       | 2026-06-05    | Tasks 6–10: all 10 agents, orchestrator, SwarmRunner (19 tests)                                                                                                                                                                                                                                                                                                                           |
+| 0.1.0           | 2026-06-06    | Tasks 11–16: CLI, GitHub Actions, slash command, calibration, e2e test, final verification                                                                                                                                                                                                                                                                                                |
+| 0.1.1           | 2026-06-06    | Guardrails G1–G6: hallucination check, diff size guard, dedup merge, timeouts, severity gate, path exclusions (37 tests)                                                                                                                                                                                                                                                                  |
+| 0.2.0           | 2026-06-06    | Phase 2: CLI consolidation, sanitizer, BreakingChangeAgent, LicenseComplianceAgent, confidence scoring, calibration CI (62 tests)                                                                                                                                                                                                                                                         |
+| 0.3.0           | 2026-06-10    | npm distribution: package renamed `ai-review-agent`, release workflow, Node.js 24, published to npm                                                                                                                                                                                                                                                                                       |
+| 0.4.0           | 2026-06-11    | prompt tuning + calibration expansion: `confidence` on all 10 agents, calibrate.ts covers all 11, new breaking-change + license fixtures                                                                                                                                                                                                                                                  |
+| 0.5.0           | 2026-06-11    | Cursor/VS Code extension: subprocess architecture, bundled install, command palette trigger, DiagnosticCollection + OutputChannel (V5-1–V5-7)                                                                                                                                                                                                                                             |
+| 0.5.0 (cleanup) | 2026-06-12    | vscode-extension dep → `^0.4.0` (npm), tarball removed from repo, `.gitignore` stale exception removed                                                                                                                                                                                                                                                                                    |
+| 0.6.0           | 2026-06-12    | MCP server: `ai-review-mcp` binary, `review_diff` tool, stdio transport, A+C hybrid output, 10 agents (no testgen), `.cursor/mcp.json`, 77 unit tests                                                                                                                                                                                                                                     |
+| 0.7.0           | 2026-06-13    | Configurable retry logic: `withRetryTimeout` wrapper, `retryAttempts`/`retryDelayMs` config fields, `--retry-attempts`/`--retry-delay` CLI flags, 3 new retry tests (80 total)                                                                                                                                                                                                            |
+| 0.8.0           | 2026-06-15    | 5 new specialist agents: ErrorHandlingAgent, ObservabilityAgent, MigrationSafetyAgent, SecretsAgent, ComplexityAgent; shell.ts runTool(); conditional MigrationSafety skip; 32 new unit tests (112 total); 5 calibration fixtures; README + config updated                                                                                                                                |
+| 0.9.0–0.9.4     | 2026-06-18–19 | --fail-fast, progress events, calibration tuning, --parallel flag; 120 unit tests                                                                                                                                                                                                                                                                                                         |
+| 1.0.0           | 2026-06-24    | --profile (6 presets), --context memory-bank, --format sarif/github-annotations, policy layer (agentPolicy), extended Finding schema (domain/evidence/impact/recommendation/blocking/source), 15 agent prompts updated, 16/16 calibration, 248 tests                                                                                                                                      |
+| 1.0.1           | 2026-06-24    | Audit remediation: sanitizer multi-pattern fix, BaseAgent defaults tests, GitHub adapter tests, vitest coverage fix, CHANGELOG, JSDoc, contextBudgetChars, lineEnd clamp, AGENT_PRIORITY docs; 264 tests                                                                                                                                                                                  |
+| 1.1.0           | 2026-06-25    | --no-emoji, --context-mode semantic (nomic-embed-text), --context-budget, .aiignore negation, ESLint (0 warnings), coverage parser fixed, orchestrator breaking-change escalation, vscode-extension v0.6.0 (profiles + context), migration-safety fixture expanded; 276 tests                                                                                                             |
+| 1.2.0           | 2026-06-26    | SRP: parsing.ts extraction; semantic context warning; vscode-extension timeout; OllamaProvider SSRF hardening; MCP shutdown handlers; 295 tests; all 3-round audit findings resolved                                                                                                                                                                                                      |
+| 1.3.0–1.13.0    | 2026-06–08    | Not tracked here — see `CHANGELOG.md`, which is authoritative for per-version detail. This table drifted from 1.2.0 and is kept only for the early history above.                                                                                                                                                                                                                         |
+| 1.13.1          | 2026-08-26    | Truncated runs report INCOMPLETE rather than a checkmark (#51); same-agent findings repeating one title collapse, keyed on title and keeping the highest severity (#50); `npm run test:docker` (#49). SLSA v1 provenance via OIDC.                                                                                                                                                        |
+| 1.14.0          | 2026-08-27    | Evidence-location invariant on all four surfaces — a finding whose quoted evidence is not at its cited `file:line` is flagged, never corrected or dropped (#55, #58, #57); a timed-out agent is no longer retried against the same exhausted budget (#63).                                                                                                                                |
+| 1.15.0          | 2026-08-27    | `ReviewResult.timings` — one row per `SwarmRunner.run()` call, concatenated across chunks and never summed, each agent carrying `attemptMs` (comparable to `effectiveTimeoutMs`), `elapsedMs` and `attempts` (#65); docs audited against the binary, fixing undocumented `--ollama-url` and exit code `4` (#68) and adding `agentStatus`/`testFiles` to the JSON envelope contract (#72). |

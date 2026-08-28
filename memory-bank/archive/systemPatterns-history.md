@@ -18,6 +18,11 @@ for the release-tagging incidents. The rule it establishes stays upstream.
 Fourth move, 2026-08-27: the DependenciesAgent unfalsifiable-assertion illustration, archived
 to make room for the squash-merge branch-cleanup rule. The rule it illustrates stays upstream.
 
+Fifth through seventh moves, 2026-08-28: the three release-tagging incidents, the
+`isPreImageOnlyEvidence` probe-vs-wiring narrative, and the BaseAgent parse-stage mechanics —
+the first two to make room for handoff conventions, the third to bring the file back under its
+target range. All the rules they support stay upstream.
+
 ## PostToolUse marker-reissue defect — reproduction (2026-08-20)
 
 **Confirmed defect (reproduced 2026-08-20):** `review-reminders-post.*` is supposed to reissue the
@@ -82,3 +87,57 @@ deterministic filter, and treat prompt wording as unproven until measured.
 **A regression test that passes against the unfixed code proves nothing.** This repo shipped an
 assertion that could not fail: `DependenciesAgent`'s calibration cases were both `expectEmpty`, so an
 agent returning `[]` passed — proven by patching it to `return []`.
+
+## Release-tagging incidents — narrative (2026-08-27)
+
+Three incidents in one session, archived 2026-08-28 to make room for the working conventions
+carried in from the handoff. The rule and the guard command stay upstream.
+
+1. `v1.14.0` was tagged from its release branch before the PR merged, so its SLSA provenance
+   attests a commit that is not on `main`. Identical content; not worth fixing.
+2. `v1.15.0` was tagged onto `main` after a merge that branch protection had _rejected_ — the tag
+   named a commit whose `package.json` still read `1.14.0`.
+3. The **good** `v1.15.0` tag was then deleted by re-running the cleanup written minutes earlier
+   for the bad one, flipping the published GitHub Release back to a draft. Recovered by re-tagging
+   `6e2ed34` and re-publishing.
+
+**npm's refusal to republish an existing version limited the damage twice** — the registry
+compensating for the process, not the process working. A tag naming an as-yet unpublished version
+would have shipped wrong content irreversibly. Prose prevented none of them: a command already
+pasted does not re-read the rule it violates.
+
+## "A probe proves the idea, not the wiring" — the isPreImageOnlyEvidence case (2026-08-21)
+
+Archived 2026-08-28. The rule stays upstream under "Falsify Before You Trust It".
+
+`isPreImageOnlyEvidence` was first wired to the section from `sliceDiffByFile`, which stores
+`diffSectionCode(section)` — post-image by construction — so the filter could never fire. Every
+predicate unit test passed, because the predicate was correct, and a scratch probe agreed, because
+it read removed lines from the raw diff instead of going through `sliceDiffByFile`. Only replaying
+a real artifact through `OrchestratorAgent.synthesize` exposed it, showing `dropped: 0` where the
+probe predicted 1.
+
+## Moved 2026-08-28 — BaseAgent 4-stage parse, stage mechanics
+
+Archived to bring `systemPatterns.md` back under its target range. The **rules** stay upstream:
+four stages, never resolve silently to "0 findings" on a response that did not parse, and
+`format:'json'` increases truncation rather than preventing it. What lives here is how each
+stage works.
+
+LLMs produce messy output. `BaseAgent.parseFindings` tries, in order:
+
+1. Parse entire response as a JSON array (or a `{"findings": [...]}` wrapped object)
+2. Parse `{"findings": [...]}` wrapped object (same try block as stage 1)
+3. Balanced-bracket extraction — find the first `[...]` span and require it to actually close,
+   handling trailing prose/code fences around the array
+4. Truncation recovery — scan the whole response for whatever complete `{...}` objects exist,
+   regardless of whether the enclosing array or a wrapper object around it ever closed. Salvages
+   findings the model finished before getting cut off instead of discarding all of them.
+
+Stages 3 and 4 share two helpers exported from `src/core/parsing.ts` — `extractBalancedSpan`
+(single balanced span) and `extractCompleteObjects` (every complete `{...}` object anywhere in
+the text, at any nesting depth, via a stack of open-brace positions rather than a depth counter
+so a stray unmatched `}` can't desync the rest of the scan). `CoverageAnalystAgent` reuses the
+same two helpers for its own two-stage parse (its schema is `{"findings":[...],"gaps":[...]}`,
+one level of nesting deeper, which is exactly why it needs `extractCompleteObjects` rather than
+`extractBalancedSpan` alone to recover anything once the outer wrapper object is truncated).
