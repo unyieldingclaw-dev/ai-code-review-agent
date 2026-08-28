@@ -1,60 +1,16 @@
 {
-  "task": "Record per-SwarmRunner.run() wall time, chunk size, effective timeout, and per-agent elapsed permanently -- to stderr and to the ReviewResult envelope, so the numbers reach the ai-review-findings CI artifact. (reopened to remediate code-review findings: retry-inflated elapsed, markdown setext heading, false comment rationale)",
+  "task": "Release 1.15.0, publishing the per-pass timing instrumentation (#65). Minor rather than patch: adds the optional `timings` field to the public ReviewResult schema.",
   "status": "complete",
-  "created_at": "2026-08-27T14:52:45Z",
-  "expires_at": "2026-08-27T22:52:45Z",
-  "approved_by": "user (explicit 'approved' on the posted contract proposal)",
+  "created_at": "2026-08-27T22:40:00Z",
+  "expires_at": "2026-08-28T06:40:00Z",
+  "approved_by": "user (\"prepare the release PR\")",
   "scope": [
     {
-      "file": "src/core/schema.ts",
+      "file": "package.json",
       "op": "edit"
     },
     {
-      "file": "src/core/runner.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/chunkRunner.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/cli/formatter.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/mcp/formatter.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/cli/formatters/sarif.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/cli/formatters/githubAnnotations.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/runner.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/chunkRunner.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/formatters/markdown.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/formatters/sarif.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/formatters/githubAnnotations.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/mcp/formatter.test.ts",
+      "file": "package-lock.json",
       "op": "edit"
     },
     {
@@ -66,13 +22,9 @@
       "op": "edit"
     },
     {
-      "file": "src/core/timingReport.ts",
-      "op": "create"
-    },
-    {
-      "file": "tests/unit/timingReport.test.ts",
-      "op": "create"
+      "file": ".claude/contracts/active-task.json",
+      "op": "edit"
     }
   ],
-  "completed_at": "2026-08-27T21:05:00Z"
+  "completed_at": "2026-08-28T02:45:00Z"
 }
