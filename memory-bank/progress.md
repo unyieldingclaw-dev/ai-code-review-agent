@@ -20,6 +20,32 @@ lineage: []
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
+## ✅ Completed (2026-08-27, third session)
+
+**v1.15.0 released, and the repo's outward-facing information audited against the binary.** Eight
+PRs (#65–#72). Releasing was the point rather than tidiness: `review.yml` installs the _published_
+package, so until 1.15.0 shipped every CI run emitted a `findings.json` with no `timings`. The
+collection this instrumentation exists for starts now.
+
+**Three tagging incidents in one session, all recorded in `systemPatterns.md` with a guard.**
+`v1.15.0` was tagged onto `main` after a merge branch protection had rejected, naming a commit
+still reading `1.14.0`; then the _good_ tag was deleted by re-running the cleanup written minutes
+earlier for the bad one, flipping the published Release to a draft. **npm's refusal to republish an
+existing version is what limited the damage — the registry compensating for the process, not the
+process working.** Recovered by re-tagging `6e2ed34` and re-publishing.
+
+**Docs audited by diffing documentation against the binary, not by reading.** The README flag table
+matched code 27/27 both directions; agent counts, `engines.node: ">=18"` (runtime deps genuinely
+require 18) and CHANGELOG all held. Two real gaps found and fixed: `--ollama-url` and exit code `4`
+were undocumented (#68), and `agentStatus`/`testFiles` were missing from the "stable envelope"
+contract (#72) — `agentStatus` being the field that drives exit 2 and the only thing separating "no
+findings, clean" from "no findings, every agent failed". Also fixed a `.vsix`-from-Releases install
+instruction that had never been true. GitHub description, homepage and topics updated.
+
+**Branch cleanup found that squash-merge blinds git's own detection** — 0 of 11 landed branches
+reported as merged. Verified each local tip against its merged PR's `headRefOid`; one differed and
+was merely _behind_. Rule in `systemPatterns.md`.
+
 ## ✅ Completed (2026-08-27, second session)
 
 **Timing instrumentation shipped — `ReviewResult.timings`, one row per `SwarmRunner.run()` call.**
