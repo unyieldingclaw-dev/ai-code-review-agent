@@ -12,6 +12,9 @@ Second move, 2026-08-27: the parallel-execution measurements, archived to make r
 release-tag guard. The decision and its load-bearing reasons stay upstream; these are the
 numbers behind them.
 
+Third move, 2026-08-27: the prompt-wording four-confirmation narrative, archived to make room
+for the release-tagging incidents. The rule it establishes stays upstream.
+
 ## PostToolUse marker-reissue defect — reproduction (2026-08-20)
 
 **Confirmed defect (reproduced 2026-08-20):** `review-reminders-post.*` is supposed to reissue the
@@ -59,3 +62,14 @@ local Ollama inference, so there's no token-cost pressure to justify accepting t
 risk for a modest, hardware-dependent wall-clock speedup. `--parallel` remains available for
 users who've verified their own Ollama setup (e.g. more VRAM headroom, `OLLAMA_NUM_PARALLEL` > 1)
 actually benefits from it.
+
+## Prompt wording vs measured defect rate — the fourth confirmation (2026-08-21)
+
+**Prompt wording does not move a measured defect rate here — four independent confirmations.** The
+fourth was argued the other way first: the prior three were _hallucination_, whereas reporting
+deleted code looked like a _missing frame_, and supplying genuinely absent information seemed
+different in kind. It was not. An explicit instruction ("lines starting with '-' have been DELETED
+… never report a problem that exists only on a '-' line") measured **7/7 still reporting** the
+deleted defect against 8/8 before, and was reverted rather than kept as decoration. Measuring was
+still right — the datapoint beats the assumption either way — but the prior stands: reach for a
+deterministic filter, and treat prompt wording as unproven until measured.

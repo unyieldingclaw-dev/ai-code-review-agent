@@ -208,13 +208,19 @@ filters: measure, don't inspect.
   `cli/formatters/{sarif,githubAnnotations}.ts`, `mcp/formatter.ts`. `toolAvailability` missed MCP
   and `locationCheck` missed SARIF+MCP, both caught post-merge by a reader. Check MCP first: its
   reader is an LLM with no terminal to cross-check against.
-- **Tag only AFTER the release PR merges, and verify the version before tagging** (2026-08-27).
-  Three failures now: `v1.14.0` tagged from its release branch (provenance attests a commit not on
-  `main`), and `v1.15.0` tagged onto `main` after a merge that branch protection had _rejected_ —
-  so the tag pointed at a commit still reading `1.14.0`. Only npm's refusal to republish an
-  existing version stopped that one; a tag naming an unpublished version would have shipped wrong
-  content irreversibly. The rule as prose did not help, because a command already pasted does not
-  re-read it. Tag with the guard instead:
+- **Release tagging: tag only after the release PR merges, verify the version first, and re-check
+  a cleanup command against current state before re-running it** (2026-08-27). Three incidents,
+  one session: `v1.14.0` tagged from its release branch (provenance attests a commit not on
+  `main`); `v1.15.0` tagged onto `main` after a merge branch protection had _rejected_, naming a
+  commit still reading `1.14.0`; then the **good** `v1.15.0` tag deleted by re-running the cleanup
+  written minutes earlier for the bad one, flipping the published Release back to a draft.
+
+  **npm's refusal to republish an existing version limited the damage twice** — the registry
+  compensating for the process, not the process working; a tag naming an as-yet unpublished
+  version would have shipped wrong content irreversibly. Prose prevented none of them: a command
+  already pasted does not re-read the rule it violates, and **a remediation correct five minutes
+  ago is not self-evidently correct now**. Tag with the guard, which covers the version but not
+  the delete:
 
   ```powershell
   git checkout main; git pull; if ((node -p "require('./package.json').version") -eq "X.Y.Z") { git tag vX.Y.Z; git push origin vX.Y.Z } else { "ABORT: main is not at X.Y.Z" }
@@ -259,19 +265,14 @@ showing `dropped: 0` where the probe predicted 1.
   covering retries, printed against a per-attempt ceiling, reads as exceeding a limit no
   attempt approached — measured at 611.7 s vs 354.7 s, all retry. State the span in the type.
 - **A uniform verdict from a verification harness is a harness bug until proven otherwise**
-  (2026-08-27). A mutation run reported 0 failures for all 13 mutations: `--reporter=basic` was
-  removed in vitest 4, so vitest errored before running a test and the parser read empty output as
-  "passed". Same rule as the line above, in the direction that discards good tests rather than
-  keeping bad ones. Assert the harness ran (parse the `Tests N failed` line) before reading it.
+  (2026-08-27). A mutation run reported 0 failures for all 13: `--reporter=basic` was removed in
+  vitest 4, so vitest errored before running a test and the parser read empty output as "passed".
+  Assert the harness ran (parse `Tests N failed`) before reading it.
 
-**Prompt wording does not move a measured defect rate here — four independent confirmations.** The
-fourth was argued the other way first: the prior three were _hallucination_, whereas reporting
-deleted code looked like a _missing frame_, and supplying genuinely absent information seemed
-different in kind. It was not. An explicit instruction ("lines starting with '-' have been DELETED
-… never report a problem that exists only on a '-' line") measured **7/7 still reporting** the
-deleted defect against 8/8 before, and was reverted rather than kept as decoration. Measuring was
-still right — the datapoint beats the assumption either way — but the prior stands: reach for a
-deterministic filter, and treat prompt wording as unproven until measured.
+**Prompt wording does not move a measured defect rate here — four independent confirmations**, the
+fourth measured 7/7 unchanged after an instruction predicted to help. Reach for a deterministic
+filter; treat prompt wording as unproven until measured. Detail:
+[`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 **A regression test that passes against the unfixed code proves nothing.** This repo shipped an
 assertion that could not fail: `DependenciesAgent`'s calibration cases were both `expectEmpty`, so an
