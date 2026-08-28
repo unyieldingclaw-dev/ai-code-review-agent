@@ -110,7 +110,9 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
 
 ## Next Steps
 
-- **Per-agent timeout ceiling — MEASURED (2026-08-27). Do not raise it.** 12 invocations over a
+- **Per-agent timeout ceiling — MEASURED, CLOSED (2026-08-27). Do not raise it.** Numbers sent to
+  the PMB session, which recorded them at our confidence level and instructed its next session not
+  to upgrade the 616 s hedge when writing the durable record. 12 invocations over a
   4,703-line diff, `--profile security`, `--chunk`, devstral on GPU. Eleven ran well under budget
   (slowest real attempt 213.2 s against a 315.4 s ceiling, 68%). The twelfth _appeared_ to exceed
   its ceiling — `adversarial` 611.7 s against 354.7 s — and that row is a **measurement artifact,
@@ -123,6 +125,11 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
   original figure was this artifact too, though unprovable since it has no source.
   Still untested: true CPU-only. `OllamaProvider` forwards no `options`, so `num_gpu: 0` is not
   reachable per-request; it needs an Ollama server restart with `OLLAMA_NUM_GPU=0`.
+- **Release the timing instrumentation.** `main` has it (#65); npm still serves `v1.14.0`, so the
+  `Unreleased` CHANGELOG section is the next release's content. Minor, not patch: it adds the
+  optional `timings` field to the public `ReviewResult` schema. Flagged because this exact drift
+  stranded #50/#51 behind `v1.13.0` for four days while 2,185 downloads/month ran on the older
+  build. Tag only AFTER the release PR merges -- see `systemPatterns.md`.
 - **PMB 1.2.1 upgrade** — on hold: `mb upgrade` copies from PMB's **working tree**, not a tag, and
   that tree had uncommitted in-flight edits. Fixes `last-reviewed`; nothing else depends on it.
 - **Marketplace publish** (VS Code extension): explicitly DEFERRED.
@@ -136,5 +143,5 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `v1.14.0` = npm latest; timing instrumentation on `feat/timing-instrumentation`, unreleased. Commands are in
+unit tests. **Git**: `main` at `0676be4`, clean, zero open PRs. Timing instrumentation merged (#65) but **unreleased** -- npm still serves `v1.14.0`, so the `Unreleased` CHANGELOG section is the next release's content. Commands are in
 `techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass.
