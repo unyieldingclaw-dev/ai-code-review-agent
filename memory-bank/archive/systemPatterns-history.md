@@ -15,6 +15,9 @@ numbers behind them.
 Third move, 2026-08-27: the prompt-wording four-confirmation narrative, archived to make room
 for the release-tagging incidents. The rule it establishes stays upstream.
 
+Fourth move, 2026-08-27: the DependenciesAgent unfalsifiable-assertion illustration, archived
+to make room for the squash-merge branch-cleanup rule. The rule it illustrates stays upstream.
+
 ## PostToolUse marker-reissue defect — reproduction (2026-08-20)
 
 **Confirmed defect (reproduced 2026-08-20):** `review-reminders-post.*` is supposed to reissue the
@@ -73,3 +76,9 @@ different in kind. It was not. An explicit instruction ("lines starting with '-'
 deleted defect against 8/8 before, and was reverted rather than kept as decoration. Measuring was
 still right — the datapoint beats the assumption either way — but the prior stands: reach for a
 deterministic filter, and treat prompt wording as unproven until measured.
+
+## Unfalsifiable regression assertion — the DependenciesAgent case
+
+**A regression test that passes against the unfixed code proves nothing.** This repo shipped an
+assertion that could not fail: `DependenciesAgent`'s calibration cases were both `expectEmpty`, so an
+agent returning `[]` passed — proven by patching it to `return []`.

@@ -168,32 +168,26 @@ actually runs — pwsh is tried first, `.sh` is only a fallback). The matcher ca
 - Tag pushes trip the push gate too, even though they carry no diff. The marker is then the hash
   of an empty diff (`e3b0c442...`), which is legitimate — there is genuinely nothing to review.
 - **The two markers are not interchangeable and gate different commands.** `/code-review` writes
-  `.claude/.code-review-ok`, which gates `git commit`, and its hash covers `git diff HEAD`.
-  `/change-review` writes `.claude/.change-review-ok`, which gates the push, and its hash covers
-  `git diff origin/main...HEAD`. Both are needed to take a change from working tree to merged PR,
-  and the push marker must be recomputed **after** committing — the branch diff changes the moment
-  a commit exists, so a marker written pre-commit no longer matches.
+  `.claude/.code-review-ok` (gates the commit, hashes `git diff HEAD`); `/change-review` writes
+  `.claude/.change-review-ok` (gates the push, hashes `git diff origin/main...HEAD`). Both are
+  needed to get from working tree to merged PR, and the push marker must be recomputed **after**
+  committing — the branch diff changes the moment a commit exists.
 
 **A failed gated command burns its marker and forces a pointless re-review** — the post-hook that
 should reissue it never fires, because PostToolUse does not run when the tool call exits non-zero.
 Reproduction and the latent tag-push variant: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 **Do not patch these scripts here.** `review-reminders*`, `pre-push-check*`, `dangerous-commands*`,
-`check-contract*`, and `update-reviewed*` are PMB-owned (`TEMPLATE_OWNED` in `mb.sh`), overwritten
-unconditionally by `mb upgrade` — PMB's own comment on that list reads "no project customization."
-A local fix is erased on the next upgrade. Report upstream instead. PMB has a structural fix for
-this defect (Layer 1 downgraded to peek-only, with the git hook as sole marker consumer) on an
-unmerged branch.
+`check-contract*` and `update-reviewed*` are PMB-owned (`TEMPLATE_OWNED` in `mb.sh`) and overwritten
+by `mb upgrade`, so a local fix is erased on the next upgrade. Report upstream instead.
 
-**`last-reviewed` is never stamped, so `mb doctor`'s staleness check reads a dead sensor** —
-`update-reviewed.*` reads a flat `.file_path` where the payload nests it under `tool_input`. Fixed
+**`last-reviewed` is never stamped, so `mb doctor`'s staleness check reads a dead sensor.** Fixed
 in PMB 1.2.1; this repo is on 1.1.1, so it arrives with `mb upgrade`, not a local edit. Diagnosis:
 [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 **Do not "fix" this by loosening the matcher without measurement.** Anchoring to command position
-would reduce false trips, but the failure direction is _missing a real push_ (`xargs git push`, a
-push inside a loop) — silently disabling a security gate. Same rule as the `claimSupport.ts`
-filters: measure, don't inspect.
+would cut false trips, but the failure direction is _missing a real push_ — silently disabling a
+security gate. Same rule as the `claimSupport.ts` filters: measure, don't inspect.
 
 ### Stacked PRs, and Fields That Must Reach Every Formatter (learned 2026-08-26)
 
@@ -225,6 +219,12 @@ filters: measure, don't inspect.
   ```powershell
   git checkout main; git pull; if ((node -p "require('./package.json').version") -eq "X.Y.Z") { git tag vX.Y.Z; git push origin vX.Y.Z } else { "ABORT: main is not at X.Y.Z" }
   ```
+
+- **Squash-merge blinds git's own merged-detection** (2026-08-27). Every PR here squash-merges,
+  so `git branch --merged` listed **0 of 11** landed branches and `-d` refused all — a cleanup
+  trusting it does nothing, and the obvious fix (force-delete) drops the verification that made
+  forcing safe. Verify the local tip equals the merged PR's `headRefOid`; when one differs check
+  **both** directions — one here was merely _behind_ by the `main` merge `strict: true` forces.
 
 - **`gh pr merge` is denied to Claude** (`permissions.deny` in `.claude/settings.json`) and this is
   intentional. The user merges. Do not route around a denial; stop and ask.
@@ -274,9 +274,9 @@ fourth measured 7/7 unchanged after an instruction predicted to help. Reach for 
 filter; treat prompt wording as unproven until measured. Detail:
 [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
-**A regression test that passes against the unfixed code proves nothing.** This repo shipped an
-assertion that could not fail: `DependenciesAgent`'s calibration cases were both `expectEmpty`, so an
-agent returning `[]` passed — proven by patching it to `return []`.
+**A regression test that passes against the unfixed code proves nothing** — this repo shipped an
+assertion that could not fail. Illustration:
+[`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 - **Revert the fix, confirm the test fails _and that the message is the one you expect_, restore.**
   The message matters as much as the failure; it is what proves the test exercises the mechanism
