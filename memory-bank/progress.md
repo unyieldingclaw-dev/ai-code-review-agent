@@ -44,6 +44,20 @@ Two peer sessions (PMB, and the outgoing ACR session) sent the same three correc
   (all 15 `standards/*.md`) is copied only when absent. Mechanics and the specific file pair this
   will desynchronise on our next upgrade: `techContext.md`.
 
+## ✅ #78 merged, and disproved its own reasoning (2026-08-28)
+
+Squashed to `2711d4e`. It cleared the stale `main` hash from `activeContext.md` and argued, in its
+own PR body, that "a current hash belongs here, since this section exists to state current state."
+
+**That was wrong, and merging it was the disproof.** The moment #78 landed, `activeContext.md`
+claimed `874b784` while `main` was `2711d4e` — stale again, by exactly one commit, four minutes
+later. The defect is **self-invalidating, not merely decaying**: a memory-bank PR moves the very
+commit it names, so the value cannot be correct once written. Two consecutive PRs tried to keep it
+current and both shipped stale.
+
+Fixed by removing the hash rather than updating it a third time; the rule is in `systemPatterns.md`,
+with the exception that matters — a **release tag** is safe to record because nothing can move it.
+
 ## ✅ #77 merged (2026-08-28)
 
 Squashed to `874b784`; branch deleted local and remote, stale remote-tracking ref pruned. Carried the

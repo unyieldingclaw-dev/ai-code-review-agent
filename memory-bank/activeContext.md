@@ -115,8 +115,11 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `main` at `874b784`, clean, in sync, zero open PRs, no stashes, `main` the only
-local branch. Remote holds `main` plus the two long-retained orphans (`chore/agent-calibration`,
+unit tests. **Git**: clean, in sync, zero open PRs, no stashes, `main` the only local branch. **The
+`main` hash is deliberately not recorded here** — read it from `git log`. Two PRs in a row tried to
+keep it current and each was stale the moment it merged, because a memory-bank PR moves the very
+commit it names. Remote holds `main` plus the two long-retained orphans (`chore/agent-calibration`,
 `claude/plan-overview-4dg42o`) — containment cannot be proven for either, so both stay. `v1.15.0`
-tagged at `6e2ed34` (the release commit, on `main`) and published; `Unreleased` is empty. Commands
+tagged at `6e2ed34` and published; `Unreleased` is empty. That tag hash **is** recorded, and the
+distinction is the point: a release tag is immutable, a branch tip is not. Commands
 are in `techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass.
