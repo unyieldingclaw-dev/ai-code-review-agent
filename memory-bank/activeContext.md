@@ -115,7 +115,7 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `main` at `c284d57`, clean, in sync, zero open PRs, no stashes, `main` the only
+unit tests. **Git**: `main` at `874b784`, clean, in sync, zero open PRs, no stashes, `main` the only
 local branch. Remote holds `main` plus the two long-retained orphans (`chore/agent-calibration`,
 `claude/plan-overview-4dg42o`) — containment cannot be proven for either, so both stay. `v1.15.0`
 tagged at `6e2ed34` (the release commit, on `main`) and published; `Unreleased` is empty. Commands

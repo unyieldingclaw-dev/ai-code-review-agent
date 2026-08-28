@@ -44,6 +44,20 @@ Two peer sessions (PMB, and the outgoing ACR session) sent the same three correc
   (all 15 `standards/*.md`) is copied only when absent. Mechanics and the specific file pair this
   will desynchronise on our next upgrade: `techContext.md`.
 
+## ✅ #77 merged (2026-08-28)
+
+Squashed to `874b784`; branch deleted local and remote, stale remote-tracking ref pruned. Carried the
+handoff merge, the `standards/MEMORY-BANK.md` constant fix, and the four-item follow-up below.
+
+**A merge was reported before it had happened, and the check caught it.** Asked to do post-merge
+cleanup, three independent signals disagreed: `gh pr view` said `OPEN` with `mergedAt: null`,
+`origin/main` was unmoved at `c284d57`, and the branch tip was contained in no main ref. Branch
+protection turned out not to be the cause — `mergeStateStatus` was `CLEAN` and required checks
+passed; the click simply had not landed. **Deleting the local branch on the reported state would
+have discarded the only copy of three commits.** Generalisable, and the same shape as the `v1.15.0`
+tagging incident where a rejected merge went unnoticed: verify a merge against `origin/main` and the
+PR's own `mergedAt`, never against the report that it happened.
+
 ## ✅ Follow-up: the four "known, not fixed" items (2026-08-28)
 
 Two turned out to be **PMB's, and neither can reach us** — reported upstream as one defect, which
@@ -84,7 +98,9 @@ judgment call left open rather than made quietly.
 
 ## ✅ Session closed (2026-08-28)
 
-**Twelve PRs merged (#65–#76), `main` at `c284d57`, nothing half-done.** `npm run check` green, 826
+**Twelve PRs merged (#65–#76) before this entry was written, nothing half-done.** The hash that sat
+here decayed within the day — #77 landed after it, which is exactly the "record the delta, not the
+level" failure this file warns about; current `main` is in `activeContext.md`. `npm run check` green, 826
 tests across 47 files, `npm audit` clean, no open PRs, no stashes. Eight of the twelve were the
 v1.15.0 release and docs audit (#65–#72); the remaining four were memory-bank corrections (#73–#76),
 recorded below. `handoff.md` was merged into the memory bank and deleted on 2026-08-28.
