@@ -44,6 +44,44 @@ Two peer sessions (PMB, and the outgoing ACR session) sent the same three correc
   (all 15 `standards/*.md`) is copied only when absent. Mechanics and the specific file pair this
   will desynchronise on our next upgrade: `techContext.md`.
 
+## ✅ Follow-up: the four "known, not fixed" items (2026-08-28)
+
+Two turned out to be **PMB's, and neither can reach us** — reported upstream as one defect, which
+PMB confirmed in their own tree and extended:
+
+- Their `templates/memory-bank/README.md` handoff-threshold fix (80% → 40%, in `2052c3c`) is in
+  **neither** ownership array. `memory-bank/*` is init-only, so it reaches new projects only —
+  silently, with no diff notice. Our copy will read 80% against a `CLAUDE.md` reading 40%
+  indefinitely.
+- Their `standards/MEMORY-BANK.md` `=50` fix is real and correct upstream, and `ADVISORY_CREATE`
+  means it can never arrive either. We fixed our copy independently the same day; **two correct
+  fixes that cannot meet.**
+
+**Root cause, agreed with PMB:** ownership class answers "may the adopter customize this file" and
+is being asked to also answer "how does a correction reach them". Those are orthogonal, and
+collapsing them is why the `=50` drift survived however many upgrades. PMB added a fourth case we
+had missed (`templates/AGENTS.md`, no distribution path at all) and confirmed the
+`memory-bank-size.yml` collision guard is **filename-based**, so its stated intent — "a project with
+its own CI keeps it" — does not hold for us, whose gate is `ci.yml`. Delivery table in
+`techContext.md`. Not ours to fix; surfaced to the operator with our reasoning attached.
+
+**One finding retracted on evidence.** We had filed `standards/MEMORY-BANK.md` pointing at
+`docs/archive/` as staleness. It is correct upstream — PMB uses `docs/archive/` consistently and has
+no `memory-bank/archive/`. **We** are the divergence. Retracted to PMB directly.
+
+**The two genuinely ours are fixed.** `techContext.md` claimed the remote branch was `master` (it is
+`main`) inside a "Current State (as of 2026-06-06)" block whose every line had rotted — 19 tests
+against 826, 20 commits against 456. Fixed the way the threshold was: **the section no longer
+restates state**, it points at `npm test`, `git`, and `progress.md`. A stale per-file test table and
+a hardcoded test count in the scripts block went the same way.
+
+**And the cap pressure is structurally resolved, not trimmed.** Moving the upgrade *procedure* next
+to the upgrade *mechanics* in `techContext.md`, and the `BaseAgent` parse-stage mechanics and agent
+thinking config out of `systemPatterns.md`, took `activeContext.md` from 149/150 to 122 and
+`systemPatterns.md` from 299/300 to 276. Both now have real headroom. Neither is inside the target
+range in `README.md`, and closing that gap further would mean removing live operational rules — a
+judgment call left open rather than made quietly.
+
 ## ✅ Session closed (2026-08-28)
 
 **Twelve PRs merged (#65–#76), `main` at `c284d57`, nothing half-done.** `npm run check` green, 826

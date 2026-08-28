@@ -18,9 +18,10 @@ for the release-tagging incidents. The rule it establishes stays upstream.
 Fourth move, 2026-08-27: the DependenciesAgent unfalsifiable-assertion illustration, archived
 to make room for the squash-merge branch-cleanup rule. The rule it illustrates stays upstream.
 
-Fifth and sixth moves, 2026-08-28: the three release-tagging incidents and the
-`isPreImageOnlyEvidence` probe-vs-wiring narrative, archived to make room for the working
-conventions carried in from `handoff.md`. The rules and the guard command stay upstream.
+Fifth through seventh moves, 2026-08-28: the three release-tagging incidents, the
+`isPreImageOnlyEvidence` probe-vs-wiring narrative, and the BaseAgent parse-stage mechanics —
+the first two to make room for handoff conventions, the third to bring the file back under its
+target range. All the rules they support stay upstream.
 
 ## PostToolUse marker-reissue defect — reproduction (2026-08-20)
 
@@ -115,3 +116,28 @@ predicate unit test passed, because the predicate was correct, and a scratch pro
 it read removed lines from the raw diff instead of going through `sliceDiffByFile`. Only replaying
 a real artifact through `OrchestratorAgent.synthesize` exposed it, showing `dropped: 0` where the
 probe predicted 1.
+
+## Moved 2026-08-28 — BaseAgent 4-stage parse, stage mechanics
+
+Archived to bring `systemPatterns.md` back under its target range. The **rules** stay upstream:
+four stages, never resolve silently to "0 findings" on a response that did not parse, and
+`format:'json'` increases truncation rather than preventing it. What lives here is how each
+stage works.
+
+LLMs produce messy output. `BaseAgent.parseFindings` tries, in order:
+
+1. Parse entire response as a JSON array (or a `{"findings": [...]}` wrapped object)
+2. Parse `{"findings": [...]}` wrapped object (same try block as stage 1)
+3. Balanced-bracket extraction — find the first `[...]` span and require it to actually close,
+   handling trailing prose/code fences around the array
+4. Truncation recovery — scan the whole response for whatever complete `{...}` objects exist,
+   regardless of whether the enclosing array or a wrapper object around it ever closed. Salvages
+   findings the model finished before getting cut off instead of discarding all of them.
+
+Stages 3 and 4 share two helpers exported from `src/core/parsing.ts` — `extractBalancedSpan`
+(single balanced span) and `extractCompleteObjects` (every complete `{...}` object anywhere in
+the text, at any nesting depth, via a stack of open-brace positions rather than a depth counter
+so a stray unmatched `}` can't desync the rest of the scan). `CoverageAnalystAgent` reuses the
+same two helpers for its own two-stage parse (its schema is `{"findings":[...],"gaps":[...]}`,
+one level of nesting deeper, which is exactly why it needs `extractCompleteObjects` rather than
+`extractBalancedSpan` alone to recover anything once the outer wrapper object is truncated).

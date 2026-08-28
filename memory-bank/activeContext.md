@@ -106,33 +106,11 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
   newest tag `v1.0.4`, nothing for 1.1.x or 1.2.x, `VERSION` 1.2.1, `.pmb-version` 1.1.1. **Waiting
   cannot resolve this**; only scheduling the PMB work can, so do not poll and do not treat the tag
   as in flight. Two signals arrive separately when each becomes true: "reached `main`" and "tag
-  exists". Once the tag exists this is **two repos, two blocks**, and the `cd` paths are
-  load-bearing — giving a cross-repo command without one sent the user to the wrong repository on
-  2026-08-28.
-
-  **Check PMB's tree is clean first — this is a precondition, not a courtesy.** `mb upgrade` copies
-  from PMB's _working directory_, so uncommitted edits under `templates/` are distributed as if they
-  were the release. PMB's tree was dirty in exactly that directory on 2026-08-28.
-
-  ```powershell
-  cd "C:\Users\Mizzo\Claude\Personal-Memory-Bank"; git status --short
-  ```
-
-  ```powershell
-  cd "C:\Users\Mizzo\Claude\Personal-Memory-Bank"; git checkout v1.2.1
-  ```
-
-  ```powershell
-  cd "C:\Users\Mizzo\Claude\AI-Code-Review-Agent"; mb upgrade
-  ```
-
-  PMB must be checked out at the tag **first**, for the working-directory reason above. That leaves
-  PMB in detached HEAD — return it to its branch afterwards, or the next PMB session starts detached. Afterwards, verify `last-reviewed` actually starts stamping — the only
-  proof the dead sensor is fixed — and re-read the upgrade's own output: it overwrites
-  `TEMPLATE_OWNED` but never copies an existing `ADVISORY_CREATE` file (`techContext.md`).
-  PMB's ACR-provenance entry is now **committed but not landed** (`2052c3c`, on their
-  `fix/block-tier-case-sensitivity`, 3 commits ahead of `main`, unmerged). Background in
-  `progress.md`.
+  exists". **The procedure lives in `techContext.md`** ("`mb upgrade` — what it actually
+  overwrites"), next to the mechanics that explain why each step is there: two repos, full `cd`
+  paths, PMB's tree clean before anything else. Do not reconstruct it from memory.
+  PMB's ACR-provenance entry is **committed but not landed** (`2052c3c`, on their
+  `fix/block-tier-case-sensitivity`, unmerged). Background in `progress.md`.
 
 ## Environment Status
 

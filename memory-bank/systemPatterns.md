@@ -16,7 +16,7 @@ lineage: []
 
 # System Patterns & Architecture Decisions
 
-**Last Updated**: 2026-07-26
+**Last Updated**: 2026-08-28
 
 ## Architecture Patterns
 
@@ -49,16 +49,15 @@ file's own "record the delta, not the level" rule warns about.
 off-by-default opt-in for hardware that's been verified to benefit from it.
 
 **Rationale**: Ollama serializes `devstral:latest` inference on this hardware — measured, not
-assumed. A 2026-07-25 attempt to make parallel the default looked good on a small test and failed
-at real scale: 14 concurrent requests served near-linearly, and because each queued request's
-timeout clock starts when it is _dispatched_ rather than when Ollama begins generating, most
-agents would have timed out purely from queue wait — reproducing the "everything times out, 0
-findings" failure this tool exists to prevent. Reverted before shipping.
+assumed. A 2026-07-25 attempt to default to parallel looked good small and failed at real scale:
+a queued request's timeout clock starts when it is _dispatched_, not when Ollama begins generating,
+so most agents would time out on queue wait alone — the "everything times out, 0 findings" failure
+this tool exists to prevent. Reverted before shipping.
 
-Load-bearing premise: there is no Anthropic/Claude integration, so every run is local inference
-and there is no token-cost pressure to trade reliability for a hardware-dependent speedup.
-`--parallel` stays available for setups verified to benefit (more VRAM, `OLLAMA_NUM_PARALLEL` > 1).
-Full measurements: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
+Load-bearing premise: no Anthropic/Claude integration, so every run is local inference and there is
+no token-cost pressure to trade reliability for a hardware-dependent speedup. `--parallel` stays
+available for setups verified to benefit. Measurements:
+[`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 ### Option B — Coexistence with PMB `/code-review`
 
@@ -69,23 +68,13 @@ cloud subagents, ours is local-only. Different tradeoffs; keep both. Final — s
 
 ### BaseAgent — 4-Stage JSON Parse (2026-07-25)
 
-LLMs produce messy output. `BaseAgent.parseFindings` tries, in order:
+LLMs produce messy output, so `BaseAgent.parseFindings` degrades through four stages: whole-response
+parse, wrapped-object parse, balanced-bracket extraction, then truncation recovery that salvages
+whatever complete `{...}` objects exist even if no enclosing array ever closed. Stage mechanics and
+the two shared `src/core/parsing.ts` helpers:
+[`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
-1. Parse entire response as a JSON array (or a `{"findings": [...]}` wrapped object)
-2. Parse `{"findings": [...]}` wrapped object (same try block as stage 1)
-3. Balanced-bracket extraction — find the first `[...]` span and require it to actually close,
-   handling trailing prose/code fences around the array
-4. Truncation recovery — scan the whole response for whatever complete `{...}` objects exist,
-   regardless of whether the enclosing array or a wrapper object around it ever closed. Salvages
-   findings the model finished before getting cut off instead of discarding all of them.
-
-Stages 3 and 4 share two helpers exported from `src/core/parsing.ts` — `extractBalancedSpan`
-(single balanced span) and `extractCompleteObjects` (every complete `{...}` object anywhere in
-the text, at any nesting depth, via a stack of open-brace positions rather than a depth counter
-so a stray unmatched `}` can't desync the rest of the scan). `CoverageAnalystAgent` reuses the
-same two helpers for its own two-stage parse (its schema is `{"findings":[...],"gaps":[...]}`,
-one level of nesting deeper, which is exactly why it needs `extractCompleteObjects` rather than
-`extractBalancedSpan` alone to recover anything once the outer wrapper object is truncated).
+The rules that govern the behaviour are what matter here, and they are not optional.
 
 Every stage's recovered/parsed items still go through the same schema validation
 (`validateAndNormalizeFindings`) before being accepted. **Never** silently resolve to "0
@@ -105,14 +94,6 @@ stage 4 exists and why every `format:'json'` call site needs equivalent recovery
 ### OllamaProvider — Think-Tag Stripping
 
 `devstral` emits `<think>...</think>` blocks before the JSON answer. Strip these before any parse attempt. Adapted from `Google-Organizer/src/workers/ollamaClient.ts`.
-
-### Agent Config
-
-All agents request `think: true`, but `OllamaProvider.supportsThinking()` only honors it for
-models whose name starts with `qwen` or `deepseek-r1` — it's silently a no-op for the actual
-configured default (`devstral`), which doesn't support it. Unlike Google-Organizer (which uses
-`think: false` unconditionally), the intent is that reasoning depth matters for code review
-quality on models that support it.
 
 ### Finding Schema
 
