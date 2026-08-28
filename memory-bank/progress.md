@@ -33,6 +33,24 @@ of whatever is on disk, never a release. Their tree is currently dirty on a feat
 `v1.0.4` — the version names no tag, commit or artifact. "Blocked on upstream release" and "upstream
 has no release mechanism" are different states; only the second tells a successor to stop waiting.
 
+**Resolved 2026-08-28 — PMB will cut releases, and tagging alone unblocks us.** The operator
+decided all three open questions. Releases: **yes**, and the decisive argument was `TEMPLATE_OWNED`
+— PMB forbids adopters from patching those files locally, so "you may not fix this yourself" and
+"you get whatever was on my desk" cannot both hold. Working-tree sourcing: **not deliberate, just
+unfinished** (zero git-ref calls and no `# WHY` comment on a load-bearing distribution choice, in a
+repo carrying 180 of them); it becomes a dev-mode flag rather than the default. Dirty-tree guard:
+**refuse, with `--allow-dirty`** — warn-only was rejected as another advisory layer.
+
+**For us the tag is the actionable event, not the merge.** Once `v1.2.1` exists we
+`git checkout v1.2.1 && mb upgrade` from a clean tree at a known ref. The guard and ref-sourcing are
+hardening for the general case, not prerequisites for us — so our unblock costs one `git tag`
+upstream and zero code either side. Sequencing PMB approved: tag first, guard second, ref-sourcing
+third; "releases eventually, guard now" was rejected once the release half turned out to be the
+cheap half.
+
+**Still holding both signals:** the ACR provenance entry is still uncommitted, and nothing has
+reached `main`. PMB will signal the tag separately from the merge, since the tag is what we act on.
+
 **Corrected 2026-08-28, PMB caught it:** we also claimed `VERSION` and `.pmb-version` contradicted
 each other. They do not — `VERSION` is PMB's own version, `.pmb-version` records which version a
 consuming project was last upgraded with (verified in `mb.sh`). Two true statements. The finding
