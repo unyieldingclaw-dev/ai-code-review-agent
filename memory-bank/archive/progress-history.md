@@ -20,6 +20,12 @@ Publishing migration, and the review-gate investigation) came across when `progr
 401/400 recording the v1.13.1 release and the self-refuting-evidence artifact. Same content,
 moved, nothing deleted.
 
+Fifth move, 2026-08-27: the last 2026-08-21 section came across when `progress.md` reached
+429/400 recording the timing-instrumentation work. Same content, moved, nothing deleted.
+
+Sixth move, 2026-08-27: the 2026-08-21 third-session entry came across when `progress.md`
+reached 402/400 recording the code-review remediation. Same content, moved, nothing deleted.
+
 ## ✅ Completed (2026-08-18)
 
 ### Audit remediation Batches 1-8 — Tier 1/2 fixes verified, implemented, tested, and committed
@@ -1193,3 +1199,109 @@ bounded:** `timeout-minutes: 45` (tool worst case ~90 min; observed 4–8.5) plu
 docs-only PRs — backstops; root cause is an unsupervised runner, environment-side. Left open at the
 time: `license-clean` resolving `commander` from this repo's lockfile — **closed later the same day,
 see the section above.**
+
+## ✅ Completed (2026-08-21, later session)
+
+**Both items PR #42 deferred are closed** (PR #42 merged as `a56d007` first).
+
+**`'partial'` added to `ToolAvailability`.** PR #42 routed a partial gitleaks scan to the LLM but
+labelled it `'unavailable-llm-fallback'`, which asserts the tool never ran — false, and it points a
+reader at installing a tool they already have instead of asking why files were skipped. A small
+honesty bug introduced while fixing a larger one. `SecretsAgent` now reports `'partial'` when
+gitleaks covered some files and the LLM covered the rest.
+
+The deferral rationale recorded in PR #42 — that `'partial'` "would ripple into the markdown/SARIF/
+MCP consumers" — **was wrong, and was checked rather than inherited.** `formatter.ts` is the only
+site that branches on the value; `sarif.ts:109` and `chunkRunner.ts:150` pass the object through
+opaquely, `src/mcp/` never read it _at all_ (fixed in the session above — that silence was itself a
+defect, just not a compile-breaking one), `runner.ts`'s `recordToolAvailability` is value-agnostic, and
+no exhaustive `switch` exists (confirmed by a clean `typecheck` after widening the union). The
+ripple was one `filter` plus one new note. The stale comments asserting otherwise are removed —
+they would otherwise keep deferring the same work. `ComplexityAgent` deliberately gets no
+`'partial'` handling: `complexity.ts:58` passes all files to lizard in one invocation, so there is
+no per-file skip to report.
+
+The formatter renders `'partial'` as its own note rather than folding it into the degraded list,
+because the degraded message says the tool is not installed and tells the reader to install it —
+precisely the wrong advice here.
+
+**`license-clean` decoupled from ACR's own lockfile.** It passed only because `commander` happens
+to be a real dependency of this repo, so it asserted against this repo's incidental dependency set
+rather than the mechanism; dropping the dependency would have silently reverted it to the
+model-recall configuration that measured 6/10 FAILING. Now runs against
+`license-clean-lockfile.json` via `projectPathFixture`. This was the last of the two calibration
+cases coupled to this repo's own state; `dependencies` was closed in PR #42.
+
+**The fixture needed its own unit test, and the reason is worth keeping.** An opponent audit found
+`licenseCompliance.ts:35` short-circuits before reading the lockfile whenever the LLM returns zero
+findings — so the fixture is exercised only on runs where the model misfires, and `calibrate.yml` is
+weekly, not a PR gate. Nothing deterministic pinned it. Dropping the fixture's `license` field would
+have silently reverted `license-clean` to model recall (6/10 FAILING) and surfaced only as
+calibration flakiness — the exact misattribution this line of work exists to prevent. Closed with a
+`licenseFacts.test.ts` case, confirmed to fail (`expected null to be 'MIT'`) when the field is
+removed.
+
+Every assertion added here was confirmed to FAIL against the pre-change code before being trusted —
+the partial-scan one with `expected 'unavailable-llm-fallback' to be 'partial'`, exactly one test,
+no collateral. 728 tests · typecheck/build/format/lint green.
+
+**Review notes.** A history-lens reviewer called the reversal of PR #42's decision a regression and
+claimed the ripple "manifested exactly as predicted"; that was checked and is false — zero SARIF and
+zero MCP files changed, 1 of 3 named consumers. Its valid half was that the code carried no rebuttal
+to the one-commit-old decision, now fixed in `secrets.ts`. A bug-lens reviewer claimed the early
+return leaves `lastToolAvailability` unassigned; false — the branch assigns `'used'` itself, and an
+existing test covers that exact state. ACR's own security profile returned 3 findings, all triaged
+as false positives or pre-existing (its "XSS" flag is on a string built from a hardcoded label map).
+
+## ✅ Completed (2026-08-21, third session)
+
+**Both open risks from PR #43 closed, plus the conventions promoted to `systemPatterns.md`.**
+
+**MCP output ignored `toolAvailability` entirely.** `formatMcpOutput` read only `agentStatus` and
+`truncation`, so a partial gitleaks scan, a not-installed tool, and a fully clean tool run were
+identical to the calling LLM — the reader least able to notice, having no terminal output to fall
+back on. This was the same defect class MCP had already been fixed for once (agent failure and
+truncation, in the 15-phase audit remediation); tool availability was simply never added.
+
+**The fix deliberately does NOT reuse the existing `warnings` array**, and that is the design
+decision worth keeping. `warnings` gates the headline (`"No findings, but the review was
+incomplete"`). A failed agent or truncated diff earns that headline; a missing optional tool does
+not — the agent ran in a documented degraded mode and returned a real result. Folding them together
+would have marked every clean run "incomplete" for anyone who simply has not installed lizard,
+training the caller to ignore the warning that actually matters. `cli/formatter.ts` already drew
+that line; MCP now matches it. Tool notes render in the body without touching the headline.
+
+**`chunkRunner` merged `toolAvailability` last-chunk-wins**, so a `'partial'` first chunk followed
+by a clean second chunk reported a COMPLETED scan — re-creating at the chunk layer the exact false
+claim `'partial'` had just removed at the agent layer. Now merged: any disagreement between chunks
+collapses to `'partial'`, and `'not-applicable'` is neutral (ignored unless it is the only value, so
+a chunk with no manifest changes cannot degrade a verdict npm audit legitimately earned elsewhere).
+
+An earlier draft of that rule carried an `else 'unavailable-llm-fallback'` branch for mixed sets.
+**No input can reach it** — a mixed set is ≥2 distinct values from
+`{used, partial, unavailable-llm-fallback}`, and every such pair contains `used` or `partial`. Found
+by re-reading the design before implementing, not by testing. `policy`/`filteredFiles`/`context`
+stay last-chunk-wins on purpose: none of them asserts anything about coverage.
+
+**`TOOL_LABELS` moved to `schema.ts`** next to `ToolAvailabilityMetadata`. `cli/formatter.ts`'s own
+comment already warned that two hand-typed copies of the tool-key list can silently drift; adding
+MCP as a third consumer with its own copy would have repeated exactly that mistake. Keying off
+`keyof ToolAvailabilityMetadata` makes a new tool integration a compile error until every renderer
+accounts for it.
+
+**Generalisable lesson from the deferral that held `'partial'` back: a rationale recorded in a code
+comment is a claim, not a finding.** The comment asserted a markdown/SARIF/MCP ripple that would
+make the change expensive; only one site actually branched on the value. Re-check an inherited
+rationale before treating it as settled.
+
+**Falsification found a weak test.** Of six new chunk-merge tests, only two failed against
+last-chunk-wins. The `'not-applicable'` neutrality test had the substantive value in the _last_
+chunk, where last-chunk-wins gives the same answer — so it was a guard test, not a regression test.
+Reordering it made it falsify (`expected 'not-applicable' to be 'used'`), bringing the count to
+three. The five MCP tests all failed correctly. **741 tests** · typecheck/build/format/lint green.
+
+**Conventions promoted to `systemPatterns.md`** from `activeContext.md` (volatile, and the wrong
+home for stable rules): the `PreToolUse` marker-timing rule, the fact that the commit and push
+markers are distinct and the push marker must be recomputed _after_ committing, and a new section on
+verifying a regression test fails — including the ordering trap above and the point that the failure
+_message_ matters as much as the failure.

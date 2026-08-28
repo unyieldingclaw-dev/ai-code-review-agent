@@ -229,6 +229,11 @@ filters: measure, don't inspect.
   `cli/formatters/{sarif,githubAnnotations}.ts`, `mcp/formatter.ts`. `toolAvailability` missed MCP
   and `locationCheck` missed SARIF+MCP, both caught post-merge by a reader. Check MCP first: its
   reader is an LLM with no terminal to cross-check against.
+- **Tag only AFTER the release PR merges** (2026-08-27). `v1.14.0` was tagged from the release
+  branch, so its provenance attests a commit that is not on `main`. Content is identical and it is
+  not worth fixing, but a pushed tag publishes irreversibly — do not repeat it.
+- **`gh pr merge` is denied to Claude** (`permissions.deny` in `.claude/settings.json`) and this is
+  intentional. The user merges. Do not route around a denial; stop and ask.
 
 ### Falsify Before You Trust It (2026-08-21, reconfirmed through 2026-08-27)
 
@@ -252,6 +257,14 @@ showing `dropped: 0` where the probe predicted 1.
   `claimSupport` unit tests still pass.
 - **Distrust a probe that agrees with you.** If a scratch script and the real pipeline disagree, the
   pipeline is right. Import the actual exported function rather than reimplementing it.
+- **A duration is not a measurement until you say what it spans** (2026-08-27). Wall time
+  covering retries, printed against a per-attempt ceiling, reads as exceeding a limit no
+  attempt approached — measured at 611.7 s vs 354.7 s, all retry. State the span in the type.
+- **A uniform verdict from a verification harness is a harness bug until proven otherwise**
+  (2026-08-27). A mutation run reported 0 failures for all 13 mutations: `--reporter=basic` was
+  removed in vitest 4, so vitest errored before running a test and the parser read empty output as
+  "passed". Same rule as the line above, in the direction that discards good tests rather than
+  keeping bad ones. Assert the harness ran (parse the `Tests N failed` line) before reading it.
 
 **Prompt wording does not move a measured defect rate here — four independent confirmations.** The
 fourth was argued the other way first: the prior three were _hallucination_, whereas reporting

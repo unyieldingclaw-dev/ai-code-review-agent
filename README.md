@@ -438,10 +438,26 @@ Every `--format json` response includes a stable envelope:
   "toolVersion": "1.14.0",
   "profile": "change-review",
   "findings": [],
-  "summary": { "totalFindings": 0, "bySeverity": {}, "byAgent": {}, "durationMs": 0 },
+  "summary": { "totalFindings": 0, "bySeverity": {}, "byAgent": {}, "durationMs": 300000 },
   "sanitizer": { "enabled": true, "applied": false, "redactedLines": 0, "warnings": [] },
   "policy": { "agentsSkipped": [], "reason": {} },
-  "context": { "mode": "memory-bank", "filesLoaded": [], "truncated": false, "estimatedTokens": 0 }
+  "context": { "mode": "memory-bank", "filesLoaded": [], "truncated": false, "estimatedTokens": 0 },
+  "timings": [
+    {
+      "diffLines": 900,
+      "effectiveTimeoutMs": 240000,
+      "durationMs": 300000,
+      "agents": [
+        {
+          "name": "security",
+          "elapsedMs": 121300,
+          "attemptMs": 121300,
+          "attempts": 1,
+          "status": "ok"
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -449,6 +465,27 @@ Every `--format json` response includes a stable envelope:
 - `profile` is `null` when `--agents` was used instead of `--profile`.
 - `policy` only appears when at least one agent was skipped by policy rules.
 - `context` only appears when `--context memory-bank` is active.
+- `timings` carries **one row per review pass**. Without `--chunk` there is exactly one; with
+  `--chunk` there is one per chunk, concatenated in order — never summed. Every result this tool
+  produces has the field; it is optional in the schema only because results archived before it
+  existed do not. `summary.durationMs` remains the aggregate across all passes.
+
+  Read it per row. `effectiveTimeoutMs` is the ceiling that pass's agents were held to. By
+  default it scales with `diffLines`, so it legitimately differs between rows; passing `--timeout`
+  disables scaling and every row then shows the value you set. Each agent carries **two**
+  durations, and the difference matters:
+
+  - `attemptMs` — the **longest** single attempt. **This is the only one comparable to
+    `effectiveTimeoutMs`**, because the timeout is applied per attempt. Longest rather than last,
+    so a slow attempt followed by a quick successful retry still shows the slow one.
+  - `elapsedMs` — wall time the caller waited, spanning every retry attempt plus the backoff
+    between them. With `attempts > 1` it can exceed the ceiling without any attempt approaching it.
+
+  So to answer "did any agent come close to its timeout?", compare `attemptMs` against
+  `effectiveTimeoutMs` and check `status`. For `status: "timeout"`, `attemptMs` is the ceiling
+  itself rather than how long the agent would have taken. A run-level summary of each pass is also
+  written to stderr as that pass completes, so a long chunked run reports progress instead of only
+  at the end; the per-agent detail above is in the envelope only.
 
 ## Development
 

@@ -38,7 +38,7 @@ swallowed-exception, SQL NULL-error, fabricated licenses. Prompt-only fixes were
 three agents and failed every time — for `license` one made it _worse_ (6/10 → 9/10). Details in
 `progress.md`.
 
-**Verified state:** 789 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
+**Verified state:** 810 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
 calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
 use `grep "orchestrator] dropped"` to tell a real filter regression from model variance. Target one
 case with `CALIBRATION_CASE=name1,name2` rather than running all 21.
@@ -94,7 +94,7 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
 - `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
 - Calibration CI: self-hosted runner, 20min timeout (nondeterminism noted under Verified state).
-- **789 unit tests**; `npm audit` clean. `npm run test:docker` is the fallback when native modules
+- **810 unit tests**; `npm audit` clean. `npm run test:docker` is the fallback when native modules
   will not load (Smart App Control) or CI is unreliable.
 - `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
   LLM entirely; `ReviewResult.toolAvailability` surfaces degraded and partial runs (markdown, SARIF,
@@ -103,21 +103,26 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
 - `vscode-extension/src/runner.ts`: 5-minute wall-clock subprocess timeout
 - `src/core/contextLoader.ts`: emits stderr warning when `nomic-embed-text` unavailable
 - **GitHub repo**: https://github.com/unyieldingclaw-dev/ai-code-review-agent
-- **npm**: `ai-review-agent@1.13.1` via Trusted Publishing (OIDC), SLSA v1 provenance attached;
+- **npm**: `ai-review-agent@1.14.0` via Trusted Publishing (OIDC), SLSA v1 provenance attached;
   `main` and npm are in sync. `release.yml` has no npm secret dependency — `id-token: write` + the
   Trusted Publisher relationship on npmjs.com suffices; `npm install -g npm@latest` runs early
   (OIDC needs npm >= 11.5.1).
 
 ## Next Steps
 
-- **Per-agent timeout ceiling — blocked; the figure behind it is UNSOURCED (2026-08-27).** The
-  "616 s against a 282,240 ms ceiling" long recorded here as a PMB finding is not in PMB's record
-  at all — they grepped their whole repo and found zero hits, hold no per-agent timings or chunk
-  count, and declined to reconstruct it. **Do not raise the ceiling on those numbers.** The reading
-  was never settled either (616 s is ambiguous between one invocation and the aggregate over ~20–36
-  of them). To unblock, instrument rather than argue: log elapsed time per `SwarmRunner.run()`
-  alongside `chunkLines`, reproduce CPU-only via `OLLAMA_NUM_GPU=0`. Full analysis in
-  `progress.md`. **Do not pick a new number by reasoning** — unmeasured tuning here has backfired.
+- **Per-agent timeout ceiling — MEASURED (2026-08-27). Do not raise it.** 12 invocations over a
+  4,703-line diff, `--profile security`, `--chunk`, devstral on GPU. Eleven ran well under budget
+  (slowest real attempt 213.2 s against a 315.4 s ceiling, 68%). The twelfth _appeared_ to exceed
+  its ceiling — `adversarial` 611.7 s against 354.7 s — and that row is a **measurement artifact,
+  not an agent running long**: stderr shows `failed (attempt 1/2): fetch failed — retrying`, so
+  611.7 s is wall time across two attempts plus backoff. No single invocation came near its
+  ceiling. The real fault in that row is `fetch failed` (Ollama dropping the connection under
+  load), which is resource pressure, already recorded as separate from our abort path.
+  **Send PMB these numbers.** Note the correspondence with their unsourced "616 s": same
+  magnitude, same agent-failure mode (`fetch failed`), same retry mechanism — suggestive that the
+  original figure was this artifact too, though unprovable since it has no source.
+  Still untested: true CPU-only. `OllamaProvider` forwards no `options`, so `num_gpu: 0` is not
+  reachable per-request; it needs an Ollama server restart with `OLLAMA_NUM_GPU=0`.
 - **PMB 1.2.1 upgrade** — on hold: `mb upgrade` copies from PMB's **working tree**, not a tag, and
   that tree had uncommitted in-flight edits. Fixes `last-reviewed`; nothing else depends on it.
 - **Marketplace publish** (VS Code extension): explicitly DEFERRED.
@@ -131,5 +136,5 @@ blocker reports 1 (`src/cli/index.ts:422-437`, deliberate — the consequence is
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `main` at `031210c` = `v1.14.0` = npm latest. Commands are in
+unit tests. **Git**: `v1.14.0` = npm latest; timing instrumentation on `feat/timing-instrumentation`, unreleased. Commands are in
 `techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass.

@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { runChunked, splitByFileBoundary } from '../../src/core/chunkRunner.js'
-import type { SwarmRunner } from '../../src/core/runner.js'
+import { SwarmRunner } from '../../src/core/runner.js'
+import { DEFAULT_CONFIG } from '../../src/core/config.js'
+import type { AgentName } from '../../src/core/schema.js'
+import type { LLMProvider } from '../../src/core/llm/provider.js'
 import type { ReviewResult } from '../../src/core/schema.js'
 
 function makeResult(overrides: Partial<ReviewResult> = {}): ReviewResult {
@@ -27,6 +30,120 @@ function makeMultiFileDiff(fileCount: number, linesPerFile = 2500): string {
     makeFileDiff(`file${i}.ts`, linesPerFile)
   ).join('\n')
 }
+
+// WIRING SEAM, not a predicate test. Every other test in this describe hands runChunked a mocked
+// `run`, which proves mergeResults concatenates whatever it is given but proves nothing about
+// whether a real SwarmRunner actually produces those rows, or whether the field survives the trip.
+// That is the exact gap that let isPreImageOnlyEvidence ship inert: its predicate tests all
+// passed, and so did a scratch probe, because neither went through the real path. Only the LLM
+// is mocked here; preprocessing, timeout scaling, the progress channel and the merge are real.
+describe('runChunked timing through a real SwarmRunner', () => {
+  it('produces one real row per chunk, each with its own line count and ceiling', async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue('[]'),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const maxDiffLines = 2000
+    const runner = new SwarmRunner(
+      { ...DEFAULT_CONFIG, agents: ['security'] as AgentName[], maxDiffLines },
+      provider
+    )
+    // Deliberately different sizes: identical chunks would pass even if every row were a copy
+    // of the first one.
+    const diff = [makeFileDiff('a.ts', 2500), makeFileDiff('b.ts', 3500)].join('\n')
+
+    const merged = await runChunked(runner, { diff }, maxDiffLines, 15)
+
+    expect(merged.timings).toHaveLength(2)
+    const [first, second] = merged.timings!
+    // Each chunk is truncated to maxDiffLines by the real preprocessDiff, and both oversized
+    // sections land there -- what matters is that two distinct rows survive with real agent
+    // entries, not one merged row.
+    expect(first!.diffLines).toBe(maxDiffLines)
+    expect(second!.diffLines).toBe(maxDiffLines)
+    expect(first!.agents.map((a) => a.name)).toEqual(['security'])
+    expect(second!.agents.map((a) => a.name)).toEqual(['security'])
+    expect(first!.effectiveTimeoutMs).toBeGreaterThan(0)
+    // The aggregate is still available for anyone who wants it -- it just is not the only thing
+    // available any more.
+    expect(merged.summary.durationMs).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('runChunked timing rows', () => {
+  // REGRESSION. `summary.durationMs` directly beside this IS summed, and summing is what makes a
+  // chunked run unreadable: the agent timeout applies per run() call, so an aggregate larger than
+  // any ceiling looks like a timeout problem whether or not one exists. The three chunks carry
+  // distinct, non-uniform values so a sum, a mean, and a last-chunk-wins read each produce a
+  // different answer from the concatenation asserted here.
+  it('concatenates one row per chunk instead of summing them', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({
+          summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 100 },
+          timings: [
+            {
+              diffLines: 900,
+              effectiveTimeoutMs: 261000,
+              durationMs: 100,
+              agents: [
+                { name: 'security', elapsedMs: 60, attemptMs: 60, attempts: 1, status: 'ok' },
+              ],
+            },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResult({
+          summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 250 },
+          timings: [
+            {
+              diffLines: 1500,
+              effectiveTimeoutMs: 315000,
+              durationMs: 250,
+              agents: [
+                {
+                  name: 'security',
+                  elapsedMs: 240,
+                  attemptMs: 240,
+                  attempts: 1,
+                  status: 'timeout',
+                },
+              ],
+            },
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        makeResult({
+          summary: { totalFindings: 0, bySeverity: {}, byAgent: {}, durationMs: 50 },
+          timings: [
+            {
+              diffLines: 300,
+              effectiveTimeoutMs: 207000,
+              durationMs: 50,
+              agents: [
+                { name: 'security', elapsedMs: 30, attemptMs: 30, attempts: 1, status: 'ok' },
+              ],
+            },
+          ],
+        })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(3) }, 2000, 15)
+
+    expect(merged.timings).toHaveLength(3)
+    expect(merged.timings!.map((t) => t.diffLines)).toEqual([900, 1500, 300])
+    expect(merged.timings!.map((t) => t.durationMs)).toEqual([100, 250, 50])
+    expect(merged.timings!.map((t) => t.effectiveTimeoutMs)).toEqual([261000, 315000, 207000])
+    // The chunk that hit its ceiling stays individually identifiable -- the whole point.
+    expect(merged.timings![1]!.agents[0]!.status).toBe('timeout')
+    // Guard, not regression: the pre-existing aggregate contract is unchanged by this field.
+    expect(merged.summary.durationMs).toBe(400)
+  })
+})
 
 describe('runChunked', () => {
   it('splits a diff into one chunk per file section and calls run() once per chunk', async () => {

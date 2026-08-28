@@ -1,5 +1,6 @@
 import type { ReviewResult, Severity } from '../core/schema.js'
 import { TOOL_LABELS, toolsWithAvailability } from '../core/schema.js'
+import { timingLabel, timingSentence } from '../core/timingReport.js'
 export { formatSarif } from './formatters/sarif.js'
 export { formatGithubAnnotations } from './formatters/githubAnnotations.js'
 
@@ -26,6 +27,17 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
 
   const failedAgents = Object.entries(agentStatus ?? {}).filter(([, status]) => status !== 'ok')
   const totalAgents = Object.keys(agentStatus ?? {}).length
+
+  // Built once and pushed on BOTH exit paths, because the no-findings path below returns early
+  // -- and a run that found nothing is exactly when this block earns its place. "0 findings"
+  // and "0 findings because every agent hit the ceiling" are the two states this whole field
+  // exists to separate, and the second one only ever reaches the early-return path.
+  //
+  // The other footers (sanitizer, context, policy) remain on the findings path only. That is
+  // pre-existing behaviour, not a decision recorded anywhere, and it is arguably wrong for the
+  // sanitizer footer at least -- redactedLines is a measured count that a 0-finding run
+  // currently drops. Left alone here rather than changed in passing.
+  const timingLines = buildTimingLines(result)
 
   lines.push('# AI Code Review Report')
   lines.push('')
@@ -184,6 +196,7 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
             : 'No issues found.'
       )
     }
+    lines.push(...timingLines)
     return lines.join('\n')
   }
 
@@ -265,7 +278,32 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     lines.push(`*Policy: ${result.policy.agentsSkipped.join(', ')} skipped by agentPolicy rules.*`)
   }
 
+  lines.push(...timingLines)
+
   return lines.join('\n')
+}
+
+function buildTimingLines(result: ReviewResult): string[] {
+  if (!result.timings || result.timings.length === 0) return []
+  // The leading '' is load-bearing, not spacing. In CommonMark a line of '---' directly beneath
+  // a paragraph is a setext heading UNDERLINE, not a thematic break -- so without the blank line
+  // this block silently promoted whatever preceded it to an <h2> and swallowed its own rule.
+  // What preceded it on the no-findings path is the verdict line ("No issues found." /
+  // "INCOMPLETE - reviewed 2000/12599 lines"), which two separate commits were spent getting
+  // right precisely because a skimming reader treats it as THE result.
+  //
+  // The sanitizer footer above happens to push '' first and so is safe; the context and policy
+  // footers between them do not, and exhibit this same bug today. Left alone as pre-existing
+  // rather than fixed in passing, but they are the same one-line change.
+  const lines = ['', '---']
+  for (const [i, t] of result.timings.entries()) {
+    // Labelled per run because under --chunk each row is a separate agent-timeout budget. A
+    // reader given one merged number cannot tell a slow review from agents nearing their ceiling
+    // -- different problems with different fixes (--chunk vs --timeout).
+    lines.push(`*${timingLabel(i, result.timings.length)}: ${timingSentence(t)}*`)
+  }
+  lines.push('*Full per-agent timings are in the `--format json` output.*')
+  return lines
 }
 
 export function formatJson(result: ReviewResult): string {

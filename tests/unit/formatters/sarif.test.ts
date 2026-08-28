@@ -302,3 +302,47 @@ describe('locationCheck signalling', () => {
     expect(out.runs[0].results[0].properties).not.toHaveProperty('locationCheck')
   })
 })
+
+describe('formatSarif timing', () => {
+  it('carries every per-run row in run-level properties, not a rendered summary', () => {
+    const sarif = JSON.parse(
+      formatSarif(
+        makeResult({
+          timings: [
+            {
+              diffLines: 900,
+              effectiveTimeoutMs: 261000,
+              durationMs: 100,
+              agents: [
+                { name: 'security', elapsedMs: 60, attemptMs: 60, attempts: 1, status: 'ok' },
+              ],
+            },
+            {
+              diffLines: 1500,
+              effectiveTimeoutMs: 315000,
+              durationMs: 250,
+              agents: [
+                {
+                  name: 'security',
+                  elapsedMs: 315000,
+                  attemptMs: 315000,
+                  attempts: 1,
+                  status: 'timeout',
+                },
+              ],
+            },
+          ],
+        })
+      )
+    )
+    const timings = sarif.runs[0].properties.timings
+    expect(timings).toHaveLength(2)
+    expect(timings[1].diffLines).toBe(1500)
+    expect(timings[1].agents[0].status).toBe('timeout')
+  })
+
+  it('omits the timings property when a result carries none', () => {
+    const sarif = JSON.parse(formatSarif(makeResult({})))
+    expect(sarif.runs[0].properties.timings).toBeUndefined()
+  })
+})

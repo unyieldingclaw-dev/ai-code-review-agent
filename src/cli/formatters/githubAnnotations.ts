@@ -48,6 +48,22 @@ function findingToAnnotation(f: Finding): string {
   return `::${level} file=${f.file},line=${f.line}${endLine},title=${title}::${message}`
 }
 
+// `result.timings` is DELIBERATELY not rendered here, and this comment exists so the next reader
+// can tell that from an oversight -- `ReviewResult.toolAvailability` and `Finding.locationCheck`
+// each reached some surfaces and silently missed others, which is why every new field is now
+// checked against all four formatters.
+//
+// This is an exception to a rule written without exceptions, so the reasons are on the record:
+//   1. Annotations are per-finding review comments on a PR. Timing is a diagnostic about the run,
+//      not a defect in the code under review, and a ::notice:: on every PR is noise charged to
+//      every reader to serve the rare one investigating the timeout ceiling.
+//   2. The actionable half of the signal is already on this surface. An agent that hits the
+//      ceiling is `agentStatus.<name> === 'timeout'`, which already emits a ::warning:: line
+//      below. What `timings` adds beyond that is measurement, not a call to action.
+//   3. The readers who can act on the measurement reach it elsewhere: the markdown and MCP
+//      reports render it, SARIF carries it machine-read in run properties, and `--format json`
+//      passes the raw field through to the findings.json CI archives.
+// Revisit only if a PR reviewer turns out to need per-run timings inline in a diff.
 export function formatGithubAnnotations(result: ReviewResult): string {
   const failedAgents = Object.entries(result.agentStatus ?? {}).filter(
     ([, status]) => status !== 'ok'

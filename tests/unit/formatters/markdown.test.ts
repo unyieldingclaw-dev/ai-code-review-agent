@@ -468,3 +468,144 @@ describe('location-unverified marker', () => {
     }
   })
 })
+
+describe('formatMarkdown timing', () => {
+  const oneRun = {
+    timings: [
+      {
+        diffLines: 900,
+        effectiveTimeoutMs: 240000,
+        durationMs: 300000,
+        agents: [
+          {
+            name: 'security' as const,
+            elapsedMs: 10_000,
+            attemptMs: 10_000,
+            attempts: 1,
+            status: 'ok' as const,
+          },
+          {
+            name: 'performance' as const,
+            elapsedMs: 121_300,
+            attemptMs: 121_300,
+            attempts: 1,
+            status: 'ok' as const,
+          },
+          {
+            name: 'design' as const,
+            elapsedMs: 20_000,
+            attemptMs: 20_000,
+            attempts: 1,
+            status: 'ok' as const,
+          },
+        ],
+      },
+    ],
+  }
+
+  it('renders the run timing, naming the slowest agent and the ceiling it ran under', () => {
+    const md = formatMarkdown(makeResult(oneRun))
+    expect(md).toContain(
+      '*Timing: 900 diff lines, 3 agents, 300.0s total, ceiling 240.0s/agent, slowest performance 121.3s*'
+    )
+    expect(md).toContain('Full per-agent timings are in the `--format json` output.')
+  })
+
+  // REGRESSION. Under --chunk each row is a separate timeout budget, so an unlabelled list of
+  // rows reads as one review reported several times. The label is what makes "run 2 of 9 came
+  // close to its ceiling" a statement a reader can make at all.
+  it('labels each row with its run number when a chunked review produced several', () => {
+    const md = formatMarkdown(
+      makeResult({
+        timings: [
+          { diffLines: 900, effectiveTimeoutMs: 261000, durationMs: 100, agents: [] },
+          { diffLines: 1500, effectiveTimeoutMs: 315000, durationMs: 250, agents: [] },
+        ],
+      })
+    )
+    expect(md).toContain('*Timing (run 1/2): 900 diff lines')
+    expect(md).toContain('*Timing (run 2/2): 1500 diff lines')
+    expect(md).not.toContain('*Timing: ')
+  })
+
+  // REGRESSION. A timed-out agent's elapsedMs IS the ceiling, so without the explicit label it
+  // renders as a completion time that merely happens to sit at the limit -- the exact misreading
+  // that lets an unsourced number look like evidence the ceiling is too low.
+  it('names the agents that hit the ceiling rather than leaving it to be inferred', () => {
+    const md = formatMarkdown(
+      makeResult({
+        timings: [
+          {
+            diffLines: 1500,
+            effectiveTimeoutMs: 240000,
+            durationMs: 600000,
+            agents: [
+              {
+                name: 'security',
+                elapsedMs: 240000,
+                attemptMs: 240000,
+                attempts: 1,
+                status: 'timeout',
+              },
+              { name: 'design', elapsedMs: 5000, attemptMs: 5000, attempts: 1, status: 'ok' },
+            ],
+          },
+        ],
+      })
+    )
+    expect(md).toContain('hit the ceiling: security')
+  })
+
+  it('omits the timing block entirely when a result carries no timings', () => {
+    expect(formatMarkdown(makeResult({}))).not.toContain('Timing')
+  })
+})
+
+describe('formatMarkdown timing separator', () => {
+  // REGRESSION, and the reason it is asserted on adjacency rather than with toContain: in
+  // CommonMark a line of '---' directly beneath a paragraph is a setext heading UNDERLINE, not a
+  // thematic break. The timing block used to open with a bare '---', which silently promoted the
+  // verdict line to an <h2> and swallowed its own rule. Every existing assertion on that line
+  // used toContain, so all of them passed while the rendered output was wrong.
+  const rendersRuleNotHeading = (md: string) => {
+    const lines = md.split('\n')
+    const i = lines.findIndex((l) => l.startsWith('*Timing'))
+    expect(i).toBeGreaterThan(0)
+    expect(lines[i - 1]).toBe('---')
+    // The line before the rule must be blank, or the rule is a heading underline instead.
+    expect(lines[i - 2]).toBe('')
+  }
+
+  it('does not turn the clean-run verdict into a heading', () => {
+    rendersRuleNotHeading(
+      formatMarkdown(
+        makeResult({
+          timings: [{ diffLines: 900, effectiveTimeoutMs: 240000, durationMs: 100, agents: [] }],
+        })
+      )
+    )
+  })
+
+  it('does not turn the INCOMPLETE verdict into a heading', () => {
+    rendersRuleNotHeading(
+      formatMarkdown(
+        makeResult({
+          truncation: { truncated: true, originalLines: 12599, keptLines: 2000 },
+          timings: [{ diffLines: 2000, effectiveTimeoutMs: 240000, durationMs: 100, agents: [] }],
+        })
+      )
+    )
+  })
+
+  it('does not turn the sanitizer footer into a heading on the findings path', () => {
+    rendersRuleNotHeading(
+      formatMarkdown(
+        makeResult({
+          findings: [makeFinding()],
+          sanitizer: { enabled: true, applied: true, redactedLines: 3, warnings: [] },
+          timings: [{ diffLines: 900, effectiveTimeoutMs: 240000, durationMs: 100, agents: [] }],
+        })
+      )
+    )
+  })
+})

@@ -314,3 +314,58 @@ describe('locationCheck signalling', () => {
     }
   })
 })
+
+describe('formatMcpOutput timing', () => {
+  const timings = [
+    {
+      diffLines: 900,
+      effectiveTimeoutMs: 240000,
+      durationMs: 300000,
+      agents: [
+        {
+          name: 'security' as const,
+          elapsedMs: 240000,
+          attemptMs: 240000,
+          attempts: 1,
+          status: 'timeout' as const,
+        },
+        {
+          name: 'design' as const,
+          elapsedMs: 20_000,
+          attemptMs: 20_000,
+          attempts: 1,
+          status: 'ok' as const,
+        },
+      ],
+    },
+  ]
+
+  it('reports timing to the calling model, naming what hit the ceiling', () => {
+    const out = formatMcpOutput(makeResult({ findings: [makeFinding('high')], timings }))
+    expect(out).toContain('Timing: 900 diff lines, 2 agents, 300.0s total, ceiling 240.0s/agent')
+    expect(out).toContain('hit the ceiling: security')
+  })
+
+  // REGRESSION. A clean run took the early return that skipped the notice block entirely, so the
+  // reader with no terminal and no artifact to open -- the only one wholly dependent on this
+  // string -- was the one told nothing. Same gap toolAvailability and locationCheck each left
+  // here before.
+  it('still reports timing on a run with no findings and no degraded tools', () => {
+    const out = formatMcpOutput(makeResult({ findings: [], timings }))
+    expect(out).toContain('No findings')
+    expect(out).toContain('Timing: 900 diff lines')
+  })
+
+  // REGRESSION for the headline gate: timing joins `notices`, which is rendered, and must never
+  // join `warnings`, which decides the headline. A slow run is not an incomplete one -- the same
+  // line toolAvailability draws, for the same reason.
+  it('does not let timing downgrade a clean headline to incomplete', () => {
+    const out = formatMcpOutput(makeResult({ findings: [], timings }))
+    expect(out).toContain('✅ No findings')
+    expect(out).not.toContain('the review was incomplete')
+  })
+
+  it('leaves the bare no-findings output untouched when a result carries no timings', () => {
+    expect(formatMcpOutput(makeResult())).toBe('## AI Code Review — ✅ No findings' + '\n')
+  })
+})

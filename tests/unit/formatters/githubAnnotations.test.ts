@@ -315,3 +315,39 @@ describe('location-unverified findings', () => {
     }
   })
 })
+
+// GUARD, not a regression test -- it passes against the pre-change code and is counted as
+// neither. It pins a deliberate exclusion: timings is the one ReviewResult field intentionally
+// absent from this surface (see the comment above formatGithubAnnotations for the three reasons).
+// Without it, a later reader applying the "every field reaches all four formatters" rule would
+// read the absence as the oversight that rule exists to catch, and "fix" it.
+describe('formatGithubAnnotations timing', () => {
+  it('deliberately emits no timing annotation, leaving the actionable half to agentStatus', () => {
+    const out = formatGithubAnnotations(
+      makeResult({
+        agentStatus: { security: 'timeout' },
+        timings: [
+          {
+            diffLines: 900,
+            effectiveTimeoutMs: 240000,
+            durationMs: 300000,
+            agents: [
+              {
+                name: 'security',
+                elapsedMs: 240000,
+                attemptMs: 240000,
+                attempts: 1,
+                status: 'timeout',
+              },
+            ],
+          },
+        ],
+      })
+    )
+    expect(out).not.toMatch(/timing/i)
+    expect(out).not.toContain('900')
+    expect(out).not.toContain('ceiling')
+    // The part a PR reviewer can act on is already here, which is why the rest is not.
+    expect(out).toContain('::warning::Agent security failed (timeout)')
+  })
+})
