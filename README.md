@@ -451,7 +451,9 @@ Every `--format json` response includes a stable envelope:
   "toolVersion": "1.15.0",
   "profile": "change-review",
   "findings": [],
+  "testFiles": [],
   "summary": { "totalFindings": 0, "bySeverity": {}, "byAgent": {}, "durationMs": 300000 },
+  "agentStatus": { "security": "ok", "correctness": "timeout" },
   "sanitizer": { "enabled": true, "applied": false, "redactedLines": 0, "warnings": [] },
   "policy": { "agentsSkipped": [], "reason": {} },
   "context": { "mode": "memory-bank", "filesLoaded": [], "truncated": false, "estimatedTokens": 0 },
@@ -476,6 +478,12 @@ Every `--format json` response includes a stable envelope:
 
 - `schemaVersion` is bumped on breaking schema changes — parse this to detect incompatible versions.
 - `profile` is `null` when `--agents` was used instead of `--profile`.
+- `agentStatus` maps each agent that ran to `"ok"`, `"timeout"`, `"parse-error"` or `"error"`.
+  **This is the field to check before trusting a clean result** — any non-`"ok"` value means that
+  agent contributed nothing, and it is what drives exit code `2`. A run can report zero findings
+  because the code is clean or because every agent failed; only this field distinguishes them.
+- `testFiles` is always present and empty unless `--suggest-tests` or `--write-tests` was passed.
+  Each entry is `{ path, content, framework }`. A default run never writes files.
 - `policy` only appears when at least one agent was skipped by policy rules.
 - `context` only appears when `--context memory-bank` is active.
 - `timings` carries **one row per review pass**. Without `--chunk` there is exactly one; with
