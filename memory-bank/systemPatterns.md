@@ -232,6 +232,12 @@ exposed it. Case: [`archive/systemPatterns-history.md`](archive/systemPatterns-h
   true; "the file is now 46,956 bytes" decays within hours, and did — three times on their side,
   twice inside the branch that wrote it. Same root as the duration lesson below: a figure recorded
   without the frame that makes it meaningful.
+- **A memory-bank file must never record the `main` hash** (2026-08-28) — the sharpest instance,
+  because it is self-invalidating rather than merely decaying. A memory-bank PR _moves the commit it
+  names_, so the value is wrong the instant it lands. Two consecutive PRs tried to keep it current
+  and both shipped stale; the second was written arguing a current hash belonged there. Read it from
+  `git log`. **Immutable identifiers are the exception** — a release tag like `v1.15.0` at `6e2ed34`
+  is safe to record precisely because nothing can move it.
 - **When a review round's findings are mostly defects introduced by the previous round's fixes,
   the change has had enough passes** (2026-08-27, named by PMB). The `elapsedMs` rounds are the
   instance, and the middle one is the whole point: round 1 found retry-inflated elapsed; round 2's
