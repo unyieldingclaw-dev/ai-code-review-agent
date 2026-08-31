@@ -1,5 +1,13 @@
 import type { ReviewResult, Severity } from '../core/schema.js'
-import { TOOL_LABELS, toolsWithAvailability } from '../core/schema.js'
+import {
+  TOOL_LABELS,
+  toolsWithAvailability,
+  agentsRanCount,
+  agentsPlannedCount,
+  earlyExitLostCoverage,
+  missedChunks,
+  isIncomplete,
+} from '../core/schema.js'
 import { timingLabel, timingSentence } from '../core/timingReport.js'
 export { formatSarif } from './formatters/sarif.js'
 export { formatGithubAnnotations } from './formatters/githubAnnotations.js'
@@ -22,11 +30,19 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
   const useEmoji = !options?.noEmoji
   const sevLabel = (s: Severity) => (useEmoji ? SEVERITY_EMOJI[s] : SEVERITY_TEXT[s])
 
-  const { findings, testFiles, summary, agentStatus, truncation } = result
+  const { findings, testFiles, summary, agentStatus, truncation, earlyExit } = result
   const lines: string[] = []
 
   const failedAgents = Object.entries(agentStatus ?? {}).filter(([, status]) => status !== 'ok')
-  const totalAgents = Object.keys(agentStatus ?? {}).length
+  const agentsRan = agentsRanCount(result)
+  // WHY the denominator is `agentsPlanned` and not `agentsRan`: agentStatus holds only agents
+  // that actually ran, so on an early exit it shrinks in step with the numerator and renders
+  // "3/3 agents" for a run that skipped twelve -- a claim of full coverage inside the banner
+  // that exists to deny it. Falling back to agentsRan keeps pre-field results (an archived
+  // findings.json, a hand-built fixture) rendering as before rather than showing "3/undefined";
+  // that fallback reproduces the old wrong denominator, which is why `incomplete` below is
+  // gated on earlyExit directly and never on the ratio.
+  const totalAgents = agentsPlannedCount(result)
 
   // Built once and pushed on BOTH exit paths, because the no-findings path below returns early
   // -- and a run that found nothing is exactly when this block earns its place. "0 findings"
@@ -62,14 +78,41 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
   // and cli/index.ts:421 sets exit code 2 -- so the process called the run degraded while its own
   // headline called it complete. That is precisely the cross-surface disagreement the test named
   // "does not render a truncated run as clean on ANY surface" exists to forbid.
-  const incomplete = truncation?.truncated || failedAgents.length > 0
+  // WHY earlyExit and a short chunk loop join this gate: they are the same defect wearing a third
+  // and fourth hat. Truncation is "part of the diff never reviewed"; a failed agent is "part of
+  // the review never performed"; --fail-fast is "the rest of the review deliberately abandoned",
+  // and a chunk loop that broke is both at once. The reader cannot act on any of them from a
+  // headline stating a plain count, and the agents that never ran are ABSENT from agentStatus
+  // rather than failed -- so `failedAgents.length` is 0 and the first two terms cannot see them.
+  const chunksMissed = missedChunks(result)
+  const incomplete = isIncomplete(result)
   const countText = `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}**`
+  // The numerator is `agentsRan`, NOT `totalAgents`. It was written as
+  // `totalAgents - failedAgents.length` back when totalAgents WAS the count of agents that ran,
+  // so the two were the same number; repointing the denominator at agentsPlanned without this
+  // would render "15/15 agents that completed" for a run that executed three -- the identical
+  // false claim, inverted.
+  //
+  // An UNKNOWN roster states no ratio at all. When `agentsPlanned` is absent -- an archived
+  // findings.json, a hand-built fixture -- `agentsPlannedCount` falls back to the count that ran,
+  // making the denominator tautologically equal the numerator: "from 3/3 agents that completed"
+  // printed beside an INCOMPLETE headline, which is the self-contradiction this change exists to
+  // remove. A missing number is reported as missing, never as agreement.
+  // The fallback denominator is trustworthy exactly when nothing was skipped: on a run that
+  // merely had agents FAIL, agentStatus holds the whole roster, so "1/3 agents that completed" is
+  // both correct and useful and predates this change. It is only an early exit that makes
+  // agentStatus a PREFIX of the roster, and only then does the fallback assert its own denominator.
+  const rosterKnown = result.agentsPlanned !== undefined || result.earlyExit === undefined
   const scope = truncation?.truncated
     ? `in ${truncation.keptLines}/${truncation.originalLines} lines reviewed`
-    : `from ${totalAgents - failedAgents.length}/${totalAgents} agents that completed`
+    : chunksMissed
+      ? `in ${chunksMissed.reviewed}/${chunksMissed.total} chunks reviewed`
+      : rosterKnown
+        ? `from ${agentsRan - failedAgents.length}/${totalAgents} agents that completed`
+        : ''
   lines.push(
     incomplete
-      ? `${useEmoji ? '⚠️ ' : ''}INCOMPLETE — ${countText} ${scope} | ${summary.durationMs}ms`
+      ? `${useEmoji ? '⚠️ ' : ''}INCOMPLETE — ${countText}${scope ? ` ${scope}` : ''} | ${summary.durationMs}ms`
       : `${countText} | ${summary.durationMs}ms`
   )
   lines.push('')
@@ -86,6 +129,37 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
         `findings past this point were never analyzed. Use --chunk to review the whole diff in ` +
         `same-size passes, or raise --max-lines to review it in one larger pass (slower per ` +
         `agent, and more likely to time out).`
+    )
+    lines.push('')
+  }
+
+  // WHY here and not with the sanitizer/context/policy footers further down: those render on the
+  // findings path only, and this banner is needed most on the path they miss -- a fail-fast run
+  // that stopped before anything survived the orchestrator returns 0 findings and exits early,
+  // which is exactly when "clean" is most misleading. Placed alongside the truncation banner for
+  // the same reason it is: both are pushed before the no-findings early return.
+  //
+  // WHY this lives in formatMarkdown rather than cli/index.ts, which appended an equivalent
+  // blockquote after the fact: a footer bolted on by one caller is invisible to every other one.
+  // The VS Code extension and any library consumer call formatMarkdown directly and got nothing,
+  // and index.ts skipped its own footer for three of the four --format values.
+  // Gated on lost coverage, not on the field: fail-fast can trip on the LAST agent, in which
+  // case nothing was skipped and there is nothing to warn about.
+  if (earlyExit && earlyExitLostCoverage(result)) {
+    const notRun = totalAgents - agentsRan
+    lines.push(
+      `${useEmoji ? '⚡ ' : ''}Fail-fast: the swarm stopped after \`${earlyExit.stoppedAt}\` ` +
+        `because a finding met the --fail-on threshold` +
+        (rosterKnown && notRun > 0 ? `, so ${notRun} of ${totalAgents} agents never ran` : '') +
+        `. This is not a full review — re-run without --fail-fast for complete coverage.`
+    )
+    lines.push('')
+  }
+
+  if (chunksMissed) {
+    lines.push(
+      `${useEmoji ? '⚠️ ' : ''}Chunked run stopped early: ${chunksMissed.reviewed} of ` +
+        `${chunksMissed.total} chunks were reviewed, so part of the diff was never analyzed.`
     )
     lines.push('')
   }
@@ -161,8 +235,18 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     const names = partialTools.map((t) => TOOL_LABELS[t]).join(', ')
     lines.push(
       `${useEmoji ? '🔧 ' : ''}Partial scan: ${names} ran but could not cover every changed ` +
-        `file — the affected agent(s) also ran the LLM over the diff so nothing was left ` +
-        `unscanned. Findings for the skipped files come from the model, not the tool.`
+        `file. ` +
+        // WHY this sentence is conditional: 'partial' now has two producers with different
+        // meanings. SecretsAgent sets it when the tool skipped files the LLM still reviewed --
+        // there, "nothing was left unscanned" is true. chunkRunner sets it when whole chunks were
+        // never reviewed by anything, and asserting the LLM covered the gap is then false, two
+        // lines below a banner saying part of the diff was never analyzed. Same status, opposite
+        // claim; the text has to follow the cause rather than the field.
+        (chunksMissed
+          ? `Part of the diff was never reviewed at all, so those files were seen by neither the ` +
+            `tool nor the model.`
+          : `The affected agent(s) also ran the LLM over the diff, so nothing was left unscanned. ` +
+            `Findings for the skipped files come from the model, not the tool.`)
     )
     lines.push('')
   }
@@ -214,14 +298,30 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
       // skimming reader, and it was contradicting its own caption. mcp/formatter.ts already refuses
       // to render a truncated run as clean; this brings the CLI in line with it, so the same state
       // does not report two different verdicts depending on which surface you read.
+      //
+      // The same reasoning extends to earlyExit and a short chunk loop, and it had to: this
+      // branch gated on truncation alone, so a --fail-fast run that surfaced nothing reached the
+      // bare "✅ No issues found." while the headline above already said INCOMPLETE. One report,
+      // two verdicts, eight lines apart — the same contradiction #51 fixed across surfaces,
+      // reappearing inside a single one.
       lines.push(
         truncation?.truncated
           ? `${useEmoji ? '⚠️ ' : ''}INCOMPLETE — reviewed ${truncation.keptLines}/${truncation.originalLines} lines. ` +
               `No issues found in that portion; the remaining ${truncation.originalLines - truncation.keptLines} ` +
               `lines were never analyzed. Re-run with --chunk for full coverage.`
-          : useEmoji
-            ? '✅ No issues found.'
-            : 'No issues found.'
+          : earlyExit && earlyExitLostCoverage(result)
+            ? `${useEmoji ? '⚠️ ' : ''}INCOMPLETE — the swarm stopped after \`${earlyExit.stoppedAt}\`. ` +
+              `No issues found by the ${agentsRan} agent(s) that ran; ` +
+              (rosterKnown
+                ? `the other ${totalAgents - agentsRan} never ran. `
+                : `the rest never ran. `) +
+              `Re-run without --fail-fast for full coverage.`
+            : chunksMissed
+              ? `${useEmoji ? '⚠️ ' : ''}INCOMPLETE — reviewed ${chunksMissed.reviewed}/${chunksMissed.total} ` +
+                `chunks. No issues found in that portion; the rest of the diff was never analyzed.`
+              : useEmoji
+                ? '✅ No issues found.'
+                : 'No issues found.'
       )
     }
     lines.push(...timingLines)

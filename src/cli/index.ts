@@ -392,7 +392,11 @@ program
           )
         }
 
-        let output =
+        // `const` now, not `let`: the only thing that ever reassigned this was the fail-fast
+        // footer appended below, and that moved into formatMarkdown. The formatters own their
+        // own output again, which is the property that was missing when a field could reach a
+        // renderer through one caller and no other.
+        const output =
           options.format === 'json'
             ? formatJson(result)
             : options.format === 'sarif'
@@ -401,15 +405,13 @@ program
                 ? formatGithubAnnotations(result)
                 : formatMarkdown(result, { noEmoji: options.emoji === false })
 
-        if (
-          result.earlyExit &&
-          options.format !== 'json' &&
-          options.format !== 'sarif' &&
-          options.format !== 'github-annotations'
-        ) {
-          const bolt = options.emoji !== false ? '⚡ ' : ''
-          output += `\n\n> ${bolt}**Fail-fast**: swarm stopped after \`${result.earlyExit.stoppedAt}\` (severity threshold met). Remaining agents were not run.\n`
-        }
+        // The fail-fast footer that used to be appended here now lives inside formatMarkdown,
+        // and each of the three formats excluded above renders earlyExit itself. Bolting it on
+        // after the fact was the defect, not the mechanism: a footer added by one caller is
+        // invisible to every other one, so the VS Code extension and any library consumer of
+        // formatMarkdown got nothing, and the exclusion list meant sarif and github-annotations
+        // got nothing either -- the field reached no formatter at all. `--format json` needs no
+        // footer because the envelope carries earlyExit verbatim.
 
         if (options.out) {
           writeFileSync(options.out, output, 'utf-8')

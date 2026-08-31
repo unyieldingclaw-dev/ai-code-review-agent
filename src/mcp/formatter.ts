@@ -1,5 +1,12 @@
 import type { Finding, ReviewResult } from '../core/schema.js'
-import { TOOL_LABELS, toolsWithAvailability } from '../core/schema.js'
+import {
+  TOOL_LABELS,
+  toolsWithAvailability,
+  agentsRanCount,
+  agentsPlannedCount,
+  earlyExitLostCoverage,
+  missedChunks,
+} from '../core/schema.js'
 import { timingLabel, timingSentence } from '../core/timingReport.js'
 
 // Only critical and high are rendered — medium/low appear in the tail only.
@@ -9,7 +16,7 @@ const SEVERITY_ICONS: Record<'critical' | 'high', string> = {
 }
 
 export function formatMcpOutput(result: ReviewResult): string {
-  const { findings, summary, agentStatus, truncation } = result
+  const { findings, summary, agentStatus, truncation, earlyExit } = result
 
   // WHY this block exists at all: this output goes back to a calling LLM (e.g. Claude Code
   // itself via the MCP tool), not a human reading a terminal -- it has no other channel to
@@ -18,9 +25,36 @@ export function formatMcpOutput(result: ReviewResult): string {
   // this function never read agentStatus/truncation at all. The markdown formatter (cli/
   // formatter.ts) already handles this correctly; this mirrors that gating logic for MCP.
   const failedAgents = Object.entries(agentStatus ?? {}).filter(([, status]) => status !== 'ok')
+  const agentsRan = agentsRanCount(result)
+  // Same denominator defect the CLI carried, in the same shape: agentStatus holds only agents
+  // that ran, so on an early exit "2/2 agent(s) failed" would describe a fifteen-agent swarm.
+  // agentsPlanned is the roster this run intended; agentsRan is the fallback for results that
+  // predate the field.
+  const totalAgents = agentsPlannedCount(result)
   const warnings: string[] = []
+  // FIRST in the array, deliberately: `warnings` drives the INCOMPLETE headline below, and this
+  // is the entry that explains why the other numbers are small. A calling LLM reading a
+  // truncated list must not lose the reason the review stopped.
+  // See earlyExitLostCoverage: a fail-fast stop on the last agent costs no coverage, and
+  // claiming "the unrun agents were not examined" when there are none is a false statement to a
+  // reader that has no other channel to check it.
+  if (earlyExit && earlyExitLostCoverage(result)) {
+    const notRun = totalAgents - agentsRan
+    warnings.push(
+      `⚠️ Fail-fast: the review stopped after \`${earlyExit.stoppedAt}\` when a finding met the ` +
+        `threshold` +
+        (notRun > 0 ? `, so ${notRun} of ${totalAgents} agents never ran` : '') +
+        `. This is a partial review — the unrun agents' domains were not examined at all.`
+    )
+  }
+  const missed = missedChunks(result)
+  if (missed) {
+    warnings.push(
+      `⚠️ Chunked review stopped early: ${missed.reviewed} of ${missed.total} chunks were ` +
+        `reviewed — the remaining chunks of the diff were never analyzed.`
+    )
+  }
   if (failedAgents.length > 0) {
-    const totalAgents = Object.keys(agentStatus ?? {}).length
     const detail = failedAgents.map(([name, status]) => `${name}: ${status}`).join(', ')
     warnings.push(
       `⚠️ ${failedAgents.length}/${totalAgents} agent(s) failed (${detail}) — results may be incomplete.`
@@ -50,7 +84,13 @@ export function formatMcpOutput(result: ReviewResult): string {
     const names = partialTools.map((t) => TOOL_LABELS[t]).join(', ')
     toolNotes.push(
       `🔧 Partial scan: ${names} covered some of the reviewed surface but not all of it — ` +
-        `findings for the remainder came from the model, not the tool.`
+        // Conditional for the same reason as cli/formatter.ts: chunkRunner now also sets 'partial'
+        // when whole chunks went unreviewed, and "the model covered the remainder" is false there.
+        // This surface's reader is an LLM with no way to cross-check, so a wrong reassurance here
+        // is worse than on any other surface.
+        (missed
+          ? `and the chunks that were skipped were reviewed by neither the tool nor the model.`
+          : `findings for the remainder came from the model, not the tool.`)
     )
   }
   const degradedTools = toolsWithAvailability(result.toolAvailability, 'unavailable-llm-fallback')

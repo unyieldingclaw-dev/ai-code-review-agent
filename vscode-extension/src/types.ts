@@ -31,10 +31,27 @@ export interface GeneratedTestFile {
   framework: string
 }
 
+export type AgentStatus = 'ok' | 'timeout' | 'parse-error' | 'error'
+
 export interface ReviewResult {
   findings: Finding[]
   testFiles: GeneratedTestFile[]
   summary: ReviewSummary
+  // Incompleteness fields. This extension is a SEPARATE package with its own hand-maintained
+  // copy of the envelope, so it does not inherit changes to src/core/schema.ts -- which is
+  // exactly how it came to be the only surface still rendering a green check for a truncated
+  // run, a run whose agents all failed, AND a fail-fast run. It received none of that work
+  // because the four-formatter rule in systemPatterns.md enumerates formatters, and this is not
+  // one; it is a second renderer behind a duplicated type.
+  //
+  // All optional, because the extension may be pointed at an older ai-review-agent than the one
+  // these fields shipped in: `renderReport` must treat absent as "not reported", never as
+  // "did not happen".
+  earlyExit?: { stoppedAt: string }
+  agentStatus?: Partial<Record<string, AgentStatus>>
+  truncation?: { truncated: boolean; originalLines: number; keptLines: number }
+  agentsPlanned?: number
+  chunking?: { total: number; reviewed: number }
 }
 
 export interface ExtensionConfig {
