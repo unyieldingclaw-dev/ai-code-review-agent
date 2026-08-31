@@ -20,28 +20,17 @@ lineage: []
 
 ## Architecture Patterns
 
-### Agent Swarm (16 Specialists + 1 Orchestrator)
+### Agent Swarm
 
-**Decision**: One abstract `BaseAgent`, sixteen concrete specialist subclasses (fifteen run by default, `testGen` is opt-in), one `Orchestrator`, driven by `SwarmRunner`.
+**Decision**: One abstract `BaseAgent`, a set of concrete specialist subclasses (`testGen` is
+opt-in), one `Orchestrator`, driven by `SwarmRunner`. The canonical list is
+`DEFAULT_CONFIG.agents` — read it there, never from a copy here.
 
-**Rationale**:
-
-- Specialist agents don't bias each other (each sees only the diff + its own system prompt)
-- Orchestrator deduplicates and cross-references after all agents complete
-- Matches how humans divide code review by domain
-
-**Implementation**:
-
-```
-SwarmRunner
-  └─ ping check (Ollama live?)
-  └─ sequential: Agent[] → Finding[][]     15 default + TestGenAgent (opt-in)
-  └─ Orchestrator → deduplicated Finding[]
-```
-
-The canonical agent list is `DEFAULT_CONFIG.agents` in `src/core/config.ts:58` — read it there. An
-enumeration here previously named 9 of the 16 under a heading claiming 16, which is the failure this
-file's own "record the delta, not the level" rule warns about.
+**Rationale**: each specialist sees only the diff and its own system prompt, so they do not read
+each other's findings; the `Orchestrator` deduplicates and cross-references afterwards. **The
+independence that buys is weaker than it looks and is under measurement** — every specialist is
+the same model behind a different prompt, so their errors correlate far more than separate
+reviewers' would. See the open corroboration contract before relying on agreement between them.
 
 ### Sequential Execution
 
@@ -93,11 +82,8 @@ stage 4 exists and why every `format:'json'` call site needs equivalent recovery
 
 ### OllamaProvider — Think-Tag Stripping
 
-`devstral` emits `<think>...</think>` blocks before the JSON answer. Strip these before any parse attempt. Adapted from `Google-Organizer/src/workers/ollamaClient.ts`.
-
-### Finding Schema
-
-All agents return `Finding[]`. Key fields: `severity`, `category`, `file`, `line`, `message`, `suggestion`. Defined in `src/core/schema.ts`.
+`devstral` emits `<think>...</think>` blocks before the JSON answer. Strip these before any
+parse attempt.
 
 ## Data Flow
 
@@ -107,17 +93,8 @@ caps, escalates cross-references → renderers (all six — see the formatter ru
 
 ## Git & Version Control
 
-### Commit Message Format
-
-```
-<type>: <short description>
-
-Types: feat, fix, chore, docs, refactor, test, style
-```
-
-### Branch Strategy
-
-- `main` — default branch and the target for every PR. All work lands via PR, squash-merged.
+Conventional commits (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`). `main` is the
+default branch and the target for every PR; all work lands via PR, squash-merged.
 
 ### Working With the Review Gates (learned 2026-08-19)
 

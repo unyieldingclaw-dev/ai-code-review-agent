@@ -286,3 +286,40 @@ proxy-assertion paragraph in this same file said "Six" when the archive already 
 **Prose-wrapping note.** `.prettierrc` sets no `proseWrap`, so the default `preserve` applies and
 prettier rewraps nothing (checked 2026-08-28) — the hand-wrapping that defeats line-wise `grep` is
 ours, not a formatter artifact.
+
+## Retired from systemPatterns.md (2026-08-31)
+
+Retired rather than deleted. Each of these stopped earning its lines for a stated reason; none was
+an operative rule still in force.
+
+**The `Finding Schema` section — RETIRED AS FACTUALLY WRONG.** It read: "All agents return
+`Finding[]`. Key fields: `severity`, `category`, `file`, `line`, `message`, `suggestion`. Defined in
+`src/core/schema.ts`." Checked against the interface on 2026-08-31: **`category` and `message` do
+not exist**, and it omitted `basis`, `domain`, `evidence`, `impact`, `recommendation` and
+`locationCheck` — the fields the last several changes were about. A reader could have coded against
+it. Another instance of the stale-list rule, and the most costly kind, because it was wrong rather
+than merely incomplete. `techContext.md`'s Key Source Files table already points at the real
+definition, so nothing replaced it.
+
+**The Agent Swarm ASCII diagram and its `15 default + TestGenAgent` count.** Redundant with the
+Data Flow paragraph, which states the same pipeline in prose, and it carried a counted enumeration
+of exactly the kind the stale-list rule condemns. The heading `(16 Specialists + 1 Orchestrator)`
+went with it for the same reason — that heading had already fired once, claiming 16 while the body
+enumerated 9.
+
+**"Matches how humans divide code review by domain."** Decorative; it justified nothing that the
+other two rationale bullets did not.
+
+**"Adapted from `Google-Organizer/src/workers/ollamaClient.ts`."** A cross-repo attribution with no
+operational content — it does not tell a reader what to do or what not to do.
+
+**The Commit Message Format code block.** Eight lines to say "conventional commits", which is
+near-universal and now stated in one.
+
+**One qualification ADDED rather than retired.** The Agent Swarm rationale asserted that specialists
+"don't bias each other". That is true of their inputs and misleading about their outputs: every
+specialist is the same model behind a different prompt, so their errors correlate far more than
+separate reviewers' would, and the orchestrator's corroboration step treats their agreement as
+evidence. Left in place but qualified, pointing at the open measurement contract, because an
+unqualified independence claim in the file that governs the design is precisely the confident stale
+assertion this document keeps being burned by.
