@@ -102,13 +102,31 @@ export function formatMcpOutput(result: ReviewResult): string {
   const mediumCount = summary.bySeverity.medium ?? 0
   const lowCount = summary.bySeverity.low ?? 0
 
+  // WHY these two headlines are gated on `warnings` the same way the no-findings path above is:
+  // both state a verdict, and a verdict is what a reader takes at face value. "✅ No critical or
+  // high findings" is a green check on a partial review, and "3 findings" is a count that reads as
+  // the complete result -- the caveat sat in warningBlock BELOW both of them. #51 established for
+  // the CLI that the glyph IS the verdict for a skimming reader and replaced it rather than
+  // qualifying it; that reasoning was applied to this file's no-findings path and not to its two
+  // siblings twenty lines down.
+  //
+  // This surface earns the fix more than the CLI did, per systemPatterns' four-formatter rule:
+  // MCP's reader is a calling LLM with no terminal to cross-check against, so a headline it
+  // believes is the only thing it gets. Measured case behind this: a 6,578-line diff reviewed at
+  // 2,000 lines returned 0 findings while the chunked run returned 15 including 2 High.
+  const incomplete = warnings.length > 0
+
   if (actionable.length === 0) {
     const tail = buildTail(mediumCount, lowCount)
-    return `## AI Code Review — ✅ No critical or high findings\n\n${warningBlock}${tail ? `_${tail}_\n` : ''}`
+    const verdict = incomplete
+      ? '⚠️ INCOMPLETE — no critical or high findings in the portion reviewed'
+      : '✅ No critical or high findings'
+    return `## AI Code Review — ${verdict}\n\n${warningBlock}${tail ? `_${tail}_\n` : ''}`
   }
 
   const count = actionable.length
-  const header = `## AI Code Review — ${count} finding${count === 1 ? '' : 's'}\n\n${warningBlock}`
+  const countText = `${count} finding${count === 1 ? '' : 's'}`
+  const header = `## AI Code Review — ${incomplete ? `⚠️ INCOMPLETE — ${countText} in the portion reviewed` : countText}\n\n${warningBlock}`
   const body = actionable.map(renderFinding).join('\n\n')
   const tail = buildTail(mediumCount, lowCount)
   const footer = tail ? `\n\n---\n_${tail}_\n` : '\n'
