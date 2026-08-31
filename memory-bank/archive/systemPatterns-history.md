@@ -23,6 +23,9 @@ Fifth through seventh moves, 2026-08-28: the three release-tagging incidents, th
 the first two to make room for handoff conventions, the third to bring the file back under its
 target range. All the rules they support stay upstream.
 
+Ninth move, 2026-08-31: the `main`-hash narrative, archived to make room for the stale-list rule.
+The rule and its immutable-identifier exception stay upstream; the two-PR story is below.
+
 Eighth move, 2026-08-31: three verification-lesson narratives (the `elapsedMs` rounds, the
 duration-span measurement, and the vitest-4 harness bug), archived to make room for the
 peer-coordination protocol and the proxy-assertion pattern. Their rules stay upstream as
@@ -221,3 +224,17 @@ record.** A confession is a claim and takes the same evidence as any other. Same
 _suggestive_ → _strong_ wording drift, but pointing the other way, which is why it is easy to miss —
 an overstated admission reads as rigour. **Our memory bank carried the wrong version for a few
 hours**, written from their first account and corrected here before it was ever committed.
+
+## The `main` hash — the two PRs that both shipped stale (2026-08-28)
+
+Moved out of `systemPatterns.md` on 2026-08-31. The rule stays upstream.
+
+Two consecutive PRs tried to keep a recorded `main` hash current and **both shipped stale**. #78
+cleared the hash and argued in its own PR body that "a current hash belongs here, since this
+section exists to state current state." Merging it was the disproof: the moment #78 landed,
+`activeContext.md` claimed `874b784` while `main` was `2711d4e` — stale again, by exactly one
+commit, four minutes later.
+
+The defect is **self-invalidating, not merely decaying**: a memory-bank PR moves the very commit it
+names, so the value cannot be correct once written. Fixed by removing the hash rather than updating
+it a third time.

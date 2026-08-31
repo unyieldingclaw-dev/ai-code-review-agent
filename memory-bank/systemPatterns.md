@@ -218,15 +218,14 @@ applies to filters, to prompts, and to the tests that are supposed to protect bo
 not "three findings" — the count was stale the first time one was added, which is this file's own
 "record the delta, not the level" rule turned on itself.)
 
-**Assert from the thing, not from a proxy for it** (2026-08-30). Six proxy assertions in one
-session, every one wrong, and **every one caught by a measurement or by the PMB peer — none by
-re-reading one's own work.** The peer's framing, worth keeping in both repos: _neither of us is
-finding these by looking; we find them when something else breaks nearby._ Instances:
-[`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
+**Assert from the thing, not from a proxy for it** (2026-08-30). Every instance so far has been
+wrong, and **none was caught by re-reading one's own work** — each came from a measurement or the peer.
+_Neither of us is finding these by looking; we find them when something else breaks nearby._
+Instances: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
-**A probe proves the idea, not the wiring.** `isPreImageOnlyEvidence` passed every predicate unit
-test and a scratch probe while being wired so it could never fire; only a real-artifact replay
-exposed it. Case: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
+**A probe proves the idea, not the wiring.** A predicate passed every unit test and a scratch probe
+while wired so it could never fire; only a real-artifact replay exposed it. Case:
+[`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 - **Replay real captured output through the real entry point.** `gh run download <run-id>` retrieves
   the `ai-review-findings` artifact `review.yml` uploads — the highest-value test input this project
@@ -246,21 +245,24 @@ exposed it. Case: [`archive/systemPatterns-history.md`](archive/systemPatterns-h
   true; "the file is now 46,956 bytes" decays within hours, and did — three times on their side,
   twice inside the branch that wrote it. Same root as the duration lesson below: a figure recorded
   without the frame that makes it meaningful.
-- **A memory-bank file must never record the `main` hash** (2026-08-28) — the sharpest instance,
-  because it is self-invalidating rather than merely decaying. A memory-bank PR _moves the commit it
-  names_, so the value is wrong the instant it lands. Two consecutive PRs tried to keep it current
-  and both shipped stale; the second was written arguing a current hash belonged there. Read it from
+- **A rule that enumerates its own members is a stale-list bug waiting to fire** (2026-08-31, named
+  by PMB — the sharper sibling of the above). The guard keeps passing while the family grows, so
+  nothing signals the drift. Three instances here: the formatter rule said four when there were
+  six; the Agent Swarm heading claimed 16 and listed 9; a test count restated in three files.
+  The fix was the same every time — point at the source of truth rather than restate it.
+- **A memory-bank file must never record the `main` hash** (2026-08-28) — self-invalidating rather
+  than merely decaying, because a memory-bank PR _moves the commit it names_. Read it from
   `git log`. **Immutable identifiers are the exception** — a release tag like `v1.15.0` at `6e2ed34`
-  is safe to record precisely because nothing can move it.
+  is safe precisely because nothing can move it. Two PRs both shipped stale trying to keep it
+  current: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 - **When a review round's findings are mostly defects introduced by the previous round's fixes, the
   change has had enough passes** (named by PMB). Getting a thing wrong from **opposite directions**
   while fixing it is the signal to ship, not to run a fourth round.
 - **A duration is not a measurement until you say what it spans.** State the span in the type.
 - **A uniform verdict from a verification harness is a harness bug until proven otherwise.** Assert
   the harness ran (parse `Tests N failed`) before reading it.
-- **One calibration pass is not a ranking** (2026-08-30). A model switch was recommended on one pass
-  each and reversed by three; the bands did not overlap once measured properly. Numbers in
-  `techContext.md`. Measurements behind all four:
+- **One calibration pass is not a ranking** (2026-08-30). A model switch recommended on one pass
+  each was reversed by three. Numbers in `techContext.md`; measurements behind all four in
   [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 **Prompt wording does not move a measured defect rate here — four independent confirmations**, the
