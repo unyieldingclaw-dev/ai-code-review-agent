@@ -23,6 +23,11 @@ Fifth through seventh moves, 2026-08-28: the three release-tagging incidents, th
 the first two to make room for handoff conventions, the third to bring the file back under its
 target range. All the rules they support stay upstream.
 
+Tenth move, 2026-08-31: a full archiving pass. The evidence behind the review-gate rules, the
+field-to-surface history, the release-tagging and squash-merge numbers, and the falsification
+examples all moved here; every rule stayed upstream, verified by diffing the bolded rule statements
+before and after. Detail below.
+
 Ninth move, 2026-08-31: the `main`-hash narrative, archived to make room for the stale-list rule.
 The rule and its immutable-identifier exception stay upstream; the two-PR story is below.
 
@@ -238,3 +243,46 @@ commit, four minutes later.
 The defect is **self-invalidating, not merely decaying**: a memory-bank PR moves the very commit it
 names, so the value cannot be correct once written. Fixed by removing the hash rather than updating
 it a third time.
+
+## Evidence moved in the tenth pass (2026-08-31)
+
+**The review-gate matcher.** `review-reminders.ps1` matches `$cmd -match 'git\s+push\b'` — the
+`.ps1` is the hook that actually runs, with the `.sh` only a fallback. It cannot distinguish the
+verb in command position from the same verb quoted as data, so a PR body, a `grep` pattern, or a
+script inlined into a shell command all trip it. The post-hook that should reissue a burned marker
+never fires, because PostToolUse does not run when a tool call exits non-zero. Latent variant: the
+ref-move check uses `git rev-parse '@{u}'`, which never moves for a tag, so a successful tag push
+reads as a failure. `last-reviewed` is fixed in PMB 1.2.1; this repo is on 1.1.1 (`.pmb-version`).
+
+**Which fields missed which surfaces.** `toolAvailability` missed MCP. `locationCheck` missed SARIF
+and MCP. `earlyExit` reached none of the six, and `vscode-extension` was three fixes behind — it had
+never received the truncation banner, the agent-failure report, or the INCOMPLETE headline — because
+the rule said "formatters" and the extension is a renderer behind a duplicated type.
+
+**Release tagging, the third incident.** Incidents 1 and 2 were tagging before the version was real;
+3 was re-running a remediation written minutes earlier for a different state, which deleted the good
+tag and flipped the published Release to a draft. npm's refusal to republish an existing version
+limited the damage twice — the registry compensating for the process, not the process working.
+
+**Squash-merge detection.** A cleanup trusting `--merged` does nothing, and force-delete drops the
+verification that made forcing safe. One local tip differed by being merely _behind_, by the `main`
+merge that `strict: true` forces.
+
+**Real-artifact replay findings.** 33% of findings carrying unresolvable `a/` paths; same-agent
+duplicates surviving dedup; and later six findings all citing wrong lines.
+
+**Wiring-seam test.** Reintroducing `isPreImageOnlyEvidence(f.evidence, section, section)` fails the
+orchestrator-level test while all 109 `claimSupport` unit tests still pass.
+
+**Falsification messages that proved the mechanism**, not merely a failure:
+`expected 'unavailable-llm-fallback' to be 'partial'`, `expected null to be 'MIT'`,
+`expected 'not-applicable' to be 'used'`. A chunk-merge test with `not-applicable` last passes under
+last-chunk-wins too, which is why the substantive value goes last.
+
+**Stale-list instances.** The formatter rule said four when there were six; the Agent Swarm heading
+claimed 16 and enumerated 9; a test count was restated in three files and drifted twice. The
+proxy-assertion paragraph in this same file said "Six" when the archive already held eight.
+
+**Prose-wrapping note.** `.prettierrc` sets no `proseWrap`, so the default `preserve` applies and
+prettier rewraps nothing (checked 2026-08-28) — the hand-wrapping that defeats line-wise `grep` is
+ours, not a formatter artifact.
