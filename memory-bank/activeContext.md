@@ -77,16 +77,17 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 
 ## Next Steps
 
-- **`earlyExit` invisible on all four surfaces — PROVEN, not fixed.** No formatter reads it; a
-  `--fail-fast` run renders clean on every surface and exits **0**, which PMB's Job 7 reads as
-  clean. The exit-0 mechanism, the replay evidence and the `chunkRunner` part are in `progress.md`.
-- **Read the trap before touching a formatter.** `cli/formatter.ts:29` derives `totalAgents` from
-  `agentStatus`, so the INCOMPLETE denominator shrinks to the agents that _started_ — live today at
-  `from 3/4 agents that completed` when 15 were configured. Folding `earlyExit` into the gate
-  without fixing that makes it render on **every** fail-fast run as "from 3/3 agents that
-  completed", turning a silent omission into a confident false claim. Plumb a real
-  configured-agent count. Adding `'skipped'` to `AgentStatus` fixes all four surfaces at once but
-  flips fail-fast runs to exit 2 and re-routes PMB's mapping — rejected for that, not for cost.
+- **`earlyExit` reached NO renderer — fixed on `fix/early-exit-visibility`, see `CHANGELOG.md`.**
+  It turned out to be **six** surfaces, not four: `review.yml` and `vscode-extension` are renderers
+  but not formatters, so the old rule could never have caught them. Evidence, the exit-0 mechanism
+  and the `chunkRunner` part are in `progress.md`; the rule is now corrected in `systemPatterns.md`.
+- **The trap, worth keeping even though the fix landed.** Deriving the INCOMPLETE denominator from
+  `agentStatus` shrinks it to the agents that _started_, so folding `earlyExit` into the gate
+  without a real roster count renders "from 3/3 agents that completed" for a run that skipped
+  twelve — a silent omission upgraded to a confident false claim. `ReviewResult.agentsPlanned` now
+  carries the roster. Adding `'skipped'` to `AgentStatus` would have fixed the four formatters
+  through machinery they already read, but flips fail-fast runs to exit 2 and re-routes PMB's
+  mapping — rejected for that, not for cost.
 - **`ping()` guesses model presence by substring — peer-cleared, awaiting the operator.**
   `ollamaProvider.ts:125-143` does `model.split(':')[0]` then `.includes()`, so `qwen2.5-coder:32b`
   reports present when only `:7b` is installed (verified live against three models). A missing model

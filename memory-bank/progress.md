@@ -26,7 +26,12 @@ Moved here from `activeContext.md` on 2026-08-31: shipped behaviour is what this
 holding it in the volatile file was costing the headroom that file most needs.
 
 - **The evidence-location check (v1.14.0) flags — never corrects or drops** — a finding whose quoted
-  evidence is not at its cited `file:line`, on all four surfaces.
+  evidence is not at its cited `file:line`, on all four **formatters** — which is four of the SIX
+  surfaces that render a verdict. Verified 2026-08-31: `locationCheck` and `toolAvailability` each
+  appear in all four formatters and **zero times** in `.github/workflows/review.yml` or
+  `vscode-extension/src/`. So a misplaced-evidence finding is flagged on four surfaces and silently
+  unflagged on the PR comment, which is the most-read of them. Not fixed; recorded because the
+  six-surface rule in `systemPatterns.md` makes it visible for the first time.
 - **Four hallucination classes have deterministic backstops rather than prompt wording**, because
   prompt-only fixes were measured across three agents and failed every time. Detail in
   [`archive/progress-history.md`](archive/progress-history.md).
@@ -75,7 +80,7 @@ folding `earlyExit` into the `incomplete` gate makes that scope string render on
 run as "from 3/3 agents that completed", converting a silent omission into a confident false claim.
 Same shape as this repo's own `elapsedMs` rounds, where round 2's fix recorded the _last_ attempt
 instead of the _longest_ and hid a slow attempt behind a fast retry. Adding `'skipped'` to
-`AgentStatus` would fix all four surfaces through machinery they already read, but `hasAgentFailures`
+`AgentStatus` would fix the four formatters through machinery they already read, but `hasAgentFailures`
 treats anything `!== 'ok'` as failure, so every fail-fast run would start exiting 2 and re-route
 PMB's mapping — rejected for that reason, not for cost.
 

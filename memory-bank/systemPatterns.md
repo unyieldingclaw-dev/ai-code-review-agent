@@ -103,7 +103,7 @@ All agents return `Finding[]`. Key fields: `severity`, `category`, `file`, `line
 
 `ai-review` on a diff → `SwarmRunner` pings Ollama (fail fast) → each specialist gets the diff plus
 its own system prompt → `OllamaProvider`, think-tag strip, 4-stage parse → `Orchestrator` dedups,
-caps, escalates cross-references → formatter renders (all four — see the formatter rule below).
+caps, escalates cross-references → renderers (all six — see the formatter rule below).
 
 ## Git & Version Control
 
@@ -174,10 +174,16 @@ security gate. Same rule as the `claimSupport.ts` filters: measure, don't inspec
   in — the branch holds the parent's pre-squash commit, so otherwise the diff replays it entirely.
 - **A stacked PR never runs `test`** — `ci.yml` fires on `pull_request: branches: [main]` only, so
   green on one means the check never ran, not that it passed.
-- **A new `Finding`/`ReviewResult` field must reach all four formatters** — `cli/formatter.ts`,
-  `cli/formatters/{sarif,githubAnnotations}.ts`, `mcp/formatter.ts`. `toolAvailability` missed MCP
-  and `locationCheck` missed SARIF+MCP, both caught post-merge by a reader. Check MCP first: its
-  reader is an LLM with no terminal to cross-check against.
+- **A new `Finding`/`ReviewResult` field must reach every surface that renders a verdict — SIX,
+  and the count is the point.** Four formatters (`cli/formatter.ts`,
+  `cli/formatters/{sarif,githubAnnotations}.ts`, `mcp/formatter.ts`) plus two that are **not**
+  formatters and were therefore invisible to this rule's own earlier wording: `review.yml`, which
+  renders the PR comment and the Step Summary from two hand-written inline scripts, and
+  `vscode-extension`, a separate package holding its own copy of the envelope. `toolAvailability`
+  missed MCP; `locationCheck` missed SARIF+MCP; `earlyExit` reached **none of the six**, and the
+  extension was three fixes behind because "formatters" never named it. Check MCP first — its
+  reader is an LLM with no terminal to cross-check — and note the workflow renderer is the
+  highest-visibility surface of the six.
 - **Release tagging: tag only after the release PR merges, verify the version first, and re-check
   a cleanup command against current state before re-running it** (2026-08-27). Three incidents in
   one session, and **the third is a different shape from the first two** — 1 and 2 were tagging
