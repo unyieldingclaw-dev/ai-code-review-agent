@@ -58,9 +58,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Notes
 
 - **No exit code changed.** A fail-fast run still exits `0`. Routing it to `3` was considered and
-  rejected: `3` means partial _coverage_ of a complete run and its documented remedy is "re-run
-  with `--chunk`", which is advice a chunked run has already taken. The downstream consumer that
-  branches on these codes was consulted before the decision.
+  rejected: `3` means partial _coverage_ of a complete run, whereas fail-fast is a
+  complete-coverage decision to stop early. Different states, different remedies, so they do not
+  share a code. The downstream consumer that branches on these codes was consulted before the
+  decision.
+- **A consumer's exit-`0` row now needs updating, and that is a consequence of this change.** That
+  row asserted "ran fully", which was safe only while a run that had _not_ run fully was
+  indistinguishable from one that had. Making the state visible is what makes the assertion wrong.
+  Reported to the consumer, who is fixing it; this change was not held for it, because the report
+  is now truthful and the description is what lags.
 - Still open, deliberately: `--fail-fast` triggers on **pre-orchestrator** severity while the exit
   code reads **post-orchestrator** severity, so the swarm can halt saying "threshold met" and then
   report that nothing met the threshold. That is a behaviour question, not a visibility one, and is
