@@ -897,3 +897,23 @@ here: `pre-push-check.*` calls `mb validate`, which was folded into `mb doctor`,
 mb doctor" message as evidence of inconsistency on every push. This is the second of the two live
 examples supporting the claim that all sixteen reported defects share one shape — the check's result
 being disconnected from whether it ran. One example does not establish a shape; two do.
+
+## Per-agent timeout ceiling — full measurement (2026-08-27, archived 2026-08-31)
+
+Moved out of `activeContext.md`'s Next Steps to make room for the `earlyExit` and `ping()` items.
+The conclusion and the do-not-re-derive instruction stay upstream; this is the measurement.
+
+12 invocations over a 4,703-line diff, `--profile security`, `--chunk`, devstral on GPU. Eleven ran
+well under budget (slowest real attempt 213.2 s against a 315.4 s ceiling, 68%). The twelfth
+_appeared_ to exceed its ceiling — `adversarial` 611.7 s against 354.7 s — and that row is a
+**measurement artifact, not an agent running long**: stderr shows
+`failed (attempt 1/2): fetch failed — retrying`, so 611.7 s is wall time across two attempts plus
+backoff. No single invocation came near its ceiling; the real fault in that row is `fetch failed`,
+which is resource pressure, separate from our abort path.
+
+Sent to PMB, who hold it at our confidence level and instructed their next session not to upgrade
+the 616 s hedge. That correspondence is **suggestive, not established** and must not be promoted to
+"resolved" — the original has no source.
+
+Still untested: true CPU-only, which needs an Ollama restart with `OLLAMA_NUM_GPU=0`
+(`OllamaProvider` forwards no `options`, so `num_gpu: 0` is unreachable per-request).

@@ -1,17 +1,13 @@
 {
-  "task": "Add an opt-in, off-by-default OpenAI-compatible LLM provider, and amend projectbrief.md's Ollama-only constraint to permit it. Testable locally against Ollama's own /v1 endpoint; targets LiteLLM at work.",
-  "status": "cancelled",
-  "created_at": "2026-08-30T23:06:11Z",
-  "expires_at": "2026-08-31T07:06:11Z",
-  "approved_by": "user (\"do what you suggest\", then cleared scoping: LiteLLM is the work target, OpenCode protocol unknown and not required)",
-  "notes": "projectbrief.md is the immutable tier. The amendment is the reason this contract exists and must not be treated as incidental. Default provider stays ollama; cloud is never implicit.",
+  "task": "Discharge the handoff protocol: merge handoff.md into the memory bank, archiving displaced history rather than compressing it, then delete handoff.md.",
+  "status": "complete",
+  "created_at": "2026-08-31T14:43:15Z",
+  "expires_at": "2026-08-31T22:43:15Z",
+  "approved_by": "user (\"approved\", on the memory-bank contract proposed first; earlyExit contract remains queued separately)",
+  "notes": "handoff.md is gitignored, so its content is durable nowhere else. Caps are CI-enforced: systemPatterns 282/300 and activeContext 125/150 are the tight ones. memory-bank/README.md and progress.md 2026-08-28 both record that compressing-to-fit deletes substance; archive instead. Do not record the main hash (systemPatterns rule).",
   "scope": [
     {
-      "file": "memory-bank/projectbrief.md",
-      "op": "edit"
-    },
-    {
-      "file": "memory-bank/systemPatterns.md",
+      "file": "memory-bank/activeContext.md",
       "op": "edit"
     },
     {
@@ -19,42 +15,34 @@
       "op": "edit"
     },
     {
+      "file": "memory-bank/systemPatterns.md",
+      "op": "edit"
+    },
+    {
       "file": "memory-bank/progress.md",
       "op": "edit"
     },
     {
-      "file": "memory-bank/activeContext.md",
+      "file": "memory-bank/archive/activeContext-history.md",
       "op": "edit"
     },
     {
-      "file": "src/core/llm/openAiCompatibleProvider.ts",
-      "op": "create"
-    },
-    {
-      "file": "src/core/llm/provider.ts",
+      "file": "memory-bank/archive/progress-history.md",
       "op": "edit"
     },
     {
-      "file": "src/core/config.ts",
+      "file": "memory-bank/archive/systemPatterns-history.md",
       "op": "edit"
     },
     {
-      "file": "src/cli/index.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/openAiCompatibleProvider.test.ts",
-      "op": "create"
-    },
-    {
-      "file": "README.md",
-      "op": "edit"
+      "file": "handoff.md",
+      "op": "delete"
     },
     {
       "file": ".claude/contracts/active-task.json",
       "op": "edit"
     }
   ],
-  "cancelled_at": "2026-08-30T23:20:00Z",
-  "cancelled_reason": "Justification was a LiteLLM gateway that does not exist on this machine. No source file was touched. Nothing to revert."
+  "completed_at": "2026-08-31T14:54:40Z",
+  "completion_notes": "All four handoff-protocol steps discharged. handoff.md was gitignored and untracked, so its deletion produces no git change -- the durability fix is that its content now lives in tracked files. Caps pass with headroom (activeContext 146/150, systemPatterns 287/300). npm run check green at 839 tests / 47 files. Archived rather than compressed: systemPatterns -13 lines to archive, progress -69, activeContext -14."
 }

@@ -23,6 +23,11 @@ Fifth through seventh moves, 2026-08-28: the three release-tagging incidents, th
 the first two to make room for handoff conventions, the third to bring the file back under its
 target range. All the rules they support stay upstream.
 
+Eighth move, 2026-08-31: three verification-lesson narratives (the `elapsedMs` rounds, the
+duration-span measurement, and the vitest-4 harness bug), archived to make room for the
+peer-coordination protocol and the proxy-assertion pattern. Their rules stay upstream as
+one-line statements; the measurements are at the end of this file.
+
 ## PostToolUse marker-reissue defect — reproduction (2026-08-20)
 
 **Confirmed defect (reproduced 2026-08-20):** `review-reminders-post.*` is supposed to reissue the
@@ -141,3 +146,78 @@ so a stray unmatched `}` can't desync the rest of the scan). `CoverageAnalystAge
 same two helpers for its own two-stage parse (its schema is `{"findings":[...],"gaps":[...]}`,
 one level of nesting deeper, which is exactly why it needs `extractCompleteObjects` rather than
 `extractBalancedSpan` alone to recover anything once the outer wrapper object is truncated).
+
+## Three verification lessons — full narratives (moved 2026-08-31)
+
+Moved out of `systemPatterns.md`'s "Falsify Before You Trust It" section to make room for the
+peer-coordination protocol and the proxy-assertion pattern. The rules stay upstream as one-line
+statements pointing here; these are the measurements that established them. Nothing deleted.
+
+**When a review round's findings are mostly defects introduced by the previous round's fixes,
+the change has had enough passes** (2026-08-27, named by PMB). The `elapsedMs` rounds are the
+instance, and the middle one is the whole point: round 1 found retry-inflated elapsed; round 2's
+fix recorded the _last_ attempt instead of the _longest_, hiding a slow attempt behind a fast
+retry; round 3 caught that. Getting a thing wrong from **opposite directions** while fixing it is
+the signal to ship, not to run a fourth round.
+
+**A duration is not a measurement until you say what it spans** (2026-08-27). Wall time
+covering retries, printed against a per-attempt ceiling, reads as exceeding a limit no
+attempt approached — measured at 611.7 s vs 354.7 s, all retry. State the span in the type.
+
+**A uniform verdict from a verification harness is a harness bug until proven otherwise**
+(2026-08-27). A mutation run reported 0 failures for all 13: `--reporter=basic` was removed in
+vitest 4, so vitest errored before running a test and the parser read empty output as "passed".
+Assert the harness ran (parse `Tests N failed`) before reading it.
+
+## The six proxy assertions — instances (2026-08-30)
+
+The rule ("assert from the thing, not from a proxy for it") stays in `systemPatterns.md`; these are
+the instances that established it, all from a single session, all wrong:
+
+1. **Disk size for VRAM fit** — a model's on-disk size read as its memory footprint.
+2. **`npm ls` for the registry** — the local dependency tree read as what the published package
+   contains. Compounded by `npm link`: `ai-review-agent` on PATH is a symlink to the working tree,
+   so "broken on npm" was asserted from uncommitted local code. It happened to be true and had not
+   been earned. Use `npm pack ai-review-agent@X` and inspect the tarball.
+3. **An unreachable agent name for an ended session** — the PMB peer's name rotates (`7b` → `1d` →
+   `c9` → `8b`) without the session ending. Misread twice, and said so out loud both times.
+4. **One calibration pass for a quality ranking** — a model switch recommended on one pass each,
+   reversed by three. Numbers in `techContext.md`.
+5. **One's own interactive runs for "nothing queued"** — the local view of activity read as the
+   server's.
+6. **A loaded model for a busy server** — `ollama ps` shows what is resident, not whether a
+   multi-pass run is in flight. A decaying `UNTIL` means no inference _right now_, not "no run
+   active"; a chunked run between chunks looks identical to idle. Acting on that reading killed
+   the peer's 979 s devstral run mid-chunk (their exit 4).
+
+Every one was caught by a measurement or by the peer; none by re-reading one's own work.
+Review-by-reading produced approximately nothing that session. Adversarial passes and real runs
+produced everything — including a misdiagnosis PMB had committed and reported as a verified fix,
+and a third instance of a defect created while fixing the first two.
+
+**A seventh instance, and it is PMB correcting their own account rather than ours** (2026-08-31).
+They first reported that commit as a **security regression they had introduced** — a UTF-16 BOM
+bypass created by the fix itself. Their own opposition pass overturned it: they report an 8-case
+byte matrix showing the change was behaviourally identical to the code it replaced, so it fixed
+nothing and broke nothing, against a hole that is unreachable anyway. Their accurate statement is
+_misdiagnosed, and the stated fix was a no-op on that axis_ — not _created a bypass_.
+
+**Both versions are peer-reported and neither was reproduced here** (their
+`tests/dangerous-commands.Tests.ps1` exists; the matrix was not re-run). Recorded as their account,
+not as our finding — the hedge this repo's own rule requires for cross-project claims, and the same
+rule that later caught their `exit 4` mapping being described in correspondence but absent from
+their committed table.
+
+**An eighth instance, committed by this repo, in the sentence warning against exactly it**
+(2026-08-31). `techContext.md`'s model-choice paragraph argued that pinned counts rot — and
+supplied "26 cases in `calibrate.ts`" as its illustration. The real `CASES` array holds **23**;
+`grep -c "name:"` had also matched an interface field and two type annotations. Caught by the
+correctness reviewer, which counted the array instead of grepping for a substring. `calibrate.ts`
+was last touched ten days earlier, so this was never drift — it was **wrong on arrival**. Removed
+rather than corrected to 23: a sentence arguing against pinning a count should not pin one.
+
+**The rule this adds: overcorrecting in the self-critical direction is its own kind of false
+record.** A confession is a claim and takes the same evidence as any other. Same family as the
+_suggestive_ → _strong_ wording drift, but pointing the other way, which is why it is easy to miss —
+an overstated admission reads as rigour. **Our memory bank carried the wrong version for a few
+hours**, written from their first account and corrected here before it was ever committed.

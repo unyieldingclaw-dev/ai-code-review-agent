@@ -16,7 +16,7 @@ lineage: []
 
 # System Patterns & Architecture Decisions
 
-**Last Updated**: 2026-08-28
+**Last Updated**: 2026-08-31
 
 ## Architecture Patterns
 
@@ -207,8 +207,16 @@ security gate. Same rule as the `claimSupport.ts` filters: measure, don't inspec
 
 ### Falsify Before You Trust It (2026-08-21, reconfirmed through 2026-08-27)
 
-Three findings that are one principle: **a claim you have not tried to disprove is not evidence.**
-It applies to filters, to prompts, and to the tests that are supposed to protect both.
+Findings that are one principle: **a claim you have not tried to disprove is not evidence.** It
+applies to filters, to prompts, and to the tests that are supposed to protect both. (Deliberately
+not "three findings" — the count was stale the first time one was added, which is this file's own
+"record the delta, not the level" rule turned on itself.)
+
+**Assert from the thing, not from a proxy for it** (2026-08-30). Six proxy assertions in one
+session, every one wrong, and **every one caught by a measurement or by the PMB peer — none by
+re-reading one's own work.** The peer's framing, worth keeping in both repos: _neither of us is
+finding these by looking; we find them when something else breaks nearby._ Instances:
+[`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 **A probe proves the idea, not the wiring.** `isPreImageOnlyEvidence` passed every predicate unit
 test and a scratch probe while being wired so it could never fire; only a real-artifact replay
@@ -238,19 +246,16 @@ exposed it. Case: [`archive/systemPatterns-history.md`](archive/systemPatterns-h
   and both shipped stale; the second was written arguing a current hash belonged there. Read it from
   `git log`. **Immutable identifiers are the exception** — a release tag like `v1.15.0` at `6e2ed34`
   is safe to record precisely because nothing can move it.
-- **When a review round's findings are mostly defects introduced by the previous round's fixes,
-  the change has had enough passes** (2026-08-27, named by PMB). The `elapsedMs` rounds are the
-  instance, and the middle one is the whole point: round 1 found retry-inflated elapsed; round 2's
-  fix recorded the _last_ attempt instead of the _longest_, hiding a slow attempt behind a fast
-  retry; round 3 caught that. Getting a thing wrong from **opposite directions** while fixing it is
-  the signal to ship, not to run a fourth round.
-- **A duration is not a measurement until you say what it spans** (2026-08-27). Wall time
-  covering retries, printed against a per-attempt ceiling, reads as exceeding a limit no
-  attempt approached — measured at 611.7 s vs 354.7 s, all retry. State the span in the type.
-- **A uniform verdict from a verification harness is a harness bug until proven otherwise**
-  (2026-08-27). A mutation run reported 0 failures for all 13: `--reporter=basic` was removed in
-  vitest 4, so vitest errored before running a test and the parser read empty output as "passed".
-  Assert the harness ran (parse `Tests N failed`) before reading it.
+- **When a review round's findings are mostly defects introduced by the previous round's fixes, the
+  change has had enough passes** (named by PMB). Getting a thing wrong from **opposite directions**
+  while fixing it is the signal to ship, not to run a fourth round.
+- **A duration is not a measurement until you say what it spans.** State the span in the type.
+- **A uniform verdict from a verification harness is a harness bug until proven otherwise.** Assert
+  the harness ran (parse `Tests N failed`) before reading it.
+- **One calibration pass is not a ranking** (2026-08-30). A model switch was recommended on one pass
+  each and reversed by three; the bands did not overlap once measured properly. Numbers in
+  `techContext.md`. Measurements behind all four:
+  [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
 **Prompt wording does not move a measured defect rate here — four independent confirmations**, the
 fourth measured 7/7 unchanged after an instruction predicted to help. Reach for a deterministic

@@ -29,6 +29,9 @@ reached 402/400 recording the code-review remediation. Same content, moved, noth
 Seventh move, 2026-08-28: the 2026-08-21 fourth-session entry, archived to make room for a
 correction to the PMB version claim. Same content, moved, nothing deleted.
 
+Eighth move, 2026-08-31: the 2026-08-27 second-session entry, archived when `progress.md` reached
+408/400 recording the `earlyExit` investigation. Same content, moved, nothing deleted.
+
 ## ✅ Completed (2026-08-18)
 
 ### Audit remediation Batches 1-8 — Tier 1/2 fixes verified, implemented, tested, and committed
@@ -1521,3 +1524,77 @@ claimed. The collapse also had to apply to **both** branches — `kept` in the m
 
 3 of 4 new tests fail against the old behaviour; the fourth (two distinct titles survive) passes
 under both by design — a guard against over-suppression, not regression coverage. **757 tests.**
+
+## Completed — 2026-08-27, second session (moved 2026-08-31)
+
+The eighth move; see the ledger at the top of this file. Moved out of `memory-bank/progress.md`
+when it reached 408/400 recording the `earlyExit` investigation. Same content, nothing deleted.
+
+## ✅ Completed (2026-08-27, second session)
+
+**Timing instrumentation shipped — `ReviewResult.timings`, one row per `SwarmRunner.run()` call.**
+Each row carries `diffLines`, the scaled `effectiveTimeoutMs`, `durationMs`, and every agent's
+`elapsedMs` paired with its `status`. Written to stderr as each pass completes and into the
+envelope, so it reaches the `ai-review-findings` artifact. **810 tests** (19 new), `npm run check`
+green.
+
+**The measurement already existed; only the persistence was missing.** `AgentProgressEvent.elapsedMs`
+has been set on every execution path -- coverage, sequential, parallel, testgen, on both the success
+and the failure branch -- and printed to stderr all along. It was a fire-and-forget callback, so it
+survived nowhere. The runner now taps that channel with a recording proxy instead of adding a second
+timer, so **no agent execution path changed at all**. Generalisable: _emitted is not recorded_, and
+a number that only ever reaches a terminal is a number you will be unable to cite later.
+
+**Concatenate, never sum -- the one decision the field rests on.** `mergeResults` sums
+`summary.durationMs`, which is right for "how long did this take" and fatal for "did any agent
+approach its ceiling": the ceiling applies per `run()` call, so a sum exceeds every ceiling without
+any agent having done so. That is precisely why "616 s" was unreadable. `status` is stored beside
+`elapsedMs` for the mirror-image reason -- a timed-out agent's elapsed _is_ the ceiling, and reads
+as a completion time sitting just under the limit unless it is labelled.
+
+**A five-lens code review found two real defects in it, and the second measurement confirmed one
+live.** (1) `elapsedMs` was captured outside `withRetryTimeout`, so it spanned every attempt plus
+backoff while `effectiveTimeoutMs` governs one attempt — a parse-error-then-success rendered as an
+agent past its own ceiling with `status: 'ok'` (measured 1015 ms vs a 300 ms ceiling). `AgentTiming`
+now carries `attemptMs` + `attempts` alongside wall time, and a retried agent is named in the line.
+(2) `buildTimingLines` opened with a bare `---`, which in CommonMark is a **setext heading
+underline**, not a rule — it silently promoted the verdict line ("No issues found." / "INCOMPLETE
+— reviewed 2000/12599 lines") to an `<h2>`. Two prior commits were spent on that exact line. Every
+existing assertion used `toContain`, so all of them passed while the render was wrong; the new tests
+assert on line adjacency instead.
+
+**The review also found twelve false claims in the new WHY comments** — `locationCheck` called a
+`ReviewResult` field (it is on `Finding`), a `slowestAgent` docblock describing "three consumers"
+that a refactor had already removed, an invented "mcp must not import cli" rule enforced by nothing,
+and an "earlier draft" cited from no commit. All corrected. Root cause: comments written against a
+draft, then not re-read after the refactor that invalidated them. **And, worst: the unsourced 616 s
+constants had been baked into four test fixtures and the README envelope example**, where a reader
+takes them for a real measurement — the exact failure `10355d6` had just finished correcting.
+Replaced with neutral values.
+
+**Self-review caught a duplicate renderer before commit.** The stderr line first composed its own
+string from the same four fields that `timingSentence` renders, and the two were already drifting --
+one parenthesised the ceiling, only one labelled a timed-out agent. `formatRunTiming` now delegates,
+so there is a single renderer behind stderr, the markdown footer and the MCP note. This is the
+`TOOL_LABELS` rule applied to a field added specifically to stop people misreading a number.
+
+**Verified through the real pipeline, not a probe.** A real `--chunk` CLI run produced three rows
+with **different per-chunk ceilings** (288 s / 360 s / 360 s, scaled from 18 / 30 / 30 lines) --
+which alone shows why one aggregate ceiling would have been wrong. All four surfaces confirmed
+end-to-end: JSON envelope, markdown footer, SARIF `properties.timings`, and MCP (by replaying the
+real captured artifact through `formatMcpOutput`). GitHub annotations excludes it deliberately,
+with the three reasons recorded above the function so the absence reads as a decision.
+
+**14 of 19 new tests fail against the unfixed code; the other 5 are guards and are not counted.**
+Confirmed by mutating each change in turn and checking the message, not just the failure -- e.g.
+`expected [ { chunkLines: 2700 } ] to have a length of 3 but got 1` for the summing mutation, and
+`expected '...⚠️ No findings, b...' to contain '✅ No findings'` for folding timing into the
+headline gate. One test moved from "guard" to "regression" only after a mutation was written that
+could falsify it.
+
+**The falsification harness lied first, and uniformly.** Its first run reported 0 failures for all
+13 mutations. `--reporter=basic` was removed in vitest 4, so vitest errored before running a single
+test and the parser read the empty output as "everything passed". A uniform verdict from a
+verification harness is a harness bug until proven otherwise -- the same rule as distrusting a probe
+that agrees with you, in the direction that would have discarded good tests instead of keeping bad
+ones.

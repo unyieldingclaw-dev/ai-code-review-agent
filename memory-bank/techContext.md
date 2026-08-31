@@ -16,7 +16,7 @@ lineage: []
 
 # Technical Context & Stack
 
-**Last Updated**: 2026-08-28
+**Last Updated**: 2026-08-31
 
 ## Development Environment
 
@@ -44,6 +44,31 @@ lineage: []
 - **Context length**: 32k (set in Ollama settings)
 - **Interface**: `LLMProvider` (src/core/llm/provider.ts)
 - **Implementation**: `OllamaProvider` (src/core/llm/ollamaProvider.ts)
+
+### Model Choice — measured 2026-08-30, do not re-derive from a single pass
+
+`devstral:latest` stays the default. Three **interleaved** calibration passes per model:
+
+| model              | cases passed | fit             | wall-clock per pass |
+| ------------------ | ------------ | --------------- | ------------------- |
+| `devstral:latest`  | 22, 24, 24   | 20 GB, 30% GPU  | 666–762 s           |
+| `qwen2.5-coder:7b` | 20, 19, 22   | 6.8 GB, 92% GPU | 68–84 s             |
+
+Counts are deliberately recorded without a denominator, because the suite size changes and pinning
+one here is the drift this file's "Current State" section exists to avoid. For the live figure read
+the `CASES` array in `calibration/calibrate.ts`, or run `npm run calibrate` (target a subset with
+`CALIBRATION_CASE=name1,name2`). Both models were measured in the same session, so the comparison
+holds regardless. Wall-clock spans a whole calibration pass, not one agent invocation.
+
+**This paragraph originally supplied an illustrative count and got it wrong** — "26 cases", from
+`grep -c "name:"`, which also matched an interface field and two type annotations; the array holds 23. Caught in review. The count is gone rather than corrected to 23, because a sentence arguing that
+pinned counts rot has no business pinning one.
+
+**The bands do not overlap at the top, and that is the finding.** A switch to `qwen2.5-coder:7b`
+was recommended on **one pass each** and was wrong; three passes reversed it. So
+`qwen2.5-coder:7b` is the _fast path_ (`--model`), never the default — its value is making
+`--chunk` affordable at roughly 9x the speed, not matching devstral's ceiling. The rule this
+established is in `systemPatterns.md`.
 
 ### Key Source Files
 
@@ -104,6 +129,75 @@ npm run calibrate                     # calibration suite (requires Ollama)
 | Service | Port  | Status                                            |
 | ------- | ----- | ------------------------------------------------- |
 | Ollama  | 11434 | Must be running for reviews and integration tests |
+
+**`OLLAMA_KEEP_ALIVE=30m` is set persistently in User scope and verified** (2026-08-30) — `ollama ps`
+reads ~29 min rather than the ~5 min default. It was previously set in **neither** User nor Machine
+scope. Applying it required restarting the daemon: Ollama reads the variable at startup, so
+exporting it in a shell does nothing to a server already running.
+
+**`ai-review-agent` on PATH is an `npm link` symlink to this working tree, not the registry build.**
+Anything concluded about "what consumers get" from the local binary is a statement about
+uncommitted local code. To reason about the published package, `npm pack ai-review-agent@X` and
+inspect the tarball. This is also why a git worktree is the wrong workspace for a change the PMB
+peer will exercise — the symlink points at the main tree, so a worktree build never reaches it.
+
+### PMB-owned defects — none fixable here
+
+`TEMPLATE_OWNED`, so `mb upgrade` overwrites any local fix. Sixteen reported across two briefs, all
+one shape: **the check's _result_ is disconnected from whether it ran.** Two live examples, and it
+takes two to establish a shape — `update-reviewed.*` reads a flat `.file_path` where the payload
+nests under `tool_input`, so `last-reviewed` is never stamped and `mb doctor` reads a dead sensor;
+`pre-push-check.*` calls `mb validate`, folded into `mb doctor`, and prints its "use mb doctor"
+message as evidence of inconsistency on every push. Moved here from `activeContext.md` on
+2026-08-31 — a standing fact about an upstream dependency, not session state.
+
+### Sharing this machine with the PMB peer session
+
+The Personal-Memory-Bank session runs on this machine and contends for the same two resources: the
+Ollama daemon, and the **self-hosted CI runner** (which is that same Ollama). Opening a PR takes the
+server via CI, so it is not a local-only act.
+
+- **Announce before restarting Ollama or opening a PR.** Both take the server.
+- **`ollama ps` cannot tell you whether a multi-pass run is in flight.** A decaying `UNTIL` means no
+  inference _right now_, not "no run active" — a chunked run between chunks is indistinguishable
+  from idle. The server cannot see its own clients between requests; ask the consumer side. Acting
+  on that reading once killed the peer's 979 s run mid-chunk.
+- **A peer session's name rotates without the session ending** (`7b` → `1d` → `c9` → `8b`). Absence
+  under a known name is not evidence it ended — read the current name from `ListAgents`.
+- **An all-markdown PR takes no server**: `review.yml` `paths-ignore`s `**/*.md`, so no `ai-review`
+  job is queued. A memory-bank PR therefore needs no announcement.
+- **An `ai-review` check showing _fail_ on a merged PR may be a cancellation, not a result** — the
+  job is cancelled by hand when it would contend with the peer.
+
+**PMB `/change-review` Job 7 shells out to ACR and branches on our exit codes — a consumer
+contract.** Changing what a code means, or making a new condition emit an existing one, changes
+their routing. **Read directly in their checkout on 2026-08-31**, at
+`PMB:.claude/commands/change-review.md:166-205` and its `templates/claude-commands/` mirror, rather
+than accepted on their report — the standing rule in `progress.md`, and this is why:
+
+| their exit | their stated meaning                           | their action                |
+| ---------- | ---------------------------------------------- | --------------------------- |
+| `0`        | **"Ran fully, nothing met the threshold"**     | genuine clean pass          |
+| `1`        | ran fully and **found** something at threshold | **use the findings**        |
+| `2`        | an agent failed internally (outranks `1`)      | not clean; fall through     |
+| `3`        | diff truncated, coverage partial               | not clean; re-run `--chunk` |
+
+- **Their invocation is `--profile security --chunk --diff <patch>`.** Verified: `fail-fast|failFast`
+  occurs **0 times** in both their command file and the shipped template, and no
+  `ai-review.config.json` exists anywhere in PMB. So `earlyExit` is latent for them, not live.
+- **`exit 4` is NOT in their table** — they described it in correspondence, but the committed
+  enumeration stops at `3`. Do not assume a missing model routes anywhere useful on their side; this
+  is the gap the `ping()` fix was meant to serve, and it may need raising with them first.
+- **Their `0` row says "Ran fully", which is exactly what a `--fail-fast` run does not do.** Their
+  own note at `:205` warns a presence-only check cannot separate "ran and found nothing" from "every
+  agent failed", calling it "a silently skipped security check reading as a pass" — the defect
+  `earlyExit` reintroduces one level up, by returning `0` from a run that stopped early.
+- **`--model` claims are peer-reported, not verified**: their file pins no model, so today's tagged
+  `--model` runs were manual. Treat as their word.
+
+**Peer-reported and NOT verifiable from this repo** — hedge accordingly, since both sides have
+drifted before: their 8-case UTF-16/UTF-32 BOM byte matrix (their `tests/dangerous-commands.Tests.ps1`
+exists, but the result was not reproduced here) and their account of their own commit history.
 
 ### `mb upgrade` — what it actually overwrites
 

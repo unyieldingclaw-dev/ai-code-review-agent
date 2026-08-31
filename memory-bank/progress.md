@@ -16,9 +16,72 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-28
+**Last Updated**: 2026-08-31
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
+
+## ✅ Two shipped invariants worth not re-deriving
+
+Moved here from `activeContext.md` on 2026-08-31: shipped behaviour is what this file is for, and
+holding it in the volatile file was costing the headroom that file most needs.
+
+- **The evidence-location check (v1.14.0) flags — never corrects or drops** — a finding whose quoted
+  evidence is not at its cited `file:line`, on all four surfaces.
+- **Four hallucination classes have deterministic backstops rather than prompt wording**, because
+  prompt-only fixes were measured across three agents and failed every time. Detail in
+  [`archive/progress-history.md`](archive/progress-history.md).
+
+## 🔎 `earlyExit` invisibility — investigated and proven, not yet fixed (2026-08-31)
+
+**Not a fix entry. This records what was established, so the next session does not re-derive it.**
+`#79` (2026-08-29), `#80` and `#81` (2026-08-31) merged; `npm run check` green, verified by running
+it rather than inherited. Count in the Metrics table below — once, not restated here.
+
+**`grep -rn earlyExit src/` hits `cli/index.ts`, `core/runner.ts` and `core/chunkRunner.ts` — no
+formatter.** The only trace a reader ever sees is a footer `cli/index.ts:411` appends _after_
+`formatMarkdown` returns, and `cli/index.ts:405-409` skips it for json, sarif **and**
+github-annotations (the handoff said SARIF only; it is all three). Any other caller of
+`formatMarkdown` gets nothing.
+
+**Proven by replay through the real shipped exports in `dist/`, not by reading** — the discipline
+this file's own rules demand, and the one the prior session's six proxy assertions failed. A
+realistic fail-fast result (3 of 15 agents run) rendered:
+
+| surface            | output                                                                 |
+| ------------------ | ---------------------------------------------------------------------- |
+| CLI markdown       | `# AI Code Review Report` — no signal                                  |
+| SARIF              | `executionSuccessful: true`, no notifications, no `earlyExit` property |
+| GitHub annotations | finding line only, no `::warning::`                                    |
+| MCP                | `## AI Code Review — ✅ No critical or high findings`                  |
+| exit code          | **0**                                                                  |
+
+**Why exit 0 rather than 1, which was not expected.** `shouldEarlyExit` (`runner.ts:239`) fires on
+**raw** per-agent findings; `orchestrator.ts:306-307` then applies "Solo High → Medium" to any high
+with no corroborator at the same location — and halting the swarm is precisely what guarantees
+nothing corroborates the trigger. Fail-fast reads pre-orchestrator severity, the exit code reads
+post-orchestrator severity, and they disagree. Precondition: ≥2 agents produced findings, else
+`orchestrator.ts:279` short-circuits and the high survives to exit 1. **This reaches a consumer** —
+PMB's Job 7 branches on `0` = clean.
+
+**A second, independent defect, live today with no fail-fast involved.** `cli/formatter.ts:29`
+derives `totalAgents` from `agentStatus`, which `runner.ts:434` writes only for agents that ran, so
+the INCOMPLETE banner's denominator shrinks to the agents that started. Demonstrated through the
+real formatter with 15 configured, 4 started, 11 never run, 1 timed out:
+`⚠️ INCOMPLETE — **0 findings** from 3/4 agents that completed`. It states 3/4 where the truth is
+3/15 — an affirmative claim of full agent coverage inside the banner meant to signal incompleteness.
+
+**That sets a trap for the obvious fix**, which is why it is recorded before any code was written:
+folding `earlyExit` into the `incomplete` gate makes that scope string render on **every** fail-fast
+run as "from 3/3 agents that completed", converting a silent omission into a confident false claim.
+Same shape as this repo's own `elapsedMs` rounds, where round 2's fix recorded the _last_ attempt
+instead of the _longest_ and hid a slow attempt behind a fast retry. Adding `'skipped'` to
+`AgentStatus` would fix all four surfaces through machinery they already read, but `hasAgentFailures`
+treats anything `!== 'ok'` as failure, so every fail-fast run would start exiting 2 and re-route
+PMB's mapping — rejected for that reason, not for cost.
+
+**Third part:** `chunkRunner.ts:167` omits `truncation` on the stated premise "Full coverage achieved
+across all chunks", which the `break` at line 90 falsifies — chunks go unreviewed with no field able
+to trigger any incompleteness gate.
 
 ## ✅ Corrections from PMB, verified in their checkout (2026-08-28)
 
@@ -219,85 +282,15 @@ instruction that had never been true. GitHub description, homepage and topics up
 reported as merged. Verified each local tip against its merged PR's `headRefOid`; one differed and
 was merely _behind_. Rule in `systemPatterns.md`.
 
-## ✅ Completed (2026-08-27, second session)
-
-**Timing instrumentation shipped — `ReviewResult.timings`, one row per `SwarmRunner.run()` call.**
-Each row carries `diffLines`, the scaled `effectiveTimeoutMs`, `durationMs`, and every agent's
-`elapsedMs` paired with its `status`. Written to stderr as each pass completes and into the
-envelope, so it reaches the `ai-review-findings` artifact. **810 tests** (19 new), `npm run check`
-green.
-
-**The measurement already existed; only the persistence was missing.** `AgentProgressEvent.elapsedMs`
-has been set on every execution path -- coverage, sequential, parallel, testgen, on both the success
-and the failure branch -- and printed to stderr all along. It was a fire-and-forget callback, so it
-survived nowhere. The runner now taps that channel with a recording proxy instead of adding a second
-timer, so **no agent execution path changed at all**. Generalisable: _emitted is not recorded_, and
-a number that only ever reaches a terminal is a number you will be unable to cite later.
-
-**Concatenate, never sum -- the one decision the field rests on.** `mergeResults` sums
-`summary.durationMs`, which is right for "how long did this take" and fatal for "did any agent
-approach its ceiling": the ceiling applies per `run()` call, so a sum exceeds every ceiling without
-any agent having done so. That is precisely why "616 s" was unreadable. `status` is stored beside
-`elapsedMs` for the mirror-image reason -- a timed-out agent's elapsed _is_ the ceiling, and reads
-as a completion time sitting just under the limit unless it is labelled.
-
-**A five-lens code review found two real defects in it, and the second measurement confirmed one
-live.** (1) `elapsedMs` was captured outside `withRetryTimeout`, so it spanned every attempt plus
-backoff while `effectiveTimeoutMs` governs one attempt — a parse-error-then-success rendered as an
-agent past its own ceiling with `status: 'ok'` (measured 1015 ms vs a 300 ms ceiling). `AgentTiming`
-now carries `attemptMs` + `attempts` alongside wall time, and a retried agent is named in the line.
-(2) `buildTimingLines` opened with a bare `---`, which in CommonMark is a **setext heading
-underline**, not a rule — it silently promoted the verdict line ("No issues found." / "INCOMPLETE
-— reviewed 2000/12599 lines") to an `<h2>`. Two prior commits were spent on that exact line. Every
-existing assertion used `toContain`, so all of them passed while the render was wrong; the new tests
-assert on line adjacency instead.
-
-**The review also found twelve false claims in the new WHY comments** — `locationCheck` called a
-`ReviewResult` field (it is on `Finding`), a `slowestAgent` docblock describing "three consumers"
-that a refactor had already removed, an invented "mcp must not import cli" rule enforced by nothing,
-and an "earlier draft" cited from no commit. All corrected. Root cause: comments written against a
-draft, then not re-read after the refactor that invalidated them. **And, worst: the unsourced 616 s
-constants had been baked into four test fixtures and the README envelope example**, where a reader
-takes them for a real measurement — the exact failure `10355d6` had just finished correcting.
-Replaced with neutral values.
-
-**Self-review caught a duplicate renderer before commit.** The stderr line first composed its own
-string from the same four fields that `timingSentence` renders, and the two were already drifting --
-one parenthesised the ceiling, only one labelled a timed-out agent. `formatRunTiming` now delegates,
-so there is a single renderer behind stderr, the markdown footer and the MCP note. This is the
-`TOOL_LABELS` rule applied to a field added specifically to stop people misreading a number.
-
-**Verified through the real pipeline, not a probe.** A real `--chunk` CLI run produced three rows
-with **different per-chunk ceilings** (288 s / 360 s / 360 s, scaled from 18 / 30 / 30 lines) --
-which alone shows why one aggregate ceiling would have been wrong. All four surfaces confirmed
-end-to-end: JSON envelope, markdown footer, SARIF `properties.timings`, and MCP (by replaying the
-real captured artifact through `formatMcpOutput`). GitHub annotations excludes it deliberately,
-with the three reasons recorded above the function so the absence reads as a decision.
-
-**14 of 19 new tests fail against the unfixed code; the other 5 are guards and are not counted.**
-Confirmed by mutating each change in turn and checking the message, not just the failure -- e.g.
-`expected [ { chunkLines: 2700 } ] to have a length of 3 but got 1` for the summing mutation, and
-`expected '...⚠️ No findings, b...' to contain '✅ No findings'` for folding timing into the
-headline gate. One test moved from "guard" to "regression" only after a mutation was written that
-could falsify it.
-
-**The falsification harness lied first, and uniformly.** Its first run reported 0 failures for all
-13 mutations. `--reporter=basic` was removed in vitest 4, so vitest errored before running a single
-test and the parser read the empty output as "everything passed". A uniform verdict from a
-verification harness is a harness bug until proven otherwise -- the same rule as distrusting a probe
-that agrees with you, in the direction that would have discarded good tests instead of keeping bad
-ones.
-
 > Completed work through 2026-08-26 is in [`archive/progress-history.md`](archive/progress-history.md).
 
 ## 📊 Metrics
 
 ### Test Coverage
 
-- **Unit Tests**: 826 passing across 47 test files, verified 2026-08-28 (run `npm test` for current
-  count)
+- **Unit Tests**: 839 passing across 47 test files, verified 2026-08-31 (run `npm test` for current
+  count — this line has been stale twice, so trust the command over it)
 - **Integration Tests**: 1 file, 5 tests — skip without INTEGRATION=1, run with live Ollama
-- **Total**: 826
 
 ### Implementation Progress
 
