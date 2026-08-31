@@ -4,6 +4,7 @@ import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import type { ReviewResult, Finding, Severity } from '../../core/schema.js'
+import { missedChunks, isIncomplete, earlyExitLostCoverage } from '../../core/schema.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(readFileSync(join(__dirname, '../../../package.json'), 'utf-8')) as {
@@ -68,8 +69,46 @@ function buildInvocation(result: ReviewResult) {
   const failedAgents = Object.entries(result.agentStatus ?? {}).filter(
     ([, status]) => status !== 'ok'
   )
-  const executionSuccessful = failedAgents.length === 0 && !result.truncation?.truncated
+  const chunksMissed = missedChunks(result)
+  // A design review objected that `executionSuccessful: false` is semantically wrong for
+  // --fail-fast, and the objection is half right: SARIF defines the field as whether the TOOL
+  // ran successfully, and a fail-fast stop is the tool obeying an instruction, not failing.
+  //
+  // It is set false anyway, for the reason the field is actually consumed. GitHub Code Scanning
+  // and most SARIF CI gates treat "0 results + executionSuccessful: true" as a clean scan, which
+  // is precisely the claim a partial review must not make -- the same reasoning already applied
+  // to `truncation` on the line this replaces, where the tool also ran exactly as instructed.
+  // Being semantically loose in the direction of "do not trust this as complete" is the safe
+  // failure direction; the alternative is a green scan over a review that never ran twelve of
+  // its agents. The notification below states which case it was, so a consumer that does read
+  // the detail is not left guessing.
+  const executionSuccessful = !isIncomplete(result)
   const notifications = [
+    ...(result.earlyExit && earlyExitLostCoverage(result)
+      ? [
+          {
+            level: 'warning' as const,
+            message: {
+              text:
+                `Fail-fast: the review stopped after "${result.earlyExit.stoppedAt}" when a ` +
+                `finding met the configured threshold. The remaining agents never ran, so this ` +
+                `is a partial review — absence of a result does not mean absence of a defect.`,
+            },
+          },
+        ]
+      : []),
+    ...(chunksMissed
+      ? [
+          {
+            level: 'warning' as const,
+            message: {
+              text:
+                `Chunked review stopped early: ${chunksMissed?.reviewed} of ` +
+                `${chunksMissed?.total} chunks were analyzed; the rest of the diff was not.`,
+            },
+          },
+        ]
+      : []),
     ...failedAgents.map(([name, status]) => ({
       level: 'error' as const,
       message: { text: `Agent "${name}" failed: ${status} — results may be incomplete.` },
@@ -118,6 +157,12 @@ export function formatSarif(result: ReviewResult): string {
             : {}),
           ...(result.agentStatus ? { agentStatus: result.agentStatus } : {}),
           ...(result.truncation?.truncated ? { truncation: result.truncation } : {}),
+          // Machine-read alongside the invocation notification above, not instead of it: a
+          // consumer computing its own coverage ratio needs the numbers, and agentStatus alone
+          // cannot supply the denominator -- it holds only the agents that ran.
+          ...(result.earlyExit ? { earlyExit: result.earlyExit } : {}),
+          ...(result.agentsPlanned !== undefined ? { agentsPlanned: result.agentsPlanned } : {}),
+          ...(result.chunking ? { chunking: result.chunking } : {}),
           ...(result.hallucinationFilter && result.hallucinationFilter.dropped.length > 0
             ? { hallucinationFilter: result.hallucinationFilter }
             : {}),

@@ -917,6 +917,13 @@ export class SwarmRunner {
       testFiles,
       summary: this.buildSummary(findings, timing.durationMs),
       ...(earlyExitAgent ? { earlyExit: { stoppedAt: earlyExitAgent } } : {}),
+      // `total` is the roster this run scheduled, already narrowed for this diff by the
+      // migration-safety gate and agentPolicy above. It has always existed -- every progress
+      // event carries it as `event.total` -- but it was fire-and-forget to stderr and survived
+      // nowhere, so every renderer fell back to counting agentStatus and got a denominator that
+      // shrank whenever agents were skipped. Recording it changes no execution path; the same
+      // "emitted is not recorded" gap that `timings` closed.
+      agentsPlanned: total,
       ...(contextMode === 'memory-bank'
         ? {
             context: {

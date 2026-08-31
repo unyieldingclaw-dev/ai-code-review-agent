@@ -1,41 +1,40 @@
 {
-  "task": "Add an opt-in, off-by-default OpenAI-compatible LLM provider, and amend projectbrief.md's Ollama-only constraint to permit it. Testable locally against Ollama's own /v1 endpoint; targets LiteLLM at work.",
-  "status": "cancelled",
-  "created_at": "2026-08-30T23:06:11Z",
-  "expires_at": "2026-08-31T07:06:11Z",
-  "approved_by": "user (\"do what you suggest\", then cleared scoping: LiteLLM is the work target, OpenCode protocol unknown and not required)",
-  "notes": "projectbrief.md is the immutable tier. The amendment is the reason this contract exists and must not be treated as incidental. Default provider stays ollama; cloud is never implicit.",
+  "task": "Make ReviewResult.earlyExit visible on ALL SIX output surfaces with a truthful agent-coverage denominator, record chunk coverage when the chunk loop breaks early, and stop chunkRunner claiming full coverage. No exit-code change.",
+  "status": "complete",
+  "created_at": "2026-08-31T19:30:35Z",
+  "expires_at": "2026-09-01T03:30:35Z",
+  "approved_by": "user (\"revise the contract to the six-surface scope\", 2026-08-31), superseding the four-surface contract approved earlier the same day",
+  "supersedes": "four-surface contract; scope doubled after an adversarial design pass returned yes-with-changes on all six fronts",
+  "design_review": "docs/superpowers/plans/2026-08-31-early-exit-visibility-design-review.md",
+  "notes": "SIX surfaces, not four. The four-formatter rule in systemPatterns.md never reached the last two because neither is a formatter: (5) .github/workflows/review.yml:147-150 is a hand-rolled github-script PR-comment renderer whose ONLY result read is result.findings, posting a green check on zero findings -- the highest-visibility surface in the repo; (6) vscode-extension does not even DECLARE earlyExit/agentStatus/truncation in its ReviewResult (types.ts:33-37) and prints a bare count plus a green check (output.ts:29-31), so it is missing the ENTIRE incompleteness contract, not just earlyExit. BLOCKERS from the design pass: (a) the denominator is NOT constant across chunks -- agent selection depends on each chunk diff via the migration-safety gate (runner.ts:714-717) and evaluatePolicy over extractChangedFiles (:719-724), so last-chunk-wins is wrong and max is only a floor; a chunking:{total,reviewed} field is needed instead; (b) SARIF executionSuccessful is the WRONG field -- a fail-fast stop is the tool obeying instructions; (c) the denominator trap recurs at mcp/formatter.ts:23, not only cli/formatter.ts:29; (d) the CLI no-findings early-return path still renders a green check. CONSTRAINTS from the PMB consumer, verified in their checkout: no exit-code change, and a consumer who never passes --fail-fast must still be protected. review.yml is a CI change (CONFIRM tier in CLAUDE.md) -- included deliberately by the scope approval, not incidentally. review.yml turned out to be TWO renderers, not one -- the PR comment and the Step Summary each parsed findings.json independently. Both now go through scripts/reviewIncompleteness.cjs so they cannot drift, the same single-renderer discipline as formatRunTiming. Also folded in (user directive, not a separate task): the wall-clock flake in tests/unit/runner.test.ts, both instances.",
+  "open_subdecision": "RESOLVED 2026-08-31: user approved bringing vscode-extension to FULL parity, not earlyExit alone. It was missing truncation and agentStatus visibility too, having received none of the incompleteness work -- the four-formatter rule enumerates formatters and this is a second renderer behind a duplicated type. renderReport had zero test coverage, which is how it drifted; vscode-extension/tests/output.test.ts now covers all four states.",
   "scope": [
     {
-      "file": "memory-bank/projectbrief.md",
+      "file": "src/core/schema.ts",
       "op": "edit"
     },
     {
-      "file": "memory-bank/systemPatterns.md",
+      "file": "src/core/runner.ts",
       "op": "edit"
     },
     {
-      "file": "memory-bank/techContext.md",
+      "file": "src/core/chunkRunner.ts",
       "op": "edit"
     },
     {
-      "file": "memory-bank/progress.md",
+      "file": "src/cli/formatter.ts",
       "op": "edit"
     },
     {
-      "file": "memory-bank/activeContext.md",
+      "file": "src/mcp/formatter.ts",
       "op": "edit"
     },
     {
-      "file": "src/core/llm/openAiCompatibleProvider.ts",
-      "op": "create"
-    },
-    {
-      "file": "src/core/llm/provider.ts",
+      "file": "src/cli/formatters/sarif.ts",
       "op": "edit"
     },
     {
-      "file": "src/core/config.ts",
+      "file": "src/cli/formatters/githubAnnotations.ts",
       "op": "edit"
     },
     {
@@ -43,18 +42,46 @@
       "op": "edit"
     },
     {
-      "file": "tests/unit/openAiCompatibleProvider.test.ts",
-      "op": "create"
+      "file": ".github/workflows/review.yml",
+      "op": "edit"
     },
     {
-      "file": "README.md",
+      "file": "vscode-extension/src/types.ts",
       "op": "edit"
+    },
+    {
+      "file": "vscode-extension/src/output.ts",
+      "op": "edit"
+    },
+    {
+      "file": "tests/unit",
+      "op": "edit"
+    },
+    {
+      "file": "CHANGELOG.md",
+      "op": "edit"
+    },
+    {
+      "file": "docs/superpowers/plans/2026-08-31-early-exit-visibility-design-review.md",
+      "op": "create"
     },
     {
       "file": ".claude/contracts/active-task.json",
       "op": "edit"
+    },
+    {
+      "file": "vscode-extension/tests/output.test.ts",
+      "op": "create"
+    },
+    {
+      "file": "scripts/reviewIncompleteness.cjs",
+      "op": "create"
     }
   ],
-  "cancelled_at": "2026-08-30T23:20:00Z",
-  "cancelled_reason": "Justification was a LiteLLM gateway that does not exist on this machine. No source file was touched. Nothing to revert."
+  "completion_notes": "Approved by code review after four Blocking findings were fixed and mutation-proved, plus two non-blocking findings from the opposition pass folded in rather than deferred (per operator directive against spun-out follow-up tasks). Opposition verdict: Approve. Final: npm run check exit 0, 875 tests / 48 files, extension 40 tests, esbuild build clean.",
+  "review_findings": "Code review found FOUR Blocking defects, all fixed and each mutation-proved: (1) the incompleteness predicate was duplicated across four TS files, which the design review had already flagged as blocker O2 -- now centralised in schema.ts; (2) mergeToolAvailability merged to 'used' when the chunk loop broke early, claiming a completed gitleaks scan over a diff it never saw, and claiming it by SILENCE since 'used' renders nothing; (3) earlyExit alone triggered a partial-review claim even when zero agents were skipped, because shouldEarlyExit runs after the LAST agent too -- producing \"INCOMPLETE - 0 findings from 3/3 agents that completed\"; (4) an absent agentsPlanned made the denominator fall back to the count that RAN, so the ratio was tautological. Three of those four were blockers the projects own design-review document had already named and this implementation shipped past. Also fixed: a Math.max that could fall below mergeAgentStatus union size, printing a NEGATIVE agent count into a PR annotation; and CRLF endings that broke prettier --check.",
+  "test_accounting": "29 new tests. 17 are regression tests (12 main-suite + 5 extension), proven by reverting every behaviour change at once and confirming each expected failure message. 6 are explicitly-labelled guards. The remaining 6, in tests/unit/reviewIncompleteness.test.ts, CANNOT be falsified by that method because scripts/reviewIncompleteness.cjs is a new module with no prior version to revert to -- they are unit tests for new pure functions and are deliberately NOT counted as regression evidence. Plus 6 further tests added for the four blocker fixes, each mutation-proved separately.",
+  "known_not_fixed": "systemPatterns.md still states the four-formatter rule when there are demonstrably six; not edited here because memory-bank changes live on a separate uncommitted branch and editing both would conflict. Non-blocking test gaps left open and named rather than silently closed: truncation+earlyExit combined, a CLI-wiring test that the footer renders exactly once, noEmoji variants of the new banners, and SARIF notification ordering. Also: the no-findings verdict line restates agent counts but omits chunk coverage (opposition finding C); mcp/formatter.ts re-derives its gate from the sub-predicates rather than calling isIncomplete directly (equivalent, verified, but inconsistent); and the INCOMPLETE-headline/exit-0 asymmetry is documented only in CHANGELOG.md, not in a code comment as the design review O9 suggested.",
+  "completed_at": "2026-08-31T22:24:33Z",
+  "opposition_findings": "Opposition found three beyond the domain agents, two now fixed: (A) the three copies of the incompleteness gate ACTUALLY DIVERGED -- scripts/reviewIncompleteness.cjs gated on  where schema.ts floors at 0 and the vscode copy checks , so a malformed envelope made the PR comment claim a partial review while every other surface stayed silent. Latent, not live, but it falsified the exact property the shared module exists to guarantee. (B) toolAvailability 'partial' has two producers with opposite meanings; chunkRunner reusing it made the report say \"part of the diff was never analyzed\" and \"nothing was left unscanned\" two lines apart. Prose is now conditional on the cause. (C) the no-findings verdict omits chunk info while restating agent counts -- verbose and lossy, not silent; left, and named in known_not_fixed."
 }

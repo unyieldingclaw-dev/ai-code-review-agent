@@ -305,6 +305,28 @@ export interface ReviewResult {
   testFiles: GeneratedTestFile[]
   summary: ReviewSummary
   earlyExit?: { stoppedAt: AgentName }
+  // How many agents this run intended to execute. PLANNED, not "configured": the roster is
+  // narrowed per-diff before anything runs -- the migration-safety gate and agentPolicy both
+  // consult the changed files -- so this is what was scheduled for THIS diff, not what the
+  // config named.
+  //
+  // WHY it must be recorded rather than derived: every surface previously computed its
+  // denominator as Object.keys(agentStatus).length, and agentStatus is written only for agents
+  // that actually ran (runner.ts, sequential and parallel paths alike). An early exit therefore
+  // shrank the denominator along with the numerator and rendered "3/3 agents that completed"
+  // for a run that skipped twelve -- an affirmative claim of full coverage inside the banner
+  // whose whole purpose is to deny it. The number already existed as the progress event's
+  // `total`; only the persistence was missing. Same shape as `timings`: emitted is not recorded.
+  agentsPlanned?: number
+  // Chunk coverage for a --chunk run. `reviewed < total` means the chunk loop stopped early
+  // (chunkRunner breaks on a chunk's earlyExit), so whole chunks of the diff were never seen.
+  //
+  // WHY this is not expressed as `truncation`: truncation means a single pass was cut short and
+  // carries exit code 3, whose documented remedy is "re-run with --chunk". Stopping a chunked
+  // run early is a different state with a different remedy, and routing it to exit 3 would tell
+  // a consumer to re-run with a flag it already passed. Recorded as its own field so the
+  // surfaces can say what happened without moving any exit code.
+  chunking?: { total: number; reviewed: number }
   context?: {
     mode: 'none' | 'memory-bank'
     filesLoaded: string[]
@@ -357,4 +379,98 @@ export interface AgentProgressEvent {
   attemptMs?: number
   attempts?: number
   earlyExit?: boolean
+}
+
+// --- Incompleteness predicate, shared by every surface that renders a verdict ---
+//
+// WHY these live here rather than being recomputed per formatter: the first version of the
+// earlyExit fix inlined `result.agentsPlanned ?? Object.keys(agentStatus ?? {}).length` and the
+// four-term incompleteness gate into cli/formatter.ts, mcp/formatter.ts, sarif.ts and
+// githubAnnotations.ts independently. A reviewer flagged it as the same drift this project has
+// already been burned by three times -- `toolAvailability` reached some surfaces and missed
+// others, `locationCheck` missed SARIF and MCP, and `earlyExit` reached none at all. Four copies
+// of a predicate is four places a fifth incompleteness cause has to be remembered.
+//
+// Two consumers deliberately do NOT use these and keep their own copies, both for hard reasons
+// rather than convenience: `scripts/reviewIncompleteness.cjs` must be CommonJS because
+// actions/github-script and `node -e` can only `require`, and `vscode-extension` is a separate
+// package that cannot import from this one. Those are the only two, and each says so in place.
+
+/** Agents that actually ran. `agentStatus` is written only for agents the runner started. */
+export function agentsRanCount(result: ReviewResult): number {
+  return Object.keys(result.agentStatus ?? {}).length
+}
+
+/**
+ * The denominator for any "N of M agents" statement.
+ *
+ * Falls back to the count that RAN only for envelopes predating `agentsPlanned` (an archived
+ * findings.json, a hand-built fixture). That fallback reproduces the old shrinking denominator,
+ * which is why `isIncomplete` never gates on the ratio -- it reads `earlyExit` directly.
+ */
+export function agentsPlannedCount(result: ReviewResult): number {
+  return result.agentsPlanned ?? agentsRanCount(result)
+}
+
+/**
+ * The chunk ratio when the chunk loop stopped early, or undefined when coverage was complete.
+ *
+ * Returns the object rather than a boolean so callers narrow `chunking` naturally at the use site.
+ * A boolean helper forces every consumer to re-assert non-undefined, and a `!` there is exactly
+ * the kind of assertion that outlives the invariant that justified it.
+ */
+export function missedChunks(
+  result: ReviewResult
+): { total: number; reviewed: number } | undefined {
+  const c = result.chunking
+  return c !== undefined && c.reviewed < c.total ? c : undefined
+}
+
+/**
+ * Agents that were scheduled but never started, or undefined when it cannot be known.
+ *
+ * Undefined for envelopes predating `agentsPlanned`; callers must treat that as "unknown", not
+ * as zero. Floored at 0 defensively -- chunkRunner already floors the denominator, but this
+ * function also runs over archived results it did not produce.
+ */
+export function agentsNotRun(result: ReviewResult): number | undefined {
+  if (result.agentsPlanned === undefined) return undefined
+  return Math.max(0, result.agentsPlanned - agentsRanCount(result))
+}
+
+/**
+ * Whether `earlyExit` actually cost coverage.
+ *
+ * NOT the same as `earlyExit !== undefined`, and the difference is a false claim we shipped once:
+ * `shouldEarlyExit` is evaluated after EVERY sequential agent including the last one, so a run can
+ * stop "early" having already executed its whole roster. Gating the banners on the mere presence
+ * of the field produced `INCOMPLETE - 0 findings from 3/3 agents that completed` alongside "the
+ * unrun agents' domains were not examined at all" -- a report contradicting itself in two lines,
+ * about a review that was in fact complete.
+ *
+ * Unknown counts as lost coverage: an old envelope carries `earlyExit` without `agentsPlanned`,
+ * and over-reporting incompleteness is the safe direction when the question cannot be answered.
+ */
+export function earlyExitLostCoverage(result: ReviewResult): boolean {
+  if (result.earlyExit === undefined) return false
+  const notRun = agentsNotRun(result)
+  return notRun === undefined || notRun > 0
+}
+
+/**
+ * Whether this run may be described as a complete review.
+ *
+ * Four causes, and they are genuinely distinct: part of the diff never read (truncation), part of
+ * the review never performed (a failed agent), the rest deliberately abandoned (`earlyExit`), and
+ * whole chunks skipped. Agents that never started are ABSENT from `agentStatus` rather than
+ * failed, which is why the earlyExit term cannot be folded into the failed-agent one.
+ */
+export function isIncomplete(result: ReviewResult): boolean {
+  const anyAgentFailed = Object.values(result.agentStatus ?? {}).some((s) => s !== 'ok')
+  return (
+    Boolean(result.truncation?.truncated) ||
+    anyAgentFailed ||
+    earlyExitLostCoverage(result) ||
+    missedChunks(result) !== undefined
+  )
 }
