@@ -172,6 +172,128 @@ describe('formatMarkdown', () => {
     expect(output).toContain('10599') // the unreviewed remainder, stated outright
   })
 
+  // REGRESSION (2026-08-30). #51 fixed the NO-findings path and stopped there, leaving the
+  // findings path stating "**15 findings**" as its headline with the truncation banner below it.
+  // A findings count is a verdict in the same way a ✅ is: it states a result, and a reader who
+  // takes it at face value has no reason to suspect 70% of the diff was never looked at.
+  //
+  // Measured, which is why this is not a style preference: a 6,578-line diff at default
+  // --max-lines reviewed 2,000 lines and reported 0 findings; the same diff with --chunk returned
+  // 15 findings including 2 High. The banner fired correctly three times over and the reader still
+  // concluded clean. A control that depends on attention is not a control.
+  it('leads with INCOMPLETE when a truncated run DID find things, not just when it found none', () => {
+    const findings = [makeFinding()]
+    const result = makeResult({
+      findings,
+      summary: { totalFindings: findings.length, bySeverity: {}, byAgent: {}, durationMs: 100 },
+      truncation: { truncated: true, originalLines: 6578, keptLines: 2000 },
+    })
+    const headline = formatMarkdown(result)
+      .split('\n')
+      .find((l) => l.includes('finding'))
+    expect(headline).toBeDefined()
+    // The incompleteness must be IN the headline, not in a line below it.
+    expect(headline).toContain('INCOMPLETE')
+    expect(headline).toContain('2000/6578')
+    expect(headline).toContain('1 finding')
+  })
+
+  it('does not state a bare findings count as the headline of a truncated run', () => {
+    // The exact shape that shipped: "**15 findings** | 200ms" with the caveat underneath it.
+    const findings = [makeFinding({ id: 'f1' }), makeFinding({ id: 'f2' })]
+    const result = makeResult({
+      findings,
+      summary: { totalFindings: findings.length, bySeverity: {}, byAgent: {}, durationMs: 100 },
+      truncation: { truncated: true, originalLines: 6578, keptLines: 2000 },
+    })
+    const bareCount = formatMarkdown(result)
+      .split('\n')
+      .find((l) => /^\*\*\d+ findings?\*\* \|/.test(l))
+    expect(bareCount).toBeUndefined()
+  })
+
+  // REGRESSION (2026-08-30), MCP side. The same defect as the two CLI cases above, on the surface
+  // that earns the fix most: systemPatterns' four-formatter rule says check MCP FIRST, because its
+  // reader is a calling LLM with no terminal to cross-check against. #51's reasoning reached this
+  // file's no-findings path and not its two siblings twenty lines below.
+  it('MCP does not show a green check for a truncated run with only medium/low findings', () => {
+    const findings = [makeFinding({ severity: 'medium' })]
+    const result = makeResult({
+      findings,
+      summary: {
+        totalFindings: 1,
+        bySeverity: { medium: 1 },
+        byAgent: {},
+        durationMs: 100,
+      },
+      truncation: { truncated: true, originalLines: 6578, keptLines: 2000 },
+    })
+    const output = formatMcpOutput(result)
+    // A ✅ here says "reviewed and found nothing serious" about 30% of a diff.
+    expect(output).not.toContain('✅')
+    expect(output.split('\n')[0]).toContain('INCOMPLETE')
+  })
+
+  it('MCP does not state a bare findings count as the headline of a truncated run', () => {
+    const findings = [
+      makeFinding({ severity: 'high' }),
+      makeFinding({ id: 'f2', severity: 'high' }),
+    ]
+    const result = makeResult({
+      findings,
+      summary: { totalFindings: 2, bySeverity: { high: 2 }, byAgent: {}, durationMs: 100 },
+      truncation: { truncated: true, originalLines: 6578, keptLines: 2000 },
+    })
+    const headline = formatMcpOutput(result).split('\n')[0]
+    expect(headline).toContain('INCOMPLETE')
+    expect(headline).not.toMatch(/—\s*\d+ findings?$/)
+  })
+
+  it('MCP still reports a genuine full-coverage run without the incompleteness headline', () => {
+    // Guard against over-correction: an untruncated run with all agents ok must keep its ✅.
+    const result = makeResult({
+      findings: [makeFinding({ severity: 'medium' })],
+      summary: { totalFindings: 1, bySeverity: { medium: 1 }, byAgent: {}, durationMs: 100 },
+      agentStatus: { security: 'ok' },
+    })
+    const output = formatMcpOutput(result)
+    expect(output).toContain('✅')
+    expect(output).not.toContain('INCOMPLETE')
+  })
+
+  // REGRESSION (2026-08-30). The first version of the INCOMPLETE headline gated on truncation
+  // ALONE, while the MCP fix in the same change gated on `warnings` — which carries agent failures
+  // too. That made the CLI the only one of four surfaces calling an agent-failure run complete:
+  // MCP said INCOMPLETE, sarif set executionSuccessful=false, githubAnnotations emitted a
+  // ::warning:: per agent, and cli/index.ts set exit code 2. The process called the run degraded
+  // while its own headline called it complete.
+  //
+  // Truncation and agent failure are the same defect wearing two hats: part of the diff never
+  // reviewed, versus part of the review never performed. Neither is actionable from a plain count.
+  it('leads with INCOMPLETE when agents failed, even with nothing truncated', () => {
+    const result = makeResult({
+      findings: [makeFinding()],
+      summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: {}, durationMs: 100 },
+      agentStatus: { security: 'ok', performance: 'timeout', design: 'error' },
+    })
+    const headline = formatMarkdown(result)
+      .split('\n')
+      .find((l) => l.includes('finding'))
+    expect(headline).toContain('INCOMPLETE')
+    expect(headline).toContain('1/3') // agents that completed, stated outright
+  })
+
+  it('CLI and MCP agree on AGENT FAILURES, not just on truncation', () => {
+    // The cross-surface check that existed only for truncation, which is why the split survived.
+    const result = makeResult({
+      findings: [makeFinding()],
+      summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: {}, durationMs: 100 },
+      agentStatus: { security: 'ok', performance: 'timeout' },
+    })
+    expect(formatMarkdown(result)).toContain('INCOMPLETE')
+    expect(formatMcpOutput(result)).toContain('INCOMPLETE')
+  })
+
   it('does not render a truncated run as clean on ANY surface — CLI and MCP agree', () => {
     // The CLI said ✅ while MCP said ⚠️ for the identical state, so the same run reported two
     // different verdicts depending on which surface you read. Whichever is chosen, both must

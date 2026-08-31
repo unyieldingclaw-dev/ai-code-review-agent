@@ -41,8 +41,36 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
 
   lines.push('# AI Code Review Report')
   lines.push('')
+  // WHY the headline itself carries incompleteness rather than leaving it to the banner below:
+  // this is the same lesson #51 learned for the no-findings path, applied to the case it missed.
+  // There, a ✅ next to qualifying text still read as a pass, so the glyph was replaced outright
+  // -- "the glyph IS the verdict for a skimming reader". A findings count is a verdict in exactly
+  // the same way: "15 findings" states a result, and a reader who takes it at face value has no
+  // reason to suspect 70% of the diff was never looked at.
+  //
+  // Measured 2026-08-30, which is why this is not a style preference: a 6,578-line diff at default
+  // --max-lines reviewed 2,000 lines and reported 0 findings; the same diff with --chunk returned
+  // 15 findings including 2 High. The truncation banner fired correctly and three times over, and
+  // the reader still concluded clean, because they read the top line and grepped for the rest. A
+  // control that depends on attention is not a control.
+  // WHY this gates on failed agents as well as truncation: they are the same defect wearing two
+  // hats -- part of the diff never reviewed, versus part of the REVIEW never performed. A reader
+  // cannot act on either from a headline that states a plain count. The first version of this fix
+  // gated on truncation alone, which made the CLI the only one of four surfaces calling such a run
+  // complete: mcp/formatter.ts says INCOMPLETE (it gates on `warnings`, which carries both),
+  // sarif.ts sets executionSuccessful=false, githubAnnotations.ts emits a ::warning:: per agent,
+  // and cli/index.ts:421 sets exit code 2 -- so the process called the run degraded while its own
+  // headline called it complete. That is precisely the cross-surface disagreement the test named
+  // "does not render a truncated run as clean on ANY surface" exists to forbid.
+  const incomplete = truncation?.truncated || failedAgents.length > 0
+  const countText = `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}**`
+  const scope = truncation?.truncated
+    ? `in ${truncation.keptLines}/${truncation.originalLines} lines reviewed`
+    : `from ${totalAgents - failedAgents.length}/${totalAgents} agents that completed`
   lines.push(
-    `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`
+    incomplete
+      ? `${useEmoji ? '⚠️ ' : ''}INCOMPLETE — ${countText} ${scope} | ${summary.durationMs}ms`
+      : `${countText} | ${summary.durationMs}ms`
   )
   lines.push('')
 
