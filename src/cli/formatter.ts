@@ -41,8 +41,23 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
 
   lines.push('# AI Code Review Report')
   lines.push('')
+  // WHY the headline itself carries incompleteness rather than leaving it to the banner below:
+  // this is the same lesson #51 learned for the no-findings path, applied to the case it missed.
+  // There, a ✅ next to qualifying text still read as a pass, so the glyph was replaced outright
+  // -- "the glyph IS the verdict for a skimming reader". A findings count is a verdict in exactly
+  // the same way: "15 findings" states a result, and a reader who takes it at face value has no
+  // reason to suspect 70% of the diff was never looked at.
+  //
+  // Measured 2026-08-30, which is why this is not a style preference: a 6,578-line diff at default
+  // --max-lines reviewed 2,000 lines and reported 0 findings; the same diff with --chunk returned
+  // 15 findings including 2 High. The truncation banner fired correctly and three times over, and
+  // the reader still concluded clean, because they read the top line and grepped for the rest. A
+  // control that depends on attention is not a control.
+  const countText = `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}**`
   lines.push(
-    `**${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}** | ${summary.durationMs}ms`
+    truncation?.truncated
+      ? `${useEmoji ? '⚠️ ' : ''}INCOMPLETE — ${countText} in ${truncation.keptLines}/${truncation.originalLines} lines reviewed | ${summary.durationMs}ms`
+      : `${countText} | ${summary.durationMs}ms`
   )
   lines.push('')
 

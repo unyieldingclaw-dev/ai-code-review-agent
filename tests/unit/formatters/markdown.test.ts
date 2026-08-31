@@ -172,6 +172,46 @@ describe('formatMarkdown', () => {
     expect(output).toContain('10599') // the unreviewed remainder, stated outright
   })
 
+  // REGRESSION (2026-08-30). #51 fixed the NO-findings path and stopped there, leaving the
+  // findings path stating "**15 findings**" as its headline with the truncation banner below it.
+  // A findings count is a verdict in the same way a ✅ is: it states a result, and a reader who
+  // takes it at face value has no reason to suspect 70% of the diff was never looked at.
+  //
+  // Measured, which is why this is not a style preference: a 6,578-line diff at default
+  // --max-lines reviewed 2,000 lines and reported 0 findings; the same diff with --chunk returned
+  // 15 findings including 2 High. The banner fired correctly three times over and the reader still
+  // concluded clean. A control that depends on attention is not a control.
+  it('leads with INCOMPLETE when a truncated run DID find things, not just when it found none', () => {
+    const findings = [makeFinding()]
+    const result = makeResult({
+      findings,
+      summary: { totalFindings: findings.length, bySeverity: {}, byAgent: {}, durationMs: 100 },
+      truncation: { truncated: true, originalLines: 6578, keptLines: 2000 },
+    })
+    const headline = formatMarkdown(result)
+      .split('\n')
+      .find((l) => l.includes('finding'))
+    expect(headline).toBeDefined()
+    // The incompleteness must be IN the headline, not in a line below it.
+    expect(headline).toContain('INCOMPLETE')
+    expect(headline).toContain('2000/6578')
+    expect(headline).toContain('1 finding')
+  })
+
+  it('does not state a bare findings count as the headline of a truncated run', () => {
+    // The exact shape that shipped: "**15 findings** | 200ms" with the caveat underneath it.
+    const findings = [makeFinding({ id: 'f1' }), makeFinding({ id: 'f2' })]
+    const result = makeResult({
+      findings,
+      summary: { totalFindings: findings.length, bySeverity: {}, byAgent: {}, durationMs: 100 },
+      truncation: { truncated: true, originalLines: 6578, keptLines: 2000 },
+    })
+    const bareCount = formatMarkdown(result)
+      .split('\n')
+      .find((l) => /^\*\*\d+ findings?\*\* \|/.test(l))
+    expect(bareCount).toBeUndefined()
+  })
+
   it('does not render a truncated run as clean on ANY surface — CLI and MCP agree', () => {
     // The CLI said ✅ while MCP said ⚠️ for the identical state, so the same run reported two
     // different verdicts depending on which surface you read. Whichever is chosen, both must
