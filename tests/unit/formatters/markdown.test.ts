@@ -261,6 +261,39 @@ describe('formatMarkdown', () => {
     expect(output).not.toContain('INCOMPLETE')
   })
 
+  // REGRESSION (2026-08-30). The first version of the INCOMPLETE headline gated on truncation
+  // ALONE, while the MCP fix in the same change gated on `warnings` — which carries agent failures
+  // too. That made the CLI the only one of four surfaces calling an agent-failure run complete:
+  // MCP said INCOMPLETE, sarif set executionSuccessful=false, githubAnnotations emitted a
+  // ::warning:: per agent, and cli/index.ts set exit code 2. The process called the run degraded
+  // while its own headline called it complete.
+  //
+  // Truncation and agent failure are the same defect wearing two hats: part of the diff never
+  // reviewed, versus part of the review never performed. Neither is actionable from a plain count.
+  it('leads with INCOMPLETE when agents failed, even with nothing truncated', () => {
+    const result = makeResult({
+      findings: [makeFinding()],
+      summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: {}, durationMs: 100 },
+      agentStatus: { security: 'ok', performance: 'timeout', design: 'error' },
+    })
+    const headline = formatMarkdown(result)
+      .split('\n')
+      .find((l) => l.includes('finding'))
+    expect(headline).toContain('INCOMPLETE')
+    expect(headline).toContain('1/3') // agents that completed, stated outright
+  })
+
+  it('CLI and MCP agree on AGENT FAILURES, not just on truncation', () => {
+    // The cross-surface check that existed only for truncation, which is why the split survived.
+    const result = makeResult({
+      findings: [makeFinding()],
+      summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: {}, durationMs: 100 },
+      agentStatus: { security: 'ok', performance: 'timeout' },
+    })
+    expect(formatMarkdown(result)).toContain('INCOMPLETE')
+    expect(formatMcpOutput(result)).toContain('INCOMPLETE')
+  })
+
   it('does not render a truncated run as clean on ANY surface — CLI and MCP agree', () => {
     // The CLI said ✅ while MCP said ⚠️ for the identical state, so the same run reported two
     // different verdicts depending on which surface you read. Whichever is chosen, both must
