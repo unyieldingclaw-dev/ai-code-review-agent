@@ -131,6 +131,25 @@ data. Mechanism and the matcher's exact pattern:
   would cut false trips, but the failure direction is _missing a real push_ — silently disabling a
   security gate. Measure, don't inspect.
 
+### Verifying Your Own Edits to Prose Files (learned 2026-08-31)
+
+Three failures from one session. All are **verification** failures, not editing failures — the edit
+landed correctly each time and the check that was supposed to confirm it lied.
+
+- **Prettier reflows blocks after every write**, so a literal string match against text written one
+  step earlier is unstable: the line breaks move under you between the write and the next match.
+  Anchor on **line ranges**, or on text that was already committed and formatted.
+- **Verify prose whitespace-normalised.** Line-wise `grep` reports false _absences_ on wrapped
+  markdown, because the phrase spans a line break. `grep -c` reports false _presences_ when the
+  string survives inside a note that records its own deletion. Both directions fail; normalise
+  whitespace before believing either.
+- **Subagents mutate the repo.** Review agents edited files twice during reviews, and a stray 0-byte
+  file reached a commit and had to be amended out. Tell review agents explicitly not to edit, and
+  read `git status` before staging rather than assuming a review was read-only.
+- Corollary to the gated-verb rule above: **write the script to a file and run the file.** The
+  matcher cannot tell a command from quoted data, and it fired on an inlined script while that
+  script was editing the very rule which documents the problem.
+
 ### Stacked PRs, and Fields That Must Reach Every Formatter (learned 2026-08-26)
 
 - **Never `--delete-branch` while a stacked child exists.** GitHub closes a PR whose _base_ branch

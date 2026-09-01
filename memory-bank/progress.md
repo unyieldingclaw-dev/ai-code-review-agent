@@ -16,7 +16,7 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-08-31
+**Last Updated**: 2026-09-01
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
@@ -35,6 +35,46 @@ holding it in the volatile file was costing the headroom that file most needs.
 - **Four hallucination classes have deterministic backstops rather than prompt wording**, because
   prompt-only fixes were measured across three agents and failed every time. Detail in
   [`archive/progress-history.md`](archive/progress-history.md).
+
+## 🔎 `filteredFiles` invisibility — implemented, NOT verified, NOT committed (2026-08-31)
+
+Found by the PMB peer, then **verified independently in source here** and proved through the built
+formatters. Same class as `earlyExit` below and **more reachable**: that one needs `--fail-fast`,
+this needs no flag at all.
+
+**Mechanism.** `--profile security` runs `security` + `adversarial`, both carrying
+`exclude: ['**/*.md']`. `policyFilter.ts:47` populates `policy.agentsSkipped` only when
+`matchesAll(changedFiles, exclude)`, and `matchesAll` is `files.every(...)` (`policyFilter.ts:12`) —
+so **every** changed file must match. On a mixed diff the match is partial: `agentsSkipped` stays
+empty, the excluded sections are still stripped from those agents' input, the stripping is recorded
+in `filteredFiles`, and no rendered surface printed it.
+
+**Measured:** 6 `.md` + 1 `.sh` changed → those two agents reviewed **1 file of 7** and every
+surface reported clean. The counter-intuitive half is the half that matters: **adding one
+non-excluded file SUPPRESSES the signal**, because it breaks the `every()`.
+
+**Do not describe the data as unreachable.** `--format json` carries it — `formatJson` is
+`JSON.stringify(result, null, 2)` (`cli/formatter.ts:337`) and `runner.ts:932` spreads the field onto
+the envelope. The _rendered_ surfaces are dark; the raw envelope is fine, so consumers have a real
+mitigation today. (Both re-verified in source 2026-09-01.)
+
+**Design decision, already made:** a partial exclusion renders at the **Policy-note tier** and does
+**not** flip the INCOMPLETE headline. The exclusion is configured and the agents did run; gating the
+headline on it would fire on nearly every mixed diff and train the reader past the banner that
+matters.
+
+**Scope boundary, deliberate:** four formatters only. `review.yml` and `vscode-extension` are the
+fifth and sixth surfaces and need infrastructure arriving with #83 (`scripts/reviewIncompleteness.cjs`,
+and the extension's envelope gaining incompleteness fields). Duplicating that module across two open
+PRs would create the divergent-copy drift this work exists to remove. They follow once #83 merges.
+
+**Implementation state (uncommitted, `stash@{0}`):** `core/schema.ts` gains
+`agentsWithNarrowedView()` + `narrowedFileCount()`; `cli/formatter.ts` gains `buildPolicyLines()`,
+pushed on **both** exit paths; `mcp/formatter.ts` adds policy + narrowing notes to `toolNotes`;
+`sarif.ts` adds `filteredFiles` to run properties plus a `note` notification;
+`githubAnnotations.ts` emits `::warning::` for skipped and narrowed. `npx tsc --noEmit` clean and
+the peer's scenario replays through the built formatters naming the exclusion on all four.
+**No tests and no mutation proof — which in this repo means not done, not nearly done.**
 
 ## 🔎 `earlyExit` invisibility — investigated and proven, not yet fixed (2026-08-31)
 
@@ -203,91 +243,7 @@ file's own rule says so. **Cap pressure was the cause
 of the deletions, not an unrelated inconvenience** — compressing to fit is how substance gets lost,
 which is why the rule in `memory-bank/README.md` says archive rather than trim.
 
-## ✅ Completed (2026-08-27, third session)
-
-**The PMB 1.2.1 upgrade was never going to resolve, and the next-step said otherwise.** Verified
-directly in PMB's checkout rather than inherited: `mb upgrade` resolves
-`TEMPLATES_DIR="$REPO_ROOT/templates"` from the local working directory and `mb.sh` contains **zero**
-`git fetch|checkout|archive|clone|describe|tag` calls in 2,939 lines — so it distributes a snapshot
-of whatever is on disk, never a release. Their tree is currently dirty on a feature branch with five
-`templates/` files modified, which is exactly the source directory.
-
-**There is also no release to wait for.** `VERSION` reads `1.2.1` but nothing is tagged past
-`v1.0.4` — the version names no tag, commit or artifact. "Blocked on upstream release" and "upstream
-has no release mechanism" are different states; only the second tells a successor to stop waiting.
-
-**Resolved 2026-08-28 — PMB will cut releases, and tagging alone unblocks us.** _[Superseded later
-the same day: the policy is approved but unimplemented and unscheduled. See "Corrections from PMB"
-at the top. Everything below describes the decision, not its delivery.]_ The operator
-decided all three open questions. Releases: **yes**, and the decisive argument was `TEMPLATE_OWNED`
-— PMB forbids adopters from patching those files locally, so "you may not fix this yourself" and
-"you get whatever was on my desk" cannot both hold. Working-tree sourcing: **not deliberate, just
-unfinished** (zero git-ref calls and no `# WHY` comment on a load-bearing distribution choice, in a
-repo carrying 180 of them); it becomes a dev-mode flag rather than the default. Dirty-tree guard:
-**refuse, with `--allow-dirty`** — warn-only was rejected as another advisory layer.
-
-**For us the tag is the actionable event, not the merge.** _[Superseded 2026-08-28: true of which
-event to act on, misleading about timing — no tag exists and none is scheduled, so this must not be
-read as "wait for it."]_ Once `v1.2.1` exists, PMB is checked out at the tag and `mb upgrade` runs
-here — **two repos, and the `cd` paths matter**; exact commands in `activeContext.md`. The guard and
-ref-sourcing are
-hardening for the general case, not prerequisites for us — so our unblock costs one `git tag`
-upstream and zero code either side. Sequencing PMB approved: tag first, guard second, ref-sourcing
-third; "releases eventually, guard now" was rejected once the release half turned out to be the
-cheap half.
-
-**Still holding both signals:** the ACR provenance entry is still uncommitted, and nothing has
-reached `main`. PMB will signal the tag separately from the merge, since the tag is what we act on.
-**Superseded 2026-08-28 —** the entry is now committed (unmerged), and "wait for the tag" was the
-wrong frame: the release work is unscheduled. See the corrections section at the top of this file.
-
-**Corrected 2026-08-28, PMB caught it:** we also claimed `VERSION` and `.pmb-version` contradicted
-each other. They do not — `VERSION` is PMB's own version, `.pmb-version` records which version a
-consuming project was last upgraded with (verified in `mb.sh`). Two true statements. The finding
-above is untouched. PMB's follow-on, which is real: their own `.pmb-version` is `1.1.1` while they
-publish `1.2.1`, so PMB has not run `mb upgrade` on itself in two versions — same drift class, with
-PMB downstream of itself.
-
-Reported upstream. **A fix we proposed was withdrawn on evidence:** `git archive <tag>` is useless
-when no tag exists, so the real ask is _cut releases first_. PMB confirmed independently and asked
-us not to upgrade until they signal work reached `main` — only that signal is actionable.
-_[Superseded 2026-08-28: there are **two** signals, "reached `main`" and "tag exists", and PMB sends
-them separately. Neither has arrived.]_
-
-**Consequence meanwhile:** `last-reviewed` stays unstamped, so `mb doctor`'s staleness check reports
-actively-edited files as months stale. Not fixable locally (`TEMPLATE_OWNED`).
-
-**One inbound claim held pending, not logged as done:** PMB earlier said the ACR provenance gap was
-closed in their record. They corrected it — the entry is written, with our hedge preserved verbatim
-(611.7 s as a retry artifact; the 616 s resemblance recorded as _not confirmed_), but uncommitted in
-the dirty tree above. Do not treat it as landed until they confirm. **Superseded 2026-08-28:** now
-committed as `2052c3c`, still unmerged — see the corrections section at the top.
-
-**v1.15.0 released, and the repo's outward-facing information audited against the binary.** Eight
-PRs (#65–#72). Releasing was the point rather than tidiness: `review.yml` installs the _published_
-package, so until 1.15.0 shipped every CI run emitted a `findings.json` with no `timings`. The
-collection this instrumentation exists for starts now.
-
-**Three tagging incidents in one session, all recorded in `systemPatterns.md` with a guard.**
-`v1.15.0` was tagged onto `main` after a merge branch protection had rejected, naming a commit
-still reading `1.14.0`; then the _good_ tag was deleted by re-running the cleanup written minutes
-earlier for the bad one, flipping the published Release to a draft. **npm's refusal to republish an
-existing version is what limited the damage — the registry compensating for the process, not the
-process working.** Recovered by re-tagging `6e2ed34` and re-publishing.
-
-**Docs audited by diffing documentation against the binary, not by reading.** The README flag table
-matched code 27/27 both directions; agent counts, `engines.node: ">=18"` (runtime deps genuinely
-require 18) and CHANGELOG all held. Two real gaps found and fixed: `--ollama-url` and exit code `4`
-were undocumented (#68), and `agentStatus`/`testFiles` were missing from the "stable envelope"
-contract (#72) — `agentStatus` being the field that drives exit 2 and the only thing separating "no
-findings, clean" from "no findings, every agent failed". Also fixed a `.vsix`-from-Releases install
-instruction that had never been true. GitHub description, homepage and topics updated.
-
-**Branch cleanup found that squash-merge blinds git's own detection** — 0 of 11 landed branches
-reported as merged. Verified each local tip against its merged PR's `headRefOid`; one differed and
-was merely _behind_. Rule in `systemPatterns.md`.
-
-> Completed work through 2026-08-26 is in [`archive/progress-history.md`](archive/progress-history.md).
+> Completed work through 2026-08-27 is in [`archive/progress-history.md`](archive/progress-history.md).
 
 ## 📊 Metrics
 

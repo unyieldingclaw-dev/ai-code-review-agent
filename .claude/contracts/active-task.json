@@ -1,13 +1,21 @@
 {
-  "task": "Discharge the handoff protocol: merge handoff.md into the memory bank, archiving displaced history rather than compressing it, then delete handoff.md.",
+  "task": "Discharge the handoff protocol for handoff.md (2026-08-31): merge it into tracked files on the #82 branch, archiving displaced history rather than compressing it, then delete handoff.md.",
   "status": "complete",
-  "created_at": "2026-08-31T14:43:15Z",
-  "expires_at": "2026-08-31T22:43:15Z",
-  "approved_by": "user (\"approved\", on the memory-bank contract proposed first; earlyExit contract remains queued separately)",
-  "notes": "handoff.md is gitignored, so its content is durable nowhere else. Caps are CI-enforced: systemPatterns 282/300 and activeContext 125/150 are the tight ones. memory-bank/README.md and progress.md 2026-08-28 both record that compressing-to-fit deletes substance; archive instead. Do not record the main hash (systemPatterns rule).",
+  "created_at": "2026-09-01T12:59:57Z",
+  "expires_at": "2026-09-01T20:59:57Z",
+  "approved_by": "user (\"approved\", 2026-09-01); archive/progress-history.md added to scope on the operator's explicit recommendation-request, 2026-09-01; ci.yml pointer-integrity check added on the operator's explicit selection from the review remediation options, 2026-09-01",
+  "notes": "This merges the SECOND handoff, onto the branch that already carries the first. It lands on #82 rather than a fresh branch off main because #82 has already rewritten all four memory-bank files (systemPatterns 282->250, techContext 236->330); a main-based branch would conflict and could resurrect the ~32 lines #82 deliberately retired. handoff.md is gitignored (.gitignore:11), so its content is durable nowhere else -- do not delete it until the replacement text is verified in tracked files. Caps are CI-enforced; archive, never compress (README.md). The parked corroboration contract goes to docs/superpowers/plans/ because it is ~30 lines of method and falsification criteria and no memory-bank file has room. Committing is in scope; PUSHING IS NOT -- #82 is open and the operator decides separately.",
   "scope": [
     {
+      "file": "docs/superpowers/plans/2026-08-31-corroboration-downgrade-measurement.md",
+      "op": "create"
+    },
+    {
       "file": "memory-bank/activeContext.md",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/progress.md",
       "op": "edit"
     },
     {
@@ -19,19 +27,11 @@
       "op": "edit"
     },
     {
-      "file": "memory-bank/progress.md",
-      "op": "edit"
-    },
-    {
       "file": "memory-bank/archive/activeContext-history.md",
       "op": "edit"
     },
     {
       "file": "memory-bank/archive/progress-history.md",
-      "op": "edit"
-    },
-    {
-      "file": "memory-bank/archive/systemPatterns-history.md",
       "op": "edit"
     },
     {
@@ -41,8 +41,12 @@
     {
       "file": ".claude/contracts/active-task.json",
       "op": "edit"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "op": "edit"
     }
   ],
-  "completed_at": "2026-08-31T14:54:40Z",
-  "completion_notes": "All four handoff-protocol steps discharged. handoff.md was gitignored and untracked, so its deletion produces no git change -- the durability fix is that its content now lives in tracked files. Caps pass with headroom (activeContext 146/150, systemPatterns 287/300). npm run check green at 839 tests / 47 files. Archived rather than compressed: systemPatterns -13 lines to archive, progress -69, activeContext -14."
+  "completed_at": "2026-09-01T13:31:00Z",
+  "completion_notes": "Merged and deleted. Content verified present in tracked files by a 58-check whitespace-normalised script BEFORE handoff.md was removed -- and that check caught a real defect: the first techContext edit script batched writeFileSync after all seven edits, so an anchor failure on edit 4 silently discarded edits 1-3 that had already printed 'ok'. One of those was the per-agent timeout ceiling, which had ALREADY been deleted from activeContext.md, so the live guard would have survived only as an archive copy. Re-applied with a write after every edit; the lesson is recorded nowhere else, so: a batched write turns a late failure into silent loss of earlier work. Caps all pass by CI's own wc -l method: activeContext 143/150, progress 311/400, systemPatterns 269/300, techContext 354/400, projectbrief 93/150. Relocations rather than deletions: per-agent timeout ceiling and VS Code distribution moved activeContext -> techContext (both are standing facts, not session state); the INCOMPLETE-denominator bullet was dropped as a duplicate only after confirming progress.md holds it in fuller detail (it has the measured 3/4-vs-3/15 case the bullet lacked). archive/activeContext-history.md was in scope but proved unnecessary -- both displaced items found better homes in techContext. Scope extended by one file: the 86-line '2026-08-27, third session' section moved to archive/progress-history.md (verified byte-identical, 83 lines), taking progress.md off 395/400; this continues the same operation #82 performed on the second-session block. NOT DONE, deliberately: the commit is gated on /code-review and the push to #82 is the operator's separate call. POST-REVIEW: /code-review raised 3 non-blocking findings, all self-inflicted, all remediated on operator instruction -- (1) activeContext.md:36 pointed at archive/activeContext-history.md for a first-handoff inventory that file never received; now names the real destinations, techContext.md and systemPatterns.md. (2) the two new PMB exit-code rows (4, any-other) were peer-reported but sat under a header asserting the table was read directly in their checkout; both rows now carry a dagger and an explicit lower-confidence note. (3) \"Unreleased is empty\" was dropped rather than archived and is restored (verified still true against CHANGELOG.md). Review also caught a cross-domain risk no single domain lens surfaced: the plan document is untracked, and git diff HEAD -- the review marker's hash input and what commit -a covers -- excludes untracked files, so the parked contract would have silently failed to land; it must be git-added before the marker is computed. Scope extended again: .github/workflows/ci.yml gains a memory-bank pointer-integrity step, tested locally in both directions by executing the run body extracted from the YAML itself (passes clean tree, exit 1 on a planted broken link). That check verifies only that link targets EXIST -- it would NOT have caught finding 1, whose target existed but lacked the content; the comment in ci.yml says so rather than overclaiming."
 }

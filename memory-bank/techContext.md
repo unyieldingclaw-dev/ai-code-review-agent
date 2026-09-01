@@ -70,6 +70,14 @@ was recommended on **one pass each** and was wrong; three passes reversed it. So
 `--chunk` affordable at roughly 9x the speed, not matching devstral's ceiling. The rule this
 established is in `systemPatterns.md`.
 
+**Per-agent timeout ceiling — MEASURED, CLOSED (2026-08-27). Do not raise it, do not re-derive
+it.** Slowest genuine attempt 213.2 s against a 315.4 s ceiling (68%); the one row that appeared
+to exceed its budget is a retry artifact. **Timeouts are not the binding constraint — model fit
+is**, which is why this sits beside the model measurement rather than in `activeContext.md`
+(moved 2026-09-01). The 616 s resemblance stays _suggestive, not established_ — the original has
+no source. Still untested: true CPU-only. Full measurement:
+[`archive/activeContext-history.md`](archive/activeContext-history.md).
+
 ### Key Source Files
 
 | File                             | Purpose                                                                     |
@@ -141,6 +149,11 @@ uncommitted local code. To reason about the published package, `npm pack ai-revi
 inspect the tarball. This is also why a git worktree is the wrong workspace for a change the PMB
 peer will exercise — the symlink points at the main tree, so a worktree build never reaches it.
 
+**This has already cost the peer a batch of measurements** (2026-09-01): every ACR figure in
+their record labelled "1.15.0" in fact described our working tree at an indeterminate commit, and
+they have retracted the label to "linked working tree, version indeterminate". Treat any
+version-attributed measurement taken through the linked binary as unattributed until re-taken.
+
 ### PMB-owned defects — none fixable here
 
 `TEMPLATE_OWNED`, so `mb upgrade` overwrites any local fix. Sixteen reported across two briefs, all
@@ -175,23 +188,29 @@ their routing. **Read directly in their checkout on 2026-08-31**, at
 `PMB:.claude/commands/change-review.md:166-205` and its `templates/claude-commands/` mirror, rather
 than accepted on their report — the standing rule in `progress.md`, and this is why:
 
-| their exit | their stated meaning                           | their action                |
-| ---------- | ---------------------------------------------- | --------------------------- |
-| `0`        | **"Ran fully, nothing met the threshold"**     | genuine clean pass          |
-| `1`        | ran fully and **found** something at threshold | **use the findings**        |
-| `2`        | an agent failed internally (outranks `1`)      | not clean; fall through     |
-| `3`        | diff truncated, coverage partial               | not clean; re-run `--chunk` |
+| their exit  | their stated meaning                           | their action                |
+| ----------- | ---------------------------------------------- | --------------------------- |
+| `0`         | **"Ran fully, nothing met the threshold"**     | genuine clean pass          |
+| `1`         | ran fully and **found** something at threshold | **use the findings**        |
+| `2`         | an agent failed internally (outranks `1`)      | not clean; fall through     |
+| `3`         | diff truncated, coverage partial               | not clean; re-run `--chunk` |
+| `4` †       | preflight failed (e.g. model missing)          | not clean; configuration    |
+| any other † | (unenumerated)                                 | **treated as `2`**          |
 
 - **Their invocation is `--profile security --chunk --diff <patch>`.** Verified: `fail-fast|failFast`
   occurs **0 times** in both their command file and the shipped template, and no
   `ai-review.config.json` exists anywhere in PMB. So `earlyExit` is latent for them, not live.
-- **`exit 4` is NOT in their table** — they described it in correspondence, but the committed
-  enumeration stops at `3`. Do not assume a missing model routes anywhere useful on their side; this
-  is the gap the `ping()` fix was meant to serve, and it may need raising with them first.
+- **† Peer-reported 2026-09-01, NOT read in their checkout.** Rows `0`–`3` were read directly at
+  the path above; the `4` and catch-all rows come from the peer's report only and are held at
+  that lower confidence until verified the same way. If true they supersede the earlier note
+  that their enumeration stopped at `3`, making exit 4 live on their side — which is what the
+  `ping()` fix was waiting on. **Do not act on exit 4 routing without checking their file.**
 - **Their `0` row says "Ran fully", which is exactly what a `--fail-fast` run does not do.** Their
   own note at `:205` warns a presence-only check cannot separate "ran and found nothing" from "every
   agent failed", calling it "a silently skipped security check reading as a pass" — the defect
   `earlyExit` reintroduces one level up, by returning `0` from a run that stopped early.
+  **#83 makes that row wrong, and they know.** It is their fix, on their side, and they asked
+  explicitly that #83 not be held for it. Do not block on it.
 - **`--model` claims are peer-reported, not verified**: their file pins no model, so today's tagged
   `--model` runs were manual. Treat as their word.
 
@@ -297,10 +316,11 @@ defect as the `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50` drift this file documents abo
 
 ## Plan & Spec Documents
 
-| File                                                               | Purpose                     |
-| ------------------------------------------------------------------ | --------------------------- |
-| `docs/superpowers/specs/2026-06-04-ai-code-review-agent-design.md` | Full design spec            |
-| `docs/superpowers/plans/2026-06-04-ai-code-review-agent.md`        | 16-task implementation plan |
+| File                                                                       | Purpose                                                                                                          |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `docs/superpowers/specs/2026-06-04-ai-code-review-agent-design.md`         | Full design spec                                                                                                 |
+| `docs/superpowers/plans/2026-06-04-ai-code-review-agent.md`                | 16-task implementation plan                                                                                      |
+| `docs/superpowers/plans/2026-08-31-corroboration-downgrade-measurement.md` | Approved, unstarted: A/B the orchestrator severity downgrade. Also parks the unverified grammar-decoding thread. |
 
 ## Shipped Capabilities
 
@@ -328,3 +348,8 @@ and holding this list there is what kept that file pinned against its 150-line c
   `main` and npm are in sync. `release.yml` has no npm secret dependency — `id-token: write` + the
   Trusted Publisher relationship on npmjs.com suffices; `npm install -g npm@latest` runs early
   (OIDC needs npm >= 11.5.1).
+- **VS Code extension has no distribution channel — an open product call, not a task.** No release
+  has ever carried a `.vsix`, `release.yml` has no upload step, and Marketplace publish is
+  explicitly DEFERRED. #68 documented the truth (build from source) rather than choosing, so docs
+  match reality either way and nothing degrades while this sits. Moved from `activeContext.md`
+  2026-09-01: a standing distribution fact, not session state.

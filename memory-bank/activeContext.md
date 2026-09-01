@@ -16,23 +16,26 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-31
+**Last Updated**: 2026-09-01
 
 ## Current Focus
 
-**Current work: `earlyExit` reaches none of the four output surfaces.** Investigated and proven
-2026-08-31, not yet fixed. A `--fail-fast` run renders as clean on markdown, SARIF,
-github-annotations **and MCP**, and exits **0**. Proven by replaying a realistic result through the
-real shipped exports in `dist/` rather than by reading: MCP printed `✅ No critical or high
-findings` for a run that executed **3 of 15 agents**. Specifics and the two fix constraints are
-under **Next Steps** — read them before touching a formatter, because the obvious one-line fix makes
-the report worse.
+**Current work: `filteredFiles` reaches no rendered surface — implemented on
+`fix/filtered-files-visibility`, NOT verified and NOT committed.** A partial exclusion strips files
+from an agent's input, records them in `filteredFiles`, and every rendered surface still reports
+clean. Mechanism, measurement and the design decision are in `progress.md`; what remains is under
+**Next Steps**. The code is written and replay-proven, which here is **not** the same as done — it
+has no tests and no mutation proof.
 
-**The prior session shipped #79 (2026-08-29) and #80/#81 (2026-08-31), then handed off.**
-`handoff.md` was merged into this memory bank and deleted on 2026-08-31; its content now lives here,
-in `techContext.md` (model choice, `OLLAMA_KEEP_ALIVE`, `npm link`, the peer protocol and PMB's
-exit-code contract) and in `systemPatterns.md` (the proxy-assertion rule). It was **gitignored**, so
-until that merge every one of those facts existed on one disk and in no commit.
+**Three branches, two open PRs, neither merged.** `#82` (this branch — memory-bank) and `#83`
+(`fix/early-exit-visibility`) are open; `fix/filtered-files-visibility` holds the uncommitted work.
+**Both PRs touch the same four formatters**, so whichever merges second needs `gh pr update-branch`
+— never a rebase, since force-push is hard-blocked. `gh pr merge` is denied to Claude by design.
+
+**Two handoffs have been merged here** (2026-08-31, and 2026-09-01). `handoff.md` is **gitignored**,
+so until each merge its facts existed on one disk and in no commit. The first merge put its
+content in `techContext.md` (model choice, `OLLAMA_KEEP_ALIVE`, the `npm link` rule, the peer
+protocol, PMB's exit-code contract) and `systemPatterns.md` (the proxy-assertion rule).
 
 **Verified state (2026-08-31): `npm run check` run directly, green.** The test count is deliberately
 not restated here — it lives once, in `progress.md`'s Metrics table, because restating it is how it
@@ -77,18 +80,30 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 
 ## Next Steps
 
-- **`earlyExit` reached NO renderer — fixed on `fix/early-exit-visibility`, see `CHANGELOG.md`.**
-  It turned out to be **six** surfaces, not four: `review.yml` and `vscode-extension` are renderers
-  but not formatters, so the old rule could never have caught them. Evidence, the exit-0 mechanism
-  and the `chunkRunner` part are in `progress.md`; the rule is now corrected in `systemPatterns.md`.
-- **The trap, worth keeping even though the fix landed.** Deriving the INCOMPLETE denominator from
-  `agentStatus` shrinks it to the agents that _started_, so folding `earlyExit` into the gate
-  without a real roster count renders "from 3/3 agents that completed" for a run that skipped
-  twelve — a silent omission upgraded to a confident false claim. `ReviewResult.agentsPlanned` now
-  carries the roster. Adding `'skipped'` to `AgentStatus` would have fixed the four formatters
-  through machinery they already read, but flips fail-fast runs to exit 2 and re-routes PMB's
-  mapping — rejected for that, not for cost.
-- **`ping()` guesses model presence by substring — peer-cleared, awaiting the operator.**
+- **`filteredFiles` — the verification is the whole remaining task.** Tests **with mutation proof**:
+  revert each behaviour, confirm the expected failure message, and count how many actually fail —
+  guards counted separately and never as regression evidence. Then a `CHANGELOG` entry,
+  `/code-review`, commit, `/change-review`, push, PR. Scope is **four formatters only**;
+  `review.yml` and `vscode-extension` are the fifth and sixth surfaces and follow once #83 lands the
+  `scripts/reviewIncompleteness.cjs` they need. Duplicating that module across two open PRs would
+  create the divergent-copy drift this work exists to remove.
+- **`earlyExit` reached NO renderer — fixed on `fix/early-exit-visibility` (PR #83).** It turned out
+  to be **six** surfaces, not four: `review.yml` and `vscode-extension` are renderers but not
+  formatters, so the old rule could never have caught them. Evidence, the exit-0 mechanism, the
+  `chunkRunner` part and the INCOMPLETE-denominator trap are in `progress.md`;
+  `ReviewResult.agentsPlanned` now carries the roster, and the six-surface rule is corrected in
+  `systemPatterns.md`.
+- **Corroboration downgrade — an approved measurement contract, not started, blocked on Ollama.**
+  Re-established at
+  [`2026-08-31-corroboration-downgrade-measurement.md`](../docs/superpowers/plans/2026-08-31-corroboration-downgrade-measurement.md)
+  after being displaced from the contract file. That document also parks a **second, unverified**
+  thread (grammar-constrained decoding costing reasoning accuracy) needing its own contract — read
+  the primary sources before acting on it.
+- **`systemPatterns.md` sits well above its 100–180 target band — an operator call, unmade.**
+  Reaching the band means dropping ~12 **live rules**, not archiving more evidence. Two options were
+  put up: accept that the file is larger than the band assumes, or split it (architecture decisions
+  vs operational rules). Neither was chosen, so it continues to accrete.
+- **`ping()` guesses model presence by substring — peer-cleared, operator has not ruled.**
   `ollamaProvider.ts:125-143` does `model.split(':')[0]` then `.includes()`, so `qwen2.5-coder:32b`
   reports present when only `:7b` is installed (verified live against three models). A missing model
   should fail preflight and exit **4** (`exitCode.ts` names that case explicitly); instead it passes,
@@ -96,27 +111,17 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
   normalise the request (`bare → :latest`) then compare for equality; the "breaks bare `devstral`"
   objection dissolves because Ollama resolves bare names the same way. PMB confirmed 2026-08-31 they
   pass no bare or registry-qualified names and want exit 4 kept with **no new code**.
-- **Per-agent timeout ceiling — MEASURED, CLOSED (2026-08-27). Do not raise it, do not re-derive
-  it.** Slowest genuine attempt 213.2 s against a 315.4 s ceiling (68%); no invocation came near its
-  budget, and the one row that appeared to is a retry artifact. **Timeouts are not the binding
-  constraint — model fit is.** The 616 s resemblance stays _suggestive, not established_ and must
-  not be promoted to "resolved"; the original has no source. Still untested: true CPU-only. Full
-  measurement: [`archive/activeContext-history.md`](archive/activeContext-history.md).
 - **`--chunk` as default — reopened by the model measurement, not yet decided.** It stays opt-in
   (`config.ts:25` documents why) and was deliberately **not** flipped on 2026-08-30, because
   flipping it trades one silent behaviour for another. What changed: at `qwen2.5-coder:7b` speeds
-  full coverage of a real diff costs roughly 200 s, which weakens the cost half of that rationale.
-  The coverage evidence is not in doubt — a 6,578-line diff at default `--max-lines` reviewed 2,000
+  full coverage of a real diff costs roughly 200 s, weakening the cost half of that rationale. The
+  coverage evidence is not in doubt — a 6,578-line diff at default `--max-lines` reviewed 2,000
   lines and returned **0 findings** where `--chunk` returned **15, including 2 High** (recorded at
   `src/cli/formatter.ts:51`). An operator call, not a task.
-- **`fetch failed` — the one open technical thread, deliberately passive.** One invocation in
-  twelve (Ollama dropping the connection under load). **n=1: do not act on it.** Since `review.yml`
+- **`fetch failed` — the one open technical thread, deliberately passive.** One invocation in twelve
+  (Ollama dropping the connection under load). **n=1: do not act on it.** Since `review.yml`
   installs the published build, every non-docs CI run now deposits `timings` rows into
   `findings.json` — the sample accumulates for free.
-- **VS Code extension has no distribution channel — an open product call, not a task.** No release
-  has ever carried a `.vsix`, `release.yml` has no upload step, and Marketplace publish is
-  explicitly DEFERRED. #68 documented the truth (build from source) rather than choosing, so docs
-  match reality either way and nothing degrades while this sits.
 - **PMB upgrade — blocked on work nobody has started. This is _not_ "awaiting a tag."** The release
   policy (tag → dirty-tree guard → ref-sourcing) is **approved but not implemented**; scheduling it
   is the operator's call. Verified in PMB's checkout 2026-08-28 — newest tag `v1.0.4`, nothing for
@@ -128,11 +133,13 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: clean, in sync, zero open PRs, no stashes, `main` the only local branch. **The
-`main` hash is deliberately not recorded here** — read it from `git log`. Two PRs in a row tried to
-keep it current and each was stale the moment it merged, because a memory-bank PR moves the very
-commit it names. Remote holds `main` plus the two long-retained orphans (`chore/agent-calibration`,
+unit tests. **Git**: three local branches and **two open PRs** (#82, #83), neither merged; the
+`fix/filtered-files-visibility` work is uncommitted. **The `main` hash is deliberately not recorded
+here** — read it from `git log`. Two PRs in a row tried to keep it current and each was stale the
+moment it merged, because a memory-bank PR moves the very commit it names. Remote holds `main`, the
+two PR branches, plus the two long-retained orphans (`chore/agent-calibration`,
 `claude/plan-overview-4dg42o`) — containment cannot be proven for either, so both stay. `v1.15.0`
-tagged at `6e2ed34` and published; `Unreleased` is empty. That tag hash **is** recorded, and the
-distinction is the point: a release tag is immutable, a branch tip is not. Commands
-are in `techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass.
+tagged at `6e2ed34` and published, and `Unreleased` is empty. That tag hash **is** recorded, and
+the distinction is the point:
+a release tag is immutable, a branch tip is not. Commands are in `techContext.md`; `npm run check`
+covers typecheck/build/format/lint/test in one pass.
