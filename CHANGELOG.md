@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A partially-excluded agent no longer reports as a clean run.** `agentPolicy` excludes take
+  effect two different ways and only one of them was ever rendered. The whole-agent skip fires only
+  when EVERY changed file matches an exclude (`policyFilter.ts:47`, via `matchesAll`, which is
+  `files.every(...)`). On a mixed diff the match is partial, so `policy.agentsSkipped` stays empty,
+  the excluded sections are stripped from that agent's input, the stripping is recorded in
+  `filteredFiles` — and no rendered surface printed it. Markdown, SARIF, github-annotations and MCP
+  all reported a clean run.
+
+  **Adding one non-excluded file SUPPRESSED the signal**, which is the opposite of what a reader
+  would guess, and reaching it needs no flag at all — unlike the `earlyExit` case, which needs
+  `--fail-fast`. Measured on `--profile security`, where `security` and `adversarial` both exclude
+  `**/*.md`: a diff of six `.md` files plus one `.sh` left those two agents reviewing one file of
+  seven, and every surface called it clean.
+
+  All four formatters now name the affected agents and how many files were withheld. **`--format
+json` was never affected** — `formatJson` is `JSON.stringify(result, null, 2)` and the runner
+  already spread `filteredFiles` onto the envelope — so consumers reading the raw envelope always
+  had the data and still do. SARIF now carries `filteredFiles` in run properties for that same
+  reason: a consumer computing its own coverage needs the mapping, not a rendered sentence.
+
+  **A partial exclusion renders at the policy-note tier and deliberately does not flip the
+  INCOMPLETE headline.** The exclusion is configured and the agents did run; gating the headline on
+  it would fire on nearly every mixed diff — in a documentation-heavy repo, most of them — and
+  train the reader past the banner that matters.
+
+  Scope is the four formatters. `review.yml` and `vscode-extension` are the fifth and sixth
+  surfaces that render a verdict, and they follow separately once the shared incompleteness module
+  they need has landed; duplicating it across two open branches would create the divergent-copy
+  drift this change exists to remove.
+
+- **Under `--chunk`, an agent narrowed in one chunk no longer reports as fully covered.**
+  `chunkRunner`'s merge policy listed `filteredFiles` among "purely diagnostic metadata" and took
+  whichever chunk ran last. That premise held only while nothing rendered the field. Now that four
+  formatters raise a coverage warning from it, a narrowing in chunk 1 followed by a clean chunk 3
+  silently reported full coverage — the same defect the warning exists to prevent, reappearing one
+  layer up. `filteredFiles` is now merged per agent as a sorted union across chunks: the same
+  promotion `toolAvailability` received once `partial` made it a claim about coverage rather than a
+  diagnostic detail.
+
 ## [1.15.0] — 2026-08-27 (a timing number now says what it spans)
 
 ### Added

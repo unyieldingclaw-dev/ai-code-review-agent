@@ -258,6 +258,49 @@ describe('runChunked', () => {
     expect(merged.toolAvailability?.gitleaks).toBe('partial')
   })
 
+  // Regression, and the same shape as the toolAvailability one above. filteredFiles was
+  // last-chunk-wins on the premise that it was purely diagnostic. Four formatters now raise a
+  // coverage warning from it, so a narrowing in chunk 1 followed by a clean chunk 2 reported as
+  // fully covered -- the exact defect that warning was added to prevent, reappearing one layer up.
+  it('merges filteredFiles -- a narrowing in an earlier chunk is not hidden by a later clean one', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ filteredFiles: { security: ['docs/a.md'] } }))
+      .mockResolvedValueOnce(makeResult({}))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.filteredFiles?.security).toEqual(['docs/a.md'])
+  })
+
+  it('unions filteredFiles per agent across chunks, deduped and sorted', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({ filteredFiles: { security: ['docs/b.md', 'docs/a.md'] } })
+      )
+      .mockResolvedValueOnce(
+        makeResult({ filteredFiles: { security: ['docs/b.md'], adversarial: ['docs/c.md'] } })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    // Sorted, so the rendered warning does not change wording with chunk order.
+    expect(merged.filteredFiles?.security).toEqual(['docs/a.md', 'docs/b.md'])
+    expect(merged.filteredFiles?.adversarial).toEqual(['docs/c.md'])
+  })
+
+  it('omits filteredFiles entirely when no chunk withheld anything', async () => {
+    const runMock = vi.fn().mockResolvedValue(makeResult({}))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.filteredFiles).toBeUndefined()
+  })
+
   // A tool that ran on one chunk and not another covered part of the diff and not the rest, which
   // is what 'partial' means. Reporting 'unavailable-llm-fallback' here would claim it never ran.
   it('collapses a used/unavailable disagreement to partial rather than to unavailable', async () => {

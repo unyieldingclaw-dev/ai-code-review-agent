@@ -16,13 +16,18 @@
 // internal truncation applies within it, same as it always has for an over-max-lines diff) -- a
 // much narrower, already-handled edge case than the general boundary-split this replaces.
 //
-// Known, accepted simplification: purely diagnostic metadata (policy, filteredFiles, context)
+// Known, accepted simplification: purely diagnostic metadata (policy, context)
 // reflects whichever chunk ran LAST, not a true merge across chunks -- acceptable for an opt-in
 // feature, since none of it gates an exit code, and losing an earlier chunk's copy of it costs
 // nothing the user-facing report still depends on.
 // toolAvailability was on that list until 'partial' existed, and no longer qualifies: a partial
 // first chunk followed by a clean one rendered as a COMPLETED tool scan, which is a claim about
 // security coverage rather than a diagnostic detail. See mergeToolAvailability below.
+// filteredFiles left that list for the same reason and by the same test: it was diagnostic only
+// while nothing rendered it, and four formatters now raise a coverage warning from it. Under
+// last-chunk-wins an agent handed a reduced diff in chunk 1 but a full one in chunk 3 reports as
+// fully covered -- which is precisely the defect that warning was added to prevent, reappearing
+// one layer up. See mergeFilteredFiles below.
 // agentStatus and evidenceCheckFilter are the two exceptions and ARE merged across all chunks
 // (see mergeAgentStatus/mergeEvidenceCheckFilter below): agentStatus feeds cli/index.ts's exit
 // code 2, so a last-chunk-wins simplification there would let a real failure in an earlier chunk
@@ -60,8 +65,8 @@ import { splitByFileBoundary } from './diffSplit.js'
 //
 // Merge policy across chunks is per-field, and the reason differs per field -- see each
 // helper's own comment rather than inferring a rule from the grouping. The shapes in use:
-//   last-chunk-wins  policy, filteredFiles, context, coverageGapFilter
-//   merged           agentStatus, toolAvailability, evidenceCheckFilter
+//   last-chunk-wins  policy, context, coverageGapFilter
+//   merged           agentStatus, toolAvailability, evidenceCheckFilter, filteredFiles
 //   concatenated     hallucinationFilter.dropped, timings
 //   summed           summary.durationMs, sanitizer.redactedLines
 //   concat + re-cap  findings (via capAndSort, to restore the global ordering invariant)
@@ -142,6 +147,7 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
   const mergedHallucinationFilter =
     droppedAcrossChunks.length > 0 ? { dropped: droppedAcrossChunks } : undefined
   const mergedToolAvailability = mergeToolAvailability(results)
+  const mergedFilteredFiles = mergeFilteredFiles(results)
 
   // CONCATENATED, never summed -- and this is the one line the whole field depends on.
   // `durationMs` (summed at the top of this function) is correct for a "how long did the review
@@ -173,7 +179,7 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
     ...(last.coverageGapFilter ? { coverageGapFilter: last.coverageGapFilter } : {}),
     ...(mergedToolAvailability ? { toolAvailability: mergedToolAvailability } : {}),
     ...(mergedEvidenceCheckFilter ? { evidenceCheckFilter: mergedEvidenceCheckFilter } : {}),
-    ...(last.filteredFiles ? { filteredFiles: last.filteredFiles } : {}),
+    ...(mergedFilteredFiles ? { filteredFiles: mergedFilteredFiles } : {}),
     ...(timings.length > 0 ? { timings } : {}),
   }
 }
@@ -216,6 +222,23 @@ function mergeEvidenceCheckFilter(
  * changes says nothing about npm audit, and must not degrade a verdict another chunk legitimately
  * earned.
  */
+// See the header comment for why this is merged rather than last-chunk-wins. Union per agent:
+// a file withheld from an agent in ANY chunk was withheld from that agent for the run, so the
+// warning must survive a later chunk that happened to exclude nothing. Sorted so the rendered
+// output is deterministic regardless of chunk order, matching agentsWithNarrowedView's sort.
+function mergeFilteredFiles(
+  results: ReviewResult[]
+): Partial<Record<AgentName, string[]>> | undefined {
+  const merged: Partial<Record<AgentName, string[]>> = {}
+  for (const r of results) {
+    for (const [agent, files] of Object.entries(r.filteredFiles ?? {})) {
+      const key = agent as AgentName
+      merged[key] = [...new Set([...(merged[key] ?? []), ...(files ?? [])])].sort()
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined
+}
+
 function mergeToolAvailability(results: ReviewResult[]): ToolAvailabilityMetadata | undefined {
   const merged: ToolAvailabilityMetadata = {}
   for (const key of Object.keys(TOOL_LABELS) as (keyof ToolAvailabilityMetadata)[]) {
