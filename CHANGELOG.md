@@ -46,6 +46,16 @@ json` was never affected** — `formatJson` is `JSON.stringify(result, null, 2)`
   promotion `toolAvailability` received once `partial` made it a claim about coverage rather than a
   diagnostic detail.
 
+  `policy` moved with it, and needed more than a union. An agent skipped on one chunk may have
+  run on another, so carrying that into the merged `agentsSkipped` would render "skipped
+  entirely — their domains were not reviewed" about an agent that did review most of the diff.
+  The merge therefore keeps `agentsSkipped` for agents skipped in **every** chunk, and demotes a
+  partial skip to the narrowed-diff note by attributing that chunk's files to `filteredFiles`.
+  Each case is now reported once, and truthfully.
+
+  `filteredFiles` is also documented in the `--format json` envelope for the first time, since
+  this change makes it the field a consumer needs to compute coverage.
+
 ## [1.15.0] — 2026-08-27 (a timing number now says what it spans)
 
 ### Added
