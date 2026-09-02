@@ -346,3 +346,35 @@ describe('formatSarif timing', () => {
     expect(sarif.runs[0].properties.timings).toBeUndefined()
   })
 })
+
+describe('formatSarif policy notes', () => {
+  const narrowed: Partial<ReviewResult> = {
+    filteredFiles: { security: ['docs/a.md'], adversarial: ['docs/a.md', 'docs/b.md'] },
+  }
+
+  it('emits a note-level notification naming the narrowed agents', () => {
+    const sarif = JSON.parse(formatSarif(makeResult(narrowed)))
+    const notes = sarif.runs[0].invocations[0].toolExecutionNotifications.filter(
+      (n: { level: string }) => n.level === 'note'
+    )
+    expect(notes).toHaveLength(1)
+    expect(notes[0].message.text).toContain('adversarial, security')
+    expect(notes[0].message.text).toContain('2 file(s)')
+  })
+
+  it('carries filteredFiles in run properties for machine consumers', () => {
+    const sarif = JSON.parse(formatSarif(makeResult(narrowed)))
+    expect(sarif.runs[0].properties.filteredFiles).toEqual(narrowed.filteredFiles)
+  })
+
+  // A note, not an error: the exclusion is configured and the agents ran.
+  it('does not clear executionSuccessful', () => {
+    const sarif = JSON.parse(formatSarif(makeResult(narrowed)))
+    expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(true)
+  })
+
+  it('omits filteredFiles from run properties when nothing was narrowed', () => {
+    const sarif = JSON.parse(formatSarif(makeResult()))
+    expect(sarif.runs[0].properties.filteredFiles).toBeUndefined()
+  })
+})

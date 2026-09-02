@@ -7,6 +7,7 @@
 // agents or a truncated diff is never indistinguishable from a clean, fully-analyzed one.
 
 import type { ReviewResult, Finding, Severity } from '../../core/schema.js'
+import { agentsWithNarrowedView, narrowedFileCount } from '../../core/schema.js'
 
 function severityToAnnotationLevel(severity: Severity): 'error' | 'warning' | 'notice' {
   if (severity === 'critical' || severity === 'high') return 'error'
@@ -76,6 +77,26 @@ export function formatGithubAnnotations(result: ReviewResult): string {
         `::warning::Diff truncated: reviewed ${result.truncation.keptLines}/${result.truncation.originalLines} lines — results may be incomplete`,
       ]
     : []
+  // Distinguished from the deliberately-excluded `timings` by that note's own second test: there
+  // is no other signal for this on this surface. A PR reviewer reading annotations has no way to
+  // learn that the security agent was handed a reduced diff.
+  const narrowedAgents = agentsWithNarrowedView(result)
+  const policyLines = [
+    ...(result.policy && result.policy.agentsSkipped.length > 0
+      ? [
+          `::warning::${escapeAnnotationValue(
+            `agentPolicy skipped ${result.policy.agentsSkipped.join(', ')} entirely — those domains were not reviewed`
+          )}`,
+        ]
+      : []),
+    ...(narrowedAgents.length > 0
+      ? [
+          `::warning::${escapeAnnotationValue(
+            `agentPolicy withheld ${narrowedFileCount(result)} file(s) in total from ${narrowedAgents.join(', ')} — those agents reviewed a reduced diff`
+          )}`,
+        ]
+      : []),
+  ]
   const findingLines = result.findings.map(findingToAnnotation)
-  return [...warningLines, ...truncationLines, ...findingLines].join('\n')
+  return [...warningLines, ...truncationLines, ...policyLines, ...findingLines].join('\n')
 }

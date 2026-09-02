@@ -456,6 +456,7 @@ Every `--format json` response includes a stable envelope:
   "agentStatus": { "security": "ok", "correctness": "timeout" },
   "sanitizer": { "enabled": true, "applied": false, "redactedLines": 0, "warnings": [] },
   "policy": { "agentsSkipped": [], "reason": {} },
+  "filteredFiles": { "security": ["docs/notes.md"] },
   "context": { "mode": "memory-bank", "filesLoaded": [], "truncated": false, "estimatedTokens": 0 },
   "timings": [
     {
@@ -484,7 +485,15 @@ Every `--format json` response includes a stable envelope:
   because the code is clean or because every agent failed; only this field distinguishes them.
 - `testFiles` is always present and empty unless `--suggest-tests` or `--write-tests` was passed.
   Each entry is `{ path, content, framework }`. A default run never writes files.
-- `policy` only appears when at least one agent was skipped by policy rules.
+- `policy` only appears when at least one agent was skipped by policy rules. An agent is listed
+  only if **every** changed file matched its excludes — under `--chunk`, only if that held for
+  every chunk.
+- `filteredFiles` only appears when an `agentPolicy` exclude removed file sections from an
+  agent's input **without** skipping the agent outright, and maps that agent to the paths it
+  never saw. **Check it alongside `agentStatus` before trusting a clean result**: those agents
+  ran and reported honestly on a reduced diff, so nothing in `findings` or `agentStatus` shows
+  the gap. It is the common case, not the rare one — a partial match leaves `policy` empty, so
+  a diff mixing excluded and non-excluded files lands here rather than there.
 - `context` only appears when `--context memory-bank` is active.
 - `timings` carries **one row per review pass**. Without `--chunk` there is exactly one; with
   `--chunk` there is one per chunk, concatenated in order — never summed. Every result this tool

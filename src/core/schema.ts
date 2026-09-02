@@ -225,6 +225,35 @@ export const TOOL_LABELS: Record<keyof ToolAvailabilityMetadata, string> = {
   lizard: 'lizard',
 }
 
+/**
+ * Agents whose view of the diff was NARROWED by agentPolicy without the agent being skipped.
+ *
+ * WHY this is distinct from `policy.agentsSkipped`, and why it needed a renderer of its own: the
+ * whole-agent skip fires only when EVERY changed file matches an exclude pattern
+ * (`policyFilter.ts`, `matchesAll`). On a mixed diff -- say six `.md` files and one `.sh` -- the
+ * match is partial, `agentsSkipped` stays empty, and the excluded sections are simply stripped
+ * from those agents' input and recorded here. The result is that adding ONE non-excluded file
+ * SUPPRESSES the only signal the report had, which is the opposite of what a reader would guess.
+ *
+ * Measured on `--profile security`, where `security` and `adversarial` both exclude `**\/*.md`:
+ * two agents reviewed one file of seven and every rendered surface reported a clean run.
+ */
+export function agentsWithNarrowedView(result: ReviewResult): string[] {
+  return Object.entries(result.filteredFiles ?? {})
+    .filter(([, files]) => (files?.length ?? 0) > 0)
+    .map(([agent]) => agent)
+    .sort()
+}
+
+/** Total file sections withheld from at least one agent by an agentPolicy exclude. */
+export function narrowedFileCount(result: ReviewResult): number {
+  const all = new Set<string>()
+  for (const files of Object.values(result.filteredFiles ?? {})) {
+    for (const f of files ?? []) all.add(f)
+  }
+  return all.size
+}
+
 /** Tool keys whose reported availability matches `state`, in TOOL_LABELS order. */
 export function toolsWithAvailability(
   toolAvailability: ToolAvailabilityMetadata | undefined,
