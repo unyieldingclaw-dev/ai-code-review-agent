@@ -20,17 +20,15 @@ lineage: []
 
 ## Current Focus
 
-**Current work: `filteredFiles` reaches no rendered surface — implemented on
-`fix/filtered-files-visibility`, NOT verified and NOT committed.** A partial exclusion strips files
-from an agent's input, records them in `filteredFiles`, and every rendered surface still reports
-clean. Mechanism, measurement and the design decision are in `progress.md`; what remains is under
-**Next Steps**. The code is written and replay-proven, which here is **not** the same as done — it
-has no tests and no mutation proof.
+**`filteredFiles` invisibility is fixed and open as #84** (2026-09-01), together with the `policy`
+and `filteredFiles` chunk merges it turned out to require. Mechanism, measurement and the design
+decision are in `progress.md`. Verified: 867 tests and **20/20 mutations killed** against a no-op
+control that killed nothing.
 
-**Three branches, two open PRs, neither merged.** `#82` (this branch — memory-bank) and `#83`
-(`fix/early-exit-visibility`) are open; `fix/filtered-files-visibility` holds the uncommitted work.
-**Both PRs touch the same four formatters**, so whichever merges second needs `gh pr update-branch`
-— never a rebase, since force-push is hard-blocked. `gh pr merge` is denied to Claude by design.
+**Three open PRs, none merged, all touching the same four formatters:** `#82` (this branch —
+memory-bank), `#83` (`fix/early-exit-visibility`), `#84` (`fix/filtered-files-visibility`).
+Whichever merges first forces `gh pr update-branch` on the others — never a rebase, since
+force-push is hard-blocked. `gh pr merge` is denied to Claude by design.
 
 **Two handoffs have been merged here** (2026-08-31, and 2026-09-01). `handoff.md` is **gitignored**,
 so until each merge its facts existed on one disk and in no commit. The first merge put its
@@ -80,13 +78,13 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 
 ## Next Steps
 
-- **`filteredFiles` — the verification is the whole remaining task.** Tests **with mutation proof**:
-  revert each behaviour, confirm the expected failure message, and count how many actually fail —
-  guards counted separately and never as regression evidence. Then a `CHANGELOG` entry,
-  `/code-review`, commit, `/change-review`, push, PR. Scope is **four formatters only**;
-  `review.yml` and `vscode-extension` are the fifth and sixth surfaces and follow once #83 lands the
-  `scripts/reviewIncompleteness.cjs` they need. Duplicating that module across two open PRs would
+- **`filteredFiles` — shipped as #84, awaiting review.** `review.yml` and `vscode-extension` are
+  the fifth and sixth surfaces and still follow once #83 lands the
+  `scripts/reviewIncompleteness.cjs` they need; duplicating that module across open PRs would
   create the divergent-copy drift this work exists to remove.
+- **`chunkRunner`'s `mergeResults` drops `truncation`, so exit 3 is unreachable under `--chunk`.**
+  Peer-reported and live-reproduced 2026-09-01; detail in `progress.md`. **Not fixed on purpose** —
+  making exit 3 reachable changes what PMB's Job 7 branches on, so it is an operator decision.
 - **`earlyExit` reached NO renderer — fixed on `fix/early-exit-visibility` (PR #83).** It turned out
   to be **six** surfaces, not four: `review.yml` and `vscode-extension` are renderers but not
   formatters, so the old rule could never have caught them. Evidence, the exit-0 mechanism, the

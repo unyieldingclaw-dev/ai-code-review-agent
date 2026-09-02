@@ -36,6 +36,32 @@ holding it in the volatile file was costing the headroom that file most needs.
   prompt-only fixes were measured across three agents and failed every time. Detail in
   [`archive/progress-history.md`](archive/progress-history.md).
 
+## 🔎 `chunkRunner` merge policy — two fixed on #84, one still open (2026-09-01)
+
+**Fixed on #84.** `filteredFiles` and `policy` were both last-chunk-wins, listed in
+`chunkRunner.ts` among "purely diagnostic metadata". That premise held only while nothing rendered
+them; #84 renders both on all four formatters, so both were promoted to real merges — the same move
+`toolAvailability` got once `partial` made it a coverage claim. `policy` needed more than a union:
+an agent skipped on one chunk may have run on the others, so a union would render "skipped entirely
+— their domains were not reviewed" about an agent that reviewed most of the diff. The merge keeps
+`agentsSkipped` for agents skipped in **every** chunk and demotes a partial skip to the
+narrowed-diff note.
+
+**OPEN, not fixed — `mergeResults` drops `truncation` entirely.** Reported by the PMB peer
+2026-09-01 and **live-reproduced by them rather than read**: a diff with one file section larger
+than `--max-lines`, run `--chunk --format json`, printed the truncation warning on the console
+while the emitted JSON carried **no `truncation` key at all** and the run exited **0**. So
+`result.truncation?.truncated` can never be true under `--chunk`, and **exit code 3 is
+unreachable** — the single case it exists to catch degrades silently to exit 0 with nothing in the
+body or the code. Repro is cheap: a 35-line file section against `--max-lines 20`.
+
+This is a **second, independent trigger** for a field-drop already recorded below via the `break` at
+`chunkRunner.ts:90`. Two triggers, one omission.
+
+**Deliberately not fixed here.** Making exit 3 reachable changes what PMB's `/change-review` Job 7
+branches on — a consumer contract — so it is an operator decision, not a ride-along on a formatter
+change. `context` also remains last-chunk-wins.
+
 ## 🔎 `filteredFiles` invisibility — implemented, NOT verified, NOT committed (2026-08-31)
 
 Found by the PMB peer, then **verified independently in source here** and proved through the built

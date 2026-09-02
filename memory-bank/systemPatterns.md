@@ -257,6 +257,24 @@ assertion that could not fail. Illustration:
   counted as evidence the bug is covered. Ordering can hide this: put the substantive value last,
   or the assertion passes under the unfixed behaviour too.
 
+### Mutation Proof — a Green Suite Is Not Evidence (2026-09-01)
+
+A test that has never failed for the right reason has not been shown to test anything. Before
+claiming a behaviour is covered, **revert it in the source and confirm the expected test dies.**
+This is the **Falsify Before You Trust It** rule above, applied to tests. Moved here from
+`activeContext.md` when the work that prompted it shipped, because it is a standing rule rather
+than session state.
+
+- **Count guards separately, never as regression evidence.** A test asserting _absence_ passes just
+  as well when the feature is deleted outright. Worth keeping, worthless as proof.
+- **Include a no-op control.** A harness that cannot tell "killed nothing" from "harness broke" is
+  not evidence; a comment-only mutation must kill zero tests.
+- **An unparseable run is INCONCLUSIVE, never zero** — that bug reported a false survivor here.
+- **A surviving mutation is usually a test gap, not a harness bug.** Establish which before
+  concluding either; the one found this way was a real gap.
+- **Write after every edit and verify restoration by hash.** A script batching its writes turns one
+  late anchor failure into silent loss of every earlier edit.
+
 ## Never Do This
 
 - ❌ Default agent execution to parallel without verifying it actually helps on real hardware at

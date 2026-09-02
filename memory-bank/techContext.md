@@ -78,6 +78,16 @@ is**, which is why this sits beside the model measurement rather than in `active
 no source. Still untested: true CPU-only. Full measurement:
 [`archive/activeContext-history.md`](archive/activeContext-history.md).
 
+**A CPU-heavy counter-datum (2026-09-01) — recorded, not acted on.** Two `--profile security` runs
+through the real CLI (750 and 943 diff lines) had **both LLM agents hit the ceiling**, at 247.5 s
+and 264.9 s, while `secrets` finished in 5 s and `dependencies` in 0 s. `ollama ps` showed devstral
+at **70%/30% CPU/GPU**. This does **not** overturn the measurement above, which was taken on GPU: it
+lands in the CPU-heavy regime that measurement lists as untested, so it fills that gap rather than
+reopening a settled one. **Do not raise the ceiling on it** — n=2 in one environment, and the entry
+above exists to stop exactly that kind of re-derivation. What it does establish is that the
+deterministic agents are unaffected, so ACR keeps useful coverage on CPU even when the LLM agents
+never complete.
+
 ### Key Source Files
 
 | File                             | Purpose                                                                     |
