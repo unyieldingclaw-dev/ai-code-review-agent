@@ -1,41 +1,21 @@
 {
-  "task": "Add an opt-in, off-by-default OpenAI-compatible LLM provider, and amend projectbrief.md's Ollama-only constraint to permit it. Testable locally against Ollama's own /v1 endpoint; targets LiteLLM at work.",
-  "status": "cancelled",
-  "created_at": "2026-08-30T23:06:11Z",
-  "expires_at": "2026-08-31T07:06:11Z",
-  "approved_by": "user (\"do what you suggest\", then cleared scoping: LiteLLM is the work target, OpenCode protocol unknown and not required)",
-  "notes": "projectbrief.md is the immutable tier. The amendment is the reason this contract exists and must not be treated as incidental. Default provider stays ollama; cloud is never implicit.",
+  "task": "Give a --chunk run's stderr enough information to tell a dead agent from a clean one, and one chunk from another.",
+  "status": "in_progress",
+  "created_at": "2026-09-12T08:34:49Z",
+  "expires_at": "2026-09-12T16:34:49Z",
+  "approved_by": "user (\"approved\", 2026-09-12, in direct response to the fold-in proposal in the prior message)",
+  "notes": "Two compounding gaps found while investigating a PMB peer's field report, both in the real-time stderr progress channel (never in the JSON/report output, which is unaffected). (1) AgentProgressEvent has no status field; a dead agent (fetch failed, timeout) and a clean one both render as 'Ns -- 0 raw findings', distinguishable only by duration, which nothing parses. The status IS already computed at every emission site (agentStatus[agent.name] = classifyAgentError(err)) in the same statement block as the onProgress call that omits it -- purely additive, zero existing test asserts the exact line text. (2) chunkRunner.ts's per-chunk loop prints no marker between chunks, and runner.ts's run() resets index=0 on every call -- chunkRunner calls run() once per chunk with the same onProgress callback -- so '[1/4] security' prints with the IDENTICAL index on every chunk. A multi-chunk run's stderr gives no way to tell which chunk you're reading without counting resets. This is why the reporting peer had to hand-build a chunk-by-chunk table themselves. Not part of #84 (agentPolicy/filteredFiles/chunk-merge) -- unrelated concern, new branch off main rather than bundled into that PR's diff.",
   "scope": [
     {
-      "file": "memory-bank/projectbrief.md",
+      "file": "src/core/schema.ts",
       "op": "edit"
     },
     {
-      "file": "memory-bank/systemPatterns.md",
+      "file": "src/core/runner.ts",
       "op": "edit"
     },
     {
-      "file": "memory-bank/techContext.md",
-      "op": "edit"
-    },
-    {
-      "file": "memory-bank/progress.md",
-      "op": "edit"
-    },
-    {
-      "file": "memory-bank/activeContext.md",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/llm/openAiCompatibleProvider.ts",
-      "op": "create"
-    },
-    {
-      "file": "src/core/llm/provider.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/config.ts",
+      "file": "src/core/chunkRunner.ts",
       "op": "edit"
     },
     {
@@ -43,18 +23,20 @@
       "op": "edit"
     },
     {
-      "file": "tests/unit/openAiCompatibleProvider.test.ts",
-      "op": "create"
+      "file": "tests/unit/runner.test.ts",
+      "op": "edit"
     },
     {
-      "file": "README.md",
+      "file": "tests/unit/chunkRunner.test.ts",
+      "op": "edit"
+    },
+    {
+      "file": "CHANGELOG.md",
       "op": "edit"
     },
     {
       "file": ".claude/contracts/active-task.json",
       "op": "edit"
     }
-  ],
-  "cancelled_at": "2026-08-30T23:20:00Z",
-  "cancelled_reason": "Justification was a LiteLLM gateway that does not exist on this machine. No source file was touched. Nothing to revert."
+  ]
 }

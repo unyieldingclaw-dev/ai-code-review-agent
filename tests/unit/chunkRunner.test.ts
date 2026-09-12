@@ -156,6 +156,28 @@ describe('runChunked', () => {
     expect(runMock).toHaveBeenCalledTimes(3)
   })
 
+  // REGRESSION: runner.run() resets its own per-agent progress index to 1 on every call, and this
+  // function calls it once per chunk with the same onProgress callback -- so "[1/4] security"
+  // prints with the IDENTICAL index on every chunk, with nothing else in the stderr stream marking
+  // a chunk boundary. A real multi-chunk report had to be hand-reconstructed into a chunk-by-chunk
+  // table by its reader for exactly this reason.
+  it('announces which chunk is running, not just the total chunk count', async () => {
+    const runMock = vi.fn().mockResolvedValue(makeResult())
+    const runner = { run: runMock } as unknown as SwarmRunner
+    const diff = makeMultiFileDiff(3)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await runChunked(runner, { diff }, 2000, 15)
+
+    const chunkLines = warnSpy.mock.calls.map((c) => c[0]).filter((m) => /chunk \d+\/\d+/.test(m))
+    expect(chunkLines).toEqual([
+      expect.stringContaining('chunk 1/3'),
+      expect.stringContaining('chunk 2/3'),
+      expect.stringContaining('chunk 3/3'),
+    ])
+    warnSpy.mockRestore()
+  })
+
   it('merges findings, testFiles, and summary counts across chunks', async () => {
     const runMock = vi
       .fn()
