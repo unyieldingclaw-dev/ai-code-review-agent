@@ -351,3 +351,22 @@ describe('formatGithubAnnotations timing', () => {
     expect(out).toContain('::warning::Agent security failed (timeout)')
   })
 })
+
+describe('formatGithubAnnotations policy notes', () => {
+  it('warns that agents reviewed a reduced diff', () => {
+    const out = formatGithubAnnotations(makeResult({ filteredFiles: { security: ['docs/a.md'] } }))
+    expect(out).toContain('::warning::')
+    expect(out).toContain('agentPolicy withheld 1 file(s) in total from security')
+  })
+
+  it('warns that agents were skipped entirely', () => {
+    const out = formatGithubAnnotations(
+      makeResult({ policy: { agentsSkipped: ['security'], reason: {} } })
+    )
+    expect(out).toContain('agentPolicy skipped security entirely')
+  })
+
+  it('says nothing about policy when neither applies', () => {
+    expect(formatGithubAnnotations(makeResult())).not.toContain('agentPolicy')
+  })
+})

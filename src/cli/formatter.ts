@@ -1,5 +1,10 @@
 import type { ReviewResult, Severity } from '../core/schema.js'
-import { TOOL_LABELS, toolsWithAvailability } from '../core/schema.js'
+import {
+  TOOL_LABELS,
+  toolsWithAvailability,
+  agentsWithNarrowedView,
+  narrowedFileCount,
+} from '../core/schema.js'
 import { timingLabel, timingSentence } from '../core/timingReport.js'
 export { formatSarif } from './formatters/sarif.js'
 export { formatGithubAnnotations } from './formatters/githubAnnotations.js'
@@ -38,6 +43,12 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
   // sanitizer footer at least -- redactedLines is a measured count that a 0-finding run
   // currently drops. Left alone here rather than changed in passing.
   const timingLines = buildTimingLines(result)
+  // Built here beside timingLines and pushed on BOTH exit paths, for the same reason that block is:
+  // the no-findings path returns early, and a run whose agents were handed a reduced diff and then
+  // reported nothing is exactly when "0 findings" needs qualifying. The sanitizer and context
+  // footers stay findings-path-only, which this file already calls arguably wrong; for this field
+  // it is not arguable -- it was the whole defect.
+  const policyLines = buildPolicyLines(result)
 
   lines.push('# AI Code Review Report')
   lines.push('')
@@ -224,6 +235,7 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
             : 'No issues found.'
       )
     }
+    lines.push(...policyLines)
     lines.push(...timingLines)
     return lines.join('\n')
   }
@@ -301,14 +313,51 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
     lines.push(`*Context: ${mode} — loaded ${fileList || 'no files'} (~${estimatedTokens} tokens)*`)
   }
 
-  if (result.policy && result.policy.agentsSkipped.length > 0) {
-    lines.push('---')
-    lines.push(`*Policy: ${result.policy.agentsSkipped.join(', ')} skipped by agentPolicy rules.*`)
-  }
+  lines.push(...policyLines)
 
   lines.push(...timingLines)
 
   return lines.join('\n')
+}
+
+/**
+ * Policy notes: agents skipped outright, and agents whose view of the diff was narrowed.
+ *
+ * WHY the narrowed case needs a line of its own: the whole-agent skip fires only when EVERY changed
+ * file matches an exclude, so a mixed diff produces a partial match, leaves `agentsSkipped` empty,
+ * and silently strips the excluded sections from that agent's input. Adding ONE non-excluded file
+ * to a documentation diff therefore suppressed the only signal the report carried. Measured on
+ * `--profile security`, where `security` and `adversarial` both exclude markdown: two agents saw
+ * one file of seven and every rendered surface reported a clean run.
+ *
+ * WHY it does not flip the INCOMPLETE headline: the exclusion is deliberate configuration and the
+ * agents did run. Gating the headline on it would fire on nearly every mixed diff -- in a
+ * documentation-heavy repo, most of them -- and train the reader past the banner that matters.
+ * Same line mcp/formatter.ts draws for a documented degraded tool.
+ */
+function buildPolicyLines(result: ReviewResult): string[] {
+  const skipped = result.policy?.agentsSkipped ?? []
+  const narrowed = agentsWithNarrowedView(result)
+  if (skipped.length === 0 && narrowed.length === 0) return []
+  // The leading '' is load-bearing, exactly as in buildTimingLines: in CommonMark a '---'
+  // directly beneath a paragraph is a setext heading UNDERLINE, so a bare '---' here promotes
+  // the verdict line to an <h2> and swallows its own rule. That was harmless-ish while this
+  // footer only ever followed other footers on the findings path -- the state buildTimingLines
+  // describes as "pre-existing, left alone". Pushing it on the no-findings path put it directly
+  // beneath "No issues found.", which is the line a skimming reader treats as THE result, so
+  // the one-line fix that comment prescribes is taken here rather than deferred again.
+  const out: string[] = ['', '---']
+  if (skipped.length > 0) {
+    out.push(`*Policy: ${skipped.join(', ')} skipped by agentPolicy rules.*`)
+  }
+  if (narrowed.length > 0) {
+    const n = narrowedFileCount(result)
+    out.push(
+      `*Policy: ${narrowed.join(', ')} reviewed a reduced diff — ${n} file${n === 1 ? '' : 's'} ` +
+        `withheld in total by agentPolicy excludes. No other agent covers their domain.*`
+    )
+  }
+  return out
 }
 
 function buildTimingLines(result: ReviewResult): string[] {

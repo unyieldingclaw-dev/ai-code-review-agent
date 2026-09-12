@@ -1,5 +1,10 @@
 import type { Finding, ReviewResult } from '../core/schema.js'
-import { TOOL_LABELS, toolsWithAvailability } from '../core/schema.js'
+import {
+  TOOL_LABELS,
+  toolsWithAvailability,
+  agentsWithNarrowedView,
+  narrowedFileCount,
+} from '../core/schema.js'
 import { timingLabel, timingSentence } from '../core/timingReport.js'
 
 // Only critical and high are rendered — medium/low appear in the tail only.
@@ -51,6 +56,22 @@ export function formatMcpOutput(result: ReviewResult): string {
     toolNotes.push(
       `🔧 Partial scan: ${names} covered some of the reviewed surface but not all of it — ` +
         `findings for the remainder came from the model, not the tool.`
+    )
+  }
+  // This surface read neither `policy` nor `filteredFiles`, so a skipped agent and a narrowed one
+  // were both invisible to a caller that has no terminal to check against.
+  if (result.policy && result.policy.agentsSkipped.length > 0) {
+    toolNotes.push(
+      `🔧 Policy: ${result.policy.agentsSkipped.join(', ')} were skipped entirely by agentPolicy ` +
+        `rules — their domains were not reviewed.`
+    )
+  }
+  const narrowedAgents = agentsWithNarrowedView(result)
+  if (narrowedAgents.length > 0) {
+    const n = narrowedFileCount(result)
+    toolNotes.push(
+      `🔧 Policy: ${narrowedAgents.join(', ')} reviewed a reduced diff — ${n} file${n === 1 ? '' : 's'} ` +
+        `withheld in total by agentPolicy excludes, and no other agent covers their domain.`
     )
   }
   const degradedTools = toolsWithAvailability(result.toolAvailability, 'unavailable-llm-fallback')

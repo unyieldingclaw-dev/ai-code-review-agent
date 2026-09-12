@@ -4,6 +4,7 @@ import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import type { ReviewResult, Finding, Severity } from '../../core/schema.js'
+import { agentsWithNarrowedView, narrowedFileCount } from '../../core/schema.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(readFileSync(join(__dirname, '../../../package.json'), 'utf-8')) as {
@@ -69,7 +70,24 @@ function buildInvocation(result: ReviewResult) {
     ([, status]) => status !== 'ok'
   )
   const executionSuccessful = failedAgents.length === 0 && !result.truncation?.truncated
+  const narrowedAgents = agentsWithNarrowedView(result)
   const notifications = [
+    // A note, not an error, and it does not clear executionSuccessful: the exclusion is configured
+    // and the agents ran. It exists so a consumer reading the detail can see which domains were
+    // handed a reduced diff.
+    ...(narrowedAgents.length > 0
+      ? [
+          {
+            level: 'note' as const,
+            message: {
+              text:
+                `agentPolicy withheld ${narrowedFileCount(result)} file(s) in total from ` +
+                `${narrowedAgents.join(', ')} — those agents reviewed a reduced diff, and no ` +
+                `other agent covers their domain.`,
+            },
+          },
+        ]
+      : []),
     ...failedAgents.map(([name, status]) => ({
       level: 'error' as const,
       message: { text: `Agent "${name}" failed: ${status} — results may be incomplete.` },
@@ -117,6 +135,11 @@ export function formatSarif(result: ReviewResult): string {
             ? { policy: result.policy }
             : {}),
           ...(result.agentStatus ? { agentStatus: result.agentStatus } : {}),
+          // Machine-read alongside the note above: a consumer computing its own coverage needs
+          // which files went to which agent, not a rendered sentence.
+          ...(result.filteredFiles && Object.keys(result.filteredFiles).length > 0
+            ? { filteredFiles: result.filteredFiles }
+            : {}),
           ...(result.truncation?.truncated ? { truncation: result.truncation } : {}),
           ...(result.hallucinationFilter && result.hallucinationFilter.dropped.length > 0
             ? { hallucinationFilter: result.hallucinationFilter }
