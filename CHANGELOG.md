@@ -7,6 +7,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`policy.agentsSkipped` could contradict `agentStatus` and `summary.byAgent` in the same
+  `--chunk` result.** Found by the PMB peer against a real 7-chunk run and reproduced
+  independently: an agent skipped on some chunks (every file in that chunk matched an
+  `agentPolicy` exclude) but not others was reported as skipped for the **entire run**, while the
+  same object's `agentStatus` said it ran fine and `summary.byAgent` showed it had findings.
+
+  The merge across chunks (added earlier in this same `filteredFiles`/`policy` promotion) computed
+  the fraction of chunks that skipped an agent using the wrong denominator: chunks that reported
+  **any** skip, rather than the total chunk count. `runner.ts` attaches a `policy` field to a
+  chunk's result only when something was skipped in that chunk — a chunk where the agent ran
+  cleanly carries no `policy` field at all, not an empty one — so that chunk was silently excluded
+  from both sides of the fraction and could never disprove a false full-run skip.
+
+  The test fixtures meant to catch exactly this modeled a "nothing skipped" chunk as an explicit
+  `{ agentsSkipped: [], reason: {} }` object, which is truthy and so was counted correctly by the
+  buggy code — masking the defect, because that is not the shape a real run produces.
+
 - **A partially-excluded agent no longer reports as a clean run.** `agentPolicy` excludes take
   effect two different ways and only one of them was ever rendered. The whole-agent skip fires only
   when EVERY changed file matches an exclude (`policyFilter.ts:47`, via `matchesAll`, which is

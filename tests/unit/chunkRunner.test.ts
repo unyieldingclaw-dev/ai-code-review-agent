@@ -300,6 +300,12 @@ describe('runChunked', () => {
     Array.from({ length: bodyLines }, (_, i) => `+line ${i}`).join('\n')
   const twoFilesWithHeaders = () =>
     [withHeaders('file0.ts', 2500), withHeaders('file1.ts', 2500)].join('\n')
+  const threeFilesWithHeaders = () =>
+    [
+      withHeaders('file0.ts', 2500),
+      withHeaders('file1.ts', 2500),
+      withHeaders('file2.ts', 2500),
+    ].join('\n')
 
   // policy was last-chunk-wins, so an agent skipped only on the final chunk was reported as
   // skipped for the whole run and vice versa. Intersection is the only reading under which the
@@ -323,12 +329,16 @@ describe('runChunked', () => {
   })
 
   it('demotes a partial skip to a narrowed view instead of claiming the agent was skipped entirely', async () => {
+    // Chunk 2 omits `policy` entirely -- the real shape runner.ts:931 emits when nothing was
+    // skipped, not an explicit empty object. Using the wrong shape here is what let the
+    // 2026-09-12 denominator bug through: an explicit `{ agentsSkipped: [], reason: {} }` is
+    // truthy and was (wrongly) counted toward the total, masking the bug it should have caught.
     const runMock = vi
       .fn()
       .mockResolvedValueOnce(
         makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
       )
-      .mockResolvedValueOnce(makeResult({ policy: { agentsSkipped: [], reason: {} } }))
+      .mockResolvedValueOnce(makeResult({}))
     const runner = { run: runMock } as unknown as SwarmRunner
 
     const merged = await runChunked(runner, { diff: twoFilesWithHeaders() }, 2000, 15)
@@ -343,9 +353,11 @@ describe('runChunked', () => {
   // tests did not reach: both of those had a final chunk that happened to agree with the
   // intersection, so a reverted merge passed them. Mutation testing surfaced the gap.
   it('does not claim a whole-run skip on the strength of the last chunk alone', async () => {
+    // Chunk 1 omits `policy` entirely -- see the comment in the previous test for why an
+    // explicit empty object here would mask the exact bug this test exists to catch.
     const runMock = vi
       .fn()
-      .mockResolvedValueOnce(makeResult({ policy: { agentsSkipped: [], reason: {} } }))
+      .mockResolvedValueOnce(makeResult({}))
       .mockResolvedValueOnce(
         makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
       )
@@ -356,6 +368,36 @@ describe('runChunked', () => {
     // It ran on chunk 1; last-chunk-wins would have asserted it was skipped for the whole run.
     expect(merged.policy?.agentsSkipped).toEqual([])
     expect(merged.filteredFiles?.security).toEqual(['file1.ts'])
+  })
+
+  // REGRESSION (2026-09-12): reported by the PMB peer against a real 7-chunk run, reproduced
+  // independently here. `policy.agentsSkipped` claimed a whole-run skip for an agent that had
+  // plainly run and found something, in the same result object -- verified by cross-referencing
+  // `agentStatus` (`ok`) and `summary.byAgent` (nonzero) at the time. Root cause: the denominator
+  // was `withPolicy.length` (chunks reporting ANY skip), not the total chunk count, so a chunk
+  // where the agent ran cleanly (no `.policy` field, per runner.ts:931) was silently excluded from
+  // both sides of the fraction and could never disprove a full-run skip.
+  it('does not claim a whole-run skip when an untouched-by-skip chunk found something', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
+      )
+      .mockResolvedValueOnce(
+        makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
+      )
+      // The chunk where security ran cleanly. No `.policy` field at all -- that is what "nothing
+      // was skipped in this chunk" looks like in real output (agentStatus.security: 'ok' there,
+      // in the real report this reproduces).
+      .mockResolvedValueOnce(makeResult({}))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: threeFilesWithHeaders() }, 2000, 15)
+
+    // It ran cleanly on chunk 3, so "skipped entirely" would be false -- the buggy denominator
+    // (chunks-with-any-skip = 2) missed this and claimed a whole-run skip anyway.
+    expect(merged.policy?.agentsSkipped).toEqual([])
+    expect(merged.filteredFiles?.security).toEqual(['file0.ts', 'file1.ts'])
   })
 
   it('omits filteredFiles entirely when no chunk withheld anything', async () => {

@@ -259,6 +259,19 @@ function attributeChunkSkips(result: ReviewResult, chunkDiff: string): ReviewRes
 // Intersection, not union: "skipped entirely" is only true if every chunk skipped it. Was
 // last-chunk-wins, which reported whatever the final chunk happened to say -- arbitrary for an
 // agent skipped on some chunks and not others.
+//
+// BUG FIXED 2026-09-12, found by the PMB peer and reproduced independently. The denominator
+// must be the total chunk count, not the count of chunks that reported ANY skip.
+// `runner.ts:931` attaches `policy` to a chunk result ONLY when something was skipped in that
+// chunk -- a chunk where the agent ran cleanly has NO policy field at all, not an empty one.
+// Dividing by `withPolicy.length` silently dropped exactly the chunks that would disprove a
+// full-run skip from both the numerator and the denominator. Reproduced: two all-`.md` chunks
+// (agent skipped in both) plus one `.ts` chunk (agent ran and found something) still reported
+// the agent as skipped for the ENTIRE run -- directly contradicting `agentStatus` and
+// `summary.byAgent` in the same result object. The test fixtures meant to catch this modeled
+// "nothing skipped this chunk" as an explicit `{ agentsSkipped: [], reason: {} }` object, which
+// is truthy and so was counted correctly by the buggy code -- masking the bug, because that is
+// not the shape `runner.ts` actually emits.
 function mergePolicy(results: ReviewResult[]): PolicyResult | undefined {
   const withPolicy = results.filter((r) => r.policy)
   if (withPolicy.length === 0) return undefined
@@ -270,8 +283,10 @@ function mergePolicy(results: ReviewResult[]): PolicyResult | undefined {
       firstReason[agent] ??= r.policy!.reason[agent]
     }
   }
+  // results.length (every chunk), NOT withPolicy.length (chunks with any skip) -- see the
+  // incident note above.
   const agentsSkipped = [...counts.entries()]
-    .filter(([, n]) => n === withPolicy.length)
+    .filter(([, n]) => n === results.length)
     .map(([agent]) => agent)
     .sort()
   const reason: Partial<Record<AgentName, string>> = {}
