@@ -29,6 +29,14 @@ reached 402/400 recording the code-review remediation. Same content, moved, noth
 Seventh move, 2026-08-28: the 2026-08-21 fourth-session entry, archived to make room for a
 correction to the PMB version claim. Same content, moved, nothing deleted.
 
+Eighth move, 2026-08-31: the 2026-08-27 second-session entry, archived when `progress.md` reached
+408/400 recording the `earlyExit` investigation. Same content, moved, nothing deleted.
+
+Ninth move, 2026-09-01: the 2026-08-27 third-session entry, archived when `progress.md` reached
+395/400 merging the second handoff — five lines short of the cap, which `README.md` warns against
+landing on. Moved before it forced the next session to refactor first. Same content, moved,
+nothing deleted.
+
 ## ✅ Completed (2026-08-18)
 
 ### Audit remediation Batches 1-8 — Tier 1/2 fixes verified, implemented, tested, and committed
@@ -1521,3 +1529,161 @@ claimed. The collapse also had to apply to **both** branches — `kept` in the m
 
 3 of 4 new tests fail against the old behaviour; the fourth (two distinct titles survive) passes
 under both by design — a guard against over-suppression, not regression coverage. **757 tests.**
+
+## Completed — 2026-08-27, second session (moved 2026-08-31)
+
+The eighth move; see the ledger at the top of this file. Moved out of `memory-bank/progress.md`
+when it reached 408/400 recording the `earlyExit` investigation. Same content, nothing deleted.
+
+## ✅ Completed (2026-08-27, second session)
+
+**Timing instrumentation shipped — `ReviewResult.timings`, one row per `SwarmRunner.run()` call.**
+Each row carries `diffLines`, the scaled `effectiveTimeoutMs`, `durationMs`, and every agent's
+`elapsedMs` paired with its `status`. Written to stderr as each pass completes and into the
+envelope, so it reaches the `ai-review-findings` artifact. **810 tests** (19 new), `npm run check`
+green.
+
+**The measurement already existed; only the persistence was missing.** `AgentProgressEvent.elapsedMs`
+has been set on every execution path -- coverage, sequential, parallel, testgen, on both the success
+and the failure branch -- and printed to stderr all along. It was a fire-and-forget callback, so it
+survived nowhere. The runner now taps that channel with a recording proxy instead of adding a second
+timer, so **no agent execution path changed at all**. Generalisable: _emitted is not recorded_, and
+a number that only ever reaches a terminal is a number you will be unable to cite later.
+
+**Concatenate, never sum -- the one decision the field rests on.** `mergeResults` sums
+`summary.durationMs`, which is right for "how long did this take" and fatal for "did any agent
+approach its ceiling": the ceiling applies per `run()` call, so a sum exceeds every ceiling without
+any agent having done so. That is precisely why "616 s" was unreadable. `status` is stored beside
+`elapsedMs` for the mirror-image reason -- a timed-out agent's elapsed _is_ the ceiling, and reads
+as a completion time sitting just under the limit unless it is labelled.
+
+**A five-lens code review found two real defects in it, and the second measurement confirmed one
+live.** (1) `elapsedMs` was captured outside `withRetryTimeout`, so it spanned every attempt plus
+backoff while `effectiveTimeoutMs` governs one attempt — a parse-error-then-success rendered as an
+agent past its own ceiling with `status: 'ok'` (measured 1015 ms vs a 300 ms ceiling). `AgentTiming`
+now carries `attemptMs` + `attempts` alongside wall time, and a retried agent is named in the line.
+(2) `buildTimingLines` opened with a bare `---`, which in CommonMark is a **setext heading
+underline**, not a rule — it silently promoted the verdict line ("No issues found." / "INCOMPLETE
+— reviewed 2000/12599 lines") to an `<h2>`. Two prior commits were spent on that exact line. Every
+existing assertion used `toContain`, so all of them passed while the render was wrong; the new tests
+assert on line adjacency instead.
+
+**The review also found twelve false claims in the new WHY comments** — `locationCheck` called a
+`ReviewResult` field (it is on `Finding`), a `slowestAgent` docblock describing "three consumers"
+that a refactor had already removed, an invented "mcp must not import cli" rule enforced by nothing,
+and an "earlier draft" cited from no commit. All corrected. Root cause: comments written against a
+draft, then not re-read after the refactor that invalidated them. **And, worst: the unsourced 616 s
+constants had been baked into four test fixtures and the README envelope example**, where a reader
+takes them for a real measurement — the exact failure `10355d6` had just finished correcting.
+Replaced with neutral values.
+
+**Self-review caught a duplicate renderer before commit.** The stderr line first composed its own
+string from the same four fields that `timingSentence` renders, and the two were already drifting --
+one parenthesised the ceiling, only one labelled a timed-out agent. `formatRunTiming` now delegates,
+so there is a single renderer behind stderr, the markdown footer and the MCP note. This is the
+`TOOL_LABELS` rule applied to a field added specifically to stop people misreading a number.
+
+**Verified through the real pipeline, not a probe.** A real `--chunk` CLI run produced three rows
+with **different per-chunk ceilings** (288 s / 360 s / 360 s, scaled from 18 / 30 / 30 lines) --
+which alone shows why one aggregate ceiling would have been wrong. All four surfaces confirmed
+end-to-end: JSON envelope, markdown footer, SARIF `properties.timings`, and MCP (by replaying the
+real captured artifact through `formatMcpOutput`). GitHub annotations excludes it deliberately,
+with the three reasons recorded above the function so the absence reads as a decision.
+
+**14 of 19 new tests fail against the unfixed code; the other 5 are guards and are not counted.**
+Confirmed by mutating each change in turn and checking the message, not just the failure -- e.g.
+`expected [ { chunkLines: 2700 } ] to have a length of 3 but got 1` for the summing mutation, and
+`expected '...⚠️ No findings, b...' to contain '✅ No findings'` for folding timing into the
+headline gate. One test moved from "guard" to "regression" only after a mutation was written that
+could falsify it.
+
+**The falsification harness lied first, and uniformly.** Its first run reported 0 failures for all
+13 mutations. `--reporter=basic` was removed in vitest 4, so vitest errored before running a single
+test and the parser read the empty output as "everything passed". A uniform verdict from a
+verification harness is a harness bug until proven otherwise -- the same rule as distrusting a probe
+that agrees with you, in the direction that would have discarded good tests instead of keeping bad
+ones.
+
+## ✅ Completed (2026-08-27, third session)
+
+**The PMB 1.2.1 upgrade was never going to resolve, and the next-step said otherwise.** Verified
+directly in PMB's checkout rather than inherited: `mb upgrade` resolves
+`TEMPLATES_DIR="$REPO_ROOT/templates"` from the local working directory and `mb.sh` contains **zero**
+`git fetch|checkout|archive|clone|describe|tag` calls in 2,939 lines — so it distributes a snapshot
+of whatever is on disk, never a release. Their tree is currently dirty on a feature branch with five
+`templates/` files modified, which is exactly the source directory.
+
+**There is also no release to wait for.** `VERSION` reads `1.2.1` but nothing is tagged past
+`v1.0.4` — the version names no tag, commit or artifact. "Blocked on upstream release" and "upstream
+has no release mechanism" are different states; only the second tells a successor to stop waiting.
+
+**Resolved 2026-08-28 — PMB will cut releases, and tagging alone unblocks us.** _[Superseded later
+the same day: the policy is approved but unimplemented and unscheduled. See "Corrections from PMB"
+at the top. Everything below describes the decision, not its delivery.]_ The operator
+decided all three open questions. Releases: **yes**, and the decisive argument was `TEMPLATE_OWNED`
+— PMB forbids adopters from patching those files locally, so "you may not fix this yourself" and
+"you get whatever was on my desk" cannot both hold. Working-tree sourcing: **not deliberate, just
+unfinished** (zero git-ref calls and no `# WHY` comment on a load-bearing distribution choice, in a
+repo carrying 180 of them); it becomes a dev-mode flag rather than the default. Dirty-tree guard:
+**refuse, with `--allow-dirty`** — warn-only was rejected as another advisory layer.
+
+**For us the tag is the actionable event, not the merge.** _[Superseded 2026-08-28: true of which
+event to act on, misleading about timing — no tag exists and none is scheduled, so this must not be
+read as "wait for it."]_ Once `v1.2.1` exists, PMB is checked out at the tag and `mb upgrade` runs
+here — **two repos, and the `cd` paths matter**; exact commands in `activeContext.md`. The guard and
+ref-sourcing are
+hardening for the general case, not prerequisites for us — so our unblock costs one `git tag`
+upstream and zero code either side. Sequencing PMB approved: tag first, guard second, ref-sourcing
+third; "releases eventually, guard now" was rejected once the release half turned out to be the
+cheap half.
+
+**Still holding both signals:** the ACR provenance entry is still uncommitted, and nothing has
+reached `main`. PMB will signal the tag separately from the merge, since the tag is what we act on.
+**Superseded 2026-08-28 —** the entry is now committed (unmerged), and "wait for the tag" was the
+wrong frame: the release work is unscheduled. See the corrections section at the top of this file.
+
+**Corrected 2026-08-28, PMB caught it:** we also claimed `VERSION` and `.pmb-version` contradicted
+each other. They do not — `VERSION` is PMB's own version, `.pmb-version` records which version a
+consuming project was last upgraded with (verified in `mb.sh`). Two true statements. The finding
+above is untouched. PMB's follow-on, which is real: their own `.pmb-version` is `1.1.1` while they
+publish `1.2.1`, so PMB has not run `mb upgrade` on itself in two versions — same drift class, with
+PMB downstream of itself.
+
+Reported upstream. **A fix we proposed was withdrawn on evidence:** `git archive <tag>` is useless
+when no tag exists, so the real ask is _cut releases first_. PMB confirmed independently and asked
+us not to upgrade until they signal work reached `main` — only that signal is actionable.
+_[Superseded 2026-08-28: there are **two** signals, "reached `main`" and "tag exists", and PMB sends
+them separately. Neither has arrived.]_
+
+**Consequence meanwhile:** `last-reviewed` stays unstamped, so `mb doctor`'s staleness check reports
+actively-edited files as months stale. Not fixable locally (`TEMPLATE_OWNED`).
+
+**One inbound claim held pending, not logged as done:** PMB earlier said the ACR provenance gap was
+closed in their record. They corrected it — the entry is written, with our hedge preserved verbatim
+(611.7 s as a retry artifact; the 616 s resemblance recorded as _not confirmed_), but uncommitted in
+the dirty tree above. Do not treat it as landed until they confirm. **Superseded 2026-08-28:** now
+committed as `2052c3c`, still unmerged — see the corrections section at the top.
+
+**v1.15.0 released, and the repo's outward-facing information audited against the binary.** Eight
+PRs (#65–#72). Releasing was the point rather than tidiness: `review.yml` installs the _published_
+package, so until 1.15.0 shipped every CI run emitted a `findings.json` with no `timings`. The
+collection this instrumentation exists for starts now.
+
+**Three tagging incidents in one session, all recorded in `systemPatterns.md` with a guard.**
+`v1.15.0` was tagged onto `main` after a merge branch protection had rejected, naming a commit
+still reading `1.14.0`; then the _good_ tag was deleted by re-running the cleanup written minutes
+earlier for the bad one, flipping the published Release to a draft. **npm's refusal to republish an
+existing version is what limited the damage — the registry compensating for the process, not the
+process working.** Recovered by re-tagging `6e2ed34` and re-publishing.
+
+**Docs audited by diffing documentation against the binary, not by reading.** The README flag table
+matched code 27/27 both directions; agent counts, `engines.node: ">=18"` (runtime deps genuinely
+require 18) and CHANGELOG all held. Two real gaps found and fixed: `--ollama-url` and exit code `4`
+were undocumented (#68), and `agentStatus`/`testFiles` were missing from the "stable envelope"
+contract (#72) — `agentStatus` being the field that drives exit 2 and the only thing separating "no
+findings, clean" from "no findings, every agent failed". Also fixed a `.vsix`-from-Releases install
+instruction that had never been true. GitHub description, homepage and topics updated.
+
+**Branch cleanup found that squash-merge blinds git's own detection** — 0 of 11 landed branches
+reported as merged. Verified each local tip against its merged PR's `headRefOid`; one differed and
+was merely _behind_. Rule in `systemPatterns.md`.
