@@ -23,18 +23,18 @@ Fifth through seventh moves, 2026-08-28: the three release-tagging incidents, th
 the first two to make room for handoff conventions, the third to bring the file back under its
 target range. All the rules they support stay upstream.
 
-Tenth move, 2026-08-31: a full archiving pass. The evidence behind the review-gate rules, the
-field-to-surface history, the release-tagging and squash-merge numbers, and the falsification
-examples all moved here; every rule stayed upstream, verified by diffing the bolded rule statements
-before and after. Detail below.
+Eighth move, 2026-08-31: three verification-lesson narratives (the `elapsedMs` rounds, the
+duration-span measurement, and the vitest-4 harness bug), archived to make room for the
+proxy-assertion pattern. Their rules stay upstream as one-line statements; the measurements are
+at the end of this file.
 
 Ninth move, 2026-08-31: the `main`-hash narrative, archived to make room for the stale-list rule.
 The rule and its immutable-identifier exception stay upstream; the two-PR story is below.
 
-Eighth move, 2026-08-31: three verification-lesson narratives (the `elapsedMs` rounds, the
-duration-span measurement, and the vitest-4 harness bug), archived to make room for the
-peer-coordination protocol and the proxy-assertion pattern. Their rules stay upstream as
-one-line statements; the measurements are at the end of this file.
+Tenth move, 2026-08-31: a full archiving pass. The evidence behind the review-gate rules, the
+field-to-surface history, the release-tagging and squash-merge numbers, and the falsification
+examples all moved here; every rule stayed upstream, verified by diffing the bolded rule statements
+before and after. Detail below.
 
 ## PostToolUse marker-reissue defect — reproduction (2026-08-20)
 
