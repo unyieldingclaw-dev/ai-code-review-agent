@@ -90,7 +90,11 @@ export async function runChunked(
     if (result.earlyExit) break // --fail-fast should stop across chunks too, not just within one
   }
 
-  return mergeResults(results, maxFindings)
+  // chunks.length, not results.length: the break above leaves results short, and the gap between
+  // the two IS the finding. Passing both is what lets the merged envelope say "2 of 5 reviewed"
+  // instead of looking identical to a complete 2-chunk run -- which is exactly what it looked
+  // like before, since mergeResults only ever sees the chunks that ran.
+  return mergeResults(results, maxFindings, chunks.length)
 }
 
 // Mirrors OrchestratorAgent.capAndSort exactly (severity desc, then VERIFIED > INFERRED >
@@ -110,7 +114,11 @@ function capAndSort(findings: ReviewResult['findings'], maxFindings: number) {
     .slice(0, maxFindings)
 }
 
-function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResult {
+function mergeResults(
+  results: ReviewResult[],
+  maxFindings: number,
+  totalChunks: number
+): ReviewResult {
   const findings = capAndSort(
     results.flatMap((r) => r.findings),
     maxFindings
@@ -141,7 +149,7 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
   const droppedAcrossChunks = results.flatMap((r) => r.hallucinationFilter?.dropped ?? [])
   const mergedHallucinationFilter =
     droppedAcrossChunks.length > 0 ? { dropped: droppedAcrossChunks } : undefined
-  const mergedToolAvailability = mergeToolAvailability(results)
+  const mergedToolAvailability = mergeToolAvailability(results, results.length < totalChunks)
 
   // CONCATENATED, never summed -- and this is the one line the whole field depends on.
   // `durationMs` (summed at the top of this function) is correct for a "how long did the review
@@ -157,6 +165,33 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
     testFiles,
     summary: { totalFindings: findings.length, bySeverity, byAgent, durationMs },
     ...(last.earlyExit ? { earlyExit: last.earlyExit } : {}),
+    // Always set, not only when short: every surface gates its banner on `reviewed < total`, so
+    // an absent field on a complete run and an absent field on an old archived result would be
+    // indistinguishable. Stating full coverage explicitly is what makes the short case legible.
+    chunking: { total: totalChunks, reviewed: results.length },
+    // MAX, not last-chunk-wins. `total` inside runner.run() is derived per chunk -- the
+    // migration-safety gate and agentPolicy both consult that chunk's changed files -- so the
+    // roster legitimately differs between chunks, and `last` would report whichever chunk
+    // happened to end the run. Max is still only a floor: if the break skipped the one chunk
+    // whose content would have enabled a diff-gated agent, that agent is in nobody's count.
+    // The chunk ratio above, not this number, is what carries coverage for a chunked run.
+    //
+    // FLOORED by the merged agentStatus size, and that term is load-bearing rather than defensive.
+    // `mergeAgentStatus` builds the UNION of agent names across chunks, while this is the MAX of
+    // per-chunk roster sizes -- and a max of sizes is not an upper bound on a union of sets. Two
+    // chunks whose agentPolicy allows disjoint agents ({security, correctness} and {design,
+    // dependencies}) each report 2, while the union is 4. Every surface then renders
+    // `agentsPlanned - agentsRan`, which would be -2: a negative "agents never ran" count printed
+    // into a PR annotation. The floor makes the denominator incapable of falling below the
+    // numerator on any surface, which is stronger than guarding each subtraction separately.
+    ...(results.some((r) => r.agentsPlanned !== undefined)
+      ? {
+          agentsPlanned: Math.max(
+            ...results.map((r) => r.agentsPlanned ?? 0),
+            Object.keys(mergedAgentStatus ?? {}).length
+          ),
+        }
+      : {}),
     ...(last.context ? { context: last.context } : {}),
     sanitizer: {
       enabled: last.sanitizer?.enabled ?? true,
@@ -164,9 +199,16 @@ function mergeResults(results: ReviewResult[], maxFindings: number): ReviewResul
       redactedLines: sanitizerRedacted,
       warnings: sanitizerWarnings,
     },
-    // Full coverage achieved across all chunks -- `truncation` is deliberately omitted, matching
-    // cli/index.ts's exit-code priority (chunking and truncation are mutually exclusive outcomes
-    // for a given run; see Task 13).
+    // `truncation` is deliberately omitted, matching cli/index.ts's exit-code priority (chunking
+    // and truncation are mutually exclusive outcomes for a given run; see Task 13).
+    //
+    // This comment used to open "Full coverage achieved across all chunks", and the `break` at the
+    // top of this file falsifies that: a chunk reporting earlyExit stops the loop, so the
+    // remaining chunks are never reviewed. The omission is still right -- setting `truncation`
+    // would route the run to exit 3, whose documented remedy is "re-run with --chunk", advice a
+    // chunked run has already taken -- but the JUSTIFICATION was false, and it was the only thing
+    // standing between an abandoned chunk loop and a report that looked complete. `chunking`
+    // above now carries that state instead, without moving any exit code.
     ...(last.policy ? { policy: last.policy } : {}),
     ...(mergedAgentStatus ? { agentStatus: mergedAgentStatus } : {}),
     ...(mergedHallucinationFilter ? { hallucinationFilter: mergedHallucinationFilter } : {}),
@@ -216,7 +258,10 @@ function mergeEvidenceCheckFilter(
  * changes says nothing about npm audit, and must not degrade a verdict another chunk legitimately
  * earned.
  */
-function mergeToolAvailability(results: ReviewResult[]): ToolAvailabilityMetadata | undefined {
+function mergeToolAvailability(
+  results: ReviewResult[],
+  coverageIncomplete: boolean
+): ToolAvailabilityMetadata | undefined {
   const merged: ToolAvailabilityMetadata = {}
   for (const key of Object.keys(TOOL_LABELS) as (keyof ToolAvailabilityMetadata)[]) {
     const reported = results
@@ -230,7 +275,20 @@ function mergeToolAvailability(results: ReviewResult[]): ToolAvailabilityMetadat
       continue
     }
     const distinct = new Set(substantive)
-    merged[key] = distinct.size === 1 ? [...distinct][0]! : 'partial'
+    const agreed = distinct.size === 1 ? [...distinct][0]! : 'partial'
+    // WHY an early chunk break degrades 'used' to 'partial': this function sees only the chunks
+    // that RAN. If each of them reported 'used', they agree, and the merge reports 'used' -- a
+    // claim that gitleaks (or npm audit) covered the whole diff, when the loop abandoned the rest
+    // of it. `used` renders nothing on any surface, so that claim is made by SILENCE, which is
+    // the one form of it a reader cannot notice.
+    //
+    // 'partial' is exactly the right word and already exists for this: this file's header
+    // describes it as covering "some of the reviewed surface but not all of it", and every
+    // formatter already renders it as "findings for the remainder came from the model, not the
+    // tool". A deterministic tool that never saw two of five chunks is in precisely that state.
+    // Only a positive claim is degraded -- 'not-applicable' and 'unavailable-llm-fallback' are
+    // unaffected, because neither asserts coverage.
+    merged[key] = coverageIncomplete && agreed === 'used' ? 'partial' : agreed
   }
   return Object.keys(merged).length > 0 ? merged : undefined
 }

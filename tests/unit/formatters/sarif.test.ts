@@ -346,3 +346,68 @@ describe('formatSarif timing', () => {
     expect(sarif.runs[0].properties.timings).toBeUndefined()
   })
 })
+
+describe('formatSarif — earlyExit and chunk coverage', () => {
+  it('does not report a fail-fast run as a successful execution', () => {
+    // executionSuccessful is the field SARIF consumers actually gate on. Leaving it true for a
+    // run that skipped twelve agents lets "0 results" read as a clean scan, which is the whole
+    // claim a partial review must not make.
+    const sarif = JSON.parse(
+      formatSarif(
+        makeResult({
+          earlyExit: { stoppedAt: 'security' },
+          agentStatus: { security: 'ok' },
+          agentsPlanned: 15,
+        })
+      )
+    )
+    expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(false)
+  })
+
+  it('states in a notification which incompleteness it was', () => {
+    // executionSuccessful alone is one bit; a consumer that reads the detail must be able to tell
+    // "stopped early" from "an agent crashed", because the remedies differ.
+    const sarif = JSON.parse(
+      formatSarif(makeResult({ earlyExit: { stoppedAt: 'security' }, agentsPlanned: 15 }))
+    )
+    const texts = sarif.runs[0].invocations[0].toolExecutionNotifications.map(
+      (n: { message: { text: string } }) => n.message.text
+    )
+    expect(texts.join(' ')).toContain('Fail-fast')
+    expect(texts.join(' ')).toContain('security')
+  })
+
+  it('carries earlyExit, agentsPlanned and chunking machine-read in run properties', () => {
+    // agentStatus cannot supply a denominator -- it holds only agents that ran -- so a consumer
+    // computing its own coverage ratio needs agentsPlanned separately.
+    const sarif = JSON.parse(
+      formatSarif(
+        makeResult({
+          earlyExit: { stoppedAt: 'security' },
+          agentsPlanned: 15,
+          chunking: { total: 5, reviewed: 2 },
+        })
+      )
+    )
+    const props = sarif.runs[0].properties
+    expect(props.earlyExit).toEqual({ stoppedAt: 'security' })
+    expect(props.agentsPlanned).toBe(15)
+    expect(props.chunking).toEqual({ total: 5, reviewed: 2 })
+  })
+
+  it('flags a chunked run that stopped before every chunk was reviewed', () => {
+    const sarif = JSON.parse(formatSarif(makeResult({ chunking: { total: 5, reviewed: 2 } })))
+    expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(false)
+  })
+
+  it('still reports a complete run as successful', () => {
+    // Guard against over-correction: chunking is set on every chunked run, so a COMPLETE one must
+    // not be read as short.
+    const sarif = JSON.parse(
+      formatSarif(
+        makeResult({ agentStatus: { security: 'ok' }, chunking: { total: 3, reviewed: 3 } })
+      )
+    )
+    expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(true)
+  })
+})

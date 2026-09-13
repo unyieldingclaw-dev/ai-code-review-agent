@@ -306,6 +306,60 @@ describe('formatMarkdown', () => {
     expect(formatMcpOutput(result)).not.toContain('✅')
   })
 
+  it('does not render a fail-fast run as clean on ANY surface', () => {
+    // The sibling test above passed `truncation` and only ever passed `truncation`, which is why
+    // it never caught this: `earlyExit` is a third incompleteness state, and both surfaces gated
+    // on the other two. A --fail-fast run stops the swarm after agent N and the remaining
+    // specialists never run -- but they are absent from agentStatus rather than failed, so
+    // `failedAgents.length` is 0 and every gate reads the run as complete.
+    const result = makeResult({
+      findings: [],
+      earlyExit: { stoppedAt: 'security' },
+      agentStatus: { coverage: 'ok', correctness: 'ok', security: 'ok' },
+      agentsPlanned: 15,
+    })
+    expect(formatMarkdown(result)).not.toContain('✅')
+    expect(formatMcpOutput(result)).not.toContain('✅')
+  })
+
+  it('counts agents that were planned, not the ones that started', () => {
+    // The trap in the obvious fix. Folding earlyExit into the `incomplete` gate makes the scope
+    // string render on every fail-fast run -- and that string derived its denominator from
+    // agentStatus, which only holds agents that ran. So the naive fix upgrades a silent omission
+    // into an affirmative false claim: "3/3 agents that completed" for a run that skipped twelve.
+    // Asserting the absence of 3/3 is what makes this falsifying rather than decorative.
+    const result = makeResult({
+      findings: [],
+      earlyExit: { stoppedAt: 'security' },
+      agentStatus: { coverage: 'ok', correctness: 'ok', security: 'ok' },
+      agentsPlanned: 15,
+    })
+    const output = formatMarkdown(result)
+    expect(output).toContain('3/15')
+    expect(output).not.toContain('3/3')
+  })
+
+  it('names the agent the swarm stopped after, so the reader can re-run deliberately', () => {
+    const result = makeResult({
+      findings: [],
+      earlyExit: { stoppedAt: 'security' },
+      agentStatus: { security: 'ok' },
+      agentsPlanned: 15,
+    })
+    expect(formatMarkdown(result)).toContain('security')
+    expect(formatMarkdown(result)).toMatch(/fail-fast/i)
+  })
+
+  it('still reports a complete run as a pass when earlyExit is absent', () => {
+    // Guard against over-correction, mirroring the truncation guard below: a run that executed
+    // its whole roster must not inherit the incompleteness headline.
+    const output = formatMarkdown(
+      makeResult({ findings: [], agentStatus: { security: 'ok' }, agentsPlanned: 1 })
+    )
+    expect(output).toContain('✅ No issues found.')
+    expect(output).not.toContain('INCOMPLETE')
+  })
+
   it('still reports an untruncated clean run as a pass', () => {
     // Guard against over-correction: the incompleteness headline must not leak into a genuine
     // full-coverage clean run.
@@ -729,5 +783,90 @@ describe('formatMarkdown timing separator', () => {
         })
       )
     )
+  })
+})
+
+describe('earlyExit that cost no coverage', () => {
+  // shouldEarlyExit is evaluated after EVERY sequential agent including the last one, so a run can
+  // stop "early" having already executed its whole roster. Before this gate, the report said
+  // "INCOMPLETE — 0 findings from 3/3 agents that completed" and, two lines later, "the unrun
+  // agents' domains were not examined at all" — contradicting itself about a complete review.
+  const fullCoverage = {
+    findings: [],
+    earlyExit: { stoppedAt: 'security' as const },
+    agentStatus: { coverage: 'ok' as const, correctness: 'ok' as const, security: 'ok' as const },
+    agentsPlanned: 3,
+  }
+
+  it('does not call a run incomplete when every planned agent ran', () => {
+    const output = formatMarkdown(makeResult(fullCoverage))
+    expect(output).not.toContain('INCOMPLETE')
+    expect(output).toContain('✅ No issues found.')
+  })
+
+  it('does not claim agents never ran when none were skipped', () => {
+    expect(formatMarkdown(makeResult(fullCoverage))).not.toMatch(/never ran|not a full review/i)
+    expect(formatMcpOutput(makeResult(fullCoverage))).not.toMatch(
+      /partial review|were not examined/i
+    )
+  })
+
+  it('still flags a fail-fast run that did skip agents', () => {
+    // Guard on the guard: the fix must not silence the case it was built for.
+    const output = formatMarkdown(makeResult({ ...fullCoverage, agentsPlanned: 15 }))
+    expect(output).toContain('INCOMPLETE')
+    expect(output).toContain('12 of 15 agents never ran')
+  })
+})
+
+describe('earlyExit on an envelope with no agentsPlanned', () => {
+  // agentsPlannedCount falls back to the count that RAN when the field is absent (an archived
+  // findings.json, a hand-built fixture). That makes the denominator tautologically equal the
+  // numerator, so the report printed "from 3/3 agents that completed" and "the other 0 never ran"
+  // directly beside an INCOMPLETE headline — a number claiming full coverage inside a verdict
+  // denying it. A missing roster is now reported as missing rather than as agreement.
+  const noRoster = {
+    findings: [],
+    earlyExit: { stoppedAt: 'security' as const },
+    agentStatus: { coverage: 'ok' as const, correctness: 'ok' as const, security: 'ok' as const },
+  }
+
+  it('states no agent ratio at all rather than a tautological one', () => {
+    const output = formatMarkdown(makeResult(noRoster))
+    expect(output).toContain('INCOMPLETE')
+    expect(output).not.toContain('3/3')
+    expect(output).not.toMatch(/other 0 never ran/)
+  })
+
+  it('still says the review was incomplete, because unknown is not the same as complete', () => {
+    expect(formatMarkdown(makeResult(noRoster))).not.toContain('✅')
+  })
+})
+
+describe('a partial tool scan says which kind of partial it was', () => {
+  // 'partial' has two producers with opposite implications. SecretsAgent sets it when the tool
+  // skipped files the LLM still reviewed. chunkRunner sets it when whole chunks were reviewed by
+  // nothing at all — and the original wording asserted "nothing was left unscanned" two lines
+  // below a banner saying part of the diff was never analyzed.
+  it('does not claim the model covered the gap when whole chunks went unreviewed', () => {
+    const output = formatMarkdown(
+      makeResult({
+        findings: [],
+        chunking: { total: 9, reviewed: 4 },
+        toolAvailability: { gitleaks: 'partial' },
+      })
+    )
+    expect(output).toContain('never analyzed')
+    expect(output).not.toContain('nothing was left unscanned')
+    expect(output).toContain('neither the tool nor the model')
+  })
+
+  it('still says the model covered the gap for an ordinary partial scan', () => {
+    // Guard: the SecretsAgent meaning must survive. Reassurance that is true should not be lost
+    // just because a second producer needed a different sentence.
+    const output = formatMarkdown(
+      makeResult({ findings: [], toolAvailability: { gitleaks: 'partial' } })
+    )
+    expect(output).toContain('nothing was left unscanned')
   })
 })

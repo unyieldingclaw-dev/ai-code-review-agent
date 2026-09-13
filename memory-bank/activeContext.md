@@ -16,19 +16,20 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-09-01
+**Last Updated**: 2026-09-12
 
 ## Current Focus
 
-**`filteredFiles` invisibility is fixed and open as #84** (2026-09-01), together with the `policy`
-and `filteredFiles` chunk merges it turned out to require. Mechanism, measurement and the design
+**`filteredFiles` invisibility is fixed and open as #84**, together with the `policy` and
+`filteredFiles` chunk merges it turned out to require. Mechanism, measurement and the design
 decision are in `progress.md`. Verified: 867 tests and **20/20 mutations killed** against a no-op
-control that killed nothing.
+control that killed nothing. Its task contract shows `status: "complete"` because the work
+shipped — that tracks the _task_, not the _PR_, which is still open.
 
-**Three open PRs, none merged, all touching the same four formatters:** `#82` (this branch —
-memory-bank), `#83` (`fix/early-exit-visibility`), `#84` (`fix/filtered-files-visibility`).
-Whichever merges first forces `gh pr update-branch` on the others — never a rebase, since
-force-push is hard-blocked. `gh pr merge` is denied to Claude by design.
+**`#82` is merged; `#83`, `#84`, `#85` are open, none merged** (`gh pr list`, 2026-09-12). `#83`
+(`fix/early-exit-visibility`) is pushed and up to date with `main`, awaiting `test` CI + merge;
+`#84`/`#85` need `gh pr update-branch` once it does — never a rebase, force-push is hard-blocked.
+`gh pr merge` is denied to Claude by design; the user runs it after checks pass.
 
 **Two handoffs have been merged here** (2026-08-31, and 2026-09-01). `handoff.md` is **gitignored**,
 so until each merge its facts existed on one disk and in no commit. The first merge put its
@@ -78,8 +79,8 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 
 ## Next Steps
 
-- **`filteredFiles` — shipped as #84, awaiting review.** `review.yml` and `vscode-extension` are
-  the fifth and sixth surfaces and still follow once #83 lands the
+- **`filteredFiles` — shipped, open as #84, awaiting review.** `review.yml` and `vscode-extension`
+  are the fifth and sixth surfaces and still follow once #83 lands the
   `scripts/reviewIncompleteness.cjs` they need; duplicating that module across open PRs would
   create the divergent-copy drift this work exists to remove.
 - **`chunkRunner`'s `mergeResults` drops `truncation`, so exit 3 is unreachable under `--chunk`.**
@@ -131,11 +132,11 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: three local branches and **two open PRs** (#82, #83), neither merged; the
-`fix/filtered-files-visibility` work is uncommitted. **The `main` hash is deliberately not recorded
+unit tests. **Git**: `#82` merged (branch deleted); **three open PRs** (`#83` pushed and awaiting
+`test` CI + merge, `#84`, `#85`), none merged. **The `main` hash is deliberately not recorded
 here** — read it from `git log`. Two PRs in a row tried to keep it current and each was stale the
-moment it merged, because a memory-bank PR moves the very commit it names. Remote holds `main`, the
-two PR branches, plus the two long-retained orphans (`chore/agent-calibration`,
+moment it merged, because a memory-bank PR moves the very commit it names. Remote holds `main`,
+three PR branches, plus the two long-retained orphans (`chore/agent-calibration`,
 `claude/plan-overview-4dg42o`) — containment cannot be proven for either, so both stay. `v1.15.0`
 tagged at `6e2ed34` and published, and `Unreleased` is empty. That tag hash **is** recorded, and
 the distinction is the point:

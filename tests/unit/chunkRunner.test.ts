@@ -474,3 +474,135 @@ describe('splitByFileBoundary', () => {
     expect(splitByFileBoundary('', 2000)).toEqual([''])
   })
 })
+
+describe('runChunked — chunk coverage when the loop breaks early', () => {
+  it('records how many chunks were reviewed when a chunk stops the run', async () => {
+    // The sibling test above already asserts run() was called twice and it passes today, which is
+    // exactly why it proves nothing: mergeResults only ever sees the chunks that RAN, so a
+    // complete 2-chunk run and a 3-chunk run that broke at 2 are identical inputs to it. The
+    // ratio is the only thing that can tell them apart.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult())
+      .mockResolvedValueOnce(makeResult({ earlyExit: { stoppedAt: 'security' } }))
+      .mockResolvedValueOnce(makeResult())
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(3) }, 2000, 15)
+
+    expect(runMock).toHaveBeenCalledTimes(2)
+    expect(merged.chunking).toEqual({ total: 3, reviewed: 2 })
+  })
+
+  it('records full coverage on a run that reviewed every chunk', async () => {
+    // Always set, never conditional: every surface gates on `reviewed < total`, so an absent field
+    // on a complete run would be indistinguishable from an absent field on an old archived result.
+    const runMock = vi.fn().mockResolvedValue(makeResult())
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(3) }, 2000, 15)
+
+    expect(merged.chunking).toEqual({ total: 3, reviewed: 3 })
+  })
+
+  it('reports the largest agent roster any chunk planned, not the last chunk that ran', async () => {
+    // runner.ts derives its roster from THAT CHUNK'S diff -- the migration-safety gate and
+    // agentPolicy both consult the changed files -- so the count legitimately differs per chunk.
+    // The larger value is deliberately FIRST: the reverse order passes under last-chunk-wins too,
+    // which would make this test decorative rather than falsifying.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ agentsPlanned: 15 }))
+      .mockResolvedValueOnce(makeResult({ agentsPlanned: 14 }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.agentsPlanned).toBe(15)
+  })
+
+  it('omits agentsPlanned entirely when no chunk reported one', async () => {
+    // Guard: Math.max() of an empty list is -Infinity, and a negative denominator would render
+    // worse than no denominator at all.
+    const runMock = vi.fn().mockResolvedValue(makeResult())
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.agentsPlanned).toBeUndefined()
+  })
+})
+
+describe('runChunked — a deterministic tool must not claim coverage it did not have', () => {
+  it('degrades a tool from used to partial when the chunk loop stopped early', async () => {
+    // Every chunk that RAN reported 'used', so they agree and the merge reported 'used' -- a
+    // positive claim that gitleaks scanned the whole diff, made about chunks it never saw.
+    // 'used' renders nothing on any surface, so the claim was made by silence.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { gitleaks: 'used' } }))
+      .mockResolvedValueOnce(
+        makeResult({ toolAvailability: { gitleaks: 'used' }, earlyExit: { stoppedAt: 'security' } })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(3) }, 2000, 15)
+
+    expect(merged.toolAvailability?.gitleaks).toBe('partial')
+  })
+
+  it('leaves a tool as used when every chunk was reviewed', async () => {
+    // Guard: only an INCOMPLETE run degrades. A complete chunked run must still be able to report
+    // that gitleaks genuinely covered everything, or the signal becomes meaningless.
+    const runMock = vi
+      .fn()
+      .mockResolvedValue(makeResult({ toolAvailability: { gitleaks: 'used' } }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.toolAvailability?.gitleaks).toBe('used')
+  })
+
+  it('does not promote not-applicable or unavailable to partial on a short run', async () => {
+    // Only a positive coverage claim is degraded. 'unavailable-llm-fallback' asserts the tool did
+    // not run at all, which stays true regardless of how many chunks were reviewed -- rewriting it
+    // would tell the reader to investigate skipped files instead of installing the tool.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({ toolAvailability: { gitleaks: 'unavailable-llm-fallback' } })
+      )
+      .mockResolvedValueOnce(
+        makeResult({
+          toolAvailability: { gitleaks: 'unavailable-llm-fallback' },
+          earlyExit: { stoppedAt: 'security' },
+        })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(3) }, 2000, 15)
+
+    expect(merged.toolAvailability?.gitleaks).toBe('unavailable-llm-fallback')
+  })
+
+  it('floors agentsPlanned at the merged agentStatus size so it cannot fall below it', async () => {
+    // Math.max of per-chunk roster SIZES is not an upper bound on the UNION of agent names
+    // mergeAgentStatus builds: two chunks whose agentPolicy allows disjoint agents each report 2
+    // while the union is 4, and every surface then renders agentsPlanned - agentsRan as -2.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({ agentsPlanned: 2, agentStatus: { security: 'ok', correctness: 'ok' } })
+      )
+      .mockResolvedValueOnce(
+        makeResult({ agentsPlanned: 2, agentStatus: { design: 'ok', dependencies: 'ok' } })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(Object.keys(merged.agentStatus ?? {})).toHaveLength(4)
+    expect(merged.agentsPlanned).toBe(4)
+  })
+})
