@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`policy.agentsSkipped` no longer claims a full-run skip when the chunk loop stopped early.**
+  `mergePolicy` promoted an agent to "skipped entirely" whenever it was excluded in every chunk
+  that ran — but an `earlyExit` break leaves the remaining chunks unexamined, so they might not
+  have excluded the agent at all. `mergeToolAvailability` already guards the analogous claim for
+  `toolAvailability` via a `coverageIncomplete` parameter; `mergePolicy` now takes the same
+  parameter and, when set, demotes the claim to a narrowed view instead — `attributeChunkSkips`
+  already recorded the relevant files in `filteredFiles` per chunk, so nothing is lost, only
+  weakened to what the run actually proved. Found by opposition review of the merge that combined
+  this feature with `earlyExit` visibility.
+
 - **A `--fail-fast` run no longer reports itself as a clean review.** `ReviewResult.earlyExit`
   reached **no formatter at all**: the only trace was a footer `cli/index.ts` appended _after_
   `formatMarkdown` returned, and that footer was skipped for `json`, `sarif` and
