@@ -7,6 +7,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **A `--fail-fast` run no longer reports itself as a clean review.** `ReviewResult.earlyExit`
+  reached **no formatter at all**: the only trace was a footer `cli/index.ts` appended _after_
+  `formatMarkdown` returned, and that footer was skipped for `json`, `sarif` and
+  `github-annotations` alike. Proven by replaying a realistic result through the shipped build — a
+  run that executed **3 of 15 agents** rendered `✅ No critical or high findings` on MCP,
+  `executionSuccessful: true` in SARIF, no annotation warning, no CLI banner, and exited **0**.
+
+  The gates could not see it. `cli/formatter.ts` and `mcp/formatter.ts` both computed
+  incompleteness from truncation and failed agents, and `runner.ts` writes `agentStatus` only for
+  agents that **ran** — so the twelve that never started were absent rather than failed, and every
+  gate read the run as complete.
+
+- **The incompleteness banner no longer overstates agent coverage.** Its denominator came from
+  `agentStatus`, which holds only agents that ran, so it shrank in step with the numerator:
+  measured live at `INCOMPLETE — 0 findings from 3/4 agents that completed` for a run where 15
+  were configured and 11 never started. A new `ReviewResult.agentsPlanned` records the roster the
+  run actually scheduled. The number already existed — every progress event carries it as
+  `event.total` — but it was fire-and-forget to stderr and survived nowhere; the same
+  "emitted is not recorded" gap `timings` closed in 1.15.0, and no execution path changed.
+
+  This was also the trap in the obvious fix: folding `earlyExit` into the gate **without** the
+  real denominator would have rendered `from 3/3 agents that completed` on every fail-fast run,
+  turning a silent omission into a confident false claim.
+
+- **A chunked run that stops early no longer looks complete.** `chunkRunner` breaks its loop when a
+  chunk reports `earlyExit`, while the merge omitted `truncation` on the stated premise that
+  "Full coverage achieved across all chunks" — which the break falsifies. `mergeResults` only ever
+  sees the chunks that ran, so an abandoned 5-chunk run was byte-identical to a complete 2-chunk
+  one. A new `ReviewResult.chunking` records `{ total, reviewed }`. `agentsPlanned` merges as the
+  **maximum** across chunks, not last-chunk-wins, because the roster is derived per chunk (the
+  migration-safety gate and `agentPolicy` both consult that chunk's changed files).
+
+- **Two surfaces the four-formatter rule structurally could not reach.** Neither is a formatter, so
+  neither had ever received any of this project's incompleteness work:
+  - `.github/workflows/review.yml` renders the PR comment **and** the Step Summary in two separate
+    inline scripts, each reading `result.findings` and nothing else — posting `✅ No issues found.`
+    on the repo's highest-visibility surface. Both now go through a shared
+    `scripts/reviewIncompleteness.cjs` so they cannot drift apart.
+  - `vscode-extension` keeps its own hand-maintained copy of the envelope, which did not declare
+    `earlyExit`, `agentStatus` **or** `truncation`. It was three fixes behind, and `renderReport`
+    had no test coverage at all — which is how it drifted unnoticed.
+
+- **Two unit tests no longer assert on wall-clock time.** `runner.test.ts` required a call to
+  finish in under 50 ms as a proxy for "the timeout was not scaled", which fails whenever the
+  machine is busy (observed at 55 ms mid-build, passing 3/3 when idle). They now assert
+  `timings[0].effectiveTimeoutMs` directly — the number they were always about, and one that does
+  not move under load.
+
 - **`policy.agentsSkipped` could contradict `agentStatus` and `summary.byAgent` in the same
   `--chunk` result.** Found by the PMB peer against a real 7-chunk run and reproduced
   independently: an agent skipped on some chunks (every file in that chunk matched an
@@ -49,10 +97,11 @@ json` was never affected** — `formatJson` is `JSON.stringify(result, null, 2)`
   it would fire on nearly every mixed diff — in a documentation-heavy repo, most of them — and
   train the reader past the banner that matters.
 
-  Scope is the four formatters. `review.yml` and `vscode-extension` are the fifth and sixth
-  surfaces that render a verdict, and they follow separately once the shared incompleteness module
-  they need has landed; duplicating it across two open branches would create the divergent-copy
-  drift this change exists to remove.
+  Scope is the four formatters. `review.yml` and `vscode-extension` also render a verdict, but
+  carry none of this policy/filteredFiles narrowing yet — the `scripts/reviewIncompleteness.cjs`
+  module those two surfaces now share (see above) covers only `earlyExit`/`agentsPlanned`/
+  `chunking`, not this feature. Extending it to policy/filteredFiles is separate follow-up work,
+  not a gap in this change.
 
 - **Under `--chunk`, an agent narrowed in one chunk no longer reports as fully covered.**
   `chunkRunner`'s merge policy listed `filteredFiles` among "purely diagnostic metadata" and took
@@ -72,6 +121,23 @@ json` was never affected** — `formatJson` is `JSON.stringify(result, null, 2)`
 
   `filteredFiles` is also documented in the `--format json` envelope for the first time, since
   this change makes it the field a consumer needs to compute coverage.
+
+### Notes
+
+- **No exit code changed.** A fail-fast run still exits `0`. Routing it to `3` was considered and
+  rejected: `3` means partial _coverage_ of a complete run, whereas fail-fast is a
+  complete-coverage decision to stop early. Different states, different remedies, so they do not
+  share a code. The downstream consumer that branches on these codes was consulted before the
+  decision.
+- **A consumer's exit-`0` row now needs updating, and that is a consequence of this change.** That
+  row asserted "ran fully", which was safe only while a run that had _not_ run fully was
+  indistinguishable from one that had. Making the state visible is what makes the assertion wrong.
+  Reported to the consumer, who is fixing it; this change was not held for it, because the report
+  is now truthful and the description is what lags.
+- Still open, deliberately: `--fail-fast` triggers on **pre-orchestrator** severity while the exit
+  code reads **post-orchestrator** severity, so the swarm can halt saying "threshold met" and then
+  report that nothing met the threshold. That is a behaviour question, not a visibility one, and is
+  tracked separately.
 
 ## [1.15.0] — 2026-08-27 (a timing number now says what it spans)
 

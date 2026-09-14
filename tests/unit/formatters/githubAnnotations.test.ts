@@ -370,3 +370,60 @@ describe('formatGithubAnnotations policy notes', () => {
     expect(formatGithubAnnotations(makeResult())).not.toContain('agentPolicy')
   })
 })
+
+describe('formatGithubAnnotations — earlyExit', () => {
+  it('emits a warning naming the agent and how many never ran', () => {
+    const out = formatGithubAnnotations(
+      makeResult({
+        earlyExit: { stoppedAt: 'security' },
+        agentStatus: { coverage: 'ok', correctness: 'ok', security: 'ok' },
+        agentsPlanned: 15,
+      })
+    )
+    expect(out).toContain('::warning::')
+    expect(out).toContain('security')
+    expect(out).toContain('12 of 15 agents never ran')
+  })
+
+  it('puts the incompleteness warning before the finding annotations', () => {
+    // Ordering is the whole point on this surface: GitHub renders annotations in emission order,
+    // and a caveat after fifteen findings is a caveat nobody scrolls to.
+    const out = formatGithubAnnotations(
+      makeResult({
+        findings: [makeFinding()],
+        earlyExit: { stoppedAt: 'security' },
+        agentsPlanned: 15,
+      })
+    )
+    const lines = out.split('\n')
+    expect(lines[0]).toContain('Fail-fast')
+    expect(lines[lines.length - 1]).toContain('file=src/auth.ts')
+  })
+
+  it('says nothing when the run completed', () => {
+    // Guard: this surface is per-PR review comments, so a spurious warning is charged to every
+    // reader of every PR.
+    const out = formatGithubAnnotations(makeResult({ agentStatus: { security: 'ok' } }))
+    expect(out).not.toContain('Fail-fast')
+  })
+})
+
+describe('policy narrowing and earlyExit combined', () => {
+  // REGRESSION: these two incompleteness causes were added by independent branches that both
+  // touched the same return array, and were merged by hand. This is the only test in this file
+  // that sets both, proving the merge concatenated policyLines and earlyExitLines rather than one
+  // replacing the other.
+  it('emits both the policy-skip warning and the fail-fast warning for the same result', () => {
+    const out = formatGithubAnnotations(
+      makeResult({
+        policy: { agentsSkipped: ['license'], reason: {} },
+        earlyExit: { stoppedAt: 'security' },
+        agentStatus: { coverage: 'ok', correctness: 'ok', security: 'ok' },
+        agentsPlanned: 15,
+      })
+    )
+    expect(out).toContain('agentPolicy skipped license entirely')
+    expect(out).toContain('Fail-fast')
+    expect(out).toContain('12 of 15 agents never ran')
+  })
+})
