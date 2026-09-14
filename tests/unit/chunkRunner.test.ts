@@ -400,6 +400,36 @@ describe('runChunked', () => {
     expect(merged.filteredFiles?.security).toEqual(['file0.ts', 'file1.ts'])
   })
 
+  // Found by opposition review of the #83/#84 merge: "skipped in every chunk that ran" is only
+  // "skipped entirely" when every chunk RAN. `earlyExit` breaking the loop early means the
+  // remaining chunks were never examined -- they might not have excluded this agent at all -- so
+  // the same demotion mergeToolAvailability applies via coverageIncomplete must apply here too.
+  it('demotes a full-run skip to a narrowed view when the chunk loop broke early', async () => {
+    const skippedLicense = {
+      policy: { agentsSkipped: ['license' as const], reason: { license: 'excluded' } },
+    }
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult(skippedLicense))
+      .mockResolvedValueOnce({
+        ...makeResult(skippedLicense),
+        earlyExit: { stoppedAt: 'security' },
+      })
+    const runner = { run: runMock } as unknown as SwarmRunner
+    const fiveFilesWithHeaders = [0, 1, 2, 3, 4]
+      .map((i) => withHeaders(`file${i}.ts`, 2500))
+      .join('\n')
+
+    const merged = await runChunked(runner, { diff: fiveFilesWithHeaders }, 2000, 15)
+
+    // Only 2 of 5 planned chunks ran (the loop broke on chunk 2's earlyExit) -- license was
+    // skipped in both, but chunks 3-5 were never seen, so "skipped entirely" is not provable.
+    expect(merged.policy?.agentsSkipped).toEqual([])
+    // Demoted, not dropped: the files license was excluded from in the chunks that DID run are
+    // still reported, as a narrowed view rather than a full-run skip.
+    expect(merged.filteredFiles?.license).toEqual(['file0.ts', 'file1.ts'])
+  })
+
   it('omits filteredFiles entirely when no chunk withheld anything', async () => {
     const runMock = vi.fn().mockResolvedValue(makeResult({}))
     const runner = { run: runMock } as unknown as SwarmRunner

@@ -159,8 +159,9 @@ function mergeResults(
   const droppedAcrossChunks = results.flatMap((r) => r.hallucinationFilter?.dropped ?? [])
   const mergedHallucinationFilter =
     droppedAcrossChunks.length > 0 ? { dropped: droppedAcrossChunks } : undefined
-  const mergedToolAvailability = mergeToolAvailability(results, results.length < totalChunks)
-  const mergedPolicy = mergePolicy(results)
+  const coverageIncomplete = results.length < totalChunks
+  const mergedToolAvailability = mergeToolAvailability(results, coverageIncomplete)
+  const mergedPolicy = mergePolicy(results, coverageIncomplete)
   // A fully-skipped agent is reported by agentsSkipped; leaving it in filteredFiles too would
   // render both "skipped entirely" and "reviewed a reduced diff" for the same agent.
   const mergedFilteredFilesAll = mergeFilteredFiles(results)
@@ -314,7 +315,17 @@ function attributeChunkSkips(result: ReviewResult, chunkDiff: string): ReviewRes
 // "nothing skipped this chunk" as an explicit `{ agentsSkipped: [], reason: {} }` object, which
 // is truthy and so was counted correctly by the buggy code -- masking the bug, because that is
 // not the shape `runner.ts` actually emits.
-function mergePolicy(results: ReviewResult[]): PolicyResult | undefined {
+// coverageIncomplete mirrors mergeToolAvailability's parameter of the same name, for the same
+// reason: "skipped in every chunk that ran" is only "skipped entirely" when every chunk RAN. An
+// earlyExit break leaves chunks after it unexamined -- they might not have excluded this agent at
+// all -- so the claim is unprovable, not merely unlikely. When coverage is incomplete, no agent is
+// promoted to a full-run skip; attributeChunkSkips already recorded its files in filteredFiles per
+// chunk, so simply not promoting it here demotes the claim to a narrowed view instead of dropping
+// it. Found by opposition review of the #83/#84 merge, reproduced in the test above.
+function mergePolicy(
+  results: ReviewResult[],
+  coverageIncomplete: boolean
+): PolicyResult | undefined {
   const withPolicy = results.filter((r) => r.policy)
   if (withPolicy.length === 0) return undefined
   const counts = new Map<AgentName, number>()
@@ -327,10 +338,12 @@ function mergePolicy(results: ReviewResult[]): PolicyResult | undefined {
   }
   // results.length (every chunk), NOT withPolicy.length (chunks with any skip) -- see the
   // incident note above.
-  const agentsSkipped = [...counts.entries()]
-    .filter(([, n]) => n === results.length)
-    .map(([agent]) => agent)
-    .sort()
+  const agentsSkipped = coverageIncomplete
+    ? []
+    : [...counts.entries()]
+        .filter(([, n]) => n === results.length)
+        .map(([agent]) => agent)
+        .sort()
   const reason: Partial<Record<AgentName, string>> = {}
   for (const agent of agentsSkipped) {
     const r = firstReason[agent]
