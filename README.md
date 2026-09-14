@@ -455,7 +455,6 @@ Every `--format json` response includes a stable envelope:
   "summary": { "totalFindings": 0, "bySeverity": {}, "byAgent": {}, "durationMs": 300000 },
   "agentStatus": { "security": "ok", "correctness": "timeout" },
   "sanitizer": { "enabled": true, "applied": false, "redactedLines": 0, "warnings": [] },
-  "policy": { "agentsSkipped": [], "reason": {} },
   "filteredFiles": { "security": ["docs/notes.md"] },
   "context": { "mode": "memory-bank", "filesLoaded": [], "truncated": false, "estimatedTokens": 0 },
   "timings": [
