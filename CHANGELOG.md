@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`mergePolicy` no longer attaches an empty `policy` object to the envelope.** After the
+  `coverageIncomplete` guard above, an agent that survived the cross-chunk intersection could still
+  end up with `agentsSkipped: []` — but the function returned `{ agentsSkipped: [], reason: {} }`
+  instead of `undefined`, a truthy-but-empty shape the non-chunked path (`runner.ts`) can never
+  produce, since it only ever sets `policy` when `agentsSkipped.length > 0`. This contradicted the
+  documented `--format json` contract ("`policy` only appears when at least one agent was skipped")
+  for any consumer that checks truthiness rather than `.agentsSkipped.length`. `mergePolicy` now
+  returns `undefined` in that case, matching the sibling `mergeToolAvailability`/`mergeFilteredFiles`
+  functions' existing pattern. Found by change-review of this PR.
+
 - **`policy.agentsSkipped` no longer claims a full-run skip when the chunk loop stopped early.**
   `mergePolicy` promoted an agent to "skipped entirely" whenever it was excluded in every chunk
   that ran — but an `earlyExit` break leaves the remaining chunks unexamined, so they might not

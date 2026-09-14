@@ -343,8 +343,12 @@ describe('runChunked', () => {
 
     const merged = await runChunked(runner, { diff: twoFilesWithHeaders() }, 2000, 15)
 
-    // It ran on chunk 2, so "skipped entirely" would be false.
-    expect(merged.policy?.agentsSkipped).toEqual([])
+    // It ran on chunk 2, so "skipped entirely" would be false. `policy` must be absent entirely,
+    // not a truthy-but-empty object -- runner.ts's own non-chunked path can never produce
+    // { agentsSkipped: [], reason: {} }, since it gates on agentsSkipped.length > 0 before ever
+    // setting the field, so a chunked run doing so would contradict the documented --format json
+    // contract for any consumer checking `if (result.policy)` rather than `.agentsSkipped.length`.
+    expect(merged.policy).toBeUndefined()
     // But it never saw chunk 1's files, which is exactly a reduced diff.
     expect(merged.filteredFiles?.security).toEqual(['file0.ts'])
   })
@@ -366,7 +370,7 @@ describe('runChunked', () => {
     const merged = await runChunked(runner, { diff: twoFilesWithHeaders() }, 2000, 15)
 
     // It ran on chunk 1; last-chunk-wins would have asserted it was skipped for the whole run.
-    expect(merged.policy?.agentsSkipped).toEqual([])
+    expect(merged.policy).toBeUndefined()
     expect(merged.filteredFiles?.security).toEqual(['file1.ts'])
   })
 
@@ -396,7 +400,7 @@ describe('runChunked', () => {
 
     // It ran cleanly on chunk 3, so "skipped entirely" would be false -- the buggy denominator
     // (chunks-with-any-skip = 2) missed this and claimed a whole-run skip anyway.
-    expect(merged.policy?.agentsSkipped).toEqual([])
+    expect(merged.policy).toBeUndefined()
     expect(merged.filteredFiles?.security).toEqual(['file0.ts', 'file1.ts'])
   })
 
@@ -424,7 +428,7 @@ describe('runChunked', () => {
 
     // Only 2 of 5 planned chunks ran (the loop broke on chunk 2's earlyExit) -- license was
     // skipped in both, but chunks 3-5 were never seen, so "skipped entirely" is not provable.
-    expect(merged.policy?.agentsSkipped).toEqual([])
+    expect(merged.policy).toBeUndefined()
     // Demoted, not dropped: the files license was excluded from in the chunks that DID run are
     // still reported, as a narrowed view rather than a full-run skip.
     expect(merged.filteredFiles?.license).toEqual(['file0.ts', 'file1.ts'])

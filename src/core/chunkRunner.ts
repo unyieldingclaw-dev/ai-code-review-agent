@@ -349,7 +349,15 @@ function mergePolicy(
     const r = firstReason[agent]
     if (r !== undefined) reason[agent] = r
   }
-  return { agentsSkipped, reason }
+  // undefined, not a truthy-but-empty object, when nothing survived the intersection (or
+  // coverageIncomplete suppressed it entirely) -- runner.ts:938 gates the non-chunked path on
+  // `agentsSkipped.length > 0` before ever setting `policy` at all, and mergeToolAvailability /
+  // mergeFilteredFiles both end the same way. Without this, a chunked run could attach
+  // `policy: { agentsSkipped: [], reason: {} }` to the envelope in a shape the non-chunked path
+  // can never produce, contradicting the documented --format json contract ("policy only appears
+  // when at least one agent was skipped") for any consumer that checks truthiness rather than
+  // `.agentsSkipped.length`. Found by change-review of this PR.
+  return agentsSkipped.length > 0 ? { agentsSkipped, reason } : undefined
 }
 
 // See the header comment for why this is merged rather than last-chunk-wins. Union per agent:

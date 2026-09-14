@@ -11,6 +11,7 @@
     { "file": "src/cli/formatters/sarif.ts", "op": "edit" },
     { "file": "src/core/chunkRunner.ts", "op": "edit" },
     { "file": "src/mcp/formatter.ts", "op": "edit" },
+    { "file": "tests/unit/chunkRunner.test.ts", "op": "edit" },
     { "file": "tests/unit/formatters/githubAnnotations.test.ts", "op": "edit" },
     { "file": "tests/unit/formatters/markdown.test.ts", "op": "edit" },
     { "file": "tests/unit/formatters/sarif.test.ts", "op": "edit" }
