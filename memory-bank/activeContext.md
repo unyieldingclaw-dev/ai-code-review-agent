@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-06-26
+last-reviewed: 2026-09-13
 compaction_generation: 0
 source_type: canonical
 confidence: high
