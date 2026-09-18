@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-18
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,7 +16,7 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-09-17
+**Last Updated**: 2026-09-18
 
 ## Current Focus
 
@@ -53,16 +53,14 @@ is the fix). All 5 self-reported `locationCheck: mismatch`/`unknown`. Reconfirms
 local-model-under-vulnerability-hunting-pressure pattern the PMB peer flagged earlier — see Next
 Steps, the formal write-up of this is still outstanding.
 
-**`#85` (`fix/chunked-progress-visibility`) is now `mergeStateStatus: CONFLICTING`** against
-`main` post-`#83` — needs `gh pr update-branch` or manual resolution, not started.
+**`#85`** (`fix/chunked-progress-visibility`) is `mergeStateStatus: CONFLICTING` against `main`
+post-`#83` — needs `gh pr update-branch` or manual resolution, not started. **`#86`**
+(`fix/update-reviewed-nested-payload`) is OPEN, mergeable, both checks passing, **NOT merged**
+despite an earlier session transcript suggesting `gh pr merge 86` had succeeded — verified directly
+via `gh pr view 86` 2026-09-17 (`mergedAt: null`). Unexplained discrepancy, flagged rather than
+guessed at. **`#87`** (`chore/acr-locationcheck-fpr-measurement`) opened 2026-09-18, clean.
 
-**`#86` (`fix/update-reviewed-nested-payload`) is OPEN, mergeable, both checks passing —
-NOT merged**, despite an earlier session transcript in this project's history suggesting a
-`gh pr merge 86` had succeeded. Verified directly via `gh pr view 86` on 2026-09-17
-(`mergedAt: null`, `state: OPEN`). Do not treat it as landed; the discrepancy itself is unexplained
-— flagged to the operator rather than guessed at.
-
-**`gh pr list` state as of 2026-09-17: `#82`, `#83` merged; `#84`, `#85`, `#86` open, none merged.**
+**`gh pr list` as of 2026-09-18: `#82`/`#83` merged; `#84`/`#85`/`#86`/`#87` open, none merged.**
 `gh pr merge` is denied to Claude by design; the user runs it after checks pass.
 
 **`npm run check` run directly 2026-09-17: green, 908 tests.** Calibration is nondeterministic —
@@ -81,9 +79,8 @@ those briefs were verified wrong — do not chase them; reasons in
 - Claim matchers are regexes over model prose. Both audit rounds found false negatives there; the
   evidence side has produced none. That is the fragile half.
 - `license-clean`/`dependencies` no longer couple to this repo's state; other cases unaudited.
-- `policy`, `filteredFiles`, and `context` are still last-chunk-wins in `chunkRunner`. That remains
-  a deliberate, documented simplification — none of them asserts anything about coverage the way
-  `toolAvailability` does, which is why only that field was promoted to a real merge.
+- `context` is still last-chunk-wins in `chunkRunner` (deliberate). `policy`/`filteredFiles` no
+  longer are — both were promoted to real cross-chunk merges by #84.
 - `ai-review` is **slow, not broken**: 8 consecutive runs to 2026-08-27 succeeded (6m43s–44m53s);
   `mizzo-local` is online. It hung once (43 min, no step 1) — environment-side, because `run.cmd` is
   interactive, and `timeout-minutes: 45` is the backstop. A docs PR showing no `ai-review` check is
@@ -110,19 +107,23 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
   `agentsWithNarrowedView().length` swap currently passes every test), and add the
   headline-stability regression test to `tests/unit/mcp/formatter.test.ts` that markdown/sarif
   already have.
-- **Still owed: a formal Task Contract Proposal for ACR's false-positive/hallucination pattern**,
-  promised to the operator twice already. #84's review adds a clean, concrete data point: 5/5 ACR
-  findings on one diff were fabricated (wrong `file:line`, self-contradicting evidence, all
-  `locationCheck: mismatch`/`unknown`). Write it up rather than re-discussing it a third time.
+- **ACR false-positive pattern — measured, not just written up, in PR #87 (2026-09-18).** The
+  Task Contract Proposal was drafted, deliberately narrowed to measurement-only after the first
+  draft's own holes were poked (it would have contradicted `evidenceLocation.ts`'s explicit
+  never-drop decision, and conflated `blocking` — which doesn't gate anything, `severity` does —
+  with a real lever). Result: 20 real trials against a new `adversarial-clean` calibration fixture,
+  31 false positives, `mismatch`/`unknown` = 74.2% — **below the 80% bar set before seeing data**,
+  so recorded as measured-and-inconclusive rather than acted on. The 25.8% that came back
+  `verified` are one consistent shape: the model accurately quotes an already-guarded line, then
+  fabricates a claim about it anyway — `locationCheck` verifies citation accuracy, not claim truth.
+  Full data in `docs/superpowers/plans/2026-09-17-acr-locationcheck-fpr-measurement.md`. Any future
+  mitigation contract needs to separately address that quarter; a blanket `locationCheck`-based
+  demotion doesn't touch it.
 - **`chunkRunner`'s `mergeResults` drops `truncation`, so exit 3 is unreachable under `--chunk`.**
   Peer-reported and live-reproduced 2026-09-01; detail in `progress.md`. **Not fixed on purpose** —
   making exit 3 reachable changes what PMB's Job 7 branches on, so it is an operator decision.
-- **`earlyExit` reached NO renderer — fixed on `fix/early-exit-visibility` (PR #83).** It turned out
-  to be **six** surfaces, not four: `review.yml` and `vscode-extension` are renderers but not
-  formatters, so the old rule could never have caught them. Evidence, the exit-0 mechanism, the
-  `chunkRunner` part and the INCOMPLETE-denominator trap are in `progress.md`;
-  `ReviewResult.agentsPlanned` now carries the roster, and the six-surface rule is corrected in
-  `systemPatterns.md`.
+- **`earlyExit` reached NO renderer — fixed and merged (PR #83, six surfaces not four).** Detail in
+  `progress.md`; six-surface rule corrected in `systemPatterns.md`. Resolved, kept only as a pointer.
 - **Operator calls parked, unmade, detail archived 2026-09-17** (full text in
   [`archive/activeContext-history.md`](archive/activeContext-history.md)): corroboration-downgrade
   measurement contract (blocked on Ollama); `systemPatterns.md` over its 100–180 target band;
@@ -135,13 +136,13 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `#82`, `#83` merged (branches deleted); **three open PRs** (`#84` change-review
+unit tests. **Git**: `#82`, `#83` merged (branches deleted); **four open PRs** (`#84` change-review
 clean, `#85` CONFLICTING against `main`, `#86` mergeable but not yet merged despite an earlier
-transcript suggesting otherwise — see Current Focus), none merged. **The `main` hash is
-deliberately not recorded
+transcript suggesting otherwise, `#87` clean — see Current Focus), none merged. **The `main` hash
+is deliberately not recorded
 here** — read it from `git log`. Two PRs in a row tried to keep it current and each was stale the
 moment it merged, because a memory-bank PR moves the very commit it names. Remote holds `main`,
-three PR branches, plus the two long-retained orphans (`chore/agent-calibration`,
+four PR branches, plus the two long-retained orphans (`chore/agent-calibration`,
 `claude/plan-overview-4dg42o`) — containment cannot be proven for either, so both stay. `v1.15.0`
 tagged at `6e2ed34` and published, and `Unreleased` is empty. That tag hash **is** recorded, and
 the distinction is the point:
