@@ -1,48 +1,14 @@
 {
-  "task": "Give a --chunk run's stderr enough information to tell a dead agent from a clean one, and one chunk from another.",
+  "task": "Resolve PR #85's merge conflict against current main. #85 branched before #82/#83/#86/#87/#84 all merged, so this catches it up to all five, not just #84 as originally scoped -- corrected mid-task after the user asked for a re-review before approving.",
   "status": "complete",
-  "created_at": "2026-09-12T08:34:49Z",
-  "expires_at": "2026-09-12T16:34:49Z",
-  "approved_by": "user (\"approved\", 2026-09-12, in direct response to the fold-in proposal in the prior message)",
-  "notes": "Two compounding gaps found while investigating a PMB peer's field report, both in the real-time stderr progress channel (never in the JSON/report output, which is unaffected). (1) AgentProgressEvent has no status field; a dead agent (fetch failed, timeout) and a clean one both render as 'Ns -- 0 raw findings', distinguishable only by duration, which nothing parses. The status IS already computed at every emission site (agentStatus[agent.name] = classifyAgentError(err)) in the same statement block as the onProgress call that omits it -- purely additive, zero existing test asserts the exact line text. (2) chunkRunner.ts's per-chunk loop prints no marker between chunks, and runner.ts's run() resets index=0 on every call -- chunkRunner calls run() once per chunk with the same onProgress callback -- so '[1/4] security' prints with the IDENTICAL index on every chunk. A multi-chunk run's stderr gives no way to tell which chunk you're reading without counting resets. This is why the reporting peer had to hand-build a chunk-by-chunk table themselves. Not part of #84 (agentPolicy/filteredFiles/chunk-merge) -- unrelated concern, new branch off main rather than bundled into that PR's diff.",
+  "created_at": "2026-09-18T12:40:00Z",
+  "expires_at": "2026-09-18T20:40:00Z",
   "scope": [
-    {
-      "file": "src/core/schema.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/runner.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/core/chunkRunner.ts",
-      "op": "edit"
-    },
-    {
-      "file": "src/cli/index.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/runner.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/chunkRunner.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "CHANGELOG.md",
-      "op": "edit"
-    },
-    {
-      "file": ".claude/contracts/active-task.json",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/cli.test.ts",
-      "op": "edit"
-    }
+    { "file": ".claude/contracts/active-task.json", "op": "edit" },
+    { "file": "CHANGELOG.md", "op": "edit" },
+    { "file": "src/core/runner.ts", "op": "edit" },
+    { "file": "tests/unit/runner.test.ts", "op": "edit" }
   ],
-  "completed_at": "2026-09-12T08:49:11Z",
-  "completion_notes": "Committed as 8f4ed7f. SCOPE CORRECTION: tests/unit/cli.test.ts was touched but never declared in the original proposal or this file's scope array -- the proposal's test-file line only named runner.test.ts and chunkRunner.test.ts; cli.test.ts was needed to prove the render side (status suffix) actually reaches the CLI's stderr output, not just the event object, and was added mid-implementation without amending scope first. Recorded here rather than silently, added to scope above after the fact. Both fixes are purely additive (one optional schema field, one stderr line) with zero behavior change to any existing field, formatter, or the JSON envelope -- confirmed by grep: exactly 6 onProgress 'end' emission sites exist in runner.ts, all 6 now pass status. VERIFICATION: 845 tests (+6, up from the main-based baseline of 839). Mutation-tested 10 mutations (6 status-drop sites, 2 index.ts render mutations, 2 chunkRunner marker mutations) -- ALL 10 killed, no-op control killed nothing, all three touched sources (runner.ts, index.ts, chunkRunner.ts) restored byte-for-byte after every run. Two mutations (coverage-path status, parallel-path status) SURVIVED on the first mutation pass -- a real, honest gap: the initial two runner.test.ts tests only exercised the sequential execution path (runAgentsSequential), not the separate coverage-agent branch (runCoverageAgent) or the separate parallel branch (runAgentsParallel). Closed with two more tests before re-running to 10/10, rather than treating a partial kill rate as sufficient. npm run check green throughout (typecheck/build/format/lint/test)."
+  "completion_notes": "Two real conflicts (contract scratch state, CHANGELOG additive entries from both sides -- concatenated); everything else (src/cli/index.ts, src/core/chunkRunner.ts, src/core/schema.ts, tests/unit/chunkRunner.test.ts) auto-merged cleanly, verified by tracing the actual feature-overlap points (AgentProgressEvent's new status field alongside earlyExit; the per-chunk stderr marker correctly interleaved with #84's attributeChunkSkips/earlyExit-break logic) rather than trusting the absence of conflict markers. Found one real, pre-existing gap in #85's own original work while doing that verification: its PR description claimed 'six emission sites' got the new status field, but runner.ts has seven phase:'end' sites -- testgen's (unchanged since before #85 branched, confirmed against the merge-base commit) never got it. Fixed and mutation-tested (reverting reproduces the exact assertion failure). 915/915 tests, clean typecheck/build/lint/format after the fix.",
+  "review_findings": "One Low-severity, non-blocking finding surfaced during merge verification (not a defect introduced by this merge): testgen's onProgress 'end' event omitted `status`, so a failed --suggest-tests/--write-tests run would render identically to a clean one on the stderr progress line. Fixed per user instruction."
 }

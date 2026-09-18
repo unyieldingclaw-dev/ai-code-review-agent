@@ -7,6 +7,9 @@ ai-review-tests/
 test_output.txt
 .claude/settings.local.json
 
+# Calibration measurement output (re-generated per run, not a fixture)
+calibration/locationcheck-fpr.json
+
 # Memory Bank
 handoff.md
 

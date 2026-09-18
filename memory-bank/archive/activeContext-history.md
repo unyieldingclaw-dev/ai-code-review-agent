@@ -1,5 +1,56 @@
 # Active Context — archived history
 
+## Moved out 2026-09-17 (191 lines against 150 limit after that session's updates)
+
+**Two handoffs merged** (2026-08-31, and 2026-09-01). `handoff.md` is **gitignored**, so until each
+merge its facts existed on one disk and in no commit. The first merge put its content in
+`techContext.md` (model choice, `OLLAMA_KEEP_ALIVE`, the `npm link` rule, the peer protocol, PMB's
+exit-code contract) and `systemPatterns.md` (the proxy-assertion rule).
+
+**Verified state (2026-08-31): `npm run check` run directly, green.** The test count is
+deliberately not restated here — it lives once, in `progress.md`'s Metrics table, because
+restating it is how it went stale twice.
+
+**PMB-owned defects — none fixable here**, and the standing inventory moved to `techContext.md`
+("PMB-owned defects") on 2026-08-31: it is a stable fact about an upstream dependency, not session
+state, and it was being held in the file least able to afford it.
+
+**From the two 2026-08-26 PMB briefs — four diagnoses verified wrong, do not chase them:** a fetch
+timeout separate from `--timeout`; parallel-by-default agents; chunking damaging hunk headers; and
+cross-file misattribution as a chunking artifact. Reasons earlier in this file.
+
+**Corroboration downgrade — an approved measurement contract, not started, blocked on Ollama.**
+Re-established at
+[`2026-08-31-corroboration-downgrade-measurement.md`](../../docs/superpowers/plans/2026-08-31-corroboration-downgrade-measurement.md)
+after being displaced from the contract file. That document also parks a **second, unverified**
+thread (grammar-constrained decoding costing reasoning accuracy) needing its own contract — read
+the primary sources before acting on it.
+
+**`ping()` guesses model presence by substring — peer-cleared, operator has not ruled.**
+`ollamaProvider.ts:125-143` does `model.split(':')[0]` then `.includes()`, so `qwen2.5-coder:32b`
+reports present when only `:7b` is installed (verified live against three models). A missing model
+should fail preflight and exit **4** (`exitCode.ts` names that case explicitly); instead it passes,
+16 agents fail, and it exits **2** — which PMB routes to triage rather than retry. Fix is to
+normalise the request (`bare → :latest`) then compare for equality; the "breaks bare `devstral`"
+objection dissolves because Ollama resolves bare names the same way. PMB confirmed 2026-08-31 they
+pass no bare or registry-qualified names and want exit 4 kept with **no new code**.
+
+**`--chunk` as default — reopened by the model measurement, not yet decided.** It stays opt-in
+(`config.ts:25` documents why) and was deliberately **not** flipped on 2026-08-30, because flipping
+it trades one silent behaviour for another. What changed: at `qwen2.5-coder:7b` speeds full
+coverage of a real diff costs roughly 200 s, weakening the cost half of that rationale. The
+coverage evidence is not in doubt — a 6,578-line diff at default `--max-lines` reviewed 2,000 lines
+and returned **0 findings** where `--chunk` returned **15, including 2 High** (recorded at
+`src/cli/formatter.ts:51`). An operator call, not a task.
+
+**PMB upgrade — blocked on work nobody has started. This is _not_ "awaiting a tag."** The release
+policy (tag → dirty-tree guard → ref-sourcing) is **approved but not implemented**; scheduling it
+is the operator's call. Verified in PMB's checkout 2026-08-28 — newest tag `v1.0.4`, nothing for
+1.1.x or 1.2.x. **Waiting cannot resolve this** — do not poll, do not treat the tag as in flight.
+Two signals arrive separately: "reached `main`" and "tag exists". **The procedure lives in
+`techContext.md`**, next to the mechanics explaining each step; do not reconstruct it from memory.
+PMB's ACR-provenance entry is committed but unlanded (`2052c3c`). Background in `progress.md`.
+
 Moved out of `memory-bank/activeContext.md` on 2026-08-19. That file had reached 902 lines
 against a 150-line limit set by its own README (601% over), and `Current Focus` alone was 748
 of them -- accumulated session narrative rather than current state, which the README
@@ -897,3 +948,23 @@ here: `pre-push-check.*` calls `mb validate`, which was folded into `mb doctor`,
 mb doctor" message as evidence of inconsistency on every push. This is the second of the two live
 examples supporting the claim that all sixteen reported defects share one shape — the check's result
 being disconnected from whether it ran. One example does not establish a shape; two do.
+
+## Per-agent timeout ceiling — full measurement (2026-08-27, archived 2026-08-31)
+
+Moved out of `activeContext.md`'s Next Steps to make room for the `earlyExit` and `ping()` items.
+The conclusion and the do-not-re-derive instruction stay upstream; this is the measurement.
+
+12 invocations over a 4,703-line diff, `--profile security`, `--chunk`, devstral on GPU. Eleven ran
+well under budget (slowest real attempt 213.2 s against a 315.4 s ceiling, 68%). The twelfth
+_appeared_ to exceed its ceiling — `adversarial` 611.7 s against 354.7 s — and that row is a
+**measurement artifact, not an agent running long**: stderr shows
+`failed (attempt 1/2): fetch failed — retrying`, so 611.7 s is wall time across two attempts plus
+backoff. No single invocation came near its ceiling; the real fault in that row is `fetch failed`,
+which is resource pressure, separate from our abort path.
+
+Sent to PMB, who hold it at our confidence level and instructed their next session not to upgrade
+the 616 s hedge. That correspondence is **suggestive, not established** and must not be promoted to
+"resolved" — the original has no source.
+
+Still untested: true CPU-only, which needs an Ollama restart with `OLLAMA_NUM_GPU=0`
+(`OllamaProvider` forwards no `options`, so `num_gpu: 0` is unreachable per-request).

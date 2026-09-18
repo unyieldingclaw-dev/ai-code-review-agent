@@ -369,3 +369,26 @@ describe('formatMcpOutput timing', () => {
     expect(formatMcpOutput(makeResult())).toBe('## AI Code Review — ✅ No findings' + '\n')
   })
 })
+
+describe('formatMcpOutput policy notes', () => {
+  // This surface read neither policy nor filteredFiles, and its caller is an LLM with no terminal
+  // to cross-check against -- so it was the worst place for the omission to sit.
+  it('names the narrowed agents and counts distinct files', () => {
+    const out = formatMcpOutput(
+      makeResult({
+        filteredFiles: { security: ['docs/a.md'], adversarial: ['docs/a.md', 'docs/b.md'] },
+      })
+    )
+    expect(out).toContain('adversarial, security reviewed a reduced diff')
+    expect(out).toContain('2 files')
+  })
+
+  it('reports agents skipped outright', () => {
+    const out = formatMcpOutput(makeResult({ policy: { agentsSkipped: ['security'], reason: {} } }))
+    expect(out).toContain('skipped entirely by agentPolicy')
+  })
+
+  it('says nothing about policy when neither applies', () => {
+    expect(formatMcpOutput(makeResult())).not.toContain('Policy:')
+  })
+})

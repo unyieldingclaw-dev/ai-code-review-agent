@@ -76,6 +76,41 @@ jobs:
           check progress 400
           exit $FAIL
 
+      # WHY: the size check above is the only memory-bank gate, and a pointer to a file
+      # that does not exist passes it with room to spare. A handoff merge on 2026-09-01
+      # shipped "First merge's inventory: archive/activeContext-history.md" naming a file
+      # that had never received the inventory; line counts were green throughout. These
+      # files are auto-read every session, so a dead cross-reference sends the next
+      # session looking somewhere empty and quietly devalues every sibling pointer.
+      #
+      # SCOPE, deliberately narrow: this checks only that link targets EXIST. It cannot
+      # check that a target contains what the pointer claims -- the semantic half of the
+      # defect above -- and it is not a substitute for reading. External URLs and bare
+      # anchors are skipped.
+      - name: Memory bank pointer integrity
+        id: mblinks
+        continue-on-error: true
+        run: |
+          BAD="${RUNNER_TEMP:-/tmp}/mb-bad-links.txt"
+          : > "$BAD"
+          find memory-bank -name '*.md' | while read -r f; do
+            d=$(dirname "$f")
+            grep -oE '\]\([^)]+\)' "$f" | sed -E 's/^\]\(//; s/\)$//' | while read -r t; do
+              case "$t" in
+                http://*|https://*|mailto:*|'#'*) continue ;;
+              esac
+              p="${t%%#*}"
+              [ -z "$p" ] && continue
+              [ -e "$d/$p" ] || echo "$f -> $t" >> "$BAD"
+            done
+          done
+          if [ -s "$BAD" ]; then
+            echo "FAILED: memory-bank pointers that do not resolve:"
+            cat "$BAD"
+            exit 1
+          fi
+          echo "ok: every memory-bank markdown pointer resolves"
+
       # WHY continue-on-error + this gate, instead of letting each step fail the
       # job immediately: this repo previously had NO push/PR CI gate at all --
       # typecheck/lint/test/build only ran at release-tag time, so a broken main
@@ -92,4 +127,5 @@ jobs:
           if [ "${{ steps.test.outcome }}" != "success" ]; then echo "FAILED: Run tests"; FAIL=1; fi
           if [ "${{ steps.build.outcome }}" != "success" ]; then echo "FAILED: Build"; FAIL=1; fi
           if [ "${{ steps.mbsize.outcome }}" != "success" ]; then echo "FAILED: Memory bank size limits"; FAIL=1; fi
+          if [ "${{ steps.mblinks.outcome }}" != "success" ]; then echo "FAILED: Memory bank pointer integrity"; FAIL=1; fi
           exit $FAIL

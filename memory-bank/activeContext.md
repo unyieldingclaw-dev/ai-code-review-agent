@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-06-26
+last-reviewed: 2026-09-18
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,54 +16,71 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-08-28
+**Last Updated**: 2026-09-18
 
 ## Current Focus
 
-**The session that shipped v1.15.0 closed clean (2026-08-28), and nothing is pending.** Twelve PRs
-merged (#65–#76), working tree clean, no open PRs, 826 tests green. **Do not go looking for work
-here**, and do not wait on the PMB upgrade — it is blocked on unscheduled work, not on a signal.
+**`#83` merged 2026-09-13.** `#84`'s branch then had to absorb that merge: its own
+`policy`/`filteredFiles` real-merge additions conflicted with `#83`'s `earlyExit`/`agentsPlanned`
+additions in the same 10 files. Resolved by combining both (neither regresses the other) — full
+domain code-review + independent opposition review + 908-test suite, pushed as `b7634e2`.
 
-**v1.15.0 published (2026-08-27)** — per-pass timing instrumentation (#65), the release that made
-the ceiling question answerable from CI artifacts rather than local trials. Publishing is OIDC
-Trusted Publishing; `NPM_TOKEN` is deleted from GitHub secrets entirely.
+**Opposition review of that merge found a real gap**, fixed as a same-PR fast-follow:
+`mergePolicy` promoted an agent to "skipped entirely" using the wrong denominator once chunking
+could exit early — `mergeToolAvailability` already guarded the analogous claim via a
+`coverageIncomplete` param; `mergePolicy` now takes the same param (`2039538`). A **second** bug
+surfaced by a full `/change-review` of the resulting branch: `mergePolicy` could return a
+truthy-but-empty `{agentsSkipped: [], reason: {}}` instead of `undefined`, a shape the non-chunked
+path can never produce — fixed to mirror the `mergeToolAvailability`/`mergeFilteredFiles`
+undefined-when-empty pattern (`c3b184b`). Both mutation-tested: reverting each fix reproduces the
+exact test failures it resolves.
 
-**Two shipped invariants worth not re-deriving.** The evidence-location check (v1.14.0) flags —
-never corrects or drops — a finding whose quoted evidence is not at its cited `file:line`, on all
-four surfaces — detail in `progress.md`. And four hallucination classes have deterministic backstops
-rather than prompt wording, because prompt-only fixes were measured across three agents and failed
-every time — that detail is in
-[`archive/progress-history.md`](archive/progress-history.md), not `progress.md`.
+**`#84`'s final `/change-review` (9 jobs + ACR + opposition) found no Blocking findings.** Real,
+non-blocking Medium findings worth a fast-follow (not yet started): `policy.agentsSkipped`'s
+"fully skipped" predicate is reimplemented independently in all 4 formatters instead of sharing a
+`schema.ts` helper (unlike the sibling `filteredFiles` concept, which got one); every fixture
+testing "N files withheld" text has narrowed-agent-count == distinct-file-count, so a
+`narrowedFileCount`/`agentsWithNarrowedView().length` copy-paste swap would pass undetected;
+`tests/unit/mcp/formatter.test.ts` lacks the headline-stability regression test the other two
+formatters have. Two smaller issues (stale contract scope, a stale `runner.ts:931`→`938` comment
+reference) were fixed inline during the review (`b63793f`). Pushed to
+`origin/fix/filtered-files-visibility` 2026-09-17.
 
-**Verified state:** 826 unit tests · `npm audit` 0 (prod + dev) · `npm run check` green ·
-calibration 21–22/22. Calibration is nondeterministic — treat a single run as weak evidence, and
-use `grep "orchestrator] dropped"` to tell a real filter regression from model variance. Target one
-case with `CALIBRATION_CASE=name1,name2` rather than running all 21.
+**ACR reported 5 "high"/"blocking:true" findings on this diff — all 5 confirmed fabricated**, independently
+by two separate reviewers reading the actual cited lines: every one cites a wrong line number, and
+4 of 5 quote code that already null-guards via `?.`/`??`/`&&` (the guard being flagged AS the bug
+is the fix). All 5 self-reported `locationCheck: mismatch`/`unknown`. Reconfirms the
+local-model-under-vulnerability-hunting-pressure pattern the PMB peer flagged earlier — see Next
+Steps, the formal write-up of this is still outstanding.
 
-**PMB-owned defects — none fixable here** (`TEMPLATE_OWNED`; `mb upgrade` overwrites them). Sixteen
-reported across two briefs, all one shape: the check's _result_ is disconnected from whether it ran.
-Two live examples, and it takes two to establish a shape — `update-reviewed.*` reads a flat
-`.file_path` where the payload nests under `tool_input`, so `last-reviewed` is never stamped and
-`mb doctor` reads a dead sensor; `pre-push-check.*` calls `mb validate`, folded into `mb doctor`, and
-prints its "use mb doctor" message as evidence of inconsistency on every push.
+**`#85`** (`fix/chunked-progress-visibility`) is `mergeStateStatus: CONFLICTING` against `main`
+post-`#83` — needs `gh pr update-branch` or manual resolution, not started. **`#86`**
+(`fix/update-reviewed-nested-payload`) is OPEN, mergeable, both checks passing, **NOT merged**
+despite an earlier session transcript suggesting `gh pr merge 86` had succeeded — verified directly
+via `gh pr view 86` 2026-09-17 (`mergedAt: null`). Unexplained discrepancy, flagged rather than
+guessed at. **`#87`** (`chore/acr-locationcheck-fpr-measurement`) opened 2026-09-18, clean.
 
-**From the two 2026-08-26 PMB briefs — four diagnoses are verified wrong, do not chase them:** a
-fetch timeout separate from `--timeout`; parallel-by-default agents; chunking damaging hunk headers;
-and cross-file misattribution as a chunking artifact. Each was disproved; reasons in
-[`archive/activeContext-history.md`](archive/activeContext-history.md). What survives: line
-attribution is unreliable from the model itself (7/5/7 across trials, unchunked), now including
-across files. Their timeout-ceiling item is measured and closed (below). Still open is exit 1
-outranking exit 3, so a truncated run with a blocker reports 1 (`src/cli/index.ts:422-437`,
-deliberate — the consequence is what is new).
+**`gh pr list` as of 2026-09-18: `#82`/`#83` merged; `#84`/`#85`/`#86`/`#87` open, none merged.**
+`gh pr merge` is denied to Claude by design; the user runs it after checks pass.
+
+**`npm run check` run directly 2026-09-17: green, 908 tests.** Calibration is nondeterministic —
+**treat a single pass as weak evidence**. Use `grep "orchestrator] dropped"` to tell a real filter
+regression from model variance, and target cases with `CALIBRATION_CASE=name1,name2` rather than
+running the suite. PMB-owned defects live in `techContext.md`, not here.
+
+**Still open from the 2026-08-26 PMB briefs:** line attribution is unreliable from the model itself
+(7/5/7 across trials, unchunked), including across files. Exit 1 outranks exit 3, so a truncated
+run with a blocker reports 1 (`src/cli/index.ts:422-438`, deliberate). Four other diagnoses from
+those briefs were verified wrong — do not chase them; reasons in
+[`archive/activeContext-history.md`](archive/activeContext-history.md).
 
 **Open risks, detailed in `progress.md`:**
 
 - Claim matchers are regexes over model prose. Both audit rounds found false negatives there; the
   evidence side has produced none. That is the fragile half.
 - `license-clean`/`dependencies` no longer couple to this repo's state; other cases unaudited.
-- `policy`, `filteredFiles`, and `context` are still last-chunk-wins in `chunkRunner`. That remains
-  a deliberate, documented simplification — none of them asserts anything about coverage the way
-  `toolAvailability` does, which is why only that field was promoted to a real merge.
+- `context` is still last-chunk-wins in `chunkRunner` (deliberate). `policy`/`filteredFiles` no
+  longer are — both were promoted to real cross-chunk merges by #84.
 - `ai-review` is **slow, not broken**: 8 consecutive runs to 2026-08-27 succeeded (6m43s–44m53s);
   `mizzo-local` is online. It hung once (43 min, no step 1) — environment-side, because `run.cmd` is
   interactive, and `timeout-minutes: 45` is the backstop. A docs PR showing no `ai-review` check is
@@ -79,47 +96,55 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 
 ## Next Steps
 
-- **Per-agent timeout ceiling — MEASURED, CLOSED (2026-08-27). Do not raise it, do not re-derive
-  it.** 12 invocations over a 4,703-line diff, `--profile security`, `--chunk`, devstral on GPU.
-  Eleven ran well under budget (slowest real attempt 213.2 s against a 315.4 s ceiling, 68%). The
-  twelfth _appeared_ to exceed its ceiling — `adversarial` 611.7 s against 354.7 s — and that row
-  is a **measurement artifact, not an agent running long**: stderr shows
-  `failed (attempt 1/2): fetch failed — retrying`, so 611.7 s is wall time across two attempts plus
-  backoff. No single invocation came near its ceiling; the real fault in that row is `fetch failed`,
-  which is resource pressure, separate from our abort path. Sent to PMB, who hold it at our
-  confidence level and instructed their next session not to upgrade the 616 s hedge. That
-  correspondence is **suggestive, not established** and must not be promoted to "resolved" — the
-  original has no source. Still untested: true CPU-only, which needs an Ollama restart with
-  `OLLAMA_NUM_GPU=0` (`OllamaProvider` forwards no `options`, so `num_gpu: 0` is unreachable
-  per-request).
-- **`fetch failed` — the one open technical thread, deliberately passive.** One invocation in
-  twelve (Ollama dropping the connection under load). **n=1: do not act on it.** Since `review.yml`
-  installs the published build, every non-docs CI run now deposits `timings` rows into
-  `findings.json` — the sample accumulates for free.
-- **VS Code extension has no distribution channel — an open product call, not a task.** No release
-  has ever carried a `.vsix`, `release.yml` has no upload step, and Marketplace publish is
-  explicitly DEFERRED. #68 documented the truth (build from source) rather than choosing, so docs
-  match reality either way and nothing degrades while this sits.
-- **PMB upgrade — blocked on work nobody has started. This is _not_ "awaiting a tag."** The release
-  policy (tag → dirty-tree guard → ref-sourcing) is **approved but not implemented**: it needs its
-  own PMB contract, and scheduling it is the user's call. Verified in PMB's checkout 2026-08-28 —
-  newest tag `v1.0.4`, nothing for 1.1.x or 1.2.x, `VERSION` 1.2.1, `.pmb-version` 1.1.1. **Waiting
-  cannot resolve this**; only scheduling the PMB work can, so do not poll and do not treat the tag
-  as in flight. Two signals arrive separately when each becomes true: "reached `main`" and "tag
-  exists". **The procedure lives in `techContext.md`** ("`mb upgrade` — what it actually
-  overwrites"), next to the mechanics that explain why each step is there: two repos, full `cd`
-  paths, PMB's tree clean before anything else. Do not reconstruct it from memory.
-  PMB's ACR-provenance entry is **committed but not landed** (`2052c3c`, on their
-  `fix/block-tier-case-sensitivity`, unmerged). Background in `progress.md`.
+- **`filteredFiles`/`policy` — merge-conflict resolved, fast-follows landed, change-review clean,
+  still awaiting merge (#84).** `review.yml` and `vscode-extension` are the fifth and sixth
+  surfaces; `#83`'s `scripts/reviewIncompleteness.cjs` they need is now merged, so they can follow
+  once #84 lands rather than duplicating that module across open PRs.
+- **Fast-follow candidate, not started: share one `skippedAgents(result)` helper across the 4
+  formatters** instead of each reimplementing `policy?.agentsSkipped.length > 0` — found by #84's
+  final change-review (Medium, non-blocking). Same session, decouple the "N files withheld" test
+  fixtures so narrowed-agent-count and distinct-file-count differ (a `narrowedFileCount` /
+  `agentsWithNarrowedView().length` swap currently passes every test), and add the
+  headline-stability regression test to `tests/unit/mcp/formatter.test.ts` that markdown/sarif
+  already have.
+- **ACR false-positive pattern — measured, not just written up, in PR #87 (2026-09-18).** The
+  Task Contract Proposal was drafted, deliberately narrowed to measurement-only after the first
+  draft's own holes were poked (it would have contradicted `evidenceLocation.ts`'s explicit
+  never-drop decision, and conflated `blocking` — which doesn't gate anything, `severity` does —
+  with a real lever). Result: 20 real trials against a new `adversarial-clean` calibration fixture,
+  31 false positives, `mismatch`/`unknown` = 74.2% — **below the 80% bar set before seeing data**,
+  so recorded as measured-and-inconclusive rather than acted on. The 25.8% that came back
+  `verified` are one consistent shape: the model accurately quotes an already-guarded line, then
+  fabricates a claim about it anyway — `locationCheck` verifies citation accuracy, not claim truth.
+  Full data in `docs/superpowers/plans/2026-09-17-acr-locationcheck-fpr-measurement.md`. Any future
+  mitigation contract needs to separately address that quarter; a blanket `locationCheck`-based
+  demotion doesn't touch it.
+- **`chunkRunner`'s `mergeResults` drops `truncation`, so exit 3 is unreachable under `--chunk`.**
+  Peer-reported and live-reproduced 2026-09-01; detail in `progress.md`. **Not fixed on purpose** —
+  making exit 3 reachable changes what PMB's Job 7 branches on, so it is an operator decision.
+- **`earlyExit` reached NO renderer — fixed and merged (PR #83, six surfaces not four).** Detail in
+  `progress.md`; six-surface rule corrected in `systemPatterns.md`. Resolved, kept only as a pointer.
+- **Operator calls parked, unmade, detail archived 2026-09-17** (full text in
+  [`archive/activeContext-history.md`](archive/activeContext-history.md)): corroboration-downgrade
+  measurement contract (blocked on Ollama); `systemPatterns.md` over its 100–180 target band;
+  `ping()`'s substring model-presence guess (`ollamaProvider.ts:125-143`, peer-cleared fix
+  available); `--chunk` as default (cost rationale weakened, not flipped); PMB upgrade (release
+  policy approved, not implemented, blocked on work nobody has started — not a tag to await).
+- **`fetch failed` — the one open technical thread, deliberately passive.** One invocation in twelve
+  (Ollama dropping the connection under load). **n=1: do not act on it.**
 
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: clean, in sync, zero open PRs, no stashes, `main` the only local branch. **The
-`main` hash is deliberately not recorded here** — read it from `git log`. Two PRs in a row tried to
-keep it current and each was stale the moment it merged, because a memory-bank PR moves the very
-commit it names. Remote holds `main` plus the two long-retained orphans (`chore/agent-calibration`,
+unit tests. **Git**: `#82`, `#83` merged (branches deleted); **four open PRs** (`#84` change-review
+clean, `#85` CONFLICTING against `main`, `#86` mergeable but not yet merged despite an earlier
+transcript suggesting otherwise, `#87` clean — see Current Focus), none merged. **The `main` hash
+is deliberately not recorded
+here** — read it from `git log`. Two PRs in a row tried to keep it current and each was stale the
+moment it merged, because a memory-bank PR moves the very commit it names. Remote holds `main`,
+four PR branches, plus the two long-retained orphans (`chore/agent-calibration`,
 `claude/plan-overview-4dg42o`) — containment cannot be proven for either, so both stay. `v1.15.0`
-tagged at `6e2ed34` and published; `Unreleased` is empty. That tag hash **is** recorded, and the
-distinction is the point: a release tag is immutable, a branch tip is not. Commands
-are in `techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass.
+tagged at `6e2ed34` and published, and `Unreleased` is empty. That tag hash **is** recorded, and
+the distinction is the point:
+a release tag is immutable, a branch tip is not. Commands are in `techContext.md`; `npm run check`
+covers typecheck/build/format/lint/test in one pass.

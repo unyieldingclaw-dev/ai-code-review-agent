@@ -280,6 +280,191 @@ describe('runChunked', () => {
     expect(merged.toolAvailability?.gitleaks).toBe('partial')
   })
 
+  // Regression, and the same shape as the toolAvailability one above. filteredFiles was
+  // last-chunk-wins on the premise that it was purely diagnostic. Four formatters now raise a
+  // coverage warning from it, so a narrowing in chunk 1 followed by a clean chunk 2 reported as
+  // fully covered -- the exact defect that warning was added to prevent, reappearing one layer up.
+  it('merges filteredFiles -- a narrowing in an earlier chunk is not hidden by a later clean one', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ filteredFiles: { security: ['docs/a.md'] } }))
+      .mockResolvedValueOnce(makeResult({}))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.filteredFiles?.security).toEqual(['docs/a.md'])
+  })
+
+  it('unions filteredFiles per agent across chunks, deduped and sorted', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({ filteredFiles: { security: ['docs/b.md', 'docs/a.md'] } })
+      )
+      .mockResolvedValueOnce(
+        makeResult({ filteredFiles: { security: ['docs/b.md'], adversarial: ['docs/c.md'] } })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    // Sorted, so the rendered warning does not change wording with chunk order.
+    expect(merged.filteredFiles?.security).toEqual(['docs/a.md', 'docs/b.md'])
+    expect(merged.filteredFiles?.adversarial).toEqual(['docs/c.md'])
+  })
+
+  // makeFileDiff above omits the '--- a/' / '+++ b/' headers a real git diff carries, and
+  // extractChangedFiles reads exactly those. Attribution of a per-chunk skip therefore needs a
+  // realistic diff; the shared helper is left alone because other tests depend on its line counts.
+  const withHeaders = (p: string, bodyLines: number) =>
+    `diff --git a/${p} b/${p}\n--- a/${p}\n+++ b/${p}\n` +
+    Array.from({ length: bodyLines }, (_, i) => `+line ${i}`).join('\n')
+  const twoFilesWithHeaders = () =>
+    [withHeaders('file0.ts', 2500), withHeaders('file1.ts', 2500)].join('\n')
+  const threeFilesWithHeaders = () =>
+    [
+      withHeaders('file0.ts', 2500),
+      withHeaders('file1.ts', 2500),
+      withHeaders('file2.ts', 2500),
+    ].join('\n')
+
+  // policy was last-chunk-wins, so an agent skipped only on the final chunk was reported as
+  // skipped for the whole run and vice versa. Intersection is the only reading under which the
+  // rendered "skipped entirely -- their domains were not reviewed" is true.
+  it('keeps agentsSkipped only for an agent skipped in EVERY chunk', async () => {
+    const skipped = {
+      policy: { agentsSkipped: ['security' as const], reason: { security: 'all files excluded' } },
+    }
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult(skipped))
+      .mockResolvedValueOnce(makeResult(skipped))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: twoFilesWithHeaders() }, 2000, 15)
+
+    expect(merged.policy?.agentsSkipped).toEqual(['security'])
+    expect(merged.policy?.reason.security).toBe('all files excluded')
+    // Reported once, as a skip -- not also as a narrowed view of the same agent.
+    expect(merged.filteredFiles?.security).toBeUndefined()
+  })
+
+  it('demotes a partial skip to a narrowed view instead of claiming the agent was skipped entirely', async () => {
+    // Chunk 2 omits `policy` entirely -- the real shape runner.ts:938 emits when nothing was
+    // skipped, not an explicit empty object. Using the wrong shape here is what let the
+    // 2026-09-12 denominator bug through: an explicit `{ agentsSkipped: [], reason: {} }` is
+    // truthy and was (wrongly) counted toward the total, masking the bug it should have caught.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
+      )
+      .mockResolvedValueOnce(makeResult({}))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: twoFilesWithHeaders() }, 2000, 15)
+
+    // It ran on chunk 2, so "skipped entirely" would be false. `policy` must be absent entirely,
+    // not a truthy-but-empty object -- runner.ts's own non-chunked path can never produce
+    // { agentsSkipped: [], reason: {} }, since it gates on agentsSkipped.length > 0 before ever
+    // setting the field, so a chunked run doing so would contradict the documented --format json
+    // contract for any consumer checking `if (result.policy)` rather than `.agentsSkipped.length`.
+    expect(merged.policy).toBeUndefined()
+    // But it never saw chunk 1's files, which is exactly a reduced diff.
+    expect(merged.filteredFiles?.security).toEqual(['file0.ts'])
+  })
+
+  // The case that separates intersection from last-chunk-wins, and the one the previous two
+  // tests did not reach: both of those had a final chunk that happened to agree with the
+  // intersection, so a reverted merge passed them. Mutation testing surfaced the gap.
+  it('does not claim a whole-run skip on the strength of the last chunk alone', async () => {
+    // Chunk 1 omits `policy` entirely -- see the comment in the previous test for why an
+    // explicit empty object here would mask the exact bug this test exists to catch.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({}))
+      .mockResolvedValueOnce(
+        makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: twoFilesWithHeaders() }, 2000, 15)
+
+    // It ran on chunk 1; last-chunk-wins would have asserted it was skipped for the whole run.
+    expect(merged.policy).toBeUndefined()
+    expect(merged.filteredFiles?.security).toEqual(['file1.ts'])
+  })
+
+  // REGRESSION (2026-09-12): reported by the PMB peer against a real 7-chunk run, reproduced
+  // independently here. `policy.agentsSkipped` claimed a whole-run skip for an agent that had
+  // plainly run and found something, in the same result object -- verified by cross-referencing
+  // `agentStatus` (`ok`) and `summary.byAgent` (nonzero) at the time. Root cause: the denominator
+  // was `withPolicy.length` (chunks reporting ANY skip), not the total chunk count, so a chunk
+  // where the agent ran cleanly (no `.policy` field, per runner.ts:938) was silently excluded from
+  // both sides of the fraction and could never disprove a full-run skip.
+  it('does not claim a whole-run skip when an untouched-by-skip chunk found something', async () => {
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
+      )
+      .mockResolvedValueOnce(
+        makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
+      )
+      // The chunk where security ran cleanly. No `.policy` field at all -- that is what "nothing
+      // was skipped in this chunk" looks like in real output (agentStatus.security: 'ok' there,
+      // in the real report this reproduces).
+      .mockResolvedValueOnce(makeResult({}))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: threeFilesWithHeaders() }, 2000, 15)
+
+    // It ran cleanly on chunk 3, so "skipped entirely" would be false -- the buggy denominator
+    // (chunks-with-any-skip = 2) missed this and claimed a whole-run skip anyway.
+    expect(merged.policy).toBeUndefined()
+    expect(merged.filteredFiles?.security).toEqual(['file0.ts', 'file1.ts'])
+  })
+
+  // Found by opposition review of the #83/#84 merge: "skipped in every chunk that ran" is only
+  // "skipped entirely" when every chunk RAN. `earlyExit` breaking the loop early means the
+  // remaining chunks were never examined -- they might not have excluded this agent at all -- so
+  // the same demotion mergeToolAvailability applies via coverageIncomplete must apply here too.
+  it('demotes a full-run skip to a narrowed view when the chunk loop broke early', async () => {
+    const skippedLicense = {
+      policy: { agentsSkipped: ['license' as const], reason: { license: 'excluded' } },
+    }
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult(skippedLicense))
+      .mockResolvedValueOnce({
+        ...makeResult(skippedLicense),
+        earlyExit: { stoppedAt: 'security' },
+      })
+    const runner = { run: runMock } as unknown as SwarmRunner
+    const fiveFilesWithHeaders = [0, 1, 2, 3, 4]
+      .map((i) => withHeaders(`file${i}.ts`, 2500))
+      .join('\n')
+
+    const merged = await runChunked(runner, { diff: fiveFilesWithHeaders }, 2000, 15)
+
+    // Only 2 of 5 planned chunks ran (the loop broke on chunk 2's earlyExit) -- license was
+    // skipped in both, but chunks 3-5 were never seen, so "skipped entirely" is not provable.
+    expect(merged.policy).toBeUndefined()
+    // Demoted, not dropped: the files license was excluded from in the chunks that DID run are
+    // still reported, as a narrowed view rather than a full-run skip.
+    expect(merged.filteredFiles?.license).toEqual(['file0.ts', 'file1.ts'])
+  })
+
+  it('omits filteredFiles entirely when no chunk withheld anything', async () => {
+    const runMock = vi.fn().mockResolvedValue(makeResult({}))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.filteredFiles).toBeUndefined()
+  })
+
   // A tool that ran on one chunk and not another covered part of the diff and not the rest, which
   // is what 'partial' means. Reporting 'unavailable-llm-fallback' here would claim it never ran.
   it('collapses a used/unavailable disagreement to partial rather than to unavailable', async () => {
@@ -494,5 +679,137 @@ describe('splitByFileBoundary', () => {
 
   it('handles an empty diff without crashing', () => {
     expect(splitByFileBoundary('', 2000)).toEqual([''])
+  })
+})
+
+describe('runChunked — chunk coverage when the loop breaks early', () => {
+  it('records how many chunks were reviewed when a chunk stops the run', async () => {
+    // The sibling test above already asserts run() was called twice and it passes today, which is
+    // exactly why it proves nothing: mergeResults only ever sees the chunks that RAN, so a
+    // complete 2-chunk run and a 3-chunk run that broke at 2 are identical inputs to it. The
+    // ratio is the only thing that can tell them apart.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult())
+      .mockResolvedValueOnce(makeResult({ earlyExit: { stoppedAt: 'security' } }))
+      .mockResolvedValueOnce(makeResult())
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(3) }, 2000, 15)
+
+    expect(runMock).toHaveBeenCalledTimes(2)
+    expect(merged.chunking).toEqual({ total: 3, reviewed: 2 })
+  })
+
+  it('records full coverage on a run that reviewed every chunk', async () => {
+    // Always set, never conditional: every surface gates on `reviewed < total`, so an absent field
+    // on a complete run would be indistinguishable from an absent field on an old archived result.
+    const runMock = vi.fn().mockResolvedValue(makeResult())
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(3) }, 2000, 15)
+
+    expect(merged.chunking).toEqual({ total: 3, reviewed: 3 })
+  })
+
+  it('reports the largest agent roster any chunk planned, not the last chunk that ran', async () => {
+    // runner.ts derives its roster from THAT CHUNK'S diff -- the migration-safety gate and
+    // agentPolicy both consult the changed files -- so the count legitimately differs per chunk.
+    // The larger value is deliberately FIRST: the reverse order passes under last-chunk-wins too,
+    // which would make this test decorative rather than falsifying.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ agentsPlanned: 15 }))
+      .mockResolvedValueOnce(makeResult({ agentsPlanned: 14 }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.agentsPlanned).toBe(15)
+  })
+
+  it('omits agentsPlanned entirely when no chunk reported one', async () => {
+    // Guard: Math.max() of an empty list is -Infinity, and a negative denominator would render
+    // worse than no denominator at all.
+    const runMock = vi.fn().mockResolvedValue(makeResult())
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.agentsPlanned).toBeUndefined()
+  })
+})
+
+describe('runChunked — a deterministic tool must not claim coverage it did not have', () => {
+  it('degrades a tool from used to partial when the chunk loop stopped early', async () => {
+    // Every chunk that RAN reported 'used', so they agree and the merge reported 'used' -- a
+    // positive claim that gitleaks scanned the whole diff, made about chunks it never saw.
+    // 'used' renders nothing on any surface, so the claim was made by silence.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(makeResult({ toolAvailability: { gitleaks: 'used' } }))
+      .mockResolvedValueOnce(
+        makeResult({ toolAvailability: { gitleaks: 'used' }, earlyExit: { stoppedAt: 'security' } })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(3) }, 2000, 15)
+
+    expect(merged.toolAvailability?.gitleaks).toBe('partial')
+  })
+
+  it('leaves a tool as used when every chunk was reviewed', async () => {
+    // Guard: only an INCOMPLETE run degrades. A complete chunked run must still be able to report
+    // that gitleaks genuinely covered everything, or the signal becomes meaningless.
+    const runMock = vi
+      .fn()
+      .mockResolvedValue(makeResult({ toolAvailability: { gitleaks: 'used' } }))
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(merged.toolAvailability?.gitleaks).toBe('used')
+  })
+
+  it('does not promote not-applicable or unavailable to partial on a short run', async () => {
+    // Only a positive coverage claim is degraded. 'unavailable-llm-fallback' asserts the tool did
+    // not run at all, which stays true regardless of how many chunks were reviewed -- rewriting it
+    // would tell the reader to investigate skipped files instead of installing the tool.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({ toolAvailability: { gitleaks: 'unavailable-llm-fallback' } })
+      )
+      .mockResolvedValueOnce(
+        makeResult({
+          toolAvailability: { gitleaks: 'unavailable-llm-fallback' },
+          earlyExit: { stoppedAt: 'security' },
+        })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(3) }, 2000, 15)
+
+    expect(merged.toolAvailability?.gitleaks).toBe('unavailable-llm-fallback')
+  })
+
+  it('floors agentsPlanned at the merged agentStatus size so it cannot fall below it', async () => {
+    // Math.max of per-chunk roster SIZES is not an upper bound on the UNION of agent names
+    // mergeAgentStatus builds: two chunks whose agentPolicy allows disjoint agents each report 2
+    // while the union is 4, and every surface then renders agentsPlanned - agentsRan as -2.
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        makeResult({ agentsPlanned: 2, agentStatus: { security: 'ok', correctness: 'ok' } })
+      )
+      .mockResolvedValueOnce(
+        makeResult({ agentsPlanned: 2, agentStatus: { design: 'ok', dependencies: 'ok' } })
+      )
+    const runner = { run: runMock } as unknown as SwarmRunner
+
+    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
+
+    expect(Object.keys(merged.agentStatus ?? {})).toHaveLength(4)
+    expect(merged.agentsPlanned).toBe(4)
   })
 })

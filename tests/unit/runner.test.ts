@@ -120,10 +120,14 @@ describe('SwarmRunner', () => {
     }
     const runner = new SwarmRunner(config, provider)
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const start = Date.now()
-    await runner.run({ diff: 'a\nb\nc' })
-    const elapsed = Date.now() - start
-    expect(elapsed).toBeLessThan(50)
+    // Asserts the computed ceiling, not wall-clock elapsed. Both this test and its sibling below
+    // previously timed the call and required it to finish under 50ms, which is a PROXY for "the
+    // timeout was not scaled up" -- and a load-dependent one. The sibling failed at 55ms during a
+    // full `npm run check` and then passed 3/3 on an idle machine, with nothing about the code
+    // under test having changed. `effectiveTimeoutMs` is the number these tests are actually
+    // about, it is recorded on every run, and it does not move when the machine is busy.
+    const result = await runner.run({ diff: 'a\nb\nc' })
+    expect(result.timings?.[0]?.effectiveTimeoutMs).toBe(30)
     warnSpy.mockRestore()
   }, 10000)
 
@@ -144,10 +148,14 @@ describe('SwarmRunner', () => {
     const runner = new SwarmRunner(config, provider)
     const largeDiff = Array.from({ length: 20 }, (_, i) => `line ${i}`).join('\n')
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const start = Date.now()
-    await runner.run({ diff: largeDiff })
-    const elapsed = Date.now() - start
-    expect(elapsed).toBeLessThan(50)
+    // This is the test that actually caught the flake, and it is also the falsifying one: the
+    // diff is 20 lines against maxDiffLines 10, so it truncates to 10 and the scaling ratio is
+    // pinned at 1. With timeoutScalingEnabled the ceiling would be the full TIMEOUT_SCALE_CAP
+    // multiple of 30; with it off the ceiling must stay exactly 30. Wall-clock could never
+    // distinguish those two, because both finish fast when every agent's chat promise never
+    // resolves -- it only ever measured that the machine was not busy.
+    const result = await runner.run({ diff: largeDiff })
+    expect(result.timings?.[0]?.effectiveTimeoutMs).toBe(30)
     warnSpy.mockRestore()
   }, 10000)
 
@@ -1177,6 +1185,52 @@ describe('SwarmRunner coverage-gap path defense (path traversal via --write-test
     const runner = new SwarmRunner(config, provider)
     const result = await runner.run({ diff: DIFF })
     expect(result.testFiles).toHaveLength(1)
+  })
+
+  // REGRESSION: testgen's onProgress 'end' event never carried `status` -- the six other emission
+  // sites (coverage x2, sequential x2, parallel x2) were fixed together, but this seventh site
+  // existed unchanged since before that fix and was missed. agentStatus.testgen was already
+  // computed correctly at this call site; only the event object omitted it, so a failed
+  // (opt-in, --suggest-tests/--write-tests only) TestGen run rendered identically to a clean one
+  // on the stderr progress line. Found verifying a merge, not by re-deriving the original fix.
+  it("onProgress 'end' event for testgen carries its status on failure, not just on success", async () => {
+    const coverageResponse = JSON.stringify({
+      findings: [],
+      gaps: [
+        {
+          file: 'src/foo.ts',
+          functionName: 'foo',
+          lineStart: 1,
+          lineEnd: 2,
+          description: 'desc',
+        },
+      ],
+    })
+    let callIndex = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => {
+        callIndex++
+        // First call: coverage agent (succeeds). Second call: TestGen (fails).
+        if (callIndex === 1) return Promise.resolve(coverageResponse)
+        return Promise.reject(new Error('always fails'))
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['coverage', 'testgen'] as AgentName[],
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const endEvents: AgentProgressEvent[] = []
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await runner.run({ diff: DIFF }, (event) => {
+      if (event.phase === 'end' && event.name === 'testgen') endEvents.push(event)
+    })
+    warnSpy.mockRestore()
+    expect(endEvents).toHaveLength(1)
+    expect(endEvents[0].status).toBe('error')
   })
 
   it('drops a coverage gap whose file is not in the reviewed diff before it ever reaches TestGen', async () => {

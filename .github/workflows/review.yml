@@ -146,8 +146,21 @@ jobs:
             }
             const result = JSON.parse(fs.readFileSync('findings.json', 'utf8'))
             const findings = result.findings ?? []
+            // This block previously read `result.findings` and nothing else, so a fail-fast run,
+            // a truncated diff, an abandoned chunk loop and a run whose agents all failed each
+            // posted "✅ No issues found." on the PR -- the highest-visibility surface in the repo
+            // asserting a clean review that never happened. The four-formatter rule in
+            // systemPatterns.md could not catch it, because this is not a formatter: it is a
+            // second renderer hand-written in YAML. Both this and the Step Summary below now go
+            // through scripts/reviewIncompleteness.cjs so they cannot drift apart.
+            const { incompletenessLines, noFindingsVerdict } = require('./scripts/reviewIncompleteness.cjs')
+            const banner = incompletenessLines(result)
+            if (banner.length > 0) {
+              lines.push(...banner)
+              lines.push('')
+            }
             if (findings.length === 0) {
-              lines.push('✅ No issues found.')
+              lines.push(noFindingsVerdict(result))
             } else {
               for (const f of findings) {
                 const emoji = { critical: '🔴', high: '🟠', medium: '🟡', low: '🔵' }[f.severity] ?? '⚪'
@@ -194,8 +207,15 @@ jobs:
               process.exit(0)
             }
             const r = JSON.parse(fs.readFileSync('findings.json','utf8'))
+            // Same gate as the PR comment above, through the same module -- see the comment there.
+            // An empty findings table is the Step Summary's version of a green check, and it was
+            // making the same unqualified claim.
+            const { incompletenessLines } = require('./scripts/reviewIncompleteness.cjs')
+            const banner = incompletenessLines(r)
+            const bannerText = banner.length ? banner.join('\n\n') + '\n\n' : ''
+            const empty = banner.length ? '| — | — | — | No findings in the portion reviewed |' : '| — | — | — | No findings |'
             const rows = (r.findings||[]).map(f => \`| \${f.severity} | \${f.agent} | \${f.file}:\${f.line} | \${f.title} |\`).join('\n')
-            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, \`## AI Review\n| Severity | Agent | Location | Issue |\n|---|---|---|---|\n\${rows||'| — | — | — | No findings |'}\n\`)
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, \`## AI Review\n\${bannerText}| Severity | Agent | Location | Issue |\n|---|---|---|---|\n\${rows||empty}\n\`)
           "
 
       - name: Upload findings artifact
