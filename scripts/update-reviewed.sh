@@ -14,11 +14,18 @@ if [ -z "$INPUT" ]; then exit 0; fi
 
 # WHY: Use python3 for JSON parsing — available on all supported platforms (Mac, Linux).
 # Falls back to exit 0 if python3 is missing rather than blocking agent work.
+#
+# WHY .get('tool_input', {}).get('file_path', ''), not .get('file_path', ''): the real
+# payload nests everything under "tool_input" (e.g. {"tool_name":"Edit","tool_input":
+# {"file_path":"..."}}), confirmed by capturing a live hook payload (see
+# scripts/check-contract.sh). The prior version read the flat field, which is always
+# empty, so this hook silently no-op'd on every Write/Edit -- last-reviewed frontmatter
+# never actually updated.
 FILE_PATH=$(echo "$INPUT" | python3 -c "
 import sys, json
 try:
     d = json.load(sys.stdin)
-    print(d.get('file_path', ''))
+    print(d.get('tool_input', {}).get('file_path', ''))
 except Exception:
     print('')
 " 2>/dev/null || true)

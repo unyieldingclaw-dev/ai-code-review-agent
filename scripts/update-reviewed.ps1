@@ -14,10 +14,14 @@ try {
     $input_json = $input | Out-String
     if ([string]::IsNullOrWhiteSpace($input_json)) { exit 0 }
 
-    $tool_input = $input_json | ConvertFrom-Json -ErrorAction Stop
+    $payload = $input_json | ConvertFrom-Json -ErrorAction Stop
 
-    # WHY: Both Write (file_path) and Edit (file_path) use the same field name.
-    $file_path = $tool_input.file_path
+    # WHY .tool_input.file_path, not .file_path: the real payload nests everything under
+    # "tool_input" (e.g. {"tool_name":"Edit","tool_input":{"file_path":"..."}}), confirmed
+    # by capturing a live hook payload (see scripts/check-contract.ps1). The prior version
+    # read $payload.file_path (flat), which is always null, so this hook silently no-op'd
+    # on every Write/Edit -- last-reviewed frontmatter never actually updated.
+    $file_path = $payload.tool_input.file_path
     if ([string]::IsNullOrWhiteSpace($file_path)) { exit 0 }
 
     # WHY: Normalize path separators before checking — Claude may pass forward slashes
