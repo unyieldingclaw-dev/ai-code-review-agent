@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-06-26
+last-reviewed: 2026-09-17
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,45 +16,65 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-09-12
+**Last Updated**: 2026-09-17
 
 ## Current Focus
 
-**`filteredFiles` invisibility is fixed and open as #84**, together with the `policy` and
-`filteredFiles` chunk merges it turned out to require. Mechanism, measurement and the design
-decision are in `progress.md`. Verified: 867 tests and **20/20 mutations killed** against a no-op
-control that killed nothing. Its task contract shows `status: "complete"` because the work
-shipped — that tracks the _task_, not the _PR_, which is still open.
+**`#83` merged 2026-09-13.** `#84`'s branch then had to absorb that merge: its own
+`policy`/`filteredFiles` real-merge additions conflicted with `#83`'s `earlyExit`/`agentsPlanned`
+additions in the same 10 files. Resolved by combining both (neither regresses the other) — full
+domain code-review + independent opposition review + 908-test suite, pushed as `b7634e2`.
 
-**`#82` is merged; `#83`, `#84`, `#85` are open, none merged** (`gh pr list`, 2026-09-12). `#83`
-(`fix/early-exit-visibility`) is pushed and up to date with `main`, awaiting `test` CI + merge;
-`#84`/`#85` need `gh pr update-branch` once it does — never a rebase, force-push is hard-blocked.
+**Opposition review of that merge found a real gap**, fixed as a same-PR fast-follow:
+`mergePolicy` promoted an agent to "skipped entirely" using the wrong denominator once chunking
+could exit early — `mergeToolAvailability` already guarded the analogous claim via a
+`coverageIncomplete` param; `mergePolicy` now takes the same param (`2039538`). A **second** bug
+surfaced by a full `/change-review` of the resulting branch: `mergePolicy` could return a
+truthy-but-empty `{agentsSkipped: [], reason: {}}` instead of `undefined`, a shape the non-chunked
+path can never produce — fixed to mirror the `mergeToolAvailability`/`mergeFilteredFiles`
+undefined-when-empty pattern (`c3b184b`). Both mutation-tested: reverting each fix reproduces the
+exact test failures it resolves.
+
+**`#84`'s final `/change-review` (9 jobs + ACR + opposition) found no Blocking findings.** Real,
+non-blocking Medium findings worth a fast-follow (not yet started): `policy.agentsSkipped`'s
+"fully skipped" predicate is reimplemented independently in all 4 formatters instead of sharing a
+`schema.ts` helper (unlike the sibling `filteredFiles` concept, which got one); every fixture
+testing "N files withheld" text has narrowed-agent-count == distinct-file-count, so a
+`narrowedFileCount`/`agentsWithNarrowedView().length` copy-paste swap would pass undetected;
+`tests/unit/mcp/formatter.test.ts` lacks the headline-stability regression test the other two
+formatters have. Two smaller issues (stale contract scope, a stale `runner.ts:931`→`938` comment
+reference) were fixed inline during the review (`b63793f`). Pushed to
+`origin/fix/filtered-files-visibility` 2026-09-17.
+
+**ACR reported 5 "high"/"blocking:true" findings on this diff — all 5 confirmed fabricated**, independently
+by two separate reviewers reading the actual cited lines: every one cites a wrong line number, and
+4 of 5 quote code that already null-guards via `?.`/`??`/`&&` (the guard being flagged AS the bug
+is the fix). All 5 self-reported `locationCheck: mismatch`/`unknown`. Reconfirms the
+local-model-under-vulnerability-hunting-pressure pattern the PMB peer flagged earlier — see Next
+Steps, the formal write-up of this is still outstanding.
+
+**`#85` (`fix/chunked-progress-visibility`) is now `mergeStateStatus: CONFLICTING`** against
+`main` post-`#83` — needs `gh pr update-branch` or manual resolution, not started.
+
+**`#86` (`fix/update-reviewed-nested-payload`) is OPEN, mergeable, both checks passing —
+NOT merged**, despite an earlier session transcript in this project's history suggesting a
+`gh pr merge 86` had succeeded. Verified directly via `gh pr view 86` on 2026-09-17
+(`mergedAt: null`, `state: OPEN`). Do not treat it as landed; the discrepancy itself is unexplained
+— flagged to the operator rather than guessed at.
+
+**`gh pr list` state as of 2026-09-17: `#82`, `#83` merged; `#84`, `#85`, `#86` open, none merged.**
 `gh pr merge` is denied to Claude by design; the user runs it after checks pass.
 
-**Two handoffs have been merged here** (2026-08-31, and 2026-09-01). `handoff.md` is **gitignored**,
-so until each merge its facts existed on one disk and in no commit. The first merge put its
-content in `techContext.md` (model choice, `OLLAMA_KEEP_ALIVE`, the `npm link` rule, the peer
-protocol, PMB's exit-code contract) and `systemPatterns.md` (the proxy-assertion rule).
+**`npm run check` run directly 2026-09-17: green, 908 tests.** Calibration is nondeterministic —
+**treat a single pass as weak evidence**. Use `grep "orchestrator] dropped"` to tell a real filter
+regression from model variance, and target cases with `CALIBRATION_CASE=name1,name2` rather than
+running the suite. PMB-owned defects live in `techContext.md`, not here.
 
-**Verified state (2026-08-31): `npm run check` run directly, green.** The test count is deliberately
-not restated here — it lives once, in `progress.md`'s Metrics table, because restating it is how it
-went stale twice. Calibration is nondeterministic — **treat a single pass as weak evidence**, now with a measured
-instance: a model switch was recommended on one pass each and reversed by three (`techContext.md`).
-Use `grep "orchestrator] dropped"` to tell a real filter regression from model variance, and target
-cases with `CALIBRATION_CASE=name1,name2` rather than running the suite. Pass counts and suite size
-are deliberately not pinned here — both have drifted before; run it.
-
-**PMB-owned defects — none fixable here**, and the standing inventory moved to `techContext.md`
-("PMB-owned defects") on 2026-08-31: it is a stable fact about an upstream dependency, not session
-state, and it was being held in the file least able to afford it.
-
-**From the two 2026-08-26 PMB briefs — four diagnoses are verified wrong, do not chase them:** a
-fetch timeout separate from `--timeout`; parallel-by-default agents; chunking damaging hunk headers;
-and cross-file misattribution as a chunking artifact. Reasons in
-[`archive/activeContext-history.md`](archive/activeContext-history.md). What survives: line
-attribution is unreliable from the model itself (7/5/7 across trials, unchunked), including across
-files. Still open — exit 1 outranks exit 3, so a truncated run with a blocker reports 1
-(`src/cli/index.ts:422-438`, deliberate; the consequence is what is new).
+**Still open from the 2026-08-26 PMB briefs:** line attribution is unreliable from the model itself
+(7/5/7 across trials, unchunked), including across files. Exit 1 outranks exit 3, so a truncated
+run with a blocker reports 1 (`src/cli/index.ts:422-438`, deliberate). Four other diagnoses from
+those briefs were verified wrong — do not chase them; reasons in
+[`archive/activeContext-history.md`](archive/activeContext-history.md).
 
 **Open risks, detailed in `progress.md`:**
 
@@ -79,10 +99,21 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 
 ## Next Steps
 
-- **`filteredFiles` — shipped, open as #84, awaiting review.** `review.yml` and `vscode-extension`
-  are the fifth and sixth surfaces and still follow once #83 lands the
-  `scripts/reviewIncompleteness.cjs` they need; duplicating that module across open PRs would
-  create the divergent-copy drift this work exists to remove.
+- **`filteredFiles`/`policy` — merge-conflict resolved, fast-follows landed, change-review clean,
+  still awaiting merge (#84).** `review.yml` and `vscode-extension` are the fifth and sixth
+  surfaces; `#83`'s `scripts/reviewIncompleteness.cjs` they need is now merged, so they can follow
+  once #84 lands rather than duplicating that module across open PRs.
+- **Fast-follow candidate, not started: share one `skippedAgents(result)` helper across the 4
+  formatters** instead of each reimplementing `policy?.agentsSkipped.length > 0` — found by #84's
+  final change-review (Medium, non-blocking). Same session, decouple the "N files withheld" test
+  fixtures so narrowed-agent-count and distinct-file-count differ (a `narrowedFileCount` /
+  `agentsWithNarrowedView().length` swap currently passes every test), and add the
+  headline-stability regression test to `tests/unit/mcp/formatter.test.ts` that markdown/sarif
+  already have.
+- **Still owed: a formal Task Contract Proposal for ACR's false-positive/hallucination pattern**,
+  promised to the operator twice already. #84's review adds a clean, concrete data point: 5/5 ACR
+  findings on one diff were fabricated (wrong `file:line`, self-contradicting evidence, all
+  `locationCheck: mismatch`/`unknown`). Write it up rather than re-discussing it a third time.
 - **`chunkRunner`'s `mergeResults` drops `truncation`, so exit 3 is unreachable under `--chunk`.**
   Peer-reported and live-reproduced 2026-09-01; detail in `progress.md`. **Not fixed on purpose** —
   making exit 3 reachable changes what PMB's Job 7 branches on, so it is an operator decision.
@@ -92,48 +123,22 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
   `chunkRunner` part and the INCOMPLETE-denominator trap are in `progress.md`;
   `ReviewResult.agentsPlanned` now carries the roster, and the six-surface rule is corrected in
   `systemPatterns.md`.
-- **Corroboration downgrade — an approved measurement contract, not started, blocked on Ollama.**
-  Re-established at
-  [`2026-08-31-corroboration-downgrade-measurement.md`](../docs/superpowers/plans/2026-08-31-corroboration-downgrade-measurement.md)
-  after being displaced from the contract file. That document also parks a **second, unverified**
-  thread (grammar-constrained decoding costing reasoning accuracy) needing its own contract — read
-  the primary sources before acting on it.
-- **`systemPatterns.md` sits well above its 100–180 target band — an operator call, unmade.**
-  Reaching the band means dropping ~12 **live rules**, not archiving more evidence. Two options were
-  put up: accept that the file is larger than the band assumes, or split it (architecture decisions
-  vs operational rules). Neither was chosen, so it continues to accrete.
-- **`ping()` guesses model presence by substring — peer-cleared, operator has not ruled.**
-  `ollamaProvider.ts:125-143` does `model.split(':')[0]` then `.includes()`, so `qwen2.5-coder:32b`
-  reports present when only `:7b` is installed (verified live against three models). A missing model
-  should fail preflight and exit **4** (`exitCode.ts` names that case explicitly); instead it passes,
-  16 agents fail, and it exits **2** — which PMB routes to triage rather than retry. Fix is to
-  normalise the request (`bare → :latest`) then compare for equality; the "breaks bare `devstral`"
-  objection dissolves because Ollama resolves bare names the same way. PMB confirmed 2026-08-31 they
-  pass no bare or registry-qualified names and want exit 4 kept with **no new code**.
-- **`--chunk` as default — reopened by the model measurement, not yet decided.** It stays opt-in
-  (`config.ts:25` documents why) and was deliberately **not** flipped on 2026-08-30, because
-  flipping it trades one silent behaviour for another. What changed: at `qwen2.5-coder:7b` speeds
-  full coverage of a real diff costs roughly 200 s, weakening the cost half of that rationale. The
-  coverage evidence is not in doubt — a 6,578-line diff at default `--max-lines` reviewed 2,000
-  lines and returned **0 findings** where `--chunk` returned **15, including 2 High** (recorded at
-  `src/cli/formatter.ts:51`). An operator call, not a task.
+- **Operator calls parked, unmade, detail archived 2026-09-17** (full text in
+  [`archive/activeContext-history.md`](archive/activeContext-history.md)): corroboration-downgrade
+  measurement contract (blocked on Ollama); `systemPatterns.md` over its 100–180 target band;
+  `ping()`'s substring model-presence guess (`ollamaProvider.ts:125-143`, peer-cleared fix
+  available); `--chunk` as default (cost rationale weakened, not flipped); PMB upgrade (release
+  policy approved, not implemented, blocked on work nobody has started — not a tag to await).
 - **`fetch failed` — the one open technical thread, deliberately passive.** One invocation in twelve
-  (Ollama dropping the connection under load). **n=1: do not act on it.** Since `review.yml`
-  installs the published build, every non-docs CI run now deposits `timings` rows into
-  `findings.json` — the sample accumulates for free.
-- **PMB upgrade — blocked on work nobody has started. This is _not_ "awaiting a tag."** The release
-  policy (tag → dirty-tree guard → ref-sourcing) is **approved but not implemented**; scheduling it
-  is the operator's call. Verified in PMB's checkout 2026-08-28 — newest tag `v1.0.4`, nothing for
-  1.1.x or 1.2.x. **Waiting cannot resolve this** — do not poll, do not treat the tag as in flight.
-  Two signals arrive separately: "reached `main`" and "tag exists". **The procedure lives in
-  `techContext.md`**, next to the mechanics explaining each step; do not reconstruct it from memory.
-  PMB's ACR-provenance entry is committed but unlanded (`2052c3c`). Background in `progress.md`.
+  (Ollama dropping the connection under load). **n=1: do not act on it.**
 
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `#82` merged (branch deleted); **three open PRs** (`#83` pushed and awaiting
-`test` CI + merge, `#84`, `#85`), none merged. **The `main` hash is deliberately not recorded
+unit tests. **Git**: `#82`, `#83` merged (branches deleted); **three open PRs** (`#84` change-review
+clean, `#85` CONFLICTING against `main`, `#86` mergeable but not yet merged despite an earlier
+transcript suggesting otherwise — see Current Focus), none merged. **The `main` hash is
+deliberately not recorded
 here** — read it from `git log`. Two PRs in a row tried to keep it current and each was stale the
 moment it merged, because a memory-bank PR moves the very commit it names. Remote holds `main`,
 three PR branches, plus the two long-retained orphans (`chore/agent-calibration`,
