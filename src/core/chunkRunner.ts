@@ -305,7 +305,7 @@ function attributeChunkSkips(result: ReviewResult, chunkDiff: string): ReviewRes
 //
 // BUG FIXED 2026-09-12, found by the PMB peer and reproduced independently. The denominator
 // must be the total chunk count, not the count of chunks that reported ANY skip.
-// `runner.ts:931` attaches `policy` to a chunk result ONLY when something was skipped in that
+// `runner.ts:938` attaches `policy` to a chunk result ONLY when something was skipped in that
 // chunk -- a chunk where the agent ran cleanly has NO policy field at all, not an empty one.
 // Dividing by `withPolicy.length` silently dropped exactly the chunks that would disprove a
 // full-run skip from both the numerator and the denominator. Reproduced: two all-`.md` chunks

@@ -329,7 +329,7 @@ describe('runChunked', () => {
   })
 
   it('demotes a partial skip to a narrowed view instead of claiming the agent was skipped entirely', async () => {
-    // Chunk 2 omits `policy` entirely -- the real shape runner.ts:931 emits when nothing was
+    // Chunk 2 omits `policy` entirely -- the real shape runner.ts:938 emits when nothing was
     // skipped, not an explicit empty object. Using the wrong shape here is what let the
     // 2026-09-12 denominator bug through: an explicit `{ agentsSkipped: [], reason: {} }` is
     // truthy and was (wrongly) counted toward the total, masking the bug it should have caught.
@@ -379,7 +379,7 @@ describe('runChunked', () => {
   // plainly run and found something, in the same result object -- verified by cross-referencing
   // `agentStatus` (`ok`) and `summary.byAgent` (nonzero) at the time. Root cause: the denominator
   // was `withPolicy.length` (chunks reporting ANY skip), not the total chunk count, so a chunk
-  // where the agent ran cleanly (no `.policy` field, per runner.ts:931) was silently excluded from
+  // where the agent ran cleanly (no `.policy` field, per runner.ts:938) was silently excluded from
   // both sides of the fraction and could never disprove a full-run skip.
   it('does not claim a whole-run skip when an untouched-by-skip chunk found something', async () => {
     const runMock = vi
