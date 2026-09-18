@@ -396,6 +396,105 @@ describe('SwarmRunner', () => {
     expect(endEvents).toHaveLength(1)
     expect(endEvents[0].findings).toBeInstanceOf(Array)
     expect(typeof endEvents[0].elapsedMs).toBe('number')
+    expect(endEvents[0].status).toBe('ok')
+  })
+
+  // REGRESSION: a dead agent and a clean one both printed "0 raw findings" on the stderr progress
+  // line, distinguishable only by duration, which nothing parses. agentStatus was already computed
+  // at every emission site -- this proves it now reaches the event a caller actually receives.
+  it("onProgress 'end' event carries the agent's status on failure, not just on success", async () => {
+    const provider: LLMProvider = {
+      chat: vi.fn().mockRejectedValue(new Error('always fails')),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const endEvents: AgentProgressEvent[] = []
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await runner.run({ diff: 'diff' }, (event) => {
+      if (event.phase === 'end') endEvents.push(event)
+    })
+    warnSpy.mockRestore()
+    expect(endEvents).toHaveLength(1)
+    expect(endEvents[0].findings).toEqual([])
+    // classifyAgentError maps a plain Error (no "timed out" in the message, not a ParseFailureError)
+    // to 'error' -- the same classification agentStatus itself receives at this call site.
+    expect(endEvents[0].status).toBe('error')
+  })
+
+  // Mutation testing surfaced this gap directly: the sequential-path tests above passed even with
+  // `status` reverted out of the coverage agent's onProgress calls entirely, because nothing here
+  // exercised that path. Coverage runs through a separate branch from the general agent loop
+  // (runCoverageAgent, not runAgentsSequential/runAgentsParallel), so it needs its own coverage.
+  it("onProgress 'end' event carries status on both the coverage success and failure paths", async () => {
+    const okProvider: LLMProvider = {
+      chat: vi.fn().mockResolvedValue('{"findings":[],"gaps":[]}'),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const okConfig = {
+      ...DEFAULT_CONFIG,
+      agents: ['coverage'] as AgentName[],
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const okEvents: AgentProgressEvent[] = []
+    await new SwarmRunner(okConfig, okProvider).run({ diff: 'diff' }, (event) => {
+      if (event.phase === 'end') okEvents.push(event)
+    })
+    expect(okEvents[0].status).toBe('ok')
+
+    const failProvider: LLMProvider = {
+      chat: vi.fn().mockRejectedValue(new Error('always fails')),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const failConfig = { ...okConfig }
+    const failEvents: AgentProgressEvent[] = []
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await new SwarmRunner(failConfig, failProvider).run({ diff: 'diff' }, (event) => {
+      if (event.phase === 'end') failEvents.push(event)
+    })
+    warnSpy.mockRestore()
+    expect(failEvents[0].status).toBe('error')
+  })
+
+  // Same gap, for the parallel branch (runAgentsParallel), which is a third, separate code path
+  // from both the sequential loop and the coverage agent.
+  it("onProgress 'end' event carries status on both the parallel success and failure paths", async () => {
+    const okProvider = makeProvider()
+    const okConfig = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'correctness'] as AgentName[],
+      parallel: true,
+    }
+    const okEvents: AgentProgressEvent[] = []
+    await new SwarmRunner(okConfig, okProvider).run({ diff: 'diff' }, (event) => {
+      if (event.phase === 'end') okEvents.push(event)
+    })
+    expect(okEvents.every((e) => e.status === 'ok')).toBe(true)
+
+    const failProvider: LLMProvider = {
+      chat: vi.fn().mockRejectedValue(new Error('always fails')),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const failConfig = {
+      ...DEFAULT_CONFIG,
+      agents: ['security'] as AgentName[],
+      parallel: true,
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const failEvents: AgentProgressEvent[] = []
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await new SwarmRunner(failConfig, failProvider).run({ diff: 'diff' }, (event) => {
+      if (event.phase === 'end') failEvents.push(event)
+    })
+    warnSpy.mockRestore()
+    expect(failEvents[0].status).toBe('error')
   })
 
   it('warns that --fail-fast has no effect when --parallel is also enabled', async () => {
@@ -1086,6 +1185,52 @@ describe('SwarmRunner coverage-gap path defense (path traversal via --write-test
     const runner = new SwarmRunner(config, provider)
     const result = await runner.run({ diff: DIFF })
     expect(result.testFiles).toHaveLength(1)
+  })
+
+  // REGRESSION: testgen's onProgress 'end' event never carried `status` -- the six other emission
+  // sites (coverage x2, sequential x2, parallel x2) were fixed together, but this seventh site
+  // existed unchanged since before that fix and was missed. agentStatus.testgen was already
+  // computed correctly at this call site; only the event object omitted it, so a failed
+  // (opt-in, --suggest-tests/--write-tests only) TestGen run rendered identically to a clean one
+  // on the stderr progress line. Found verifying a merge, not by re-deriving the original fix.
+  it("onProgress 'end' event for testgen carries its status on failure, not just on success", async () => {
+    const coverageResponse = JSON.stringify({
+      findings: [],
+      gaps: [
+        {
+          file: 'src/foo.ts',
+          functionName: 'foo',
+          lineStart: 1,
+          lineEnd: 2,
+          description: 'desc',
+        },
+      ],
+    })
+    let callIndex = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => {
+        callIndex++
+        // First call: coverage agent (succeeds). Second call: TestGen (fails).
+        if (callIndex === 1) return Promise.resolve(coverageResponse)
+        return Promise.reject(new Error('always fails'))
+      }),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['coverage', 'testgen'] as AgentName[],
+      retryAttempts: 1,
+      retryDelayMs: 0,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const endEvents: AgentProgressEvent[] = []
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await runner.run({ diff: DIFF }, (event) => {
+      if (event.phase === 'end' && event.name === 'testgen') endEvents.push(event)
+    })
+    warnSpy.mockRestore()
+    expect(endEvents).toHaveLength(1)
+    expect(endEvents[0].status).toBe('error')
   })
 
   it('drops a coverage gap whose file is not in the reviewed diff before it ever reaches TestGen', async () => {
