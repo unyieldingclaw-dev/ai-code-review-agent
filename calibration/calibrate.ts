@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, writeFileSync } from 'fs'
+import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { OllamaProvider } from '../src/core/llm/ollamaProvider.js'
@@ -232,6 +232,19 @@ const CASES: CalibrationCase[] = [
     fixtureFile: 'calibration/fixtures/adversarial.diff',
     expectedKeyword: 'empty',
     baitKeyword: 'trimOrDefault',
+  },
+  {
+    // No other agent's clean fixture is run through `adversarial` -- this is the first
+    // true-negative case for this agent at all, added to measure whether `locationCheck`
+    // (verified/mismatch/unknown) predicts the false positives this agent produces. Every
+    // function here is already defensively guarded against the exact edge classes the
+    // adversarial prompt hunts for (null/undefined, empty collections, boundary values,
+    // malformed JSON), mirroring the real guarded code ACR fabricated null-reference findings
+    // against on 2026-09-17 (see docs/superpowers/plans/2026-09-17-acr-locationcheck-fpr-measurement.md).
+    name: 'adversarial-clean',
+    agentName: 'adversarial',
+    fixtureFile: 'calibration/fixtures/adversarial-clean.diff',
+    expectEmpty: true,
   },
   {
     // Keyword is the fixture's REAL ISSUE function, not 'integration' -- see the complexity case
@@ -499,6 +512,19 @@ async function main() {
   let passed = 0
   let failed = 0
 
+  // Measurement contract (docs/superpowers/plans/2026-09-17-acr-locationcheck-fpr-measurement.md):
+  // does `locationCheck` (verified/mismatch/unknown) predict a finding is a false positive? Every
+  // finding logged here is a false positive BY CONSTRUCTION -- it survived on a case whose fixture
+  // has no legitimate finding of that kind (expectEmpty), or matched a category the fixture is
+  // known to have none of (expectNoInjectionOrExceptionClaims, forbiddenKeyword). No manual
+  // labeling is needed; the calibration fixtures' own ground truth is the label.
+  const falsePositiveLocationChecks: Array<{
+    case: string
+    agent: string
+    locationCheck: string
+    title: string
+  }> = []
+
   for (const c of selectedCases) {
     process.stdout.write(`\nRunning calibration: ${c.name}...\n`)
     const diff = readFileSync(c.fixtureFile, 'utf-8')
@@ -523,6 +549,14 @@ async function main() {
             `  ❌ FAIL — expected zero findings, got ${findings.length}: ` +
               findings.map((f) => `"${f.title}"`).join(', ')
           )
+          for (const f of findings) {
+            falsePositiveLocationChecks.push({
+              case: c.name,
+              agent: c.agentName ?? c.name,
+              locationCheck: f.locationCheck ?? 'unknown',
+              title: f.title,
+            })
+          }
           failed++
         }
         continue
@@ -541,6 +575,14 @@ async function main() {
             `  ❌ FAIL — ${bad.length} injection/swallowed-exception claim(s) survived: ` +
               bad.map((f) => `"${f.title}"`).join(', ')
           )
+          for (const f of bad) {
+            falsePositiveLocationChecks.push({
+              case: c.name,
+              agent: c.agentName ?? c.name,
+              locationCheck: f.locationCheck ?? 'unknown',
+              title: f.title,
+            })
+          }
           failed++
         }
         continue
@@ -562,6 +604,14 @@ async function main() {
             `  ❌ FAIL — ${bad.length} "${c.forbiddenKeyword}" finding(s) survived: ` +
               bad.map((f) => `"${f.title}"`).join(', ')
           )
+          for (const f of bad) {
+            falsePositiveLocationChecks.push({
+              case: c.name,
+              agent: c.agentName ?? c.name,
+              locationCheck: f.locationCheck ?? 'unknown',
+              title: f.title,
+            })
+          }
           failed++
         }
         continue
@@ -641,6 +691,38 @@ async function main() {
       console.log(`  ❌ FAIL — agent error: ${(err as Error).message}`)
       failed++
     }
+  }
+
+  // Gitignored: this is live measurement output, re-generated per run, not a fixture. Written
+  // even when empty so a run that produced zero false positives is distinguishable from a run
+  // that was never instrumented, and appended-to rather than overwritten across repeated
+  // invocations (e.g. CALIBRATION_CASE=adversarial-clean run N times) so trials accumulate
+  // instead of only the last one surviving.
+  const fprLogPath = 'calibration/locationcheck-fpr.json'
+  const priorRuns: unknown[] = existsSync(fprLogPath)
+    ? (JSON.parse(readFileSync(fprLogPath, 'utf-8')) as unknown[])
+    : []
+  writeFileSync(
+    fprLogPath,
+    JSON.stringify(
+      [
+        ...priorRuns,
+        { ranAt: new Date().toISOString(), model, falsePositives: falsePositiveLocationChecks },
+      ],
+      null,
+      2
+    )
+  )
+  if (falsePositiveLocationChecks.length > 0) {
+    const byCheck = new Map<string, number>()
+    for (const fp of falsePositiveLocationChecks) {
+      byCheck.set(fp.locationCheck, (byCheck.get(fp.locationCheck) ?? 0) + 1)
+    }
+    const breakdown = [...byCheck.entries()].map(([k, n]) => `${k}=${n}`).join(', ')
+    console.log(
+      `\nFalse positives by locationCheck this run: ${breakdown} ` +
+        `(${falsePositiveLocationChecks.length} total, logged to ${fprLogPath})`
+    )
   }
 
   console.log(`\nCalibration [${model}]: ${passed} passed, ${failed} failed`)
