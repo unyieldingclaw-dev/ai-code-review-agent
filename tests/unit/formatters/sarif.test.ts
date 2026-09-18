@@ -347,6 +347,38 @@ describe('formatSarif timing', () => {
   })
 })
 
+describe('formatSarif policy notes', () => {
+  const narrowed: Partial<ReviewResult> = {
+    filteredFiles: { security: ['docs/a.md'], adversarial: ['docs/a.md', 'docs/b.md'] },
+  }
+
+  it('emits a note-level notification naming the narrowed agents', () => {
+    const sarif = JSON.parse(formatSarif(makeResult(narrowed)))
+    const notes = sarif.runs[0].invocations[0].toolExecutionNotifications.filter(
+      (n: { level: string }) => n.level === 'note'
+    )
+    expect(notes).toHaveLength(1)
+    expect(notes[0].message.text).toContain('adversarial, security')
+    expect(notes[0].message.text).toContain('2 file(s)')
+  })
+
+  it('carries filteredFiles in run properties for machine consumers', () => {
+    const sarif = JSON.parse(formatSarif(makeResult(narrowed)))
+    expect(sarif.runs[0].properties.filteredFiles).toEqual(narrowed.filteredFiles)
+  })
+
+  // A note, not an error: the exclusion is configured and the agents ran.
+  it('does not clear executionSuccessful', () => {
+    const sarif = JSON.parse(formatSarif(makeResult(narrowed)))
+    expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(true)
+  })
+
+  it('omits filteredFiles from run properties when nothing was narrowed', () => {
+    const sarif = JSON.parse(formatSarif(makeResult()))
+    expect(sarif.runs[0].properties.filteredFiles).toBeUndefined()
+  })
+})
+
 describe('formatSarif — earlyExit and chunk coverage', () => {
   it('does not report a fail-fast run as a successful execution', () => {
     // executionSuccessful is the field SARIF consumers actually gate on. Leaving it true for a
@@ -409,5 +441,32 @@ describe('formatSarif — earlyExit and chunk coverage', () => {
       )
     )
     expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(true)
+  })
+})
+
+describe('policy narrowing and earlyExit combined', () => {
+  // REGRESSION: these two incompleteness causes were added by independent branches that both
+  // touched buildInvocation's notifications array, and were merged by hand. This is the only test
+  // in this file that sets both, proving the merge combined the two notification lists rather
+  // than one silently overwriting the other.
+  it('emits both a policy note and a fail-fast warning notification for the same result', () => {
+    const sarif = JSON.parse(
+      formatSarif(
+        makeResult({
+          filteredFiles: { security: ['docs/a.md'] },
+          earlyExit: { stoppedAt: 'security' },
+          agentStatus: { coverage: 'ok' },
+          agentsPlanned: 15,
+        })
+      )
+    )
+    const notifications = sarif.runs[0].invocations[0].toolExecutionNotifications
+    const levels = notifications.map((n: { level: string }) => n.level)
+    expect(levels).toContain('note')
+    expect(levels).toContain('warning')
+    const texts = notifications.map((n: { message: { text: string } }) => n.message.text).join(' ')
+    expect(texts).toContain('reviewed a reduced diff')
+    expect(texts).toContain('Fail-fast')
+    expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(false)
   })
 })

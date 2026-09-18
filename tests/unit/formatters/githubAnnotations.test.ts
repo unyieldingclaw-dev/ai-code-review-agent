@@ -352,6 +352,25 @@ describe('formatGithubAnnotations timing', () => {
   })
 })
 
+describe('formatGithubAnnotations policy notes', () => {
+  it('warns that agents reviewed a reduced diff', () => {
+    const out = formatGithubAnnotations(makeResult({ filteredFiles: { security: ['docs/a.md'] } }))
+    expect(out).toContain('::warning::')
+    expect(out).toContain('agentPolicy withheld 1 file(s) in total from security')
+  })
+
+  it('warns that agents were skipped entirely', () => {
+    const out = formatGithubAnnotations(
+      makeResult({ policy: { agentsSkipped: ['security'], reason: {} } })
+    )
+    expect(out).toContain('agentPolicy skipped security entirely')
+  })
+
+  it('says nothing about policy when neither applies', () => {
+    expect(formatGithubAnnotations(makeResult())).not.toContain('agentPolicy')
+  })
+})
+
 describe('formatGithubAnnotations — earlyExit', () => {
   it('emits a warning naming the agent and how many never ran', () => {
     const out = formatGithubAnnotations(
@@ -386,5 +405,25 @@ describe('formatGithubAnnotations — earlyExit', () => {
     // reader of every PR.
     const out = formatGithubAnnotations(makeResult({ agentStatus: { security: 'ok' } }))
     expect(out).not.toContain('Fail-fast')
+  })
+})
+
+describe('policy narrowing and earlyExit combined', () => {
+  // REGRESSION: these two incompleteness causes were added by independent branches that both
+  // touched the same return array, and were merged by hand. This is the only test in this file
+  // that sets both, proving the merge concatenated policyLines and earlyExitLines rather than one
+  // replacing the other.
+  it('emits both the policy-skip warning and the fail-fast warning for the same result', () => {
+    const out = formatGithubAnnotations(
+      makeResult({
+        policy: { agentsSkipped: ['license'], reason: {} },
+        earlyExit: { stoppedAt: 'security' },
+        agentStatus: { coverage: 'ok', correctness: 'ok', security: 'ok' },
+        agentsPlanned: 15,
+      })
+    )
+    expect(out).toContain('agentPolicy skipped license entirely')
+    expect(out).toContain('Fail-fast')
+    expect(out).toContain('12 of 15 agents never ran')
   })
 })

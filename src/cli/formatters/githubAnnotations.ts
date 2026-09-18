@@ -7,6 +7,7 @@
 // agents or a truncated diff is never indistinguishable from a clean, fully-analyzed one.
 
 import type { ReviewResult, Finding, Severity } from '../../core/schema.js'
+import { agentsWithNarrowedView, narrowedFileCount } from '../../core/schema.js'
 import { agentsRanCount, missedChunks, earlyExitLostCoverage } from '../../core/schema.js'
 
 function severityToAnnotationLevel(severity: Severity): 'error' | 'warning' | 'notice' {
@@ -77,6 +78,26 @@ export function formatGithubAnnotations(result: ReviewResult): string {
         `::warning::Diff truncated: reviewed ${result.truncation.keptLines}/${result.truncation.originalLines} lines — results may be incomplete`,
       ]
     : []
+  // Distinguished from the deliberately-excluded `timings` by that note's own second test: there
+  // is no other signal for this on this surface. A PR reviewer reading annotations has no way to
+  // learn that the security agent was handed a reduced diff.
+  const narrowedAgents = agentsWithNarrowedView(result)
+  const policyLines = [
+    ...(result.policy && result.policy.agentsSkipped.length > 0
+      ? [
+          `::warning::${escapeAnnotationValue(
+            `agentPolicy skipped ${result.policy.agentsSkipped.join(', ')} entirely — those domains were not reviewed`
+          )}`,
+        ]
+      : []),
+    ...(narrowedAgents.length > 0
+      ? [
+          `::warning::${escapeAnnotationValue(
+            `agentPolicy withheld ${narrowedFileCount(result)} file(s) in total from ${narrowedAgents.join(', ')} — those agents reviewed a reduced diff`
+          )}`,
+        ]
+      : []),
+  ]
   // WHY earlyExit is rendered here when `timings` deliberately is not, given the exclusion note
   // above applies to "a diagnostic about the run rather than a defect in the code under review":
   // that note's SECOND reason is the distinguishing test, and it does not hold here. For timings,
@@ -112,11 +133,20 @@ export function formatGithubAnnotations(result: ReviewResult): string {
   const missed = missedChunks(result)
   const chunkLines = missed
     ? [
-        `::warning::Chunked review stopped early: ${missed.reviewed}/${missed.total} chunks analyzed — part of the diff was never reviewed`,
+        `::warning::${escapeAnnotationValue(
+          `Chunked review stopped early: ${missed.reviewed}/${missed.total} chunks analyzed — part of the diff was never reviewed`
+        )}`,
       ]
     : []
   const findingLines = result.findings.map(findingToAnnotation)
-  return [...warningLines, ...truncationLines, ...earlyExitLines, ...chunkLines, ...findingLines]
+  return [
+    ...warningLines,
+    ...truncationLines,
+    ...policyLines,
+    ...earlyExitLines,
+    ...chunkLines,
+    ...findingLines,
+  ]
     .filter((l) => l.length > 0)
     .join('\n')
 }

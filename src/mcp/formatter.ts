@@ -2,6 +2,8 @@ import type { Finding, ReviewResult } from '../core/schema.js'
 import {
   TOOL_LABELS,
   toolsWithAvailability,
+  agentsWithNarrowedView,
+  narrowedFileCount,
   agentsRanCount,
   agentsPlannedCount,
   earlyExitLostCoverage,
@@ -91,6 +93,22 @@ export function formatMcpOutput(result: ReviewResult): string {
         (missed
           ? `and the chunks that were skipped were reviewed by neither the tool nor the model.`
           : `findings for the remainder came from the model, not the tool.`)
+    )
+  }
+  // This surface read neither `policy` nor `filteredFiles`, so a skipped agent and a narrowed one
+  // were both invisible to a caller that has no terminal to check against.
+  if (result.policy && result.policy.agentsSkipped.length > 0) {
+    toolNotes.push(
+      `🔧 Policy: ${result.policy.agentsSkipped.join(', ')} were skipped entirely by agentPolicy ` +
+        `rules — their domains were not reviewed.`
+    )
+  }
+  const narrowedAgents = agentsWithNarrowedView(result)
+  if (narrowedAgents.length > 0) {
+    const n = narrowedFileCount(result)
+    toolNotes.push(
+      `🔧 Policy: ${narrowedAgents.join(', ')} reviewed a reduced diff — ${n} file${n === 1 ? '' : 's'} ` +
+        `withheld in total by agentPolicy excludes, and no other agent covers their domain.`
     )
   }
   const degradedTools = toolsWithAvailability(result.toolAvailability, 'unavailable-llm-fallback')

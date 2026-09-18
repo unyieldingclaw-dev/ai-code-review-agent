@@ -7,6 +7,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`mergePolicy` no longer attaches an empty `policy` object to the envelope.** After the
+  `coverageIncomplete` guard above, an agent that survived the cross-chunk intersection could still
+  end up with `agentsSkipped: []` — but the function returned `{ agentsSkipped: [], reason: {} }`
+  instead of `undefined`, a truthy-but-empty shape the non-chunked path (`runner.ts`) can never
+  produce, since it only ever sets `policy` when `agentsSkipped.length > 0`. This contradicted the
+  documented `--format json` contract ("`policy` only appears when at least one agent was skipped")
+  for any consumer that checks truthiness rather than `.agentsSkipped.length`. `mergePolicy` now
+  returns `undefined` in that case, matching the sibling `mergeToolAvailability`/`mergeFilteredFiles`
+  functions' existing pattern. Found by change-review of this PR.
+
+- **`policy.agentsSkipped` no longer claims a full-run skip when the chunk loop stopped early.**
+  `mergePolicy` promoted an agent to "skipped entirely" whenever it was excluded in every chunk
+  that ran — but an `earlyExit` break leaves the remaining chunks unexamined, so they might not
+  have excluded the agent at all. `mergeToolAvailability` already guards the analogous claim for
+  `toolAvailability` via a `coverageIncomplete` parameter; `mergePolicy` now takes the same
+  parameter and, when set, demotes the claim to a narrowed view instead — `attributeChunkSkips`
+  already recorded the relevant files in `filteredFiles` per chunk, so nothing is lost, only
+  weakened to what the run actually proved. Found by opposition review of the merge that combined
+  this feature with `earlyExit` visibility.
+
 - **A `--fail-fast` run no longer reports itself as a clean review.** `ReviewResult.earlyExit`
   reached **no formatter at all**: the only trace was a footer `cli/index.ts` appended _after_
   `formatMarkdown` returned, and that footer was skipped for `json`, `sarif` and
@@ -54,6 +74,73 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   machine is busy (observed at 55 ms mid-build, passing 3/3 when idle). They now assert
   `timings[0].effectiveTimeoutMs` directly — the number they were always about, and one that does
   not move under load.
+
+- **`policy.agentsSkipped` could contradict `agentStatus` and `summary.byAgent` in the same
+  `--chunk` result.** Found by the PMB peer against a real 7-chunk run and reproduced
+  independently: an agent skipped on some chunks (every file in that chunk matched an
+  `agentPolicy` exclude) but not others was reported as skipped for the **entire run**, while the
+  same object's `agentStatus` said it ran fine and `summary.byAgent` showed it had findings.
+
+  The merge across chunks (added earlier in this same `filteredFiles`/`policy` promotion) computed
+  the fraction of chunks that skipped an agent using the wrong denominator: chunks that reported
+  **any** skip, rather than the total chunk count. `runner.ts` attaches a `policy` field to a
+  chunk's result only when something was skipped in that chunk — a chunk where the agent ran
+  cleanly carries no `policy` field at all, not an empty one — so that chunk was silently excluded
+  from both sides of the fraction and could never disprove a false full-run skip.
+
+  The test fixtures meant to catch exactly this modeled a "nothing skipped" chunk as an explicit
+  `{ agentsSkipped: [], reason: {} }` object, which is truthy and so was counted correctly by the
+  buggy code — masking the defect, because that is not the shape a real run produces.
+
+- **A partially-excluded agent no longer reports as a clean run.** `agentPolicy` excludes take
+  effect two different ways and only one of them was ever rendered. The whole-agent skip fires only
+  when EVERY changed file matches an exclude (`policyFilter.ts:47`, via `matchesAll`, which is
+  `files.every(...)`). On a mixed diff the match is partial, so `policy.agentsSkipped` stays empty,
+  the excluded sections are stripped from that agent's input, the stripping is recorded in
+  `filteredFiles` — and no rendered surface printed it. Markdown, SARIF, github-annotations and MCP
+  all reported a clean run.
+
+  **Adding one non-excluded file SUPPRESSED the signal**, which is the opposite of what a reader
+  would guess, and reaching it needs no flag at all — unlike the `earlyExit` case, which needs
+  `--fail-fast`. Measured on `--profile security`, where `security` and `adversarial` both exclude
+  `**/*.md`: a diff of six `.md` files plus one `.sh` left those two agents reviewing one file of
+  seven, and every surface called it clean.
+
+  All four formatters now name the affected agents and how many files were withheld. **`--format
+json` was never affected** — `formatJson` is `JSON.stringify(result, null, 2)` and the runner
+  already spread `filteredFiles` onto the envelope — so consumers reading the raw envelope always
+  had the data and still do. SARIF now carries `filteredFiles` in run properties for that same
+  reason: a consumer computing its own coverage needs the mapping, not a rendered sentence.
+
+  **A partial exclusion renders at the policy-note tier and deliberately does not flip the
+  INCOMPLETE headline.** The exclusion is configured and the agents did run; gating the headline on
+  it would fire on nearly every mixed diff — in a documentation-heavy repo, most of them — and
+  train the reader past the banner that matters.
+
+  Scope is the four formatters. `review.yml` and `vscode-extension` also render a verdict, but
+  carry none of this policy/filteredFiles narrowing yet — the `scripts/reviewIncompleteness.cjs`
+  module those two surfaces now share (see above) covers only `earlyExit`/`agentsPlanned`/
+  `chunking`, not this feature. Extending it to policy/filteredFiles is separate follow-up work,
+  not a gap in this change.
+
+- **Under `--chunk`, an agent narrowed in one chunk no longer reports as fully covered.**
+  `chunkRunner`'s merge policy listed `filteredFiles` among "purely diagnostic metadata" and took
+  whichever chunk ran last. That premise held only while nothing rendered the field. Now that four
+  formatters raise a coverage warning from it, a narrowing in chunk 1 followed by a clean chunk 3
+  silently reported full coverage — the same defect the warning exists to prevent, reappearing one
+  layer up. `filteredFiles` is now merged per agent as a sorted union across chunks: the same
+  promotion `toolAvailability` received once `partial` made it a claim about coverage rather than a
+  diagnostic detail.
+
+  `policy` moved with it, and needed more than a union. An agent skipped on one chunk may have
+  run on another, so carrying that into the merged `agentsSkipped` would render "skipped
+  entirely — their domains were not reviewed" about an agent that did review most of the diff.
+  The merge therefore keeps `agentsSkipped` for agents skipped in **every** chunk, and demotes a
+  partial skip to the narrowed-diff note by attributing that chunk's files to `filteredFiles`.
+  Each case is now reported once, and truthfully.
+
+  `filteredFiles` is also documented in the `--format json` envelope for the first time, since
+  this change makes it the field a consumer needs to compute coverage.
 
 ### Notes
 

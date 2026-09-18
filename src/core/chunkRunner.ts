@@ -16,13 +16,21 @@
 // internal truncation applies within it, same as it always has for an over-max-lines diff) -- a
 // much narrower, already-handled edge case than the general boundary-split this replaces.
 //
-// Known, accepted simplification: purely diagnostic metadata (policy, filteredFiles, context)
+// Known, accepted simplification: purely diagnostic metadata (context)
 // reflects whichever chunk ran LAST, not a true merge across chunks -- acceptable for an opt-in
 // feature, since none of it gates an exit code, and losing an earlier chunk's copy of it costs
 // nothing the user-facing report still depends on.
 // toolAvailability was on that list until 'partial' existed, and no longer qualifies: a partial
 // first chunk followed by a clean one rendered as a COMPLETED tool scan, which is a claim about
 // security coverage rather than a diagnostic detail. See mergeToolAvailability below.
+// filteredFiles left that list for the same reason and by the same test: it was diagnostic only
+// while nothing rendered it, and four formatters now raise a coverage warning from it. Under
+// last-chunk-wins an agent handed a reduced diff in chunk 1 but a full one in chunk 3 reports as
+// fully covered -- which is precisely the defect that warning was added to prevent, reappearing
+// one layer up. See mergeFilteredFiles below.
+// policy followed it for the same reason and in the same change: this class of exclusion is now
+// rendered on all four formatters, so last-chunk-wins could assert an agent had been skipped
+// entirely on the strength of the final chunk alone. See mergePolicy and attributeChunkSkips.
 // agentStatus and evidenceCheckFilter are the two exceptions and ARE merged across all chunks
 // (see mergeAgentStatus/mergeEvidenceCheckFilter below): agentStatus feeds cli/index.ts's exit
 // code 2, so a last-chunk-wins simplification there would let a real failure in an earlier chunk
@@ -48,20 +56,22 @@ import type {
   GeneratedTestFile,
   AgentName,
   AgentStatus,
+  PolicyResult,
   EvidenceCheckFilterMetadata,
   ToolAvailability,
   ToolAvailabilityMetadata,
 } from './schema.js'
 import { SEVERITY_RANK, TOOL_LABELS } from './schema.js'
 import { splitByFileBoundary } from './diffSplit.js'
+import { extractChangedFiles } from './policyFilter.js'
 
 // Re-exported for the existing chunkRunner.test.ts contract tests; defined in diffSplit.ts so
 // leaf consumers (claimSupport) need not import this orchestration module.
 //
 // Merge policy across chunks is per-field, and the reason differs per field -- see each
 // helper's own comment rather than inferring a rule from the grouping. The shapes in use:
-//   last-chunk-wins  policy, filteredFiles, context, coverageGapFilter
-//   merged           agentStatus, toolAvailability, evidenceCheckFilter
+//   last-chunk-wins  context, coverageGapFilter
+//   merged           agentStatus, toolAvailability, evidenceCheckFilter, filteredFiles, policy
 //   concatenated     hallucinationFilter.dropped, timings
 //   summed           summary.durationMs, sanitizer.redactedLines
 //   concat + re-cap  findings (via capAndSort, to restore the global ordering invariant)
@@ -86,7 +96,7 @@ export async function runChunked(
   for (const chunkDiff of chunks) {
     const chunkInput: ReviewInput = { ...input, diff: chunkDiff }
     const result = await runner.run(chunkInput, onProgress, contextMode)
-    results.push(result)
+    results.push(attributeChunkSkips(result, chunkDiff))
     if (result.earlyExit) break // --fail-fast should stop across chunks too, not just within one
   }
 
@@ -149,7 +159,19 @@ function mergeResults(
   const droppedAcrossChunks = results.flatMap((r) => r.hallucinationFilter?.dropped ?? [])
   const mergedHallucinationFilter =
     droppedAcrossChunks.length > 0 ? { dropped: droppedAcrossChunks } : undefined
-  const mergedToolAvailability = mergeToolAvailability(results, results.length < totalChunks)
+  const coverageIncomplete = results.length < totalChunks
+  const mergedToolAvailability = mergeToolAvailability(results, coverageIncomplete)
+  const mergedPolicy = mergePolicy(results, coverageIncomplete)
+  // A fully-skipped agent is reported by agentsSkipped; leaving it in filteredFiles too would
+  // render both "skipped entirely" and "reviewed a reduced diff" for the same agent.
+  const mergedFilteredFilesAll = mergeFilteredFiles(results)
+  const mergedFilteredFiles = mergedFilteredFilesAll
+    ? (() => {
+        const out = { ...mergedFilteredFilesAll }
+        for (const agent of mergedPolicy?.agentsSkipped ?? []) delete out[agent]
+        return Object.keys(out).length > 0 ? out : undefined
+      })()
+    : undefined
 
   // CONCATENATED, never summed -- and this is the one line the whole field depends on.
   // `durationMs` (summed at the top of this function) is correct for a "how long did the review
@@ -209,13 +231,13 @@ function mergeResults(
     // chunked run has already taken -- but the JUSTIFICATION was false, and it was the only thing
     // standing between an abandoned chunk loop and a report that looked complete. `chunking`
     // above now carries that state instead, without moving any exit code.
-    ...(last.policy ? { policy: last.policy } : {}),
+    ...(mergedPolicy ? { policy: mergedPolicy } : {}),
     ...(mergedAgentStatus ? { agentStatus: mergedAgentStatus } : {}),
     ...(mergedHallucinationFilter ? { hallucinationFilter: mergedHallucinationFilter } : {}),
     ...(last.coverageGapFilter ? { coverageGapFilter: last.coverageGapFilter } : {}),
     ...(mergedToolAvailability ? { toolAvailability: mergedToolAvailability } : {}),
     ...(mergedEvidenceCheckFilter ? { evidenceCheckFilter: mergedEvidenceCheckFilter } : {}),
-    ...(last.filteredFiles ? { filteredFiles: last.filteredFiles } : {}),
+    ...(mergedFilteredFiles ? { filteredFiles: mergedFilteredFiles } : {}),
     ...(timings.length > 0 ? { timings } : {}),
   }
 }
@@ -258,6 +280,103 @@ function mergeEvidenceCheckFilter(
  * changes says nothing about npm audit, and must not degrade a verdict another chunk legitimately
  * earned.
  */
+// An agent skipped for THIS chunk saw none of THIS chunk's files -- but it may have run on other
+// chunks, so carrying that into the merged agentsSkipped would render "skipped entirely ... their
+// domains were not reviewed", which would be false. A per-chunk skip is precisely a narrowed view
+// of the overall diff, which filteredFiles already renders truthfully, so the chunk's files are
+// attributed there instead. mergePolicy then keeps agentsSkipped for agents skipped in EVERY
+// chunk, and mergeResults strips those agents back out of filteredFiles so a full skip is reported
+// once rather than twice.
+function attributeChunkSkips(result: ReviewResult, chunkDiff: string): ReviewResult {
+  const skipped = result.policy?.agentsSkipped ?? []
+  if (skipped.length === 0) return result
+  const files = extractChangedFiles(chunkDiff)
+  if (files.length === 0) return result
+  const filteredFiles: Partial<Record<AgentName, string[]>> = { ...(result.filteredFiles ?? {}) }
+  for (const agent of skipped) {
+    filteredFiles[agent] = [...new Set([...(filteredFiles[agent] ?? []), ...files])].sort()
+  }
+  return { ...result, filteredFiles }
+}
+
+// Intersection, not union: "skipped entirely" is only true if every chunk skipped it. Was
+// last-chunk-wins, which reported whatever the final chunk happened to say -- arbitrary for an
+// agent skipped on some chunks and not others.
+//
+// BUG FIXED 2026-09-12, found by the PMB peer and reproduced independently. The denominator
+// must be the total chunk count, not the count of chunks that reported ANY skip.
+// `runner.ts:938` attaches `policy` to a chunk result ONLY when something was skipped in that
+// chunk -- a chunk where the agent ran cleanly has NO policy field at all, not an empty one.
+// Dividing by `withPolicy.length` silently dropped exactly the chunks that would disprove a
+// full-run skip from both the numerator and the denominator. Reproduced: two all-`.md` chunks
+// (agent skipped in both) plus one `.ts` chunk (agent ran and found something) still reported
+// the agent as skipped for the ENTIRE run -- directly contradicting `agentStatus` and
+// `summary.byAgent` in the same result object. The test fixtures meant to catch this modeled
+// "nothing skipped this chunk" as an explicit `{ agentsSkipped: [], reason: {} }` object, which
+// is truthy and so was counted correctly by the buggy code -- masking the bug, because that is
+// not the shape `runner.ts` actually emits.
+// coverageIncomplete mirrors mergeToolAvailability's parameter of the same name, for the same
+// reason: "skipped in every chunk that ran" is only "skipped entirely" when every chunk RAN. An
+// earlyExit break leaves chunks after it unexamined -- they might not have excluded this agent at
+// all -- so the claim is unprovable, not merely unlikely. When coverage is incomplete, no agent is
+// promoted to a full-run skip; attributeChunkSkips already recorded its files in filteredFiles per
+// chunk, so simply not promoting it here demotes the claim to a narrowed view instead of dropping
+// it. Found by opposition review of the #83/#84 merge, reproduced in the test above.
+function mergePolicy(
+  results: ReviewResult[],
+  coverageIncomplete: boolean
+): PolicyResult | undefined {
+  const withPolicy = results.filter((r) => r.policy)
+  if (withPolicy.length === 0) return undefined
+  const counts = new Map<AgentName, number>()
+  const firstReason: Partial<Record<AgentName, string>> = {}
+  for (const r of withPolicy) {
+    for (const agent of r.policy!.agentsSkipped) {
+      counts.set(agent, (counts.get(agent) ?? 0) + 1)
+      firstReason[agent] ??= r.policy!.reason[agent]
+    }
+  }
+  // results.length (every chunk), NOT withPolicy.length (chunks with any skip) -- see the
+  // incident note above.
+  const agentsSkipped = coverageIncomplete
+    ? []
+    : [...counts.entries()]
+        .filter(([, n]) => n === results.length)
+        .map(([agent]) => agent)
+        .sort()
+  const reason: Partial<Record<AgentName, string>> = {}
+  for (const agent of agentsSkipped) {
+    const r = firstReason[agent]
+    if (r !== undefined) reason[agent] = r
+  }
+  // undefined, not a truthy-but-empty object, when nothing survived the intersection (or
+  // coverageIncomplete suppressed it entirely) -- runner.ts:938 gates the non-chunked path on
+  // `agentsSkipped.length > 0` before ever setting `policy` at all, and mergeToolAvailability /
+  // mergeFilteredFiles both end the same way. Without this, a chunked run could attach
+  // `policy: { agentsSkipped: [], reason: {} }` to the envelope in a shape the non-chunked path
+  // can never produce, contradicting the documented --format json contract ("policy only appears
+  // when at least one agent was skipped") for any consumer that checks truthiness rather than
+  // `.agentsSkipped.length`. Found by change-review of this PR.
+  return agentsSkipped.length > 0 ? { agentsSkipped, reason } : undefined
+}
+
+// See the header comment for why this is merged rather than last-chunk-wins. Union per agent:
+// a file withheld from an agent in ANY chunk was withheld from that agent for the run, so the
+// warning must survive a later chunk that happened to exclude nothing. Sorted so the rendered
+// output is deterministic regardless of chunk order, matching agentsWithNarrowedView's sort.
+function mergeFilteredFiles(
+  results: ReviewResult[]
+): Partial<Record<AgentName, string[]>> | undefined {
+  const merged: Partial<Record<AgentName, string[]>> = {}
+  for (const r of results) {
+    for (const [agent, files] of Object.entries(r.filteredFiles ?? {})) {
+      const key = agent as AgentName
+      merged[key] = [...new Set([...(merged[key] ?? []), ...(files ?? [])])].sort()
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined
+}
+
 function mergeToolAvailability(
   results: ReviewResult[],
   coverageIncomplete: boolean

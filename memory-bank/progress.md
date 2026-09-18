@@ -7,7 +7,7 @@ tags:
   - work/completed
   - work/in-progress
   - work/backlog
-last-reviewed: 2026-06-26
+last-reviewed: 2026-09-17
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,9 +16,69 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-09-01
+**Last Updated**: 2026-09-17
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
+
+## 🔎 #84's merge with #83, two fast-follow fixes, and a full change-review (2026-09-13–17)
+
+**#83 merged 2026-09-13, so #84's branch had to absorb it.** Both PRs touched the same 10 files
+additively (#83: `earlyExit`/`agentsPlanned` visibility; #84: `policy`/`filteredFiles` real-merge).
+Resolved by combining both — domain code-review + independent opposition review + the full test
+suite (908 tests) — pushed as `b7634e2`. Neither feature regressed the other.
+
+**Fast-follow #1 (`2039538`): `mergePolicy` needed the same `coverageIncomplete` guard
+`mergeToolAvailability` already had.** Found by opposition review of the merge itself: once
+chunking can exit early, "skipped in every chunk that ran" is not "skipped entirely" — the
+remaining chunks were never examined and might disprove it. Same fix shape as `mergeToolAvailability`,
+mutation-tested (reverting reproduces the exact failures it resolves).
+
+**Fast-follow #2 (`c3b184b`): `mergePolicy` could return `{agentsSkipped: [], reason: {}}`
+instead of `undefined`.** Found by a full `/change-review` of the resulting branch — this is a
+shape the non-chunked path (`runner.ts:938`, gated on `agentsSkipped.length > 0`) can never
+produce, contradicting the documented `--format json` contract for any consumer checking
+truthiness rather than `.agentsSkipped.length`. Fixed to match `mergeToolAvailability`'s and
+`mergeFilteredFiles`'s existing undefined-when-empty pattern. Mutation-tested the same way.
+
+**The full `/change-review` (9 jobs + ACR + opposition) found no Blocking findings**, but several
+real Medium ones worth a fast-follow:
+
+- `policy.agentsSkipped`'s "fully skipped" predicate (`result.policy?.agentsSkipped.length > 0`) is
+  reimplemented independently in all 4 formatters (`cli/formatter.ts`, `githubAnnotations.ts`,
+  `mcp/formatter.ts`, `sarif.ts`) instead of sharing one `schema.ts` helper, unlike the sibling
+  `filteredFiles` concept (`agentsWithNarrowedView`/`narrowedFileCount`). Opposition review checked
+  this against the file's own documented 3-incident drift history (`toolAvailability`,
+  `locationCheck`, `earlyExit`) and judged it a real but lesser risk — those incidents were all
+  silent _omissions_ on some surface; this predicate is uniformly present on all 4, just
+  duplicated. Medium, not High.
+- Every test fixture for "N files withheld" text has narrowed-agent-count == distinct-file-count
+  (2≈2 or 1≈1), so a `narrowedFileCount(result)` / `agentsWithNarrowedView(result).length`
+  copy-paste swap would render the wrong number and pass every test undetected.
+- `tests/unit/mcp/formatter.test.ts` lacks the "policy note doesn't flip the headline to
+  INCOMPLETE" regression test that markdown and SARIF both have. Safe today by inspection
+  (`mcp/formatter.ts` routes policy notes to `toolNotes`, never `warnings`), but unguarded.
+- `chunkRunner.ts`'s `mergedFilteredFiles` post-processing has the identical
+  truthy-but-empty-object hazard fast-follow #2 fixed for `mergePolicy`, but the one test
+  exercising it asserts only `merged.filteredFiles?.security`, not the whole object.
+
+**ACR (local Ollama swarm) reported 5 "high"/"blocking:true" findings — all 5 confirmed
+fabricated**, independently by the orchestrator and by the opposition reviewer reading the actual
+cited lines: every finding cites the wrong `file:line`, and 4 of 5 quote code that already
+null-guards via `?.`/`??`/`&&` — the exact guard being flagged AS the bug is the fix. All 5
+self-reported `locationCheck: mismatch`/`unknown`. Concrete data point for the still-outstanding
+Task Contract Proposal on ACR's hallucination pattern (`activeContext.md`).
+
+**Two smaller issues, found by opposition review, fixed inline rather than left open (`b63793f`):**
+`active-task.json`'s scope array was missing 3 files the contract's own work touched (`README.md`,
+`src/core/schema.ts`, `tests/unit/mcp/formatter.test.ts`); a pre-existing comment in
+`chunkRunner.ts` and two in `chunkRunner.test.ts` cited `runner.ts:931` for the policy-gating line
+— code had shifted since, the real line is 938 (comment-only, no behavior change). Also fixed: a
+stale `--format json` example in `README.md` still showed `"policy": {"agentsSkipped": [],
+"reason": {}}` next to a `filteredFiles`-only scenario, contradicting the rule this same PR added
+three lines below it.
+
+Pushed to `origin/fix/filtered-files-visibility` 2026-09-17. Full report in this session's
+transcript; not duplicated here.
 
 ## ✅ Two shipped invariants worth not re-deriving
 
@@ -36,71 +96,20 @@ holding it in the volatile file was costing the headroom that file most needs.
   prompt-only fixes were measured across three agents and failed every time. Detail in
   [`archive/progress-history.md`](archive/progress-history.md).
 
-## 🔎 `chunkRunner` merge policy — two fixed on #84, one still open (2026-09-01)
+## 🔎 `chunkRunner`'s `mergeResults` still drops `truncation` entirely — OPEN (2026-09-01)
 
-**Fixed on #84.** `filteredFiles` and `policy` were both last-chunk-wins, listed in
-`chunkRunner.ts` among "purely diagnostic metadata". That premise held only while nothing rendered
-them; #84 renders both on all four formatters, so both were promoted to real merges — the same move
-`toolAvailability` got once `partial` made it a coverage claim. `policy` needed more than a union:
-an agent skipped on one chunk may have run on the others, so a union would render "skipped entirely
-— their domains were not reviewed" about an agent that reviewed most of the diff. The merge keeps
-`agentsSkipped` for agents skipped in **every** chunk and demotes a partial skip to the
-narrowed-diff note.
-
-**OPEN, not fixed — `mergeResults` drops `truncation` entirely.** Reported by the PMB peer
-2026-09-01 and **live-reproduced by them rather than read**: a diff with one file section larger
-than `--max-lines`, run `--chunk --format json`, printed the truncation warning on the console
-while the emitted JSON carried **no `truncation` key at all** and the run exited **0**. So
-`result.truncation?.truncated` can never be true under `--chunk`, and **exit code 3 is
-unreachable** — the single case it exists to catch degrades silently to exit 0 with nothing in the
-body or the code. Repro is cheap: a 35-line file section against `--max-lines 20`.
-
-This is a **second, independent trigger** for a field-drop already recorded below via the `break` at
-`chunkRunner.ts:90`. Two triggers, one omission.
-
-**Deliberately not fixed here.** Making exit 3 reachable changes what PMB's `/change-review` Job 7
-branches on — a consumer contract — so it is an operator decision, not a ride-along on a formatter
-change. `context` also remains last-chunk-wins.
-
-## 🔎 `filteredFiles` invisibility — implemented, NOT verified, NOT committed (2026-08-31)
-
-Found by the PMB peer, then **verified independently in source here** and proved through the built
-formatters. Same class as `earlyExit` below and **more reachable**: that one needs `--fail-fast`,
-this needs no flag at all.
-
-**Mechanism.** `--profile security` runs `security` + `adversarial`, both carrying
-`exclude: ['**/*.md']`. `policyFilter.ts:47` populates `policy.agentsSkipped` only when
-`matchesAll(changedFiles, exclude)`, and `matchesAll` is `files.every(...)` (`policyFilter.ts:12`) —
-so **every** changed file must match. On a mixed diff the match is partial: `agentsSkipped` stays
-empty, the excluded sections are still stripped from those agents' input, the stripping is recorded
-in `filteredFiles`, and no rendered surface printed it.
-
-**Measured:** 6 `.md` + 1 `.sh` changed → those two agents reviewed **1 file of 7** and every
-surface reported clean. The counter-intuitive half is the half that matters: **adding one
-non-excluded file SUPPRESSES the signal**, because it breaks the `every()`.
-
-**Do not describe the data as unreachable.** `--format json` carries it — `formatJson` is
-`JSON.stringify(result, null, 2)` (`cli/formatter.ts:337`) and `runner.ts:932` spreads the field onto
-the envelope. The _rendered_ surfaces are dark; the raw envelope is fine, so consumers have a real
-mitigation today. (Both re-verified in source 2026-09-01.)
-
-**Design decision, already made:** a partial exclusion renders at the **Policy-note tier** and does
-**not** flip the INCOMPLETE headline. The exclusion is configured and the agents did run; gating the
-headline on it would fire on nearly every mixed diff and train the reader past the banner that
-matters.
-
-**Scope boundary, deliberate:** four formatters only. `review.yml` and `vscode-extension` are the
-fifth and sixth surfaces and need infrastructure arriving with #83 (`scripts/reviewIncompleteness.cjs`,
-and the extension's envelope gaining incompleteness fields). Duplicating that module across two open
-PRs would create the divergent-copy drift this work exists to remove. They follow once #83 merges.
-
-**Implementation state (uncommitted, `stash@{0}`):** `core/schema.ts` gains
-`agentsWithNarrowedView()` + `narrowedFileCount()`; `cli/formatter.ts` gains `buildPolicyLines()`,
-pushed on **both** exit paths; `mcp/formatter.ts` adds policy + narrowing notes to `toolNotes`;
-`sarif.ts` adds `filteredFiles` to run properties plus a `note` notification;
-`githubAnnotations.ts` emits `::warning::` for skipped and narrowed. `npx tsc --noEmit` clean and
-the peer's scenario replays through the built formatters naming the exclusion on all four.
-**No tests and no mutation proof — which in this repo means not done, not nearly done.**
+Reported by the PMB peer 2026-09-01 and **live-reproduced by them rather than read**: a diff with
+one file section larger than `--max-lines`, run `--chunk --format json`, printed the truncation
+warning on the console while the emitted JSON carried **no `truncation` key at all** and the run
+exited **0**. So `result.truncation?.truncated` can never be true under `--chunk`, and **exit code
+3 is unreachable** — the single case it exists to catch degrades silently to exit 0 with nothing in
+the body or the code. Repro is cheap: a 35-line file section against `--max-lines 20`. A second,
+independent trigger for the same field-drop is recorded below via the `break` at
+`chunkRunner.ts:90`. **Deliberately not fixed** — making exit 3 reachable changes what PMB's
+`/change-review` Job 7 branches on, an operator decision, not a ride-along on a formatter change.
+`context` also remains last-chunk-wins, by the same deliberate simplification. Full detail on the
+now-fixed `policy`/`filteredFiles` merge and the `filteredFiles` invisibility investigation that
+preceded it: [`archive/progress-history.md`](archive/progress-history.md).
 
 ## 🔎 `earlyExit` invisibility — investigated and proven, not yet fixed (2026-08-31)
 

@@ -4,6 +4,7 @@ import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import type { ReviewResult, Finding, Severity } from '../../core/schema.js'
+import { agentsWithNarrowedView, narrowedFileCount } from '../../core/schema.js'
 import { missedChunks, isIncomplete, earlyExitLostCoverage } from '../../core/schema.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -69,6 +70,7 @@ function buildInvocation(result: ReviewResult) {
   const failedAgents = Object.entries(result.agentStatus ?? {}).filter(
     ([, status]) => status !== 'ok'
   )
+  const narrowedAgents = agentsWithNarrowedView(result)
   const chunksMissed = missedChunks(result)
   // A design review objected that `executionSuccessful: false` is semantically wrong for
   // --fail-fast, and the objection is half right: SARIF defines the field as whether the TOOL
@@ -84,6 +86,22 @@ function buildInvocation(result: ReviewResult) {
   // the detail is not left guessing.
   const executionSuccessful = !isIncomplete(result)
   const notifications = [
+    // A note, not an error, and it does not clear executionSuccessful: the exclusion is configured
+    // and the agents ran. It exists so a consumer reading the detail can see which domains were
+    // handed a reduced diff.
+    ...(narrowedAgents.length > 0
+      ? [
+          {
+            level: 'note' as const,
+            message: {
+              text:
+                `agentPolicy withheld ${narrowedFileCount(result)} file(s) in total from ` +
+                `${narrowedAgents.join(', ')} — those agents reviewed a reduced diff, and no ` +
+                `other agent covers their domain.`,
+            },
+          },
+        ]
+      : []),
     ...(result.earlyExit && earlyExitLostCoverage(result)
       ? [
           {
@@ -156,6 +174,11 @@ export function formatSarif(result: ReviewResult): string {
             ? { policy: result.policy }
             : {}),
           ...(result.agentStatus ? { agentStatus: result.agentStatus } : {}),
+          // Machine-read alongside the note above: a consumer computing its own coverage needs
+          // which files went to which agent, not a rendered sentence.
+          ...(result.filteredFiles && Object.keys(result.filteredFiles).length > 0
+            ? { filteredFiles: result.filteredFiles }
+            : {}),
           ...(result.truncation?.truncated ? { truncation: result.truncation } : {}),
           // Machine-read alongside the invocation notification above, not instead of it: a
           // consumer computing its own coverage ratio needs the numbers, and agentStatus alone
