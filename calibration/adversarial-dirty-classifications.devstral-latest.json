@@ -1,0 +1,869 @@
+[
+  {
+    "model": "devstral:latest",
+    "trial": "1",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "2",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "3",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "4",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "5",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "9",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "10",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "12",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "13",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "14",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "15",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "16",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "17",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "18",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "clampScore: negative score not handled",
+        "detail": "Score -1 is not clamped to 0",
+        "line": 4
+      },
+      {
+        "title": "clampScore: score > 100 not handled",
+        "detail": "Score 101 is not clamped to 0",
+        "line": 5
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "19",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "20",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "1",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one array index",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` will cause an out-of-bounds access",
+        "line": 9
+      },
+      {
+        "title": "Division by zero",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` will cause division by zero",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "2",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "3",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one array access",
+        "detail": "The loop in averageFindingsPerChunk uses `<=` instead of `<`, leading to an out-of-bounds access when findingsPerChunk is non-empty.",
+        "line": 13
+      },
+      {
+        "title": "Division by zero",
+        "detail": "The function will divide by zero when findingsPerChunk is empty, causing an exception.",
+        "line": 13
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "4",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Null pointer dereference in averageFindingsPerChunk",
+        "detail": "Passing null to averageFindingsPerChunk where an array is expected",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "5",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Array index out of bounds",
+        "detail": "The for loop condition allows access to findingsPerChunk[findingsPerChunk.length], which is out of bounds",
+        "line": 12
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "9",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Null findingsPerChunk array not handled",
+        "detail": "Passing `null` to `averageFindingsPerChunk` will throw a TypeError when trying to access `length` on `null`.",
+        "line": 9
+      },
+      {
+        "title": "Empty findingsPerChunk array causes division by zero",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` will result in a division by zero, returning `Infinity`.",
+        "line": 9
+      },
+      {
+        "title": "Off-by-one error in loop",
+        "detail": "The loop in `averageFindingsPerChunk` iterates one time too many, causing an `undefined` value to be added to the total.",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "10",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one error in loop bounds",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` will cause an out-of-bounds access in the for loop due to `i <= findingsPerChunk.length`.",
+        "line": 8
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "12",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Array index out of bounds in averageFindingsPerChunk",
+        "detail": "Passing an empty array causes an 'index out of bounds' error because the loop condition is i <= findingsPerChunk.length instead of i < findingsPerChunk.length.",
+        "line": 8
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "13",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Array bounds check missing in averageFindingsPerChunk",
+        "detail": "Passing an empty array to averageFindingsPerChunk will cause a division by zero error.",
+        "line": 11
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "14",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Empty array passed to averageFindingsPerChunk",
+        "detail": "Passing an empty array to averageFindingsPerChunk causes a division by zero.",
+        "line": 10
+      },
+      {
+        "title": "Array length check in averageFindingsPerChunk",
+        "detail": "findingsPerChunk[i] will cause an out of bounds access when i equals findingsPerChunk.length.",
+        "line": 10
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "15",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Out of bounds access in averageFindingsPerChunk",
+        "detail": "Passing an empty array to averageFindingsPerChunk results in division by zero",
+        "line": 12
+      },
+      {
+        "title": "Unsafe array access in averageFindingsPerChunk",
+        "detail": "Passing a non-empty array to averageFindingsPerChunk with a length of 0 results in division by zero",
+        "line": 12
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "16",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one error in loop bound",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` causes an index out of bounds error",
+        "line": 7
+      },
+      {
+        "title": "Division by zero in average calculation",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` causes division by zero",
+        "line": 7
+      },
+      {
+        "title": "Index out of bounds in map function",
+        "detail": "Passing arrays of different lengths to `chunkDurationsMs` causes an index out of bounds error",
+        "line": 12
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "17",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one error in findingsPerChunk length",
+        "detail": "The loop condition i <= findingsPerChunk.length causes an array index out of bounds exception",
+        "line": 11
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "18",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk: out of bounds access",
+        "detail": "findingsPerChunk.length=0 causes division by zero",
+        "line": 9
+      },
+      {
+        "title": "chunkDurationsMs: out of bounds access",
+        "detail": "startTimes.length=1, endTimes.length=0 causes index out of range",
+        "line": 13
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "19",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Out-of-bounds access in averageFindingsPerChunk",
+        "detail": "When findingsPerChunk is empty, the loop runs once with i=0, accessing findingsPerChunk[0] which does not exist",
+        "line": 9
+      },
+      {
+        "title": "Division by zero in averageFindingsPerChunk",
+        "detail": "When findingsPerChunk is empty, total is 0 and the function returns 0/0",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "20",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Empty array input causes division by zero",
+        "detail": "When findingsPerChunk is an empty array, the function tries to divide by its length, resulting in division by zero.",
+        "line": 10
+      },
+      {
+        "title": "Out of bounds access with empty array",
+        "detail": "When findingsPerChunk is an empty array, the loop condition i <= findingsPerChunk.length allows i to become 0, causing an out-of-bounds access.",
+        "line": 10
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "1",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one array index in map",
+        "detail": "Passing arrays of different lengths to `chunkDurationsMs` will cause an out-of-bounds access",
+        "line": 22
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "2",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Array length mismatch in chunkDurationsMs",
+        "detail": "Pass arrays of different lengths to chunkDurationsMs to trigger an out of bounds access (e.g., [1], [1, 2])",
+        "line": 16
+      },
+      {
+        "title": "Empty array in medianReviewTimeMs",
+        "detail": "Pass an empty array to medianReviewTimeMs to trigger an out of bounds access (e.g., [])",
+        "line": 21
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "3",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Out-of-bounds array access",
+        "detail": "If startTimes and endTimes have different lengths, endTimes[i] may be undefined, causing an error.",
+        "line": 22
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "4",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Array index out of bounds in chunkDurationsMs",
+        "detail": "Passing arrays of different lengths to chunkDurationsMs",
+        "line": 16
+      },
+      {
+        "title": "Division by zero in formatDurationSummary",
+        "detail": "Passing empty array to formatDurationSummary",
+        "line": 22
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "5",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "9",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Division by zero in medianReviewTimeMs",
+        "detail": "Passing an empty array to `medianReviewTimeMs` will cause an error when trying to access the middle element.",
+        "line": 20
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "10",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Unhandled empty arrays in chunkDurationsMs",
+        "detail": "If startTimes or endTimes is an empty array, the map function will not have a corresponding element to subtract, resulting in undefined values.",
+        "line": 15
+      },
+      {
+        "title": "Division by zero in formatDurationSummary",
+        "detail": "Passing an empty array to `formatDurationSummary` will cause a division by zero error in the average calculation.",
+        "line": 20
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "12",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Undefined access in chunkDurationsMs",
+        "detail": "Passing arrays of different lengths (e.g., startTimes longer than endTimes) results in undefined access because the function does not check if endTimes[i] exists.",
+        "line": 19
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "13",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Array length mismatch in chunkDurationsMs",
+        "detail": "Passing arrays of different lengths to chunkDurationsMs will cause an index out of bounds error.",
+        "line": 21
+      },
+      {
+        "title": "Potential division by zero in averageFindingsPerChunk",
+        "detail": "Passing an empty array to averageFindingsPerChunk will cause a division by zero error.",
+        "line": 19
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "14",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Unbalanced startTimes and endTimes arrays in chunkDurationsMs",
+        "detail": "Passing arrays of different lengths to chunkDurationsMs causes an out of bounds access.",
+        "line": 16
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "15",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "16",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Division by zero in total seconds calculation",
+        "detail": "Passing an empty array to `formatDurationSummary` causes division by zero",
+        "line": 17
+      },
+      {
+        "title": "Index out of bounds in median calculation",
+        "detail": "Passing an empty array to `medianReviewTimeMs` causes an index out of bounds error",
+        "line": 21
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "17",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs can return negative numbers",
+        "detail": "If startTimes[i] > endTimes[i] for any i, the result will be negative",
+        "line": 18
+      },
+      {
+        "title": "formatDurationSummary handles empty durationsMs",
+        "detail": "Pass an empty array to formatDurationSummary to trigger incorrect summary",
+        "line": 22
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "18",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "formatDurationSummary: empty durationsMs",
+        "detail": "durationsMs.length=0 causes division by zero",
+        "line": 17
+      },
+      {
+        "title": "medianReviewTimeMs: empty sortedTimesMs",
+        "detail": "sortedTimesMs.length=0 causes index out of range",
+        "line": 21
+      },
+      {
+        "title": "medianReviewTimeMs: odd sortedTimesMs",
+        "detail": "sortedTimesMs.length=1 causes index out of range",
+        "line": 21
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "19",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Out-of-bounds access in chunkDurationsMs",
+        "detail": "When startTimes and endTimes have different lengths, endTimes[i] accesses out-of-bounds memory",
+        "line": 15
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "20",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Mismatched array lengths cause undefined access",
+        "detail": "If startTimes and endTimes have different lengths, the map function will access undefined for missing elements.",
+        "line": 19
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "1",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "2",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "3",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Division by zero",
+        "detail": "The function will divide by zero when durationsMs is empty, causing an exception.",
+        "line": 26
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "4",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Array index out of bounds in medianReviewTimeMs",
+        "detail": "Passing empty array to medianReviewTimeMs",
+        "line": 27
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "5",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "9",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Division by zero in normalizeWeights",
+        "detail": "Passing an array of weights where all weights are zero will cause a division by zero, returning an array of `NaN`.",
+        "line": 26
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "10",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Unhandled empty arrays in medianReviewTimeMs",
+        "detail": "Passing an empty array to `medianReviewTimeMs` will cause an error when accessing the middle element.",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "12",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "13",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "14",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Unsorted array passed to medianReviewTimeMs",
+        "detail": "medianReviewTimeMs assumes sortedTimesMs is sorted.",
+        "line": 24
+      },
+      {
+        "title": "Empty array passed to medianReviewTimeMs",
+        "detail": "Passing an empty array to medianReviewTimeMs causes an out of bounds access.",
+        "line": 24
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "15",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Division by zero in medianReviewTimeMs",
+        "detail": "Passing an empty array to medianReviewTimeMs results in division by zero",
+        "line": 27
+      },
+      {
+        "title": "Unsafe array access in medianReviewTimeMs",
+        "detail": "Passing a non-empty array to medianReviewTimeMs with a length of 0 results in division by zero",
+        "line": 27
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "16",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Division by zero in weight normalization",
+        "detail": "Passing an array of zeros to `normalizeWeights` causes division by zero",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "17",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs handles even-length arrays incorrectly",
+        "detail": "If sortedTimesMs.length is even, the median is not correctly computed",
+        "line": 26
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "18",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "normalizeWeights: empty weights",
+        "detail": "weights.length=0 causes division by zero",
+        "line": 25
+      },
+      {
+        "title": "normalizeWeights: all zeros",
+        "detail": "weights=[0,0,0] causes division by zero",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "19",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Out-of-bounds access in medianReviewTimeMs",
+        "detail": "When sortedTimesMs has length 1, mid is 0 and the function returns sortedTimesMs[0] which exists, but when length is even, it may not return the true median",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "devstral:latest",
+    "trial": "20",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  }
+]

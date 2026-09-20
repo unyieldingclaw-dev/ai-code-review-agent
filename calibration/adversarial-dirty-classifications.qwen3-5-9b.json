@@ -1,0 +1,1063 @@
+[
+  {
+    "model": "qwen3.5:9b",
+    "trial": "1",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [
+      {
+        "title": "NaN bypasses score validation",
+        "detail": "Type annotation says number but NaN is accepted. Input: `NaN` passes through since `NaN < 0` and `NaN > 100` both evaluate to false, returning NaN instead of a valid clamped value. This breaks callers expecting bounded result.",
+        "line": 1
+      }
+    ],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "2",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "3",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "4",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "5",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "6",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "7",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [
+      {
+        "title": "clampScore handles negative and oversized inputs defensively",
+        "detail": "Function correctly returns 0 for values < 0 or > 100. No breaking issues found - this is intentional validation.",
+        "line": 4
+      }
+    ],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "8",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "9",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "10",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [
+      {
+        "title": "Missing NaN/Infinity validation for clampScore",
+        "detail": "clampScore doesn't validate for Number.NaN or Infinity. Both will pass through to return original value (NaN, Infinity) which may be unexpected.",
+        "line": 5
+      }
+    ],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "11",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore incorrectly clamps high scores to 0",
+        "detail": "Code clamps score > 100 to 0 instead of capping at 100. An adversarial actor can send very high numeric values to manipulate metric outputs.",
+        "line": 5
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "12",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "13",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [
+      {
+        "title": "NaN input to clampScore bypasses validation logic",
+        "detail": "clampScore() uses `score < 0` and `score > 100`. NaN comparisons always return false, so NaN passes through unchanged. This could propagate through metrics pipeline.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "14",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore returns 0 for >100 instead of capping at 100",
+        "detail": "Pass: `score=150` incorrectly returns 0 instead of capping at 100. Logic appears inverted - second condition should return 100 not 0.",
+        "line": 1
+      },
+      {
+        "title": "clampScore handles non-finite numbers incorrectly",
+        "detail": "Pass: `Number.NEGATIVE_INFINITY` passes as valid but returns 0 (correct). However, `Infinity` also should return 100. Both handled same way now - could be unintended.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "15",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "16",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "17",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Logic error returns 0 instead of 100 for scores > 100",
+        "detail": "When score > 100, function returns 0 instead of returning 100 (the maximum bound). This is inverted clamp logic.",
+        "line": 4
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "18",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "19",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore returns 0 for scores > 100 instead of clamping to 100",
+        "detail": "Logic bug: `if (score > 100) return 0` should be `return 100`",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "20",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "1",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Array bounds error: loop condition uses <= instead of <",
+        "detail": "The loop iterates 'i <= findingsPerChunk.length' causing out-of-bounds access at index `length` which returns undefined, and empty arrays cause division by zero. Input: `[]` array, returns NaN; `[1,2]` sums 3+undefined (NaN)",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "2",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "3",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one loop bounds error causes array out of range access",
+        "detail": "`for (let i = 0; i <= findingsPerChunk.length; i++)` iterates past valid indices, accessing `findingsPerChunk[findingsPerChunk.length]` which is undefined, causing NaN addition and crash",
+        "line": 7
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "4",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one error in averageFindingsPerChunk loop condition",
+        "detail": "The loop uses 'i <= findingsPerChunk.length' which accesses index out of bounds (Array indices are 0 to length-1). Also divides by length without checking for empty array, causing NaN.",
+        "line": 8
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "5",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one loop bound in averageFindingsPerChunk causes OOB access",
+        "detail": "Loop condition uses `i <= findingsPerChunk.length` which iterates one past the end (i === length). At index=length, findingsPerChunk[i] is undefined. Also divides by length when empty array passed causing NaN/Infinity.",
+        "line": 7
+      },
+      {
+        "title": "NaN result on empty findingsPerChunk due to division by zero",
+        "detail": "Empty array passed causes total/0 = NaN, which corrupts downstream metrics calculations and may cause floating-point comparison failures.",
+        "line": 7
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "6",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Out-of-bounds array access in averageFindingsPerChunk loop",
+        "detail": "Loop condition uses `i <= findingsPerChunk.length` which accesses index beyond the array bounds. An input like [1,2,3] would read index 3 (undefined) on last iteration.",
+        "line": 13
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "7",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Index out of bounds in averageFindingsPerChunk - off-by-one loop",
+        "detail": "Loop uses `i <= findingsPerChunk.length` instead of `<`. When length=5, iterates i=0..6 (indices 0-5), accessing index 6 which is undefined. Returns NaN for division on empty array.",
+        "line": 8
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "8",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "9",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one loop bound causes undefined array access",
+        "detail": "Loop condition i <= findingsPerChunk.length allows i to equal array length, causing findingsPerChunk[i] access with undefined value when i = length. Example input: [{}, {}] (array of any values) will throw TypeError on last iteration.",
+        "line": 12
+      },
+      {
+        "title": "Division by zero on empty findings array returns NaN",
+        "detail": "Empty array passes through to return total / 0 which is NaN instead of handling edge case. Example: [] -> returns NaN.",
+        "line": 13
+      },
+      {
+        "title": "clampScore silently clamps to 0 instead of erroring",
+        "detail": "Accepts negative numbers and returns 0. While this might be intended, an adversarial actor sending score = -9999 would still get 0 rather than validation error for malformed input.",
+        "line": 7
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "10",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "11",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one error in array loop access",
+        "detail": "Loop uses i <= findingsPerChunk.length instead of i < length. When array is empty, this causes undefined behavior. When array has items, accessing index at length throws out-of-bounds.",
+        "line": 10
+      },
+      {
+        "title": "clampScore rejects zero input incorrectly",
+        "detail": "The function returns 0 for score === 100 due to the second if condition checking > 100, but should handle exactly 100 correctly. Edge case at boundary value 100.",
+        "line": 8
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "12",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one loop condition causes index out of bounds",
+        "detail": "Loop uses `i <= findingsPerChunk.length` which accesses one past-end index on every iteration, causing undefined or runtime error when i = array.length. Any non-empty array breaks this.",
+        "line": 13
+      },
+      {
+        "title": "clampScore returns 0 for high valid scores instead of capping at 100",
+        "detail": "Code returns 0 when score > 100. Should clamp to 100 not set to 0, losing all data above 100.",
+        "line": 12
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "13",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one loop condition causes out-of-bounds access",
+        "detail": "In averageFindingsPerChunk(), the loop uses `i <= findingsPerChunk.length` instead of `<`. This accesses index beyond array bounds, returning undefined. Adding undefined to total creates NaN. Empty arrays also cause division by zero (NaN).",
+        "line": 8
+      },
+      {
+        "title": "Mismatched array lengths in chunkDurationsMs cause undefined access",
+        "detail": "chunkDurationsMs() maps over startTimes but directly accesses endTimes[i]. If arrays have different lengths, this accesses undefined indices, causing out-of-bounds behavior and corrupt results.",
+        "line": 12
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "14",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one loop bounds error causes IndexOutOfBounds",
+        "detail": "Loop condition `i <= findingsPerChunk.length` accesses index at length which is undefined. Pass: `[1,2,3]` - returns undefined value added to total before dividing by 3",
+        "line": 8
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "15",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "16",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Logic error: scores above 100 incorrectly clamped to 0",
+        "detail": "Code returns 0 when score > 100, but should return 100. This corrupts any score normalization that relies on upper-bound capping.",
+        "line": 9
+      },
+      {
+        "title": "Out of bounds array access causes undefined/NaN results",
+        "detail": "averageFindingsPerChunk uses i <= findingsPerChunk.length instead of i <, accessing index 'length' which is undefined, causing total += undefined each iteration. Empty arrays cause division by zero.",
+        "line": 7
+      },
+      {
+        "title": "Array length mismatch causes undefined values in output",
+        "detail": "chunkDurationsMs maps startTimes but accesses endTimes[i] without checking if i exists. If arrays differ in length, returns undefined values or crashes.",
+        "line": 13
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "17",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Out of bounds array access causes NaN/undefined results",
+        "detail": "Loop condition `i <= findingsPerChunk.length` accesses index `findingsPerChunk.length` which is always out of bounds for a JavaScript array (valid indices are 0 to length-1). Returns undefined for that element, causing total += undefined which becomes NaN, and NaN / number = NaN.",
+        "line": 8
+      },
+      {
+        "title": "Division by zero when array is empty",
+        "detail": "When `findingsPerChunk.length === 0`, the function returns `0 / 0` which equals NaN. Empty array input causes math error.",
+        "line": 10
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "18",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Division by zero with empty array input",
+        "detail": "averageFindingsPerChunk divides by findingsPerChunk.length which is 0 when empty, causing NaN/Infinity and potential crash",
+        "line": 9
+      },
+      {
+        "title": "Out-of-bounds array access in averageFindingsPerChunk",
+        "detail": "Loop uses i <= length causing findingsPerChunk[length] to access undefined when array is empty",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "19",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Division by zero on empty array in averageFindingsPerChunk",
+        "detail": "Empty number[] causes division by 0: `return total / findingsPerChunk.length` when length=0",
+        "line": 8
+      },
+      {
+        "title": "Off-by-one index error in averageFindingsPerChunk loop",
+        "detail": "Using `<=` instead of `<` accesses undefined element at `findingsPerChunk[findingsPerChunk.length]`",
+        "line": 7
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "20",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Loop out-of-bounds access with empty array edge case",
+        "detail": "averageFindingsPerChunk function loops with 'i <= findingsPerChunk.length' instead of '<', accessing undefined element at index = length when array is non-empty. Division by zero when array is empty returns NaN.",
+        "line": 8
+      },
+      {
+        "title": "Empty array returns NaN in formatDurationSummary",
+        "detail": "reduce on empty array returns 0, but 's total' is still returned. This is acceptable but empty collection handling should be explicit.",
+        "line": 13
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "1",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Mismatched array lengths cause undefined values",
+        "detail": "Uses startTimes.length to iterate but reads from endTimes, causing undefined if arrays have different lengths. Input: `[100]` as startTimes and `[]` as endTimes returns empty array or NaN. Adversary could send mismatched length arrays.",
+        "line": 17
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "2",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "3",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "4",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Array length mismatch vulnerability in chunkDurationsMs",
+        "detail": "Maps startTimes against endTimes using index i without validating both arrays have same length. If endTimes is shorter, returns undefined values.",
+        "line": 17
+      },
+      {
+        "title": "Empty array causes NaN in averageFindingsPerChunk return value",
+        "detail": "When findingsPerChunk is empty, the division total / 0 returns NaN. The function should handle this edge case.",
+        "line": 15
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "5",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Empty array causes index out of bounds in medianReviewTimeMs",
+        "detail": "When sortedTimesMs is empty, mid = 0, but sortedTimesMs[0] throws RangeError: Invalid array length. Also returns undefined element for even-length arrays depending on implementation intent.",
+        "line": 20
+      },
+      {
+        "title": "Empty durationsMs returns meaningless summary",
+        "detail": "Reduction with initial 0 on empty array returns \"0s total\" which may not be valid business logic. Consider whether zero-duration reports should be rejected.",
+        "line": 19
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "6",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Division by zero on empty array in averageFindingsPerChunk",
+        "detail": "Empty array [] passed returns NaN from `total / findingsPerChunk.length` since length is 0. Adversary could send empty array payload to cause silent numeric corruption.",
+        "line": 15
+      },
+      {
+        "title": "Mismatched array lengths in chunkDurationsMs causes undefined access",
+        "detail": "No validation that startTimes.length === endTimes.length. Attacker could send arrays of different lengths, causing read of undefined for mismatched indices.",
+        "line": 21
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "7",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Undefined access when arrays have different lengths",
+        "detail": "Maps startTimes but accesses endTimes[i] without checking if endTimes has element at index i. If arrays are unequal length, will throw TypeError for undefined.",
+        "line": 17
+      },
+      {
+        "title": "Undefined returned for empty array in medianReviewTimeMs",
+        "detail": "When sortedTimesMs is empty, mid=0 but accessing sortedTimesMs[0] returns undefined. No validation for empty input.",
+        "line": 22
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "8",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [
+      {
+        "title": "Wrong clamping logic for high scores",
+        "detail": "clampScore returns 0 for both score < 0 AND score > 100, should clamp to boundary values (0 or 100)",
+        "line": 15
+      }
+    ],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "9",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Array length mismatch causes undefined access in map",
+        "detail": "endTimes[i] accessed without bounds check. If endTimes is shorter than startTimes, this throws TypeError on indices beyond endTimes.length.",
+        "line": 18
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "10",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [
+      {
+        "title": "Off-by-one loop index causes out-of-bounds access",
+        "detail": "The loop uses 'i <= findingsPerChunk.length' which accesses undefined at the last iteration (index = length is out of bounds). For array [1,2,3] with length 3, i will be 0,1,2,3 — accessing [3] which doesn't exist.",
+        "line": 16
+      }
+    ],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "11",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs assumes matching array lengths",
+        "detail": "Function maps over startTimes and indexes endTimes[i] without length validation. If endTimes is shorter than startTimes, results in undefined values. If endTimes is longer, extra data ignored.",
+        "line": 21
+      },
+      {
+        "title": "normalizeWeights returns original weights when total is 0",
+        "detail": "When all weights sum to 0, function returns weights.map(() => 0). This masks data quality issues and normalizes nothing.",
+        "line": 19
+      },
+      {
+        "title": "divide-by-zero protection insufficient",
+        "detail": "Checks if total === 0 but doesn't handle floating-point edge cases where total could be very close to zero. Also masks upstream data quality issues.",
+        "line": 19
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "12",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Arrays of unequal length causes undefined in output",
+        "detail": "No length validation between startTimes and endTimes arrays. If endTimes is shorter, returns undefined for out-of-bounds indices.",
+        "line": 20
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "13",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "14",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Array index out of bounds when arrays have different lengths",
+        "detail": "Function assumes endTimes and startTimes are same length. Pass: `[{start: [1,2], end: [3]}]` - throws TypeError when i >= endTimes.length",
+        "line": 18
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "15",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "16",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "17",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Mismatched array lengths cause undefined values",
+        "detail": "Uses endTimes[i] without validating that endTimes.length >= startTimes.length. If arrays are different lengths, this produces undefined calculations.",
+        "line": 16
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "18",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "NaN from mismatched array lengths in chunkDurationsMs",
+        "detail": "If startTimes is longer than endTimes, undefined values from endTimes[i] become NaN and propagate through calculations",
+        "line": 18
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "19",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Returns undefined on empty array in medianReviewTimeMs",
+        "detail": "Empty number[] causes `sortedTimesMs[mid]` to be undefined when length=0",
+        "line": 17
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "20",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "clampScore returns wrong value for scores above 100",
+        "detail": "Score > 100 returns 0 instead of clamped value of 100. Logic bug in upper bound handling.",
+        "line": 15
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "1",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Median undefined on empty array",
+        "detail": "Empty input array returns undefined (number type violated). Input: `[]` array causes function to return undefined, breaking callers expecting number. Also doesn't handle even-length arrays correctly for true median calculation.",
+        "line": 27
+      },
+      {
+        "title": "Median returns first element for odd-length arrays incorrectly",
+        "detail": "For [1, 3, 5], mid = floor(3/2) = 1, returns 3 (correct). But for even length like [1, 3], mid = 1, returns 3 not average. True median should be average of middle two elements for even-length sorted arrays.",
+        "line": 27
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "2",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "3",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "4",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Empty array causes undefined return in medianReviewTimeMs",
+        "detail": "Empty sortedTimesMs array returns undefined instead of a valid number. Math.floor(0 / 2) = 0, accessing sortedTimesMs[0] on empty array is undefined.",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "5",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "6",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Empty array causes incorrect formatting in formatDurationSummary",
+        "detail": "Passing empty number[] returns '0s total' which breaks contracts expecting meaningful duration summary. Downstream logic may fail on this edge case.",
+        "line": 24
+      },
+      {
+        "title": "Undefined returned on empty array in medianReviewTimeMs",
+        "detail": "Empty sortedTimesMs[] returns undefined since Math.floor(0/2)=0 and accessing [0] of empty array. Downstream code expecting a number will break.",
+        "line": 27
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "7",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "8",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "9",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Median access crashes on empty array input",
+        "detail": "Accesses sortedTimesMs[mid] without checking if array has elements. mid = 0 when length is 0, causing undefined property access and NaN or TypeError.",
+        "line": 27
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "10",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Missing length validation for endTimes array",
+        "detail": "chunkDurationsMs assumes startTimes and endTimes have equal length. If endTimes is shorter than startTimes, map callback at index >= endTimes.length will throw TypeError when accessing endTimes[i].",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "11",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "12",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "13",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Zero-length durationsMs reduces to 0s total without validation",
+        "detail": "formatDurationSummary() handles empty array gracefully by returning \"0s total\", but this hides whether data collection failed or if legitimately no reviews occurred.",
+        "line": 27
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "14",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Empty array causes division by zero in median calculation",
+        "detail": "Pass: `[]` returns `undefined` when accessing `sortedTimesMs[mid]` where mid=0. Empty input breaks the function without validation.",
+        "line": 26
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "15",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "16",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Median index calculation incorrect for odd-length arrays",
+        "detail": "Uses Math.floor(length/2) which returns wrong middle index. For array [1,2,3], length=3, mid=floor(1.5)=1, returns 2 instead of element at index 1 (value 2). Correct median for odd is at floor((n-1)/2)",
+        "line": 26
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "17",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Median calculation uses wrong index for even-length arrays",
+        "detail": "For even-length array [1,2,3,4], `Math.floor(4/2) = 2` returns value at index 2 (third element: 3), but true median should be average of two middle elements (2 and 3). Incorrect for even counts.",
+        "line": 26
+      },
+      {
+        "title": "Empty duration array produces misleading summary",
+        "detail": "Returns '0s total' for empty durations. Adversarial actor could submit empty array to bypass metrics tracking.",
+        "line": 24
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "18",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "Undefined returned for empty sortedTimesMs in medianReviewTimeMs",
+        "detail": "Returns undefined when array is empty, breaking downstream code expecting a number",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "19",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Empty weights array handling ambiguity in normalizeWeights",
+        "detail": "Empty weights array passes total===0 check but returns map of empty array (returns []) instead of throwing or defaulting",
+        "line": 27
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "qwen3.5:9b",
+    "trial": "20",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "Wrong median calculation for even-length arrays",
+        "detail": "Uses floor(length/2) as index which returns second middle element for even-length arrays instead of averaging both middle elements. This breaks mathematical correctness.",
+        "line": 24
+      },
+      {
+        "title": "Array length mismatch causes NaN in chunkDurationsMs",
+        "detail": "Maps over startTimes but accesses endTimes[i]. If arrays have different lengths, returns undefined or NaN for missing elements.",
+        "line": 24
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  }
+]

@@ -1,0 +1,866 @@
+[
+  {
+    "ranAt": "2026-09-18T23:25:31.983Z",
+    "model": "devstral:latest",
+    "trial": "1",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 9,
+        "title": "Off-by-one array index",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` will cause an out-of-bounds access",
+        "locationCheck": "verified",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 9,
+        "title": "Division by zero",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` will cause division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 22,
+        "title": "Off-by-one array index in map",
+        "detail": "Passing arrays of different lengths to `chunkDurationsMs` will cause an out-of-bounds access",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 28,
+        "title": "Empty array division by zero",
+        "detail": "Passing an empty array to `formatDurationSummary` will cause division by zero",
+        "locationCheck": "verified",
+        "matchedDefectId": null
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 33,
+        "title": "Array index out of bounds",
+        "detail": "Passing an array with one element to `medianReviewTimeMs` will cause an out-of-bounds access",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-18T23:30:10.088Z",
+    "model": "devstral:latest",
+    "trial": "2",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 6,
+        "title": "Array out of bounds in averageFindingsPerChunk",
+        "detail": "Pass an array with one element to averageFindingsPerChunk to trigger an out of bounds access (e.g., [1])",
+        "locationCheck": "verified",
+        "matchedDefectId": null
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 6,
+        "title": "Empty array division by zero in averageFindingsPerChunk",
+        "detail": "Pass an empty array to averageFindingsPerChunk to trigger a division by zero (e.g., [])",
+        "locationCheck": "verified",
+        "matchedDefectId": null
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 16,
+        "title": "Array length mismatch in chunkDurationsMs",
+        "detail": "Pass arrays of different lengths to chunkDurationsMs to trigger an out of bounds access (e.g., [1], [1, 2])",
+        "locationCheck": "verified",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 21,
+        "title": "Empty array in medianReviewTimeMs",
+        "detail": "Pass an empty array to medianReviewTimeMs to trigger an out of bounds access (e.g., [])",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-18T23:34:24.769Z",
+    "model": "devstral:latest",
+    "trial": "3",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 13,
+        "title": "Off-by-one array access",
+        "detail": "The loop in averageFindingsPerChunk uses `<=` instead of `<`, leading to an out-of-bounds access when findingsPerChunk is non-empty.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 13,
+        "title": "Division by zero",
+        "detail": "The function will divide by zero when findingsPerChunk is empty, causing an exception.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 22,
+        "title": "Out-of-bounds array access",
+        "detail": "If startTimes and endTimes have different lengths, endTimes[i] may be undefined, causing an error.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 26,
+        "title": "Division by zero",
+        "detail": "The function will divide by zero when durationsMs is empty, causing an exception.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 30,
+        "title": "Invalid median calculation",
+        "detail": "The function does not handle even-length arrays correctly, as it always uses the middle element.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 33,
+        "title": "Division by zero",
+        "detail": "The function will divide by zero when weights is empty, causing an exception.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-18T23:38:41.548Z",
+    "model": "devstral:latest",
+    "trial": "4",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 9,
+        "title": "Null pointer dereference in averageFindingsPerChunk",
+        "detail": "Passing null to averageFindingsPerChunk where an array is expected",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 16,
+        "title": "Array index out of bounds in chunkDurationsMs",
+        "detail": "Passing arrays of different lengths to chunkDurationsMs",
+        "locationCheck": "verified",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 22,
+        "title": "Division by zero in formatDurationSummary",
+        "detail": "Passing empty array to formatDurationSummary",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 27,
+        "title": "Array index out of bounds in medianReviewTimeMs",
+        "detail": "Passing empty array to medianReviewTimeMs",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 32,
+        "title": "Division by zero in normalizeWeights",
+        "detail": "Passing empty array to normalizeWeights",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-18T23:42:10.536Z",
+    "model": "devstral:latest",
+    "trial": "5",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 12,
+        "title": "Array index out of bounds",
+        "detail": "The for loop condition allows access to findingsPerChunk[findingsPerChunk.length], which is out of bounds",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:00:45.737Z",
+    "model": "devstral:latest",
+    "trial": "9",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 9,
+        "title": "Null findingsPerChunk array not handled",
+        "detail": "Passing `null` to `averageFindingsPerChunk` will throw a TypeError when trying to access `length` on `null`.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 9,
+        "title": "Empty findingsPerChunk array causes division by zero",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` will result in a division by zero, returning `Infinity`.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 9,
+        "title": "Off-by-one error in loop",
+        "detail": "The loop in `averageFindingsPerChunk` iterates one time too many, causing an `undefined` value to be added to the total.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 14,
+        "title": "Mismatched array lengths in chunkDurationsMs",
+        "detail": "If `startTimes` and `endTimes` have different lengths, the map function will throw an error when trying to access `endTimes[i]`.",
+        "locationCheck": "verified",
+        "matchedDefectId": null
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 20,
+        "title": "Division by zero in medianReviewTimeMs",
+        "detail": "Passing an empty array to `medianReviewTimeMs` will cause an error when trying to access the middle element.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 26,
+        "title": "Division by zero in normalizeWeights",
+        "detail": "Passing an array of weights where all weights are zero will cause a division by zero, returning an array of `NaN`.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:04:23.153Z",
+    "model": "devstral:latest",
+    "trial": "10",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 8,
+        "title": "Off-by-one error in loop bounds",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` will cause an out-of-bounds access in the for loop due to `i <= findingsPerChunk.length`.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 15,
+        "title": "Unhandled empty arrays in chunkDurationsMs",
+        "detail": "If startTimes or endTimes is an empty array, the map function will not have a corresponding element to subtract, resulting in undefined values.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 20,
+        "title": "Division by zero in formatDurationSummary",
+        "detail": "Passing an empty array to `formatDurationSummary` will cause a division by zero error in the average calculation.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 25,
+        "title": "Unhandled empty arrays in medianReviewTimeMs",
+        "detail": "Passing an empty array to `medianReviewTimeMs` will cause an error when accessing the middle element.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:12:04.393Z",
+    "model": "devstral:latest",
+    "trial": "12",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 8,
+        "title": "Array index out of bounds in averageFindingsPerChunk",
+        "detail": "Passing an empty array causes an 'index out of bounds' error because the loop condition is i <= findingsPerChunk.length instead of i < findingsPerChunk.length.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 19,
+        "title": "Undefined access in chunkDurationsMs",
+        "detail": "Passing arrays of different lengths (e.g., startTimes longer than endTimes) results in undefined access because the function does not check if endTimes[i] exists.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 23,
+        "title": "Division by zero in averageFindingsPerChunk",
+        "detail": "Passing an empty array causes division by zero because the function does not check if findingsPerChunk.length is zero before dividing.",
+        "locationCheck": "verified",
+        "matchedDefectId": null
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 29,
+        "title": "Division by zero in normalizeWeights",
+        "detail": "Passing an array of weights where the sum is zero causes division by zero because the function does not check if total is zero before dividing.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:14:40.755Z",
+    "model": "devstral:latest",
+    "trial": "13",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 11,
+        "title": "Array bounds check missing in averageFindingsPerChunk",
+        "detail": "Passing an empty array to averageFindingsPerChunk will cause a division by zero error.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 21,
+        "title": "Array length mismatch in chunkDurationsMs",
+        "detail": "Passing arrays of different lengths to chunkDurationsMs will cause an index out of bounds error.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 29,
+        "title": "Array bounds check missing in medianReviewTimeMs",
+        "detail": "Passing an empty array to medianReviewTimeMs will cause an index out of bounds error.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 19,
+        "title": "Potential division by zero in averageFindingsPerChunk",
+        "detail": "Passing an empty array to averageFindingsPerChunk will cause a division by zero error.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:16:48.990Z",
+    "model": "devstral:latest",
+    "trial": "14",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 10,
+        "title": "Empty array passed to averageFindingsPerChunk",
+        "detail": "Passing an empty array to averageFindingsPerChunk causes a division by zero.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 10,
+        "title": "Array length check in averageFindingsPerChunk",
+        "detail": "findingsPerChunk[i] will cause an out of bounds access when i equals findingsPerChunk.length.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 24,
+        "title": "Unsorted array passed to medianReviewTimeMs",
+        "detail": "medianReviewTimeMs assumes sortedTimesMs is sorted.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 24,
+        "title": "Empty array passed to medianReviewTimeMs",
+        "detail": "Passing an empty array to medianReviewTimeMs causes an out of bounds access.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 30,
+        "title": "Empty weights array passed to normalizeWeights",
+        "detail": "Passing an empty array to normalizeWeights causes a division by zero.",
+        "locationCheck": "verified",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 16,
+        "title": "Unbalanced startTimes and endTimes arrays in chunkDurationsMs",
+        "detail": "Passing arrays of different lengths to chunkDurationsMs causes an out of bounds access.",
+        "locationCheck": "verified",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:19:16.791Z",
+    "model": "devstral:latest",
+    "trial": "15",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 12,
+        "title": "Out of bounds access in averageFindingsPerChunk",
+        "detail": "Passing an empty array to averageFindingsPerChunk results in division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 12,
+        "title": "Unsafe array access in averageFindingsPerChunk",
+        "detail": "Passing a non-empty array to averageFindingsPerChunk with a length of 0 results in division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 27,
+        "title": "Division by zero in medianReviewTimeMs",
+        "detail": "Passing an empty array to medianReviewTimeMs results in division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 27,
+        "title": "Unsafe array access in medianReviewTimeMs",
+        "detail": "Passing a non-empty array to medianReviewTimeMs with a length of 0 results in division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 33,
+        "title": "Division by zero in normalizeWeights",
+        "detail": "Passing an array of zeros to normalizeWeights results in division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:21:47.025Z",
+    "model": "devstral:latest",
+    "trial": "16",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 7,
+        "title": "Off-by-one error in loop bound",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` causes an index out of bounds error",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 7,
+        "title": "Division by zero in average calculation",
+        "detail": "Passing an empty array to `averageFindingsPerChunk` causes division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 12,
+        "title": "Index out of bounds in map function",
+        "detail": "Passing arrays of different lengths to `chunkDurationsMs` causes an index out of bounds error",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 17,
+        "title": "Division by zero in total seconds calculation",
+        "detail": "Passing an empty array to `formatDurationSummary` causes division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 21,
+        "title": "Index out of bounds in median calculation",
+        "detail": "Passing an empty array to `medianReviewTimeMs` causes an index out of bounds error",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 25,
+        "title": "Division by zero in weight normalization",
+        "detail": "Passing an array of zeros to `normalizeWeights` causes division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:23:41.348Z",
+    "model": "devstral:latest",
+    "trial": "17",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 6,
+        "title": "Empty array causes division by zero",
+        "detail": "Pass an empty array to averageFindingsPerChunk to trigger division by zero",
+        "locationCheck": "verified",
+        "matchedDefectId": null
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 11,
+        "title": "Off-by-one error in findingsPerChunk length",
+        "detail": "The loop condition i <= findingsPerChunk.length causes an array index out of bounds exception",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 18,
+        "title": "chunkDurationsMs can return negative numbers",
+        "detail": "If startTimes[i] > endTimes[i] for any i, the result will be negative",
+        "locationCheck": "verified",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 22,
+        "title": "formatDurationSummary handles empty durationsMs",
+        "detail": "Pass an empty array to formatDurationSummary to trigger incorrect summary",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 26,
+        "title": "medianReviewTimeMs handles even-length arrays incorrectly",
+        "detail": "If sortedTimesMs.length is even, the median is not correctly computed",
+        "locationCheck": "verified",
+        "matchedDefectId": "D4-empty-array-median"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 30,
+        "title": "normalizeWeights handles empty weights array",
+        "detail": "Pass an empty array to normalizeWeights to trigger division by zero",
+        "locationCheck": "verified",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:27:47.004Z",
+    "model": "devstral:latest",
+    "trial": "18",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 4,
+        "title": "clampScore: negative score not handled",
+        "detail": "Score -1 is not clamped to 0",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D1-clamp-upper-bound"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 5,
+        "title": "clampScore: score > 100 not handled",
+        "detail": "Score 101 is not clamped to 0",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D1-clamp-upper-bound"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 9,
+        "title": "averageFindingsPerChunk: out of bounds access",
+        "detail": "findingsPerChunk.length=0 causes division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 13,
+        "title": "chunkDurationsMs: out of bounds access",
+        "detail": "startTimes.length=1, endTimes.length=0 causes index out of range",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 17,
+        "title": "formatDurationSummary: empty durationsMs",
+        "detail": "durationsMs.length=0 causes division by zero",
+        "locationCheck": "verified",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 21,
+        "title": "medianReviewTimeMs: empty sortedTimesMs",
+        "detail": "sortedTimesMs.length=0 causes index out of range",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 21,
+        "title": "medianReviewTimeMs: odd sortedTimesMs",
+        "detail": "sortedTimesMs.length=1 causes index out of range",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 25,
+        "title": "normalizeWeights: empty weights",
+        "detail": "weights.length=0 causes division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 25,
+        "title": "normalizeWeights: all zeros",
+        "detail": "weights=[0,0,0] causes division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:29:39.612Z",
+    "model": "devstral:latest",
+    "trial": "19",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 9,
+        "title": "Out-of-bounds access in averageFindingsPerChunk",
+        "detail": "When findingsPerChunk is empty, the loop runs once with i=0, accessing findingsPerChunk[0] which does not exist",
+        "locationCheck": "verified",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 9,
+        "title": "Division by zero in averageFindingsPerChunk",
+        "detail": "When findingsPerChunk is empty, total is 0 and the function returns 0/0",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 15,
+        "title": "Out-of-bounds access in chunkDurationsMs",
+        "detail": "When startTimes and endTimes have different lengths, endTimes[i] accesses out-of-bounds memory",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 25,
+        "title": "Out-of-bounds access in medianReviewTimeMs",
+        "detail": "When sortedTimesMs has length 1, mid is 0 and the function returns sortedTimesMs[0] which exists, but when length is even, it may not return the true median",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      }
+    ]
+  },
+  {
+    "ranAt": "2026-09-19T00:31:37.954Z",
+    "model": "devstral:latest",
+    "trial": "20",
+    "smoke": false,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 300000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 10,
+        "title": "Empty array input causes division by zero",
+        "detail": "When findingsPerChunk is an empty array, the function tries to divide by its length, resulting in division by zero.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 10,
+        "title": "Out of bounds access with empty array",
+        "detail": "When findingsPerChunk is an empty array, the loop condition i <= findingsPerChunk.length allows i to become 0, causing an out-of-bounds access.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D2-offbyone-nan-propagation"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 19,
+        "title": "Mismatched array lengths cause undefined access",
+        "detail": "If startTimes and endTimes have different lengths, the map function will access undefined for missing elements.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 23,
+        "title": "Empty durations array causes division by zero",
+        "detail": "When durationsMs is an empty array, the reduce function returns 0, which is then used in the division.",
+        "locationCheck": "verified",
+        "matchedDefectId": null
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 30,
+        "title": "Empty array causes undefined median",
+        "detail": "When sortedTimesMs is an empty array, the function tries to access the middle element, which is undefined.",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      }
+    ]
+  }
+]
