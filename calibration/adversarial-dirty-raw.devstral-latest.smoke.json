@@ -1,0 +1,56 @@
+[
+  {
+    "ranAt": "2026-09-18T23:20:22.149Z",
+    "model": "devstral:latest",
+    "trial": "smoke-recheck",
+    "smoke": true,
+    "case": "adversarial-dirty",
+    "fixtureHash": "06a5eccee4e2e255",
+    "oracleVersion": "1.0.0",
+    "oracleHash": "c7fa4dc695363174",
+    "configVersion": "adversarial-dirty-run-config-v1",
+    "agentTimeoutMs": 180000,
+    "findings": [
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 15,
+        "title": "Array index out of bounds in averageFindingsPerChunk",
+        "detail": "Passing an empty array to averageFindingsPerChunk causes an out-of-bounds access",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 15,
+        "title": "Division by zero in averageFindingsPerChunk",
+        "detail": "Passing an empty array causes division by zero when calculating average",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D3-ms-seconds-unit-mismatch"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 30,
+        "title": "Division by zero in normalizeWeights",
+        "detail": "Passing an array of all zeros causes division by zero",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "T1-guarded-division-normalizeWeights"
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 23,
+        "title": "Out of bounds access in chunkDurationsMs",
+        "detail": "When startTimes and endTimes have different lengths, map accesses an out-of-bounds index",
+        "locationCheck": "verified",
+        "matchedDefectId": null
+      },
+      {
+        "file": "src/core/reviewMetrics.ts",
+        "line": 27,
+        "title": "Division by zero in medianReviewTimeMs",
+        "detail": "Passing an empty array causes division by zero when calculating midpoint",
+        "locationCheck": "mismatch",
+        "matchedDefectId": "D4-empty-array-median"
+      }
+    ]
+  }
+]

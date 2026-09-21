@@ -7,7 +7,7 @@ tags:
   - work/completed
   - work/in-progress
   - work/backlog
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-19
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,69 +16,202 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-09-17
+**Last Updated**: 2026-09-19
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
-## 🔎 #84's merge with #83, two fast-follow fixes, and a full change-review (2026-09-13–17)
+## 🔧 Timeout plumbing bug: found, fixed, verified (2026-09-19)
 
-**#83 merged 2026-09-13, so #84's branch had to absorb it.** Both PRs touched the same 10 files
-additively (#83: `earlyExit`/`agentsPlanned` visibility; #84: `policy`/`filteredFiles` real-merge).
-Resolved by combining both — domain code-review + independent opposition review + the full test
-suite (908 tests) — pushed as `b7634e2`. Neither feature regressed the other.
+**Found via this repo's own `/code-review` (triggered by the pre-commit hook on
+`chore/model-recall-calibration`'s uncommitted work), independently confirmed by direct source
+reading and by the opposition reviewer.** `calibrate.ts`'s agent-invocation call site never passed
+a `signal` to `BaseAgent.run()`, so `OllamaProvider.chat()`'s
+`signal: options.signal ?? AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS)` always fell
+through to its own hardcoded 300,000ms default — regardless of `CALIBRATION_TIMEOUT_MS`,
+`agentTimeoutMs`, or anything in `config.ts`. Every calibration batch run to date, in both the
+restraint (`adversarial-clean`) and recall (`adversarial-dirty`) experiments, ran under the same
+~300s ceiling; no batch was ever actually at 180s. This invalidates the specific causal claim
+"retested Ornith at 300000ms, timeout rate dropped" as a _causal_ statement — the observed drop is
+real but is run-to-run variance, not a timeout-budget effect. Corrected in place in both
+`docs/superpowers/plans/2026-09-18-acr-model-comparison-devstral-ornith-qwen.md` and
+`.../2026-09-18-acr-adversarial-dirty-fixture-design.md`; the raw findings, FP rates, and recall
+percentages already reported are unaffected and stand as measured.
 
-**Fast-follow #1 (`2039538`): `mergePolicy` needed the same `coverageIncomplete` guard
-`mergeToolAvailability` already had.** Found by opposition review of the merge itself: once
-chunking can exit early, "skipped in every chunk that ran" is not "skipped entirely" — the
-remaining chunks were never examined and might disprove it. Same fix shape as `mergeToolAvailability`,
-mutation-tested (reverting reproduces the exact failures it resolves).
+**Two self-critique passes on the remediation plan (both user-requested) before touching code**
+caught: an overreach (adding a `main()`-execution guard purely for testability, rejected —
+`calibrate.ts` has zero tests by deliberate project convention); a non-protective metadata field
+(`effectiveTimeoutMs`, would have been derived from the same variable used to build the signal and
+so could never diverge — replaced with an independently-measured `elapsedMs`); and a
+data-destructive crash-safety design (silently treating a corrupted oracle log as empty, rejected
+in favor of backing it up to `.corrupted-<timestamp>.json` first).
 
-**Fast-follow #2 (`c3b184b`): `mergePolicy` could return `{agentsSkipped: [], reason: {}}`
-instead of `undefined`.** Found by a full `/change-review` of the resulting branch — this is a
-shape the non-chunked path (`runner.ts:938`, gated on `agentsSkipped.length > 0`) can never
-produce, contradicting the documented `--format json` contract for any consumer checking
-truthiness rather than `.agentsSkipped.length`. Fixed to match `mergeToolAvailability`'s and
-`mergeFilteredFiles`'s existing undefined-when-empty pattern. Mutation-tested the same way.
+**Fix, applied to the shared call site used by every calibration case, not just the new oracle
+one**: `calibrate.ts` now passes `AbortSignal.timeout(agentTimeoutMs)` explicitly. Added
+`elapsedMs` (independently measured wall-clock time, not derived from `agentTimeoutMs`) to each
+`oracleRuns` log entry. Wrapped the oracle-log `JSON.parse` in try/catch with a corrupted-file
+backup, since it previously sat outside any try/catch and a truncated prior log would have crashed
+`main()` and lost the current invocation's freshly-collected data too, not just the old history.
+Added 3 regression tests to `tests/unit/ollamaProvider.test.ts` covering `OllamaProvider.chat()`'s
+side of the contract — `options.signal ?? AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS)`
+(caller signal honored and forwarded unchanged; a caller timeout is actually enforced rather than
+falling back to 300s; two different caller timeouts produce two measurably different enforced
+deadlines). **These do not cover `calibrate.ts`'s own call site** — it has zero test coverage by
+deliberate project convention (tsx-only, excluded from `vitest.config.ts`), so a future edit that
+drops the `AbortSignal.timeout(agentTimeoutMs)` argument there would reintroduce this exact bug and
+nothing here would catch it; caught and corrected in this session's own re-check after an earlier
+comment overstated this as closing that gap. 911/915 tests passing (4 pre-existing skips, unrelated
+to this change), clean typecheck/lint/format.
 
-**The full `/change-review` (9 jobs + ACR + opposition) found no Blocking findings**, but several
-real Medium ones worth a fast-follow:
+**Verification run — `npm run calibrate` unfiltered against `devstral:latest`, matching CI's exact
+invocation, run once after the fix as planned: 23 passed, 3 failed. All three failures pre-date or
+are independent of this fix, not new regressions it introduced:**
 
-- `policy.agentsSkipped`'s "fully skipped" predicate (`result.policy?.agentsSkipped.length > 0`) is
-  reimplemented independently in all 4 formatters (`cli/formatter.ts`, `githubAnnotations.ts`,
-  `mcp/formatter.ts`, `sarif.ts`) instead of sharing one `schema.ts` helper, unlike the sibling
-  `filteredFiles` concept (`agentsWithNarrowedView`/`narrowedFileCount`). Opposition review checked
-  this against the file's own documented 3-incident drift history (`toolAvailability`,
-  `locationCheck`, `earlyExit`) and judged it a real but lesser risk — those incidents were all
-  silent _omissions_ on some surface; this predicate is uniformly present on all 4, just
-  duplicated. Medium, not High.
-- Every test fixture for "N files withheld" text has narrowed-agent-count == distinct-file-count
-  (2≈2 or 1≈1), so a `narrowedFileCount(result)` / `agentsWithNarrowedView(result).length`
-  copy-paste swap would render the wrong number and pass every test undetected.
-- `tests/unit/mcp/formatter.test.ts` lacks the "policy note doesn't flip the headline to
-  INCOMPLETE" regression test that markdown and SARIF both have. Safe today by inspection
-  (`mcp/formatter.ts` routes policy notes to `toolNotes`, never `warnings`), but unguarded.
-- `chunkRunner.ts`'s `mergedFilteredFiles` post-processing has the identical
-  truthy-but-empty-object hazard fast-follow #2 fixed for `mergePolicy`, but the one test
-  exercising it asserts only `merged.filteredFiles?.security`, not the whole object.
+- `dependencies`: 3 real CVEs (fast-uri, hono, qs) — confirmed directly via `npm audit --json`
+  against this repo's actual current dependency tree (2 moderate, 1 high). `DependenciesAgent`
+  shells out to real `npm audit`, never touches Ollama, and is untouched by this fix. Environmental
+  drift (new CVEs disclosed since this fixture was last green), not a code defect.
+- `adversarial-clean`: one hallucinated finding on a single trial. Consistent with Devstral's
+  already-measured ~70% failure rate on this exact fixture (see the model-comparison entry below);
+  unrelated to timeouts.
+- `adversarial-dirty`: **"agent error: The operation was aborted due to timeout."** This is the one
+  failure worth flagging as a genuine, newly-exposed consequence of the fix rather than noise.
+  Devstral was already measured at a 20% timeout rate on this exact fixture (4/20 in the N=20×3
+  recall study) — but that study, like everything else, ran under the accidental ~300s ceiling.
+  This verification run is the first time `adversarial-dirty` has ever run against the _real_
+  180s default (`DEFAULT_CONFIG.agentTimeoutMs`, CI's implicit value — no `CALIBRATION_TIMEOUT_MS`
+  is set in `.github/workflows/calibrate.yml`), and a single trial timing out is unsurprising given
+  the fixture's already-known timeout-proneness at the longer, previously-silent budget.
+  **Resolved 2026-09-19, user's call:** flagged as an operational decision rather than patched
+  around unilaterally; user directed raising it. `.github/workflows/calibrate.yml`'s "Run
+  calibration suite" step now sets `CALIBRATION_TIMEOUT_MS: '300000'`, pinning calibration back to
+  the ~300s budget it always effectively ran under. Production's real timeout enforcement
+  (`src/core/runner.ts`'s `withTimeout`) is untouched — this only affects the calibration
+  harness's own budget, not `DEFAULT_CONFIG.agentTimeoutMs` (180000) or real review runs.
 
-**ACR (local Ollama swarm) reported 5 "high"/"blocking:true" findings — all 5 confirmed
-fabricated**, independently by the orchestrator and by the opposition reviewer reading the actual
-cited lines: every finding cites the wrong `file:line`, and 4 of 5 quote code that already
-null-guards via `?.`/`??`/`&&` — the exact guard being flagged AS the bug is the fix. All 5
-self-reported `locationCheck: mismatch`/`unknown`. Concrete data point for the still-outstanding
-Task Contract Proposal on ACR's hallucination pattern (`activeContext.md`).
+**Not yet done, deliberately paused for this fix:** re-adjudicating PR #85's 11 persisted findings
+against commit `7f07fd6`, and building PR #84's pre-registered pre-fix oracle at commit `b7634e2` —
+see the entry below. This remediation work happened first per explicit user direction: fix and
+verify the harness before collecting more evidence with it.
 
-**Two smaller issues, found by opposition review, fixed inline rather than left open (`b63793f`):**
-`active-task.json`'s scope array was missing 3 files the contract's own work touched (`README.md`,
-`src/core/schema.ts`, `tests/unit/mcp/formatter.test.ts`); a pre-existing comment in
-`chunkRunner.ts` and two in `chunkRunner.test.ts` cited `runner.ts:931` for the policy-gating line
-— code had shifted since, the real line is 938 (comment-only, no behavior change). Also fixed: a
-stale `--format json` example in `README.md` still showed `"policy": {"agentsSkipped": [],
-"reason": {}}` next to a `filteredFiles`-only scenario, contradicting the rule this same PR added
-three lines below it.
+## ✅ #84/#86/#87 merged; #85's merge-conflict resolution is done and pushed, NOT merged (2026-09-18)
 
-Pushed to `origin/fix/filtered-files-visibility` 2026-09-17. Full report in this session's
-transcript; not duplicated here.
+**Corrected 2026-09-18: this section previously claimed all four PRs were in `main`. `#85` is not**
+— verified via `gh pr view 85` (`state: OPEN, mergedAt: null`), not assumed, after a later request
+depended on knowing which PRs actually merged. `#86`/`#87` merged cleanly; `#84` fast-forward.
+`#85` (`fix/chunked-progress-visibility`) needed real conflict resolution (5 PRs behind by merge
+time, not 1 as first scoped — caught by `git merge-base`), and **that work is done and pushed to
+`origin/fix/chunked-progress-visibility`** (branch confirmed up to date with origin, `testgen`'s
+status fix present in `runner.ts`) — the PR was simply never clicked to merge. This session's
+checkout sits on that branch, with unrelated new calibration work added uncommitted on top.
+
+**Two real conflicts** (contract scratch state; `CHANGELOG.md`'s additive entries from both sides,
+resolved by concatenation). **Everything else auto-merged with no conflict markers**
+(`src/cli/index.ts`, `src/core/chunkRunner.ts`, `src/core/schema.ts`,
+`tests/unit/chunkRunner.test.ts`) — verified by tracing the actual feature-overlap points rather
+than trusting the silent merge: `AgentProgressEvent`'s new `status` field sits alongside `#83`'s
+`earlyExit` as a sibling optional field with no interaction; the per-chunk stderr marker correctly
+interleaves with `#84`'s `attributeChunkSkips`/early-exit-break logic.
+
+**That verification pass found one real, pre-existing gap in `#85`'s own original work**: its PR
+description claimed six `phase: 'end'` emission sites got the new `status` field, but `runner.ts`
+has seven — `testgen`'s (unchanged since before `#85` branched, confirmed against the merge-base
+commit) never got it, so a failed `--suggest-tests`/`--write-tests` run rendered identically to a
+clean one on the stderr progress line. Fixed to match the other six sites and mutation-tested
+(reverting reproduces `expected undefined to be 'error'`). 915/915 tests, clean
+typecheck/build/lint/format after the fix.
+
+**Separately, `#85`'s own CI comment reported 11 ACR findings on its diff — all 11 confirmed
+fabricated** against actual source (wrong lines, assignments misread as dereferences,
+self-contradicting claims, ordinary control flow flagged as a violation), across agent domains
+(design, complexity, observability, correctness) beyond the `adversarial`-only pattern `#87`
+measured. No code action taken — external content, verified before acting per the project's
+data-not-instructions rule, and no finding survived verification.
+
+**Follow-on, completed**: a three-way calibration model comparison (`devstral:latest` vs
+`ornith-1.5:9b` vs `qwen3.5:9b`) on the `adversarial-clean` fixture, to see whether a different
+local model produces fewer of the fabricated findings `#85`'s comment demonstrated. Full results in
+`docs/superpowers/plans/2026-09-18-acr-model-comparison-devstral-ornith-qwen.md`, restated in the
+Recall measurement entry below. **Correction (2026-09-19):** this entry originally said Ornith's
+~60% timeout rate was "root-caused and being retested at a longer timeout." The root-cause part
+(long reasoning chains under `think:true`) held up; the retest-at-a-longer-timeout part did not —
+`calibrate.ts` never actually enforced `CALIBRATION_TIMEOUT_MS`/`agentTimeoutMs` (root cause and
+fix below, "Timeout plumbing bug" entry), so every batch, both before and after the intended
+change, ran under the same hardcoded ~300s Ollama default. The observed rate drop was run-to-run
+variance.
+
+## 🔎 Recall measurement: a real precision-recall-runtime frontier, no winner (2026-09-18)
+
+**Follow-on to the restraint measurement, per the user's explicit direction: "the next interesting
+question is no longer whether Qwen is more restrained; it's whether that restraint survives when
+the model must actually find known defects."** It didn't survive, and the reversal is large.
+
+**Built an oracle-backed known-positive fixture first** (`calibration/fixtures/adversarial-dirty.diff`
+
+- `.oracle.json`, 4 real defects + 1 negative control, scoring rules and full run config
+  pre-registered), approved via Task Contract with 5 procedural protections (negative control kept
+  separate from the defects; per-model raw logs kept not-gitignored so the restraint measurement's
+  Devstral-data-loss can't repeat; fixed run order not reordered after early results; a pre-checkpoint
+  smoke run tagged and excluded rather than folded into the dataset; fixture/oracle left unchanged by
+  what that smoke run revealed). Full procedure in the design doc, not restated here.
+
+**Mean exact-detection recall across the 4 planted defects: Devstral 20%, Qwen3.5 32.5%, Ornith
+52.5%.** Per-defect: `D1` (clamp bug) 0%/20%/75%; `D2` (off-by-one→NaN) 65%/80%/85%; `D3`
+(ms/seconds unit mismatch) 0%/0%/0%; `D4` (empty-array median) 15%/30%/50%.
+
+**`D3` was missed by every one of 60 trials — a fixture design finding, not a model signal, and its
+0% stays in the official score for all three, not excluded or adjusted.** Every model converged on
+the same different, real, but unplanted observation instead (`chunkDurationsMs` not validating
+equal array lengths, one function away from the actual bug: `formatDurationSummary` mislabeling
+milliseconds as seconds). This "adjacent bug dominated attention" explanation is interpretation of
+_why_ — it does not touch the number; correcting a preregistered score after seeing every model
+miss it is the exact goalpost-move this methodology exists to prevent.
+
+**The negative-control rates here (5%/30%/56%) do not cancel or update the restraint measurement's
+`verified` rates (55%/25.8%/18.4%)** — not the same measurement. `adversarial-clean` had 4
+already-guarded functions and nothing else to find, built specifically to provoke false positives;
+this fixture has 1 control competing against 4 real defects. Ornith's 5% here says it didn't
+fabricate a claim when real bugs were available elsewhere — it says nothing about a fixture with no
+real bugs at all, which the restraint measurement already answered, at a high rate. Both stand.
+
+**Honest summary is a frontier, not a winner** — Devstral: mediocre restraint, weakest recall (20%
+mean), and a real new operational strike: 0/20 timeouts on `adversarial-clean` vs 4/20 (20%) here,
+meaning ordinary diff-complexity variation (not just "thinking" mode) can now cost ACR an answer
+entirely, invisible until a fixture this size existed to expose it. Qwen3.5: best restraint (45%
+clean/18.4%
+verified), best runtime (0% timeouts on both fixtures), middle recall (32.5%). Ornith: worst
+restraint (15% clean/55% verified), best recall (52.5%), timeout-prone (15%, then 5%). **No
+synthetic scalar score invented to force a winner** — weighting recall against dangerous-FP-rate
+now, having seen both outcomes, would encode a preference into the metric after the fact rather
+than measure one. **Devstral is no longer the presumed incumbent a challenger must dethrone** — one
+of three candidates, currently with the weakest empirical case: no clear advantage on any of the
+three axes, where Qwen3.5 and Ornith each have one.
+
+**Next, not started, per explicit direction: stop building synthetic fixtures.** A small labeled
+historical corpus (~10-20 real past review cases, established dispositions, real repo context), same
+five axes (mechanism-correct recall, unsupported/verified-but-false findings, timeouts, failure
+amplification), across all three models — answers what no synthetic fixture can. Not doing yet: any
+model-specific guard, prompt tuning, routing, or ensemble ("Ornith for recall, Qwen for
+verification") — would mask which base model is better before that's even decided.
+
+**Classification is manual against pre-registered `minimumEvidence`, not automated** — per this
+project's own standing note that claim-matcher regexes over model prose are "the fragile half."
+The harness only automates the cheap part (does a cited file:line fall in a defect's range). A real
+content/location cross-contamination pattern surfaced (didn't change any trial's outcome, but makes
+the negative-control rate above a **lower bound**) and two disclosed leniency rules were applied
+consistently — both detailed in the design doc, not restated here.
+
+**No production model change.** Full design, oracle, scoring rules, locked configuration, and
+results: `docs/superpowers/plans/2026-09-18-acr-adversarial-dirty-fixture-design.md`. Per-trial audit
+trail (original finding text + human classification, kept as separate records so judgment calls can
+be re-checked): `calibration/adversarial-dirty-classifications.<model-slug>.json`.
+
+> The restraint-only comparison this recall measurement follows on from (numbers restated above) is
+> fully written up in `docs/superpowers/plans/2026-09-18-acr-model-comparison-devstral-ornith-qwen.md`.
+
+> `#84`'s merge with `#83`, two fast-follow fixes, and its full change-review (2026-09-13–17) are
+> archived in [`archive/progress-history.md`](archive/progress-history.md) — superseded by the
+> "`#84`/`#86`/`#87` merged; `#85` not merged" entry above, which covers the same work plus what
+> came after.
 
 ## ✅ Two shipped invariants worth not re-deriving
 
@@ -163,122 +296,9 @@ PMB's mapping — rejected for that reason, not for cost.
 across all chunks", which the `break` at line 90 falsifies — chunks go unreviewed with no field able
 to trigger any incompleteness gate.
 
-## ✅ Corrections from PMB, verified in their checkout (2026-08-28)
-
-Two peer sessions (PMB, and the outgoing ACR session) sent the same three corrections after
-`handoff.md` was written. **All verified directly in PMB's repo rather than accepted on assertion**
-— the standing rule here, and both sides have been wrong before.
-
-- **"Awaiting the v1.2.1 tag" was the wrong frame, and it invited polling.** The release policy is
-  approved but **not implemented**; it needs its own PMB contract and is the user's call to
-  schedule. Confirmed: newest tag `v1.0.4`, nothing for 1.1.x or 1.2.x. Blocked on work nobody has
-  started, not work in flight — a distinction that changes what a successor should do with it.
-- **The ACR-provenance entry is committed but not landed** — `2052c3c` on PMB's
-  `fix/block-tier-case-sensitivity`, 3 commits ahead of `main`, unmerged. Our 616 s hedge survived:
-  the entry records that we decline to call the resemblance confirmed, because a resemblance cannot
-  promote an unsourced number to evidence. **One wording drift flagged back to them and accepted:**
-  their entry said we judge the resemblance _strong_, an adjective we never used, where our record
-  says _suggestive, not established_. PMB corrected it and left the correction visible rather than
-  overwriting silently — **their stated reason**, from their message: a silent fix "would have
-  erased the evidence that cross-project wording drifts, which is the thing worth keeping."
-  **Their fix is uncommitted** — `2052c3c` still reads "strong" (verified); they will name the
-  commit when it lands. Operative hedge was intact throughout; only the adjective was wrong.
-- **`mb upgrade` synchronises less than it prints** — read in `scripts/mb.sh`. `ADVISORY_CREATE`
-  (all 15 `standards/*.md`) is copied only when absent. Mechanics and the specific file pair this
-  will desynchronise on our next upgrade: `techContext.md`.
-
-## ✅ #78 merged, and disproved its own reasoning (2026-08-28)
-
-Squashed to `2711d4e`. It cleared the stale `main` hash from `activeContext.md` and argued, in its
-own PR body, that "a current hash belongs here, since this section exists to state current state."
-
-**That was wrong, and merging it was the disproof.** The moment #78 landed, `activeContext.md`
-claimed `874b784` while `main` was `2711d4e` — stale again, by exactly one commit, four minutes
-later. The defect is **self-invalidating, not merely decaying**: a memory-bank PR moves the very
-commit it names, so the value cannot be correct once written. Two consecutive PRs tried to keep it
-current and both shipped stale.
-
-Fixed by removing the hash rather than updating it a third time; the rule is in `systemPatterns.md`,
-with the exception that matters — a **release tag** is safe to record because nothing can move it.
-
-## ✅ #77 merged (2026-08-28)
-
-Squashed to `874b784`; branch deleted local and remote, stale remote-tracking ref pruned. Carried the
-handoff merge, the `standards/MEMORY-BANK.md` constant fix, and the four-item follow-up below.
-
-**A merge was reported before it had happened, and the check caught it.** Asked to do post-merge
-cleanup, three independent signals disagreed: `gh pr view` said `OPEN` with `mergedAt: null`,
-`origin/main` was unmoved at `c284d57`, and the branch tip was contained in no main ref. Branch
-protection turned out not to be the cause — `mergeStateStatus` was `CLEAN` and required checks
-passed; the click simply had not landed. **Deleting the local branch on the reported state would
-have discarded the only copy of three commits.** Generalisable, and the same shape as the `v1.15.0`
-tagging incident where a rejected merge went unnoticed: verify a merge against `origin/main` and the
-PR's own `mergedAt`, never against the report that it happened.
-
-## ✅ Follow-up: the four "known, not fixed" items (2026-08-28)
-
-Two turned out to be **PMB's, and neither can reach us** — reported upstream as one defect, which
-PMB confirmed in their own tree and extended:
-
-- Their `templates/memory-bank/README.md` handoff-threshold fix (80% → 40%, in `2052c3c`) is in
-  **neither** ownership array. `memory-bank/*` is init-only, so it reaches new projects only —
-  silently, with no diff notice. Our copy will read 80% against a `CLAUDE.md` reading 40%
-  indefinitely.
-- Their `standards/MEMORY-BANK.md` `=50` fix is real and correct upstream, and `ADVISORY_CREATE`
-  means it can never arrive either. We fixed our copy independently the same day; **two correct
-  fixes that cannot meet.**
-
-**Root cause, agreed with PMB:** ownership class answers "may the adopter customize this file" and
-is being asked to also answer "how does a correction reach them". Those are orthogonal, and
-collapsing them is why the `=50` drift survived however many upgrades. PMB added a fourth case we
-had missed (`templates/AGENTS.md`, no distribution path at all) and confirmed the
-`memory-bank-size.yml` collision guard is **filename-based**, so its stated intent — "a project with
-its own CI keeps it" — does not hold for us, whose gate is `ci.yml`. Delivery table in
-`techContext.md`. Not ours to fix; surfaced to the operator with our reasoning attached.
-
-**One finding retracted on evidence.** We had filed `standards/MEMORY-BANK.md` pointing at
-`docs/archive/` as staleness. It is correct upstream — PMB uses `docs/archive/` consistently and has
-no `memory-bank/archive/`. **We** are the divergence. Retracted to PMB directly.
-
-**The two genuinely ours are fixed.** `techContext.md` claimed the remote branch was `master` (it is
-`main`) inside a "Current State (as of 2026-06-06)" block whose every line had rotted — 19 tests
-against 826, 20 commits against 456. Fixed the way the threshold was: **the section no longer
-restates state**, it points at `npm test`, `git`, and `progress.md`. A stale per-file test table and
-a hardcoded test count in the scripts block went the same way.
-
-**And the cap pressure is structurally resolved, not trimmed.** Moving the upgrade _procedure_ next
-to the upgrade _mechanics_ in `techContext.md`, and the `BaseAgent` parse-stage mechanics and agent
-thinking config out of `systemPatterns.md`, took `activeContext.md` from 149/150 to 122 and
-`systemPatterns.md` from 299/300 to 276. Both now have real headroom. Neither is inside the target
-range in `README.md`, and closing that gap further would mean removing live operational rules — a
-judgment call left open rather than made quietly.
-
-## ✅ Session closed (2026-08-28)
-
-**Twelve PRs merged (#65–#76) before this entry was written, nothing half-done.** The hash that sat
-here decayed within the day — #77 landed after it, which is exactly the "record the delta, not the
-level" failure this file warns about; current `main` is in `activeContext.md`. `npm run check` green, 826
-tests across 47 files, `npm audit` clean, no open PRs, no stashes. Eight of the twelve were the
-v1.15.0 release and docs audit (#65–#72); the remaining four were memory-bank corrections (#73–#76),
-recorded below. `handoff.md` was merged into the memory bank and deleted on 2026-08-28.
-
-**Merging it required archiving first, and the first attempt at that went wrong.**
-`activeContext.md` was at 149/150 and `systemPatterns.md` at 299/300, so material had to move before
-anything new could land. The first pass **compressed instead of moving**, and a five-lens review
-caught it deleting substance outright: `pre-push-check.*` as the second PMB-defect example, `#69`'s
-`run.cmd`-is-interactive and not-a-required-check clauses, the `INCOMPLETE` glyph rationale, and the
-middle `elapsedMs` round — the one that carries the rule's whole point. All restored, to `archive/`
-where historical and to the live file where still operative.
-
-**The structural fix was moving the standing capability inventory out of `activeContext.md`** into
-`techContext.md`, which is where an inventory of what exists belongs; that file's frontmatter scopes
-it to focus, blockers and next steps. That moved 22 lines out of `activeContext.md`; archiving the
-2026-08-26 section moved 104 out of `progress.md`. Deltas, not levels — the levels decay, and this
-file's own rule says so. **Cap pressure was the cause
-of the deletions, not an unrelated inconvenience** — compressing to fit is how substance gets lost,
-which is why the rule in `memory-bank/README.md` says archive rather than trim.
-
-> Completed work through 2026-08-27 is in [`archive/progress-history.md`](archive/progress-history.md).
+> Completed work through 2026-08-28 (PMB corrections, #77/#78, the four "known, not fixed"
+> follow-ups, and the 2026-08-28 session close) is in
+> [`archive/progress-history.md`](archive/progress-history.md).
 
 ## 📊 Metrics
 
