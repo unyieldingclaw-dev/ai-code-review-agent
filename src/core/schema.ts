@@ -408,6 +408,12 @@ export interface AgentProgressEvent {
   attemptMs?: number
   attempts?: number
   earlyExit?: boolean
+  // Set on 'end' only. Every emission site already computes this value into `agentStatus` in the
+  // same statement -- it was simply never passed through. Without it, a dead agent (fetch failed,
+  // timeout) and a clean one both render as "Ns -- 0 raw findings" on the stderr progress line,
+  // distinguishable only by duration, which nothing parses. Reported from a real multi-chunk run
+  // where that ambiguity forced a hand-built reconstruction from timing alone.
+  status?: AgentStatus
 }
 
 // --- Incompleteness predicate, shared by every surface that renders a verdict ---
