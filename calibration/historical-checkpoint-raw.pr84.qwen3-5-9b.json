@@ -1,0 +1,417 @@
+{
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "src/core/chunkRunner.ts",
+      "line": 307,
+      "title": "mergePolicy does not handle conflicting skip reasons across chunks",
+      "detail": "The mergePolicy function picks the first reason seen for an agent when multiple chunks report skips with different reasons. This conflict resolution is not tested.",
+      "evidence": "// The merge keeps `agentsSkipped` for agents skipped in **every** chunk, and demotes a partial skip to the narrowed-diff note...",
+      "recommendation": "Add test case:\ntypescript\nit('keeps first reason when multiple chunks report different reasons', async () => {\n  const runMock = vi.fn().mockResolvedValue(\n    makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded chunk1' } } })\n  ).mockResolvedValueOnce(\n    makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'policy override' } } })\n  )\n  const merged = await runChunked(runner, {}, 2000, 15)\n  expect(merged.policy?.reason.security).toBe('excluded chunk1') // first wins\n})\n",
+      "impact": "When an agent is skipped in multiple chunks with different exclusion reasons, the rendered report will show only the first reason, potentially hiding important context about other exclusion causes.",
+      "blocking": false,
+      "source": "llm",
+      "id": "coverage-0",
+      "agent": "coverage",
+      "confidence": 70,
+      "domain": "Testing",
+      "basis": "INFERRED",
+      "suggestion": "Add test case:\ntypescript\nit('keeps first reason when multiple chunks report different reasons', async () => {\n  const runMock = vi.fn().mockResolvedValue(\n    makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded chunk1' } } })\n  ).mockResolvedValueOnce(\n    makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'policy override' } } })\n  )\n  const merged = await runChunked(runner, {}, 2000, 15)\n  expect(merged.policy?.reason.security).toBe('excluded chunk1') // first wins\n})\n",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/chunkRunner.ts",
+      "line": 312,
+      "title": "Unnecessary Map allocation in mergePolicy hot path",
+      "detail": "mergePolicy creates new Map<AgentName,number> for each chunk run, then reads repeatedly. For high-chunk-count scenarios this adds O(n) allocations per merge call.",
+      "evidence": "const counts = new Map<AgentName, number>()\n  const firstReason: Partial<Record<AgentName, string>> = {}\n  for (const r of withPolicy) {\n    for (const agent of r.policy!.agentsSkipped) {\n      counts.set(agent, (counts.get(agent) ?? 0) + 1)\n      firstReason[agent] ??= r.policy!.reason[agent]\n    }\n  }",
+      "recommendation": "Use an object instead of Map when keys are string agent names (no ordering needed):\n\nconst counts: Record<AgentName, number> = {}\nconst firstReason: Partial<Record<AgentName, string>> = {}\nfor (const r of withPolicy) {\n  for (const agent of r.policy!.agentsSkipped) {\n    const current = counts[agent] ?? 0\n    counts[agent] = current + 1\n    if (!firstReason[agent]) firstReason[agent] = r.policy!.reason[agent]\n  }\n}",
+      "suggestion": "Use object instead of Map for string-keyed aggregation when order doesn't matter",
+      "id": "performance-0",
+      "agent": "performance",
+      "confidence": 70,
+      "domain": "Performance",
+      "basis": "INFERRED",
+      "impact": "",
+      "blocking": false,
+      "source": "llm",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/chunkRunner.ts",
+      "line": 329,
+      "title": "Array deduplication + sort in mergeFilteredFiles creates new arrays each iteration",
+      "detail": "mergeFilteredFiles creates a new array and sorts it for every agent per chunk, causing O(n*m log m) where n=chunks, m=files. For large diffs with many files this becomes expensive.",
+      "evidence": "merged[key] = [...new Set([...(merged[key] ?? []), ...(files ?? [])])].sort()",
+      "recommendation": "Use Map to accumulate unique files, then sort once at the end:\n\nconst merged: Partial<Record<AgentName, string[]>> = {}\nfor (const r of results) {\n  for (const [agent, files] of Object.entries(r.filteredFiles ?? {})) {\n    if (!merged[agent]) merged[agent] = []\n    // Use object as temp Set to dedup\n    const existingMap = new Map<string,boolean>()\n    for (const f of [...(merged[agent] ?? []), ...(files ?? [])]) {\n      if (!existingMap.has(f)) {\n        existingMap.set(f, true)\n        merged[agent].push(f)\n      }\n    }\n  }\n}\n// Sort once after merging all chunks\nfor (const agent of Object.keys(merged)) {\n  merged[agent].sort()\n}",
+      "suggestion": "Accumulate with Map and sort once at the end rather than sorting per iteration",
+      "id": "performance-1",
+      "agent": "performance",
+      "confidence": 70,
+      "domain": "Performance",
+      "basis": "INFERRED",
+      "impact": "",
+      "blocking": false,
+      "source": "llm",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/cli/formatters/sarif.ts",
+      "line": 156,
+      "title": "Empty filteredFiles object causes false undefined comparison",
+      "detail": "When result.filteredFiles exists but is an empty object {}, Object.keys().length returns 0, but the filter condition allows it through. An attacker could send an empty filteredFiles object that would cause mergedFilteredFiles to incorrectly return undefined when files were actually filtered.",
+      "evidence": "...(result.filteredFiles && Object.keys(result.filteredFiles).length > 0 ? { filteredFiles: result.filteredFiles } : {}),",
+      "recommendation": "Add explicit null/undefined check and length guard: \"if (result.filteredFiles && typeof result.filteredFiles === 'object' && !Array.isArray(result.filteredFiles) && Object.keys(result.filteredFiles).length > 0)\"",
+      "blocking": false,
+      "source": "llm",
+      "id": "adversarial-0",
+      "agent": "adversarial",
+      "confidence": 70,
+      "domain": "Adversarial",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Add explicit null/undefined check and length guard: \"if (result.filteredFiles && typeof result.filteredFiles === 'object' && !Array.isArray(result.filteredFiles) && Object.keys(result.filteredFiles).length > 0)\"",
+      "locationCheck": "unknown"
+    },
+    {
+      "severity": "medium",
+      "file": "src/cli/formatter.ts",
+      "line": 410,
+      "title": "Markdown formatter now renders policy notes on both exit paths",
+      "detail": "buildPolicyLines() added to formatMarkdown output on both findings and no-findings paths (line 332). No integration test verifies the no-findings path still renders policy correctly.",
+      "evidence": "lines.push(...policyLines)",
+      "recommendation": "Add integration test: run review with --format markdown --profile security on mixed diff of excluded + non-excluded files, assert policy note appears in output even when no findings exist",
+      "blocking": false,
+      "source": "llm",
+      "id": "integration-0",
+      "agent": "integration",
+      "confidence": 70,
+      "domain": "Integration",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Add integration test: run review with --format markdown --profile security on mixed diff of excluded + non-excluded files, assert policy note appears in output even when no findings exist",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/cli/formatters/githubAnnotations.ts",
+      "line": 136,
+      "title": "GitHub annotations now render policy warning notes",
+      "detail": "Policy notes added to annotation array (lines 87-109). Need integration test verifying GitHub PR comments render correctly with new warning format.",
+      "evidence": "return [\n  ...warningLines,\n  ...truncationLines,\n  ...policyLines,",
+      "recommendation": "Add integration test: run review via GitHub CLI workflow against a forked repo with excluded+non-excluded files, verify PR comment includes policy warning in correct format and position",
+      "blocking": false,
+      "source": "llm",
+      "id": "integration-1",
+      "agent": "integration",
+      "confidence": 70,
+      "domain": "Integration",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Add integration test: run review via GitHub CLI workflow against a forked repo with excluded+non-excluded files, verify PR comment includes policy warning in correct format and position",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/cli/formatters/sarif.ts",
+      "line": 89,
+      "title": "SARIF now carries filteredFiles in run properties and policy notes",
+      "detail": "executionSuccessful stays true even with partial coverage (lines 70, 86-102). New filteredFiles in run.properties. Need integration test verifying SARIF consumers can compute coverage from this data.",
+      "evidence": "...(result.filteredFiles && Object.keys(result.filteredFiles).length > 0 ? { filteredFiles: result.filteredFiles } : {}),",
+      "recommendation": "Add integration test: generate SARIF output for chunked review with narrowed views, parse JSON and verify executionSuccessful is true, run properties contain filteredFiles, note notification appears with correct text",
+      "blocking": false,
+      "source": "llm",
+      "id": "integration-2",
+      "agent": "integration",
+      "confidence": 70,
+      "domain": "Integration",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Add integration test: generate SARIF output for chunked review with narrowed views, parse JSON and verify executionSuccessful is true, run properties contain filteredFiles, note notification appears with correct text",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/mcp/formatter.ts",
+      "line": 95,
+      "title": "MCP tool output now renders policy notes for LLM consumers",
+      "detail": "MCP formatter now includes policy notes (lines 98-106). MCP clients depend on this API contract. Need integration test with mock MCP server.",
+      "evidence": "toolNotes.push(\n  `🔧 Policy: ${result.policy.agentsSkipped.join(', ')} were skipped entirely by agentPolicy rules — their domains were not reviewed.`",
+      "recommendation": "Add integration test: call formatMcpOutput with real ReviewResult from chunked run, assert toolNotes array contains policy notes in correct format when applicable",
+      "blocking": false,
+      "source": "llm",
+      "id": "integration-3",
+      "agent": "integration",
+      "confidence": 70,
+      "domain": "Integration",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Add integration test: call formatMcpOutput with real ReviewResult from chunked run, assert toolNotes array contains policy notes in correct format when applicable",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/schema.ts",
+      "line": 237,
+      "title": "New agentsWithNarrowedView function exposes filteredFiles data",
+      "detail": "New public functions added to schema (lines 235-260). Unit tests exist but integration test should verify these work correctly when consumed by formatters in end-to-end scenarios.",
+      "evidence": "export function agentsWithNarrowedView(result: ReviewResult): string[] {",
+      "recommendation": "Add integration test: run full CLI with --chunk, assert merged result has correct filteredFiles shape, then import schema functions and verify they return expected values matching formatter expectations",
+      "blocking": false,
+      "source": "llm",
+      "id": "integration-4",
+      "agent": "integration",
+      "confidence": 70,
+      "domain": "Integration",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Add integration test: run full CLI with --chunk, assert merged result has correct filteredFiles shape, then import schema functions and verify they return expected values matching formatter expectations",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/chunkRunner.ts",
+      "line": 248,
+      "title": "mergePolicy and mergeFilteredFiles now handle intersection/union differently",
+      "detail": "New merge logic for policy (lines 230-279) changes how agentsSkipped is computed across chunks. Integration test should verify with 3+ chunks having different skip states.",
+      "evidence": "function mergePolicy(results: ReviewResult[]): PolicyResult | undefined {",
+      "recommendation": "Add integration test: run chunked review with 4 chunks where only last has skips, verify merged.policy.agentsSkipped is empty and merged.filteredFiles contains all narrowed views",
+      "blocking": false,
+      "source": "llm",
+      "id": "integration-5",
+      "agent": "integration",
+      "confidence": 70,
+      "domain": "Integration",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Add integration test: run chunked review with 4 chunks where only last has skips, verify merged.policy.agentsSkipped is empty and merged.filteredFiles contains all narrowed views",
+      "locationCheck": "unknown"
+    },
+    {
+      "severity": "medium",
+      "file": "README.md",
+      "line": 456,
+      "title": "JSON envelope contract changed - filteredFiles field now stable",
+      "detail": "README documents JSON response includes stable envelope. New filteredFiles field means backward-incompatible schema change if consumers relied on exact structure. Need integration test with real consumer.",
+      "evidence": "\"filteredFiles\": { \"security\": [\"docs/notes.md\"] },",
+      "recommendation": "Add integration test: call CLI with --format json, parse JSON output, verify new fields exist and match contract in CHANGELOG.md documentation",
+      "blocking": false,
+      "source": "llm",
+      "id": "integration-7",
+      "agent": "integration",
+      "confidence": 70,
+      "domain": "Integration",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Add integration test: call CLI with --format json, parse JSON output, verify new fields exist and match contract in CHANGELOG.md documentation",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/chunkRunner.ts",
+      "line": 127,
+      "title": "mergeResults has CCN of 22 - high cyclomatic complexity",
+      "detail": "The mergeResults function exhibits excessive cyclomatic complexity (22 decision paths) for a file-merging operation. The function merges multiple result fields using different strategies per-field, with complex branching logic that makes reasoning about field propagation difficult. This complexity increases debugging difficulty and testing surface.",
+      "evidence": "CCN=22 for mergeResults@127-243 (from lizard metrics). The function handles: last-chunk-wins vs merged policies, filteredFiles unions, agentStatus merging, toolAvailability collapsing to 'partial', etc.",
+      "recommendation": "Extract each field's merge strategy into separate helper functions. Create a config object describing merge rules per-field.",
+      "suggestion": "Decompose the multi-strategy merge logic into individual merge* helpers with clear naming",
+      "blocking": false,
+      "source": "llm",
+      "id": "complexity-0",
+      "agent": "complexity",
+      "confidence": 70,
+      "domain": "Complexity",
+      "basis": "INFERRED",
+      "impact": "",
+      "locationCheck": "unknown"
+    },
+    {
+      "severity": "medium",
+      "file": "src/mcp/formatter.ts",
+      "line": 20,
+      "title": "formatMcpOutput has CCN of 26 - high cyclomatic complexity",
+      "detail": "formatMcpOutput exhibits high cyclomatic complexity (26 decision paths) for formatting MCP output. The function now handles multiple policy states: normal results, agent skips, narrowed views, degraded tools. This complexity makes it harder to maintain consistent formatting across all code paths and increases cognitive load for reviewers.",
+      "evidence": "CCN=26 for formatMcpOutput@20-190 (from lizard metrics). The function now checks earlyExit, agentsSkipped, narrowed agents, toolAvailability with degraded states, and more.",
+      "recommendation": "Extract policy-related formatting into separate functions. Create a dedicated policyNotes helper that returns string arrays for different states.",
+      "blocking": false,
+      "source": "llm",
+      "id": "complexity-1",
+      "agent": "complexity",
+      "confidence": 70,
+      "domain": "Complexity",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Extract policy-related formatting into separate functions. Create a dedicated policyNotes helper that returns string arrays for different states.",
+      "locationCheck": "unknown"
+    }
+  ],
+  "testFiles": [],
+  "summary": {
+    "totalFindings": 13,
+    "bySeverity": {
+      "medium": 13
+    },
+    "byAgent": {
+      "coverage": 1,
+      "performance": 2,
+      "adversarial": 1,
+      "integration": 7,
+      "complexity": 2
+    },
+    "durationMs": 808382
+  },
+  "agentsPlanned": 14,
+  "sanitizer": {
+    "enabled": true,
+    "applied": false,
+    "redactedLines": 0,
+    "warnings": []
+  },
+  "filteredFiles": {
+    "security": ["CHANGELOG.md", "README.md"],
+    "adversarial": ["CHANGELOG.md", "README.md"]
+  },
+  "agentStatus": {
+    "coverage": "ok",
+    "security": "ok",
+    "performance": "ok",
+    "correctness": "ok",
+    "design": "ok",
+    "dependencies": "ok",
+    "adversarial": "ok",
+    "integration": "ok",
+    "breaking-change": "ok",
+    "license": "ok",
+    "error-handling": "ok",
+    "observability": "ok",
+    "secrets": "ok",
+    "complexity": "ok"
+  },
+  "hallucinationFilter": {
+    "dropped": [
+      {
+        "agent": "integration",
+        "title": "CI workflow uses both PR comment and step summary renderers",
+        "file": ".github/workflows/review.yml"
+      }
+    ]
+  },
+  "toolAvailability": {
+    "npmAudit": "not-applicable",
+    "gitleaks": "used",
+    "lizard": "used"
+  },
+  "timings": [
+    {
+      "diffLines": 1147,
+      "effectiveTimeoutMs": 300000,
+      "durationMs": 808382,
+      "agents": [
+        {
+          "name": "coverage",
+          "elapsedMs": 166410,
+          "attemptMs": 166410,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "security",
+          "elapsedMs": 37349,
+          "attemptMs": 37349,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "performance",
+          "elapsedMs": 95974,
+          "attemptMs": 95974,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "correctness",
+          "elapsedMs": 68335,
+          "attemptMs": 68335,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "design",
+          "elapsedMs": 44903,
+          "attemptMs": 44903,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "dependencies",
+          "elapsedMs": 0,
+          "attemptMs": 0,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "adversarial",
+          "elapsedMs": 50993,
+          "attemptMs": 50993,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "integration",
+          "elapsedMs": 120134,
+          "attemptMs": 120134,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "breaking-change",
+          "elapsedMs": 44319,
+          "attemptMs": 44319,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "license",
+          "elapsedMs": 1,
+          "attemptMs": 1,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "error-handling",
+          "elapsedMs": 42668,
+          "attemptMs": 42668,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "observability",
+          "elapsedMs": 44008,
+          "attemptMs": 44008,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "secrets",
+          "elapsedMs": 4739,
+          "attemptMs": 4739,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "complexity",
+          "elapsedMs": 88540,
+          "attemptMs": 88540,
+          "attempts": 1,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": "ai-review-agent/v1",
+  "toolVersion": "1.15.0",
+  "profile": null
+}
