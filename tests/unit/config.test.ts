@@ -51,6 +51,16 @@ describe('DEFAULT_CONFIG', () => {
     expect(DEFAULT_CONFIG.agentPolicy?.security?.exclude).toContain('**/*.md')
     expect(DEFAULT_CONFIG.agentPolicy?.adversarial?.exclude).toContain('**/*.md')
   })
+
+  // Same failure mode as the .md exclude above, reproduced live 2026-09-19: these two agents
+  // fabricated findings by reading calibration's synthetic fixtures and this project's own raw
+  // model-output JSON logs as if they described real application code.
+  it('security and adversarial exclude calibration fixtures and data by default', () => {
+    expect(DEFAULT_CONFIG.agentPolicy?.security?.exclude).toContain('calibration/fixtures/**')
+    expect(DEFAULT_CONFIG.agentPolicy?.security?.exclude).toContain('calibration/*.json')
+    expect(DEFAULT_CONFIG.agentPolicy?.adversarial?.exclude).toContain('calibration/fixtures/**')
+    expect(DEFAULT_CONFIG.agentPolicy?.adversarial?.exclude).toContain('calibration/*.json')
+  })
 })
 
 describe('loadConfig', () => {
