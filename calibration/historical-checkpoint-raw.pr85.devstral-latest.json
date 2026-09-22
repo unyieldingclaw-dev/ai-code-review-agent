@@ -1,0 +1,363 @@
+{
+  "findings": [
+    {
+      "severity": "high",
+      "file": "src/cli/index.ts",
+      "line": 315,
+      "title": "Potential command injection via stderr output",
+      "detail": "The code directly writes user-supplied data (event.status) to stderr, which could allow command injection if not properly sanitized.",
+      "evidence": "process.stderr.write(`[${event.index}/${event.total}] ${event.name}   ${elapsed} — ${summary}${statusSuffix}\\n`);",
+      "recommendation": "Sanitize user-supplied data before writing it to stderr.",
+      "blocking": true,
+      "source": "llm",
+      "id": "security-0",
+      "agent": "security",
+      "confidence": 70,
+      "domain": "Security",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Sanitize user-supplied data before writing it to stderr.",
+      "locationCheck": "verified"
+    },
+    {
+      "severity": "high",
+      "file": "src/cli/index.ts",
+      "line": 313,
+      "title": "High complexity in CLI progress reporting",
+      "detail": "The function has deeply nested conditionals and high cyclomatic complexity, making it hard to maintain and understand.",
+      "evidence": "process.stderr.write(...)",
+      "recommendation": "Break this logic into smaller, well-defined functions.",
+      "blocking": true,
+      "source": "lizard",
+      "id": "complexity-0",
+      "agent": "complexity",
+      "confidence": 70,
+      "domain": "Complexity",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Break this logic into smaller, well-defined functions.",
+      "corroboratingAgents": ["performance", "integration"],
+      "relatedFindings": ["performance-0", "integration-0"],
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "high",
+      "file": "src/core/runner.ts",
+      "line": 378,
+      "title": "High complexity in SwarmRunner run method",
+      "detail": "The function has deeply nested conditionals and high cyclomatic complexity, making it hard to maintain and understand.",
+      "evidence": "const endEvents: AgentProgressEvent[] = []",
+      "recommendation": "Break this logic into smaller, well-defined functions.",
+      "blocking": true,
+      "source": "lizard",
+      "id": "complexity-2",
+      "agent": "complexity",
+      "confidence": 70,
+      "domain": "Complexity",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Break this logic into smaller, well-defined functions.",
+      "corroboratingAgents": ["integration"],
+      "relatedFindings": ["integration-2"],
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "high",
+      "file": "src/core/runner.ts",
+      "line": 392,
+      "title": "Missing error logging in catch block",
+      "detail": "Error paths and catch blocks should log exceptions for observability",
+      "evidence": "catch (err) {",
+      "recommendation": "logger.error(err)",
+      "blocking": true,
+      "source": "llm",
+      "id": "observability-0",
+      "agent": "observability",
+      "confidence": 70,
+      "domain": "Observability",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "logger.error(err)",
+      "locationCheck": "unknown"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/schema.ts",
+      "line": 357,
+      "title": "Potential command injection via status field",
+      "detail": "The status field in AgentProgressEvent could be manipulated by an attacker to inject malicious commands.",
+      "evidence": "status?: AgentStatus",
+      "recommendation": "Validate and sanitize the status field before using it.",
+      "blocking": false,
+      "source": "llm",
+      "id": "security-1",
+      "agent": "security",
+      "confidence": 70,
+      "domain": "Security",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Validate and sanitize the status field before using it.",
+      "corroboratingAgents": ["coverage", "integration"],
+      "relatedFindings": ["coverage-0", "integration-3"],
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/runner.ts",
+      "line": 393,
+      "title": "Redundant Object Allocation",
+      "detail": "Object allocation in a hot path can be inefficient.",
+      "evidence": "{ findings: [], gaps: [], earlyExit: false }",
+      "recommendation": "Reuse objects or use a more efficient data structure if possible.",
+      "blocking": false,
+      "source": "llm",
+      "id": "performance-2",
+      "agent": "performance",
+      "confidence": 70,
+      "domain": "Performance",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Reuse objects or use a more efficient data structure if possible.",
+      "corroboratingAgents": ["coverage", "design"],
+      "relatedFindings": ["coverage-1", "design-1"],
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/runner.ts",
+      "line": 445,
+      "title": "New status handling in parallel path needs tests",
+      "detail": "The status field is added to several event emissions in runner.ts without corresponding tests.",
+      "evidence": "The status field is added to event emissions in runner.ts without tests for handling the new field.",
+      "recommendation": "Add tests to verify the status field is correctly passed and handled in all cases.",
+      "blocking": false,
+      "source": "llm",
+      "id": "coverage-2",
+      "agent": "coverage",
+      "confidence": 70,
+      "domain": "Testing",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Add tests to verify the status field is correctly passed and handled in all cases.",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/chunkRunner.ts",
+      "line": 83,
+      "title": "Medium complexity in chunkRunner runChunked",
+      "detail": "The function has 3+ levels of nesting and medium cyclomatic complexity, which could be simplified.",
+      "evidence": "for (const [i, chunkDiff] of chunks.entries())",
+      "recommendation": "Break this logic into smaller, well-defined functions.",
+      "blocking": false,
+      "source": "lizard",
+      "id": "complexity-1",
+      "agent": "complexity",
+      "confidence": 70,
+      "domain": "Complexity",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Break this logic into smaller, well-defined functions.",
+      "corroboratingAgents": ["performance", "integration"],
+      "relatedFindings": ["performance-1", "integration-1"],
+      "locationCheck": "verified"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/schema.ts",
+      "line": 363,
+      "title": "Potential violation of Interface Segregation Principle",
+      "detail": "The AgentProgressEvent interface is being modified to include a new optional status field. This might be a sign of the Interface Segregation Principle violation if not all consumers of this interface need the status field.",
+      "evidence": "Added status?: AgentStatus to AgentProgressEvent",
+      "recommendation": "Consider creating a more specific interface for consumers that require the status field, adhering to the Interface Segregation Principle.",
+      "blocking": false,
+      "source": "llm",
+      "id": "design-0",
+      "agent": "design",
+      "confidence": 70,
+      "domain": "Architecture Drift",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "Consider creating a more specific interface for consumers that require the status field, adhering to the Interface Segregation Principle.",
+      "locationCheck": "mismatch"
+    },
+    {
+      "severity": "medium",
+      "file": "src/core/runner.ts",
+      "line": 532,
+      "title": "Missing error logging in catch block",
+      "detail": "Error paths and catch blocks should log exceptions for observability",
+      "evidence": "catch (err) {",
+      "recommendation": "logger.error(err)",
+      "blocking": true,
+      "source": "llm",
+      "id": "observability-1",
+      "agent": "observability",
+      "confidence": 70,
+      "domain": "Observability",
+      "basis": "INFERRED",
+      "impact": "",
+      "suggestion": "logger.error(err)",
+      "locationCheck": "unknown"
+    }
+  ],
+  "testFiles": [],
+  "summary": {
+    "totalFindings": 10,
+    "bySeverity": {
+      "high": 4,
+      "medium": 6
+    },
+    "byAgent": {
+      "security": 2,
+      "complexity": 3,
+      "observability": 2,
+      "performance": 1,
+      "coverage": 1,
+      "design": 1
+    },
+    "durationMs": 1109179
+  },
+  "agentsPlanned": 14,
+  "sanitizer": {
+    "enabled": true,
+    "applied": false,
+    "redactedLines": 0,
+    "warnings": []
+  },
+  "filteredFiles": {
+    "security": ["CHANGELOG.md"],
+    "adversarial": ["CHANGELOG.md"]
+  },
+  "agentStatus": {
+    "coverage": "ok",
+    "security": "ok",
+    "performance": "ok",
+    "correctness": "ok",
+    "design": "ok",
+    "dependencies": "ok",
+    "adversarial": "timeout",
+    "integration": "ok",
+    "breaking-change": "ok",
+    "license": "ok",
+    "error-handling": "ok",
+    "observability": "ok",
+    "secrets": "ok",
+    "complexity": "ok"
+  },
+  "toolAvailability": {
+    "npmAudit": "not-applicable",
+    "gitleaks": "used",
+    "lizard": "used"
+  },
+  "timings": [
+    {
+      "diffLines": 426,
+      "effectiveTimeoutMs": 300000,
+      "durationMs": 1109179,
+      "agents": [
+        {
+          "name": "coverage",
+          "elapsedMs": 143968,
+          "attemptMs": 143968,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "security",
+          "elapsedMs": 66586,
+          "attemptMs": 66586,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "performance",
+          "elapsedMs": 89282,
+          "attemptMs": 89282,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "correctness",
+          "elapsedMs": 14627,
+          "attemptMs": 14627,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "design",
+          "elapsedMs": 76896,
+          "attemptMs": 76896,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "dependencies",
+          "elapsedMs": 2,
+          "attemptMs": 2,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "adversarial",
+          "elapsedMs": 300039,
+          "attemptMs": 300037,
+          "attempts": 1,
+          "status": "timeout"
+        },
+        {
+          "name": "integration",
+          "elapsedMs": 153048,
+          "attemptMs": 153048,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "breaking-change",
+          "elapsedMs": 15179,
+          "attemptMs": 15179,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "license",
+          "elapsedMs": 1,
+          "attemptMs": 1,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "error-handling",
+          "elapsedMs": 14337,
+          "attemptMs": 14337,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "observability",
+          "elapsedMs": 60798,
+          "attemptMs": 60798,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "secrets",
+          "elapsedMs": 3185,
+          "attemptMs": 3185,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "complexity",
+          "elapsedMs": 171198,
+          "attemptMs": 171198,
+          "attempts": 1,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": "ai-review-agent/v1",
+  "toolVersion": "1.15.0",
+  "profile": null
+}
