@@ -132,9 +132,18 @@ export const DEFAULT_CONFIG: ReviewConfig = {
   // the documented config-shallow-merge caveat: a project's own agentPolicy setting for ANY agent
   // replaces this default entirely (loadConfig does a shallow merge). Re-specify these excludes
   // in your own ai-review.config.json if you set agentPolicy for any agent and want to keep them.
+  //
+  // calibration/fixtures/** and calibration/*.json added 2026-09-19 -- the same failure mode,
+  // reproduced live against this repo's own diff via /change-review: these two agents fabricated
+  // findings (a hallucinated `averageFindingsPerChunk` "bug" attributed to calibrate.ts:50, which
+  // is an unrelated interface field; a hallucinated `clampScore` NaN-validation "vulnerability")
+  // by reading calibration's synthetic fixtures (deliberately planted fake vulnerable code, by
+  // design -- see calibration/fixtures/*.diff) and this session's raw model-output/classification
+  // JSON logs (prose quoting those same fake bug titles) as if they described real, current
+  // application code. calibrate.ts itself stays visible -- it's real harness logic, not data.
   agentPolicy: {
-    security: { exclude: ['**/*.md'] },
-    adversarial: { exclude: ['**/*.md'] },
+    security: { exclude: ['**/*.md', 'calibration/fixtures/**', 'calibration/*.json'] },
+    adversarial: { exclude: ['**/*.md', 'calibration/fixtures/**', 'calibration/*.json'] },
   },
 }
 

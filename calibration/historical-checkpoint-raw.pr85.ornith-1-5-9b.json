@@ -1,0 +1,151 @@
+{
+  "findings": [],
+  "testFiles": [],
+  "summary": {
+    "totalFindings": 0,
+    "bySeverity": {},
+    "byAgent": {},
+    "durationMs": 2454472
+  },
+  "agentsPlanned": 14,
+  "sanitizer": {
+    "enabled": true,
+    "applied": false,
+    "redactedLines": 0,
+    "warnings": []
+  },
+  "filteredFiles": {
+    "security": ["CHANGELOG.md"],
+    "adversarial": ["CHANGELOG.md"]
+  },
+  "agentStatus": {
+    "coverage": "timeout",
+    "security": "ok",
+    "performance": "ok",
+    "correctness": "timeout",
+    "design": "timeout",
+    "dependencies": "ok",
+    "adversarial": "timeout",
+    "integration": "timeout",
+    "breaking-change": "ok",
+    "license": "ok",
+    "error-handling": "ok",
+    "observability": "timeout",
+    "secrets": "ok",
+    "complexity": "timeout"
+  },
+  "toolAvailability": {
+    "npmAudit": "not-applicable",
+    "gitleaks": "used"
+  },
+  "timings": [
+    {
+      "diffLines": 426,
+      "effectiveTimeoutMs": 300000,
+      "durationMs": 2454472,
+      "agents": [
+        {
+          "name": "coverage",
+          "elapsedMs": 300016,
+          "attemptMs": 300016,
+          "attempts": 1,
+          "status": "timeout"
+        },
+        {
+          "name": "security",
+          "elapsedMs": 46575,
+          "attemptMs": 46575,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "performance",
+          "elapsedMs": 80129,
+          "attemptMs": 80129,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "correctness",
+          "elapsedMs": 300014,
+          "attemptMs": 300014,
+          "attempts": 1,
+          "status": "timeout"
+        },
+        {
+          "name": "design",
+          "elapsedMs": 300028,
+          "attemptMs": 300027,
+          "attempts": 1,
+          "status": "timeout"
+        },
+        {
+          "name": "dependencies",
+          "elapsedMs": 1,
+          "attemptMs": 1,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "adversarial",
+          "elapsedMs": 300014,
+          "attemptMs": 300013,
+          "attempts": 1,
+          "status": "timeout"
+        },
+        {
+          "name": "integration",
+          "elapsedMs": 300018,
+          "attemptMs": 300017,
+          "attempts": 1,
+          "status": "timeout"
+        },
+        {
+          "name": "breaking-change",
+          "elapsedMs": 69246,
+          "attemptMs": 69246,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "license",
+          "elapsedMs": 1,
+          "attemptMs": 1,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "error-handling",
+          "elapsedMs": 154790,
+          "attemptMs": 154790,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "observability",
+          "elapsedMs": 300007,
+          "attemptMs": 300007,
+          "attempts": 1,
+          "status": "timeout"
+        },
+        {
+          "name": "secrets",
+          "elapsedMs": 3593,
+          "attemptMs": 3593,
+          "attempts": 1,
+          "status": "ok"
+        },
+        {
+          "name": "complexity",
+          "elapsedMs": 300017,
+          "attemptMs": 300017,
+          "attempts": 1,
+          "status": "timeout"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": "ai-review-agent/v1",
+  "toolVersion": "1.15.0",
+  "profile": null
+}
