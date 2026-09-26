@@ -1,0 +1,425 @@
+diff --git a/.claude/contracts/active-task.json b/.claude/contracts/active-task.json
+index 2843010..92e100c 100644
+--- a/.claude/contracts/active-task.json
++++ b/.claude/contracts/active-task.json
+@@ -1,60 +1,48 @@
+ {
+-  "task": "Add an opt-in, off-by-default OpenAI-compatible LLM provider, and amend projectbrief.md's Ollama-only constraint to permit it. Testable locally against Ollama's own /v1 endpoint; targets LiteLLM at work.",
+-  "status": "cancelled",
+-  "created_at": "2026-08-30T23:06:11Z",
+-  "expires_at": "2026-08-31T07:06:11Z",
+-  "approved_by": "user (\"do what you suggest\", then cleared scoping: LiteLLM is the work target, OpenCode protocol unknown and not required)",
+-  "notes": "projectbrief.md is the immutable tier. The amendment is the reason this contract exists and must not be treated as incidental. Default provider stays ollama; cloud is never implicit.",
++  "task": "Give a --chunk run's stderr enough information to tell a dead agent from a clean one, and one chunk from another.",
++  "status": "complete",
++  "created_at": "2026-09-12T08:34:49Z",
++  "expires_at": "2026-09-12T16:34:49Z",
++  "approved_by": "user (\"approved\", 2026-09-12, in direct response to the fold-in proposal in the prior message)",
++  "notes": "Two compounding gaps found while investigating a PMB peer's field report, both in the real-time stderr progress channel (never in the JSON/report output, which is unaffected). (1) AgentProgressEvent has no status field; a dead agent (fetch failed, timeout) and a clean one both render as 'Ns -- 0 raw findings', distinguishable only by duration, which nothing parses. The status IS already computed at every emission site (agentStatus[agent.name] = classifyAgentError(err)) in the same statement block as the onProgress call that omits it -- purely additive, zero existing test asserts the exact line text. (2) chunkRunner.ts's per-chunk loop prints no marker between chunks, and runner.ts's run() resets index=0 on every call -- chunkRunner calls run() once per chunk with the same onProgress callback -- so '[1/4] security' prints with the IDENTICAL index on every chunk. A multi-chunk run's stderr gives no way to tell which chunk you're reading without counting resets. This is why the reporting peer had to hand-build a chunk-by-chunk table themselves. Not part of #84 (agentPolicy/filteredFiles/chunk-merge) -- unrelated concern, new branch off main rather than bundled into that PR's diff.",
+   "scope": [
+     {
+-      "file": "memory-bank/projectbrief.md",
++      "file": "src/core/schema.ts",
+       "op": "edit"
+     },
+     {
+-      "file": "memory-bank/systemPatterns.md",
++      "file": "src/core/runner.ts",
+       "op": "edit"
+     },
+     {
+-      "file": "memory-bank/techContext.md",
++      "file": "src/core/chunkRunner.ts",
+       "op": "edit"
+     },
+     {
+-      "file": "memory-bank/progress.md",
++      "file": "src/cli/index.ts",
+       "op": "edit"
+     },
+     {
+-      "file": "memory-bank/activeContext.md",
++      "file": "tests/unit/runner.test.ts",
+       "op": "edit"
+     },
+     {
+-      "file": "src/core/llm/openAiCompatibleProvider.ts",
+-      "op": "create"
+-    },
+-    {
+-      "file": "src/core/llm/provider.ts",
++      "file": "tests/unit/chunkRunner.test.ts",
+       "op": "edit"
+     },
+     {
+-      "file": "src/core/config.ts",
++      "file": "CHANGELOG.md",
+       "op": "edit"
+     },
+     {
+-      "file": "src/cli/index.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "tests/unit/openAiCompatibleProvider.test.ts",
+-      "op": "create"
+-    },
+-    {
+-      "file": "README.md",
++      "file": ".claude/contracts/active-task.json",
+       "op": "edit"
+     },
+     {
+-      "file": ".claude/contracts/active-task.json",
++      "file": "tests/unit/cli.test.ts",
+       "op": "edit"
+     }
+   ],
+-  "cancelled_at": "2026-08-30T23:20:00Z",
+-  "cancelled_reason": "Justification was a LiteLLM gateway that does not exist on this machine. No source file was touched. Nothing to revert."
++  "completed_at": "2026-09-12T08:49:11Z",
++  "completion_notes": "Committed as 8f4ed7f. SCOPE CORRECTION: tests/unit/cli.test.ts was touched but never declared in the original proposal or this file's scope array -- the proposal's test-file line only named runner.test.ts and chunkRunner.test.ts; cli.test.ts was needed to prove the render side (status suffix) actually reaches the CLI's stderr output, not just the event object, and was added mid-implementation without amending scope first. Recorded here rather than silently, added to scope above after the fact. Both fixes are purely additive (one optional schema field, one stderr line) with zero behavior change to any existing field, formatter, or the JSON envelope -- confirmed by grep: exactly 6 onProgress 'end' emission sites exist in runner.ts, all 6 now pass status. VERIFICATION: 845 tests (+6, up from the main-based baseline of 839). Mutation-tested 10 mutations (6 status-drop sites, 2 index.ts render mutations, 2 chunkRunner marker mutations) -- ALL 10 killed, no-op control killed nothing, all three touched sources (runner.ts, index.ts, chunkRunner.ts) restored byte-for-byte after every run. Two mutations (coverage-path status, parallel-path status) SURVIVED on the first mutation pass -- a real, honest gap: the initial two runner.test.ts tests only exercised the sequential execution path (runAgentsSequential), not the separate coverage-agent branch (runCoverageAgent) or the separate parallel branch (runAgentsParallel). Closed with two more tests before re-running to 10/10, rather than treating a partial kill rate as sufficient. npm run check green throughout (typecheck/build/format/lint/test)."
+ }
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index b5531ba..753963a 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+ 
+ ## [Unreleased]
+ 
++### Fixed
++
++- **A dead agent and a clean one printed the identical stderr progress line.** `AgentProgressEvent`
++  had no `status` field, so an agent that timed out or failed and one that ran clean and genuinely
++  found nothing both rendered `Ns — 0 raw findings`, distinguishable only by duration — which
++  nothing parses. The value was already computed at every emission site
++  (`agentStatus[agent.name] = classifyAgentError(err)`) in the same statement as the `onProgress`
++  call that omitted it. Now passed through and rendered as a suffix (e.g. `(timeout)`) whenever the
++  status isn't `'ok'`.
++
++- **A `--chunk` run's stderr gave no way to tell which chunk you were reading.** `runner.ts`'s
++  `run()` resets its per-agent progress index to 1 on every call, and `chunkRunner` calls it once
++  per chunk with the same `onProgress` callback — so `[1/4] security` printed with the identical
++  index on every chunk, and nothing else in the stream marked a chunk boundary. The one-time
++  "split into N chunks" announcement fires before the loop starts and is never repeated. Now each
++  chunk prints its own `chunk N/total (lines)` marker as it begins.
++
++  Both gaps were reported from a real multi-chunk run whose reader had to hand-reconstruct a
++  chunk-by-chunk table from timing alone to tell a genuine zero from a `fetch failed`. Neither
++  affects the JSON envelope or any rendered report — `--format json` and all four report
++  formatters were already correct; this is the real-time stderr channel only.
++
+ ## [1.15.0] — 2026-08-27 (a timing number now says what it spans)
+ 
+ ### Added
+diff --git a/src/cli/index.ts b/src/cli/index.ts
+index 73c1d7c..ca13115 100644
+--- a/src/cli/index.ts
++++ b/src/cli/index.ts
+@@ -313,8 +313,13 @@ program
+                 .map((s) => `${bySev[s]} ${s}`)
+               summary += ` (${parts.join(', ')})`
+             }
++            // WHY this suffix: without it, an agent that timed out or errored renders identically
++            // to one that ran clean and genuinely found nothing -- both print "0 raw findings",
++            // and duration is the only tell, which nothing here parses. Reported from a real
++            // 610s-fetch-failed row that was visually indistinguishable from a 13s genuine zero.
++            const statusSuffix = event.status && event.status !== 'ok' ? ` (${event.status})` : ''
+             process.stderr.write(
+-              `[${event.index}/${event.total}] ${event.name}   ${elapsed} — ${summary}\n`
++              `[${event.index}/${event.total}] ${event.name}   ${elapsed} — ${summary}${statusSuffix}\n`
+             )
+             if (event.earlyExit) {
+               const bolt = options.emoji !== false ? '⚡ ' : ''
+diff --git a/src/core/chunkRunner.ts b/src/core/chunkRunner.ts
+index 69a8c9a..229fcec 100644
+--- a/src/core/chunkRunner.ts
++++ b/src/core/chunkRunner.ts
+@@ -83,7 +83,17 @@ export async function runChunked(
+   )
+ 
+   const results: ReviewResult[] = []
+-  for (const chunkDiff of chunks) {
++  for (const [i, chunkDiff] of chunks.entries()) {
++    // WHY this line exists: `runner.run()` resets its own per-agent progress index to 1 on every
++    // call, and chunkRunner calls it once per chunk with the same onProgress callback -- so
++    // `[1/4] security` prints with the IDENTICAL index on every chunk, with nothing else in the
++    // stderr stream marking where one chunk ends and the next begins. A real multi-chunk report
++    // had to be hand-reconstructed into a chunk-by-chunk table by the reader for exactly this
++    // reason. The one-time "split into N chunks" line above announces the total once; this says
++    // which one is running now.
++    console.warn(
++      `[ai-review] chunk ${i + 1}/${chunks.length} (${chunkDiff.split('\n').length} lines)`
++    )
+     const chunkInput: ReviewInput = { ...input, diff: chunkDiff }
+     const result = await runner.run(chunkInput, onProgress, contextMode)
+     results.push(result)
+diff --git a/src/core/runner.ts b/src/core/runner.ts
+index f16b827..363a336 100644
+--- a/src/core/runner.ts
++++ b/src/core/runner.ts
+@@ -378,6 +378,7 @@ export class SwarmRunner {
+         attempts: stats.attempts,
+         attemptMs: stats.maxAttemptMs,
+         earlyExit,
++        status: 'ok',
+       })
+       return { findings, gaps, earlyExit }
+     } catch (err) {
+@@ -392,6 +393,7 @@ export class SwarmRunner {
+         elapsedMs: Date.now() - startMs,
+         attempts: stats.attempts,
+         attemptMs: stats.maxAttemptMs,
++        status: agentStatus.coverage,
+       })
+       return { findings: [], gaps: [], earlyExit: false }
+     }
+@@ -443,6 +445,7 @@ export class SwarmRunner {
+           attempts: stats.attempts,
+           attemptMs: stats.maxAttemptMs,
+           earlyExit: shouldStop,
++          status: 'ok',
+         })
+         if (shouldStop) {
+           earlyExitAgent = agent.name
+@@ -462,6 +465,7 @@ export class SwarmRunner {
+           elapsedMs: Date.now() - startMs,
+           attempts: stats.attempts,
+           attemptMs: stats.maxAttemptMs,
++          status: agentStatus[agent.name],
+         })
+       }
+     }
+@@ -517,6 +521,7 @@ export class SwarmRunner {
+             elapsedMs: Date.now() - startMs,
+             attempts: stats.attempts,
+             attemptMs: stats.maxAttemptMs,
++            status: 'ok',
+           })
+         } catch (err) {
+           agentStatus[agent.name] = classifyAgentError(err)
+@@ -532,6 +537,7 @@ export class SwarmRunner {
+             elapsedMs: Date.now() - startMs,
+             attempts: stats.attempts,
+             attemptMs: stats.maxAttemptMs,
++            status: agentStatus[agent.name],
+           })
+         }
+       })
+diff --git a/src/core/schema.ts b/src/core/schema.ts
+index 42cf83d..c18c693 100644
+--- a/src/core/schema.ts
++++ b/src/core/schema.ts
+@@ -357,4 +357,10 @@ export interface AgentProgressEvent {
+   attemptMs?: number
+   attempts?: number
+   earlyExit?: boolean
++  // Set on 'end' only. Every emission site already computes this value into `agentStatus` in the
++  // same statement -- it was simply never passed through. Without it, a dead agent (fetch failed,
++  // timeout) and a clean one both render as "Ns -- 0 raw findings" on the stderr progress line,
++  // distinguishable only by duration, which nothing parses. Reported from a real multi-chunk run
++  // where that ambiguity forced a hand-built reconstruction from timing alone.
++  status?: AgentStatus
+ }
+diff --git a/tests/unit/chunkRunner.test.ts b/tests/unit/chunkRunner.test.ts
+index 993a65a..0aaf0a9 100644
+--- a/tests/unit/chunkRunner.test.ts
++++ b/tests/unit/chunkRunner.test.ts
+@@ -156,6 +156,28 @@ describe('runChunked', () => {
+     expect(runMock).toHaveBeenCalledTimes(3)
+   })
+ 
++  // REGRESSION: runner.run() resets its own per-agent progress index to 1 on every call, and this
++  // function calls it once per chunk with the same onProgress callback -- so "[1/4] security"
++  // prints with the IDENTICAL index on every chunk, with nothing else in the stderr stream marking
++  // a chunk boundary. A real multi-chunk report had to be hand-reconstructed into a chunk-by-chunk
++  // table by its reader for exactly this reason.
++  it('announces which chunk is running, not just the total chunk count', async () => {
++    const runMock = vi.fn().mockResolvedValue(makeResult())
++    const runner = { run: runMock } as unknown as SwarmRunner
++    const diff = makeMultiFileDiff(3)
++    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
++
++    await runChunked(runner, { diff }, 2000, 15)
++
++    const chunkLines = warnSpy.mock.calls.map((c) => c[0]).filter((m) => /chunk \d+\/\d+/.test(m))
++    expect(chunkLines).toEqual([
++      expect.stringContaining('chunk 1/3'),
++      expect.stringContaining('chunk 2/3'),
++      expect.stringContaining('chunk 3/3'),
++    ])
++    warnSpy.mockRestore()
++  })
++
+   it('merges findings, testFiles, and summary counts across chunks', async () => {
+     const runMock = vi
+       .fn()
+diff --git a/tests/unit/cli.test.ts b/tests/unit/cli.test.ts
+index 4bd739a..d14395a 100644
+--- a/tests/unit/cli.test.ts
++++ b/tests/unit/cli.test.ts
+@@ -218,6 +218,53 @@ describe('CLI — agent-count announcement', () => {
+     const { stderr } = await runCli([])
+     expect(stderr).toContain('with 1 agent...')
+   })
++
++  // REGRESSION: a dead agent and a clean one both printed "0 raw findings" here, distinguishable
++  // only by duration -- which nothing parses, and a real multi-chunk report needed a hand-built
++  // table to tell them apart. This proves the CLI actually renders the distinguishing signal now
++  // that the event carries it.
++  it('marks a non-ok agent status on the progress line instead of printing an identical clean line', async () => {
++    MockSwarmRunner.mockImplementation(function () {
++      return {
++        run: vi.fn().mockImplementation(async (_input, onProgress) => {
++          onProgress?.({
++            phase: 'end',
++            name: 'security',
++            index: 1,
++            total: 1,
++            findings: [],
++            elapsedMs: 610000,
++            status: 'timeout',
++          })
++          return makeResult({ findings: [] })
++        }),
++      }
++    })
++    const { stderr } = await runCli([])
++    expect(stderr).toContain('0 raw findings (timeout)')
++  })
++
++  it('adds no suffix when the agent status is ok', async () => {
++    MockSwarmRunner.mockImplementation(function () {
++      return {
++        run: vi.fn().mockImplementation(async (_input, onProgress) => {
++          onProgress?.({
++            phase: 'end',
++            name: 'security',
++            index: 1,
++            total: 1,
++            findings: [],
++            elapsedMs: 13000,
++            status: 'ok',
++          })
++          return makeResult({ findings: [] })
++        }),
++      }
++    })
++    const { stderr } = await runCli([])
++    expect(stderr).toContain('0 raw findings\n')
++    expect(stderr).not.toMatch(/0 raw findings \(/)
++  })
+ })
+ 
+ describe('CLI — argument parsing and output', () => {
+diff --git a/tests/unit/runner.test.ts b/tests/unit/runner.test.ts
+index 264d433..b79e8b8 100644
+--- a/tests/unit/runner.test.ts
++++ b/tests/unit/runner.test.ts
+@@ -388,6 +388,105 @@ describe('SwarmRunner', () => {
+     expect(endEvents).toHaveLength(1)
+     expect(endEvents[0].findings).toBeInstanceOf(Array)
+     expect(typeof endEvents[0].elapsedMs).toBe('number')
++    expect(endEvents[0].status).toBe('ok')
++  })
++
++  // REGRESSION: a dead agent and a clean one both printed "0 raw findings" on the stderr progress
++  // line, distinguishable only by duration, which nothing parses. agentStatus was already computed
++  // at every emission site -- this proves it now reaches the event a caller actually receives.
++  it("onProgress 'end' event carries the agent's status on failure, not just on success", async () => {
++    const provider: LLMProvider = {
++      chat: vi.fn().mockRejectedValue(new Error('always fails')),
++      ping: vi.fn().mockResolvedValue({ ok: true }),
++    }
++    const config = {
++      ...DEFAULT_CONFIG,
++      agents: ['security'] as AgentName[],
++      retryAttempts: 1,
++      retryDelayMs: 0,
++    }
++    const runner = new SwarmRunner(config, provider)
++    const endEvents: AgentProgressEvent[] = []
++    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
++    await runner.run({ diff: 'diff' }, (event) => {
++      if (event.phase === 'end') endEvents.push(event)
++    })
++    warnSpy.mockRestore()
++    expect(endEvents).toHaveLength(1)
++    expect(endEvents[0].findings).toEqual([])
++    // classifyAgentError maps a plain Error (no "timed out" in the message, not a ParseFailureError)
++    // to 'error' -- the same classification agentStatus itself receives at this call site.
++    expect(endEvents[0].status).toBe('error')
++  })
++
++  // Mutation testing surfaced this gap directly: the sequential-path tests above passed even with
++  // `status` reverted out of the coverage agent's onProgress calls entirely, because nothing here
++  // exercised that path. Coverage runs through a separate branch from the general agent loop
++  // (runCoverageAgent, not runAgentsSequential/runAgentsParallel), so it needs its own coverage.
++  it("onProgress 'end' event carries status on both the coverage success and failure paths", async () => {
++    const okProvider: LLMProvider = {
++      chat: vi.fn().mockResolvedValue('{"findings":[],"gaps":[]}'),
++      ping: vi.fn().mockResolvedValue({ ok: true }),
++    }
++    const okConfig = {
++      ...DEFAULT_CONFIG,
++      agents: ['coverage'] as AgentName[],
++      retryAttempts: 1,
++      retryDelayMs: 0,
++    }
++    const okEvents: AgentProgressEvent[] = []
++    await new SwarmRunner(okConfig, okProvider).run({ diff: 'diff' }, (event) => {
++      if (event.phase === 'end') okEvents.push(event)
++    })
++    expect(okEvents[0].status).toBe('ok')
++
++    const failProvider: LLMProvider = {
++      chat: vi.fn().mockRejectedValue(new Error('always fails')),
++      ping: vi.fn().mockResolvedValue({ ok: true }),
++    }
++    const failConfig = { ...okConfig }
++    const failEvents: AgentProgressEvent[] = []
++    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
++    await new SwarmRunner(failConfig, failProvider).run({ diff: 'diff' }, (event) => {
++      if (event.phase === 'end') failEvents.push(event)
++    })
++    warnSpy.mockRestore()
++    expect(failEvents[0].status).toBe('error')
++  })
++
++  // Same gap, for the parallel branch (runAgentsParallel), which is a third, separate code path
++  // from both the sequential loop and the coverage agent.
++  it("onProgress 'end' event carries status on both the parallel success and failure paths", async () => {
++    const okProvider = makeProvider()
++    const okConfig = {
++      ...DEFAULT_CONFIG,
++      agents: ['security', 'correctness'] as AgentName[],
++      parallel: true,
++    }
++    const okEvents: AgentProgressEvent[] = []
++    await new SwarmRunner(okConfig, okProvider).run({ diff: 'diff' }, (event) => {
++      if (event.phase === 'end') okEvents.push(event)
++    })
++    expect(okEvents.every((e) => e.status === 'ok')).toBe(true)
++
++    const failProvider: LLMProvider = {
++      chat: vi.fn().mockRejectedValue(new Error('always fails')),
++      ping: vi.fn().mockResolvedValue({ ok: true }),
++    }
++    const failConfig = {
++      ...DEFAULT_CONFIG,
++      agents: ['security'] as AgentName[],
++      parallel: true,
++      retryAttempts: 1,
++      retryDelayMs: 0,
++    }
++    const failEvents: AgentProgressEvent[] = []
++    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
++    await new SwarmRunner(failConfig, failProvider).run({ diff: 'diff' }, (event) => {
++      if (event.phase === 'end') failEvents.push(event)
++    })
++    warnSpy.mockRestore()
++    expect(failEvents[0].status).toBe('error')
+   })
+ 
+   it('warns that --fail-fast has no effect when --parallel is also enabled', async () => {
