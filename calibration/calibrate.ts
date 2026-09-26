@@ -1,4 +1,5 @@
 import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'fs'
+import { createHash } from 'crypto'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { OllamaProvider } from '../src/core/llm/ollamaProvider.js'
@@ -63,6 +64,23 @@ interface CalibrationCase {
   // is clean of ONE specific defect that the diff removes -- the agent may still say something
   // legitimate about the code the diff ADDS, which expectEmpty would flag as a failure.
   forbiddenKeyword?: string
+  // Path to a pre-registered oracle JSON (see calibration/fixtures/adversarial-dirty.oracle.json
+  // for the shape): a known-positive recall case. Does not assert pass/fail -- logs every raw
+  // finding, tagged with which oracle defect (if any) its cited location falls within, for
+  // separate manual classification. See the adversarial-dirty case's own comment for why
+  // classification is manual rather than automated.
+  oracleFile?: string
+}
+
+interface OracleDefect {
+  id: string
+  location: { file: string; lineStart: number; lineEnd: number }
+}
+
+interface Oracle {
+  version: string
+  defects: OracleDefect[]
+  trap: { id: string; location: { file: string; lineStart: number; lineEnd: number } }
 }
 
 const BORDER = '╔════════════════════════════════════════════════════════════╗'
@@ -76,6 +94,12 @@ function printBox(lines: string[]): void {
   process.stderr.write('\n' + BORDER + '\n')
   for (const l of lines) process.stderr.write(`║  ${pad(l, 56)}║\n`)
   process.stderr.write(BORDER_BOT + '\n\n')
+}
+
+/** sha256 of a file's exact current bytes, so a durable log entry can prove which fixture/oracle
+ * version actually produced it, independent of what a filename or a version string CLAIMS. */
+function hashFile(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex').slice(0, 16)
 }
 
 /** Prints what an agent actually returned, so a failing case is diagnosable from its own output. */
@@ -245,6 +269,22 @@ const CASES: CalibrationCase[] = [
     agentName: 'adversarial',
     fixtureFile: 'calibration/fixtures/adversarial-clean.diff',
     expectEmpty: true,
+  },
+  {
+    // Recall companion to adversarial-clean's restraint measurement (see
+    // docs/superpowers/plans/2026-09-18-acr-model-comparison-devstral-ornith-qwen.md's Next Test
+    // Design section and the follow-up design doc). 4 planted defects, each with a pre-registered
+    // oracle entry (id/location/mechanism/expectedConsequence/minimumEvidence) fixed before any
+    // model ran against this fixture, plus 1 intentionally-correct trap construct. This case does
+    // not assert pass/fail against the oracle -- mechanism-correctness classification is manual,
+    // not automated string-matching (the project's own experience with claim-matcher regexes over
+    // model prose is why: see activeContext.md's "fragile half" note). It only does the
+    // deterministic part -- which oracle defect, if any, a finding's cited location falls within --
+    // and logs every raw finding for later classification, so results can't drift after the fact.
+    name: 'adversarial-dirty',
+    agentName: 'adversarial',
+    fixtureFile: 'calibration/fixtures/adversarial-dirty.diff',
+    oracleFile: 'calibration/fixtures/adversarial-dirty.oracle.json',
   },
   {
     // Keyword is the fixture's REAL ISSUE function, not 'integration' -- see the complexity case
@@ -451,6 +491,13 @@ async function main() {
   // Override which model calibration runs against without editing config.ts -- e.g. to bake
   // off a candidate model's finding quality: CALIBRATION_MODEL=qwen3:latest npm run calibrate
   const model = process.env.CALIBRATION_MODEL || DEFAULT_CONFIG.model
+  // Same idea for the per-agent timeout -- e.g. a thinking-capable candidate model's reasoning
+  // trace length varies enough call-to-call that the 180s default clips a real fraction of
+  // otherwise-successful runs: CALIBRATION_TIMEOUT_MS=300000 npm run calibrate
+  const agentTimeoutMs = process.env.CALIBRATION_TIMEOUT_MS
+    ? Number(process.env.CALIBRATION_TIMEOUT_MS)
+    : DEFAULT_CONFIG.agentTimeoutMs
+  const config = { ...DEFAULT_CONFIG, agentTimeoutMs }
   const provider = new OllamaProvider(DEFAULT_CONFIG.ollamaUrl, model)
 
   // Check 1: Ollama reachable
@@ -490,23 +537,23 @@ async function main() {
     process.exit(1)
   }
 
-  const orch = new OrchestratorAgent(DEFAULT_CONFIG)
+  const orch = new OrchestratorAgent(config)
   const agentMap: Record<string, BaseAgent> = {
-    security: new SecurityAgent(provider, DEFAULT_CONFIG),
-    performance: new PerformanceAgent(provider, DEFAULT_CONFIG),
-    correctness: new CorrectnessAgent(provider, DEFAULT_CONFIG),
-    design: new DesignAgent(provider, DEFAULT_CONFIG),
-    dependencies: new DependenciesAgent(provider, DEFAULT_CONFIG),
-    adversarial: new AdversarialAgent(provider, DEFAULT_CONFIG),
-    integration: new IntegrationScoutAgent(provider, DEFAULT_CONFIG),
-    coverage: new CoverageAnalystAgent(provider, DEFAULT_CONFIG),
-    'breaking-change': new BreakingChangeAgent(provider, DEFAULT_CONFIG),
-    license: new LicenseComplianceAgent(provider, DEFAULT_CONFIG),
-    'error-handling': new ErrorHandlingAgent(provider, DEFAULT_CONFIG),
-    observability: new ObservabilityAgent(provider, DEFAULT_CONFIG),
-    'migration-safety': new MigrationSafetyAgent(provider, DEFAULT_CONFIG),
-    secrets: new SecretsAgent(provider, DEFAULT_CONFIG),
-    complexity: new ComplexityAgent(provider, DEFAULT_CONFIG),
+    security: new SecurityAgent(provider, config),
+    performance: new PerformanceAgent(provider, config),
+    correctness: new CorrectnessAgent(provider, config),
+    design: new DesignAgent(provider, config),
+    dependencies: new DependenciesAgent(provider, config),
+    adversarial: new AdversarialAgent(provider, config),
+    integration: new IntegrationScoutAgent(provider, config),
+    coverage: new CoverageAnalystAgent(provider, config),
+    'breaking-change': new BreakingChangeAgent(provider, config),
+    license: new LicenseComplianceAgent(provider, config),
+    'error-handling': new ErrorHandlingAgent(provider, config),
+    observability: new ObservabilityAgent(provider, config),
+    'migration-safety': new MigrationSafetyAgent(provider, config),
+    secrets: new SecretsAgent(provider, config),
+    complexity: new ComplexityAgent(provider, config),
   }
 
   let passed = 0
@@ -525,20 +572,138 @@ async function main() {
     title: string
   }> = []
 
+  // Oracle-backed recall runs (adversarial-dirty and any future known-positive fixture): every
+  // raw finding, tagged with the oracle defect its cited location falls within (or 'trap' or
+  // null), written durably below -- see fprLogPath's sibling, the per-model oracleLogPath.
+  //
+  // WHY smoke defaults to true, not false: CALIBRATION_SMOKE must be explicitly set to '0' for a
+  // run to count as scored. A forgotten env var degrades toward "excluded from the dataset and
+  // visibly logged as smoke", not toward "silently counted" -- the same asymmetric-failure
+  // reasoning OllamaProvider's degradeThinking applies to capability probing.
+  const isSmoke = process.env.CALIBRATION_SMOKE !== '0'
+  // Ties every entry to the exact locked configuration in
+  // docs/superpowers/plans/2026-09-18-acr-adversarial-dirty-fixture-design.md's "Locked run
+  // configuration" section -- bump this string if that section is ever revised, so old and new
+  // entries are never silently compared as if under the same config.
+  const RUN_CONFIG_VERSION = 'adversarial-dirty-run-config-v1'
+  const oracleRuns: Array<{
+    ranAt: string
+    model: string
+    trial: string | null
+    smoke: boolean
+    case: string
+    fixtureHash: string
+    oracleVersion: string
+    oracleHash: string
+    configVersion: string
+    agentTimeoutMs: number
+    // Independently measured wall-clock time for THIS call, not derived from agentTimeoutMs --
+    // the point is that the two can be compared later without re-reading source. A future silent
+    // regression of the same shape as the one this field was added to catch (agentTimeoutMs
+    // configured but not actually enforced) would show up here directly: an entry claiming
+    // agentTimeoutMs: 50000 that actually elapsed 290000ms is visible in the data itself.
+    elapsedMs: number
+    findings: Array<{
+      file: string
+      line: number
+      title: string
+      detail: string
+      locationCheck: string
+      matchedDefectId: string | null
+    }>
+  }> = []
+
   for (const c of selectedCases) {
     process.stdout.write(`\nRunning calibration: ${c.name}...\n`)
     const diff = readFileSync(c.fixtureFile, 'utf-8')
+    const callStart = Date.now()
     try {
-      const rawFindings: Finding[] = await agentMap[c.agentName ?? c.name].run({
-        diff,
-        projectPath: c.projectPathFixture
-          ? materializeFixtureProject(c.projectPathFixture)
-          : process.cwd(),
-      })
+      // WHY this signal, not the OllamaProvider-internal default it used to fall through to:
+      // BaseAgent.run() never reads config.agentTimeoutMs itself, so without an explicit signal
+      // every calibration call was silently governed by OllamaProvider's own hardcoded 300s
+      // DEFAULT_TIMEOUT_MS regardless of CALIBRATION_TIMEOUT_MS or DEFAULT_CONFIG.agentTimeoutMs
+      // -- confirmed by reading base.ts and ollamaProvider.ts directly, not assumed. This made
+      // the "root-caused Ornith's timeouts, retested at 300000ms" conclusion reported earlier
+      // this session wrong about WHY the rate changed (see the correction in
+      // docs/superpowers/plans/2026-09-18-acr-model-comparison-devstral-ornith-qwen.md and
+      // .../2026-09-18-acr-adversarial-dirty-fixture-design.md). Passing a real signal here makes
+      // the configured value the one that's actually enforced, for every case, not just the new
+      // oracle one -- this call site is shared.
+      const rawFindings: Finding[] = await agentMap[c.agentName ?? c.name].run(
+        {
+          diff,
+          projectPath: c.projectPathFixture
+            ? materializeFixtureProject(c.projectPathFixture)
+            : process.cwd(),
+        },
+        AbortSignal.timeout(agentTimeoutMs)
+      )
       // Exercise the same file-existence and claim-support defenses runner.ts applies in real
       // usage, so calibration reflects actual end-to-end behavior, not just the raw agent's
       // output.
       const findings = orch.synthesize(rawFindings, extractChangedFiles(diff), undefined, diff)
+
+      if (c.oracleFile) {
+        const oracle = JSON.parse(readFileSync(c.oracleFile, 'utf-8')) as Oracle
+        const matchLocation = (file: string, line: number): string | null => {
+          for (const d of oracle.defects) {
+            if (
+              file.endsWith(d.location.file) &&
+              line >= d.location.lineStart &&
+              line <= d.location.lineEnd
+            ) {
+              return d.id
+            }
+          }
+          const t = oracle.trap.location
+          if (file.endsWith(t.file) && line >= t.lineStart && line <= t.lineEnd)
+            return oracle.trap.id
+          return null
+        }
+        const tagged = findings.map((f) => ({
+          file: f.file,
+          line: f.line,
+          title: f.title,
+          detail: f.detail,
+          locationCheck: f.locationCheck ?? 'unknown',
+          matchedDefectId: matchLocation(f.file, f.line),
+        }))
+        const hitDefects = new Set(
+          tagged
+            .map((t) => t.matchedDefectId)
+            .filter((id): id is string => id !== null && id !== oracle.trap.id)
+        )
+        const trapHits = tagged.filter((t) => t.matchedDefectId === oracle.trap.id).length
+        const unmatched = tagged.filter((t) => t.matchedDefectId === null).length
+        console.log(
+          `  ${findings.length} finding(s) — location hits on ${hitDefects.size}/${oracle.defects.length} ` +
+            `defect(s) [${[...hitDefects].join(', ') || 'none'}], ${trapHits} on the trap, ` +
+            `${unmatched} unmatched. Mechanism-correctness NOT scored here (manual, see design doc).`
+        )
+        if (isSmoke) {
+          console.log(
+            `  ⚠ CALIBRATION_SMOKE not set to '0' -- this run is tagged smoke:true and will NOT ` +
+              `count toward any model's N=20 dataset.`
+          )
+        }
+        printFindings(findings)
+        oracleRuns.push({
+          ranAt: new Date().toISOString(),
+          model,
+          trial: process.env.CALIBRATION_TRIAL ?? null,
+          smoke: isSmoke,
+          case: c.name,
+          fixtureHash: hashFile(c.fixtureFile),
+          oracleVersion: oracle.version,
+          oracleHash: hashFile(c.oracleFile),
+          configVersion: RUN_CONFIG_VERSION,
+          agentTimeoutMs,
+          elapsedMs: Date.now() - callStart,
+          findings: tagged,
+        })
+        passed++
+        continue
+      }
 
       if (c.expectEmpty) {
         if (findings.length === 0) {
@@ -667,7 +832,7 @@ async function main() {
     process.stdout.write(`\nRunning calibration: testgen...\n`)
     try {
       const diff = readFileSync('calibration/fixtures/testgen.diff', 'utf-8')
-      const testGen = new TestGenAgent(provider, DEFAULT_CONFIG)
+      const testGen = new TestGenAgent(provider, config)
       const { testFiles } = await testGen.runWithGaps({ diff }, [
         {
           file: 'src/billing/invoice.ts',
@@ -723,6 +888,42 @@ async function main() {
       `\nFalse positives by locationCheck this run: ${breakdown} ` +
         `(${falsePositiveLocationChecks.length} total, logged to ${fprLogPath})`
     )
+  }
+
+  // NOT gitignored, deliberately -- this is the durable retention fix for the data loss the
+  // adversarial-clean/three-way comparison hit (calibration/locationcheck-fpr.json is gitignored
+  // and was overwritten between models with no backup). Two further protections beyond "not
+  // gitignored", per the same lesson: (1) one file PER MODEL, so nothing one model's run does
+  // (including a mistaken `rm -f` between batches) can touch another model's data -- the
+  // overwrite risk that mattered was never git, it was a human clearing state between models; (2)
+  // smoke runs get their own suffixed file, never sharing a path with scored data, so "preserve
+  // it separately" holds by construction rather than by remembering to filter on `smoke` later.
+  // Same append-across-invocations pattern as fprLogPath above; only written when this invocation
+  // actually ran an oracle case.
+  if (oracleRuns.length > 0) {
+    const modelSlug = model.replace(/[^a-z0-9]+/gi, '-')
+    const oracleLogPath = `calibration/adversarial-dirty-raw.${modelSlug}${isSmoke ? '.smoke' : ''}.json`
+    let priorOracleRuns: unknown[] = []
+    if (existsSync(oracleLogPath)) {
+      const rawPriorLog = readFileSync(oracleLogPath, 'utf-8')
+      try {
+        priorOracleRuns = JSON.parse(rawPriorLog) as unknown[]
+      } catch (err) {
+        // A truncated/corrupted prior log must not crash main() via the top-level main().catch()
+        // handler -- that would lose this invocation's freshly-collected oracleRuns too, not just
+        // the old history. Back the unreadable file up for forensic recovery rather than silently
+        // treating it as empty (which would discard it the moment this write succeeds), then
+        // proceed as if this model had no prior history.
+        const backupPath = oracleLogPath.replace(/\.json$/, `.corrupted-${Date.now()}.json`)
+        writeFileSync(backupPath, rawPriorLog)
+        console.warn(
+          `\nWARNING: ${oracleLogPath} was not valid JSON (${(err as Error).message}). ` +
+            `Backed up unreadable content to ${backupPath} and starting a fresh log for this model.`
+        )
+      }
+    }
+    writeFileSync(oracleLogPath, JSON.stringify([...priorOracleRuns, ...oracleRuns], null, 2))
+    console.log(`\n${oracleRuns.length} oracle run(s) logged to ${oracleLogPath}`)
   }
 
   console.log(`\nCalibration [${model}]: ${passed} passed, ${failed} failed`)

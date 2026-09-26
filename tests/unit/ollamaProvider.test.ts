@@ -174,6 +174,88 @@ describe('OllamaProvider', () => {
         'Ollama HTTP 500'
       )
     })
+
+    // REGRESSION (2026-09-19). calibrate.ts's call site never passed a signal, so every
+    // calibration agent call fell through to this DEFAULT_TIMEOUT_MS (300s) instead of the
+    // configured agentTimeoutMs -- a "retested at 300000ms" conclusion reported as causal was
+    // actually unchanged behavior. These three tests pin THIS FILE's half of that contract --
+    // that chat() actually honors options.signal/options.timeout when given one -- so it cannot
+    // silently regress back to always using DEFAULT_TIMEOUT_MS. They do NOT cover calibrate.ts's
+    // own call site (it has no test coverage by deliberate project convention, tsx-only, excluded
+    // from vitest.config.ts); a future edit that drops the AbortSignal.timeout(agentTimeoutMs)
+    // argument there would reintroduce the exact bug this fixed and nothing here would catch it.
+    it('passes a caller-supplied AbortSignal to fetch unchanged, ignoring the timeout option', async () => {
+      let capturedSignal: AbortSignal | undefined
+      // `init` is optionally-typed and guarded (rather than destructured directly) because
+      // Vitest's own post-test housekeeping re-invokes the last mockImplementation once more
+      // with no arguments after the test body finishes; every mock in this file must tolerate
+      // that phantom call without throwing, the same way stubCapabilities' String(url) does.
+      mockFetch.mockImplementation(async (_url?: string, init?: RequestInit) => {
+        if (!init) return { ok: true, json: async () => ({ message: { content: 'ok' } }) }
+        capturedSignal = init.signal as AbortSignal
+        return { ok: true, json: async () => ({ message: { content: 'ok' } }) }
+      })
+      const controller = new AbortController()
+      const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
+      await provider.chat([{ role: 'user', content: 'test' }], {
+        signal: controller.signal,
+        timeout: 999_999,
+      })
+      expect(capturedSignal).toBe(controller.signal)
+    })
+
+    it('enforces a caller-supplied timeout instead of the 300s internal default', async () => {
+      mockFetch.mockImplementation(
+        (_url?: string, init?: RequestInit) =>
+          new Promise((resolve, reject) => {
+            const signal = init?.signal as AbortSignal | undefined
+            // See the phantom-invocation note above: a no-args call must resolve, not hang or
+            // throw, since nothing awaits it.
+            if (!signal) {
+              resolve({ ok: true, json: async () => ({ message: { content: 'ok' } }) })
+              return
+            }
+            signal.addEventListener('abort', () => reject(new Error('aborted')))
+          })
+      )
+      const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
+      const start = Date.now()
+      await expect(
+        provider.chat([{ role: 'user', content: 'test' }], { timeout: 30 })
+      ).rejects.toThrow()
+      // Generous upper bound: proves the 30ms configured timeout governed this call, not
+      // DEFAULT_TIMEOUT_MS (300_000ms), which this assertion would fail under.
+      expect(Date.now() - start).toBeLessThan(5_000)
+    })
+
+    it('produces two different enforced deadlines for two different caller-supplied timeouts', async () => {
+      mockFetch.mockImplementation(
+        (_url?: string, init?: RequestInit) =>
+          new Promise((resolve, reject) => {
+            const signal = init?.signal as AbortSignal | undefined
+            if (!signal) {
+              resolve({ ok: true, json: async () => ({ message: { content: 'ok' } }) })
+              return
+            }
+            signal.addEventListener('abort', () => reject(new Error('aborted')))
+          })
+      )
+      const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
+
+      const shortStart = Date.now()
+      await expect(
+        provider.chat([{ role: 'user', content: 'test' }], { timeout: 20 })
+      ).rejects.toThrow()
+      const shortElapsed = Date.now() - shortStart
+
+      const longStart = Date.now()
+      await expect(
+        provider.chat([{ role: 'user', content: 'test' }], { timeout: 150 })
+      ).rejects.toThrow()
+      const longElapsed = Date.now() - longStart
+
+      expect(longElapsed).toBeGreaterThan(shortElapsed)
+    })
   })
 
   describe('ping', () => {

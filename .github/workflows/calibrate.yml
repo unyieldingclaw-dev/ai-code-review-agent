@@ -74,3 +74,14 @@ jobs:
         run: npm run calibrate
         env:
           OLLAMA_URL: http://localhost:11434
+          # calibrate.ts's agent-invocation call site never passed a signal, so every run here
+          # has always been silently governed by OllamaProvider's own hardcoded 300s default,
+          # not DEFAULT_CONFIG.agentTimeoutMs (180000) -- confirmed 2026-09-19 by reading
+          # base.ts/ollamaProvider.ts directly. That call site now honors this value for real
+          # (calibrate.ts passes AbortSignal.timeout(agentTimeoutMs) explicitly), so this pins
+          # calibration to the ~300s budget it always effectively ran under rather than letting
+          # the newly-real 180s default cut into a fixture (adversarial-dirty) already measured
+          # at a nonzero timeout rate even at 300s. Production's real timeout enforcement
+          # (src/core/runner.ts's withTimeout) is untouched by this -- this only affects the
+          # calibration harness's own budget.
+          CALIBRATION_TIMEOUT_MS: '300000'

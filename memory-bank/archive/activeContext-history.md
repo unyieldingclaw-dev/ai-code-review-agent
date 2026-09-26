@@ -1,5 +1,22 @@
 # Active Context — archived history
 
+## Moved out 2026-09-18 (170 lines against 150 limit; superseded by "#84/#85/#86/#87 merged")
+
+**`#83` merged 2026-09-13. `#84`'s branch then had to absorb that merge**: its own
+`policy`/`filteredFiles` real-merge additions conflicted with `#83`'s `earlyExit`/`agentsPlanned`
+additions in the same 10 files. Resolved by combining both (neither regresses the other) — full
+domain code-review + independent opposition review + 908-test suite, pushed as `b7634e2`.
+
+**Opposition review of that merge found a real gap**, fixed as a same-PR fast-follow:
+`mergePolicy` promoted an agent to "skipped entirely" using the wrong denominator once chunking
+could exit early — `mergeToolAvailability` already guarded the analogous claim via a
+`coverageIncomplete` param; `mergePolicy` now takes the same param (`2039538`). A **second** bug
+surfaced by a full `/change-review` of the resulting branch: `mergePolicy` could return a
+truthy-but-empty `{agentsSkipped: [], reason: {}}` instead of `undefined`, a shape the non-chunked
+path can never produce — fixed to mirror the `mergeToolAvailability`/`mergeFilteredFiles`
+undefined-when-empty pattern (`c3b184b`). Both mutation-tested: reverting each fix reproduces the
+exact test failures it resolves.
+
 ## Moved out 2026-09-17 (191 lines against 150 limit after that session's updates)
 
 **Two handoffs merged** (2026-08-31, and 2026-09-01). `handoff.md` is **gitignored**, so until each

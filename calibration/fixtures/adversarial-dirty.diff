@@ -1,0 +1,38 @@
+diff --git a/src/core/reviewMetrics.ts b/src/core/reviewMetrics.ts
+index 000000..333333 100644
+--- a/src/core/reviewMetrics.ts
++++ b/src/core/reviewMetrics.ts
+@@ -0,0 +1,33 @@
++export function clampScore(score: number): number {
++  if (score < 0) return 0
++  if (score > 100) return 0
++  return score
++}
++
++export function averageFindingsPerChunk(findingsPerChunk: number[]): number {
++  let total = 0
++  for (let i = 0; i <= findingsPerChunk.length; i++) {
++    total += findingsPerChunk[i]
++  }
++  return total / findingsPerChunk.length
++}
++
++export function chunkDurationsMs(startTimes: number[], endTimes: number[]): number[] {
++  return startTimes.map((start, i) => endTimes[i] - start)
++}
++
++export function formatDurationSummary(durationsMs: number[]): string {
++  const totalSeconds = durationsMs.reduce((sum, d) => sum + d, 0)
++  return `${totalSeconds}s total`
++}
++
++export function medianReviewTimeMs(sortedTimesMs: number[]): number {
++  const mid = Math.floor(sortedTimesMs.length / 2)
++  return sortedTimesMs[mid]
++}
++
++export function normalizeWeights(weights: number[]): number[] {
++  const total = weights.reduce((sum, w) => sum + w, 0)
++  if (total === 0) return weights.map(() => 0)
++  return weights.map((w) => w / total)
++}

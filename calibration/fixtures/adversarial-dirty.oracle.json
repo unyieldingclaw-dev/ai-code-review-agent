@@ -1,0 +1,75 @@
+{
+  "version": "1.0.0",
+  "fixtureFile": "calibration/fixtures/adversarial-dirty.diff",
+  "createdAt": "2026-09-18",
+  "notes": "Pre-registered before any model saw the fixture, per the checkpoint agreed in docs/superpowers/plans/2026-09-18-acr-model-comparison-devstral-ornith-qwen.md. Do not edit after any trial has run; a revision requires a new version string and a fresh N=20 run under it.",
+  "defects": [
+    {
+      "id": "D1-clamp-upper-bound",
+      "category": "straightforward-local-bug",
+      "location": {
+        "file": "src/core/reviewMetrics.ts",
+        "function": "clampScore",
+        "lineStart": 1,
+        "lineEnd": 5,
+        "primaryLine": 3
+      },
+      "mechanism": "The upper-bound branch (`if (score > 100) return 0`) returns 0 instead of 100 when score exceeds 100, silently zeroing valid high scores instead of clamping them to the maximum.",
+      "expectedConsequence": "Any score above 100 is reported as 0 rather than 100 -- a silent, severe undercount for exactly the inputs the clamp exists to handle.",
+      "minimumEvidence": "Finding cites reviewMetrics.ts / clampScore (line 1-5, primarily line 3) AND states that scores above 100 produce 0 (or equivalent: 'returns zero instead of the clamped maximum', 'high scores are zeroed'). Merely noting 'no upper bound check' without identifying that the existing branch returns the WRONG value (0, not 100) is location-correct/mechanism-wrong, not exact."
+    },
+    {
+      "id": "D2-offbyone-nan-propagation",
+      "category": "obvious-location-reasoning-required-consequence",
+      "location": {
+        "file": "src/core/reviewMetrics.ts",
+        "function": "averageFindingsPerChunk",
+        "lineStart": 7,
+        "lineEnd": 13,
+        "primaryLine": 9
+      },
+      "mechanism": "The loop condition `i <= findingsPerChunk.length` reads one index past the array's end. `findingsPerChunk[length]` is `undefined`; `total += undefined` immediately becomes `NaN`, and `NaN` propagates through every subsequent addition and the final division.",
+      "expectedConsequence": "averageFindingsPerChunk returns NaN for EVERY call regardless of input (verified: both a 3-element array and an empty array return NaN) -- not a small numerical error, a total failure of the function's stated purpose.",
+      "minimumEvidence": "Finding cites reviewMetrics.ts / averageFindingsPerChunk (line 7-13, primarily line 9 or the loop) AND identifies the off-by-one / out-of-bounds array read as the mechanism (accessing index `length`). Recognizing either the out-of-bounds read or its NaN consequence counts, since they are the same fact at different points in the causal chain -- but a finding that only says 'this loop looks suspicious' or flags something else about the function (e.g. missing null check on the array) without identifying the boundary read is location-correct/mechanism-wrong."
+    },
+    {
+      "id": "D3-ms-seconds-unit-mismatch",
+      "category": "cross-function-data-flow-bug",
+      "location": {
+        "file": "src/core/reviewMetrics.ts",
+        "function": "formatDurationSummary (consuming chunkDurationsMs's output)",
+        "lineStart": 15,
+        "lineEnd": 22,
+        "primaryLine": 21
+      },
+      "mechanism": "`chunkDurationsMs` correctly returns durations in milliseconds (per its own name and the `Ms` suffix). `formatDurationSummary` sums those millisecond values into `totalSeconds` and labels the result 's' (seconds) without ever dividing by 1000 -- the variable name claims a unit conversion that never happens in the code.",
+      "expectedConsequence": "Verified: two chunks of 5000ms and 3000ms produce '8000s total' -- a claimed 8000 seconds (over 2 hours) for what is actually 8 seconds of real duration, a 1000x overstatement purely from the unit mislabeling.",
+      "minimumEvidence": "Finding identifies that a millisecond value is being treated/labeled as seconds without conversion -- must reference the unit mismatch specifically (not just 'this variable name is confusing' or a generic naming complaint). Citing only `chunkDurationsMs` OR only `formatDurationSummary` in isolation without connecting the units across both is mechanism-correct/location-imprecise, since the defect only exists at the boundary between the two functions."
+    },
+    {
+      "id": "D4-empty-array-median",
+      "category": "boundary-condition-bug",
+      "location": {
+        "file": "src/core/reviewMetrics.ts",
+        "function": "medianReviewTimeMs",
+        "lineStart": 24,
+        "lineEnd": 27,
+        "primaryLine": 26
+      },
+      "mechanism": "No guard for an empty input array. For `sortedTimesMs = []`, `mid = Math.floor(0/2) = 0`, and `sortedTimesMs[0]` on an empty array is `undefined` -- returned as-is despite the declared return type `number`.",
+      "expectedConsequence": "Verified: called with zero review times, the function returns `undefined`, not `0`, not `NaN`, not a thrown error -- a value that violates its own declared return type and will silently corrupt any downstream arithmetic or string templating that assumes a number.",
+      "minimumEvidence": "Finding cites reviewMetrics.ts / medianReviewTimeMs (line 24-27) AND identifies the empty-array case specifically (not just 'no input validation' in general) as producing an incorrect/undefined result. A finding about the function's median algorithm being wrong for a DIFFERENT reason (e.g. even-length arrays not averaging the two middle elements) is a real but different observation and does not satisfy this oracle entry -- score it as an unrelated finding for this defect, not as detection, and note it separately since it is still a legitimate finding, just not the planted one."
+    }
+  ],
+  "trap": {
+    "id": "T1-guarded-division-normalizeWeights",
+    "location": {
+      "file": "src/core/reviewMetrics.ts",
+      "function": "normalizeWeights",
+      "lineStart": 29,
+      "lineEnd": 33
+    },
+    "whyTempting": "Contains a division (`w / total`) that pattern-matches to the 'unguarded division / possible divide-by-zero' shape flagged elsewhere in this experiment's clean-fixture results, but `total === 0` is checked immediately before and short-circuits with an all-zero return. Verified: normalizeWeights([0,0,0]) returns [0,0,0], no NaN, no throw.",
+    "scoring": "This function has NO oracle defect. Any finding whose cited location falls within lines 29-33 is an unrelated false positive by construction, exactly like a finding on `adversarial-clean`'s already-guarded functions -- it is not scored against any defect ID and never counts toward recall."
+  }
+}

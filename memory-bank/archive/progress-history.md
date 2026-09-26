@@ -1,5 +1,192 @@
 # Progress — archived history
 
+Fifth move, 2026-09-19: the five sections below (Corrections from PMB, #78 merged, #77 merged, the
+four "known, not fixed" follow-up items, and Session closed — all 2026-08-28) came across because
+`progress.md` reached 405 lines against its 400 hard max while today's timeout-plumbing-bug
+correction and new dated entry were being added. All five predate every open item currently tracked
+in `progress.md`; nothing in them is still active.
+
+## ✅ Corrections from PMB, verified in their checkout (2026-08-28)
+
+Two peer sessions (PMB, and the outgoing ACR session) sent the same three corrections after
+`handoff.md` was written. **All verified directly in PMB's repo rather than accepted on assertion**
+— the standing rule here, and both sides have been wrong before.
+
+- **"Awaiting the v1.2.1 tag" was the wrong frame, and it invited polling.** The release policy is
+  approved but **not implemented**; it needs its own PMB contract and is the user's call to
+  schedule. Confirmed: newest tag `v1.0.4`, nothing for 1.1.x or 1.2.x. Blocked on work nobody has
+  started, not work in flight — a distinction that changes what a successor should do with it.
+- **The ACR-provenance entry is committed but not landed** — `2052c3c` on PMB's
+  `fix/block-tier-case-sensitivity`, 3 commits ahead of `main`, unmerged. Our 616 s hedge survived:
+  the entry records that we decline to call the resemblance confirmed, because a resemblance cannot
+  promote an unsourced number to evidence. **One wording drift flagged back to them and accepted:**
+  their entry said we judge the resemblance _strong_, an adjective we never used, where our record
+  says _suggestive, not established_. PMB corrected it and left the correction visible rather than
+  overwriting silently — **their stated reason**, from their message: a silent fix "would have
+  erased the evidence that cross-project wording drifts, which is the thing worth keeping."
+  **Their fix is uncommitted** — `2052c3c` still reads "strong" (verified); they will name the
+  commit when it lands. Operative hedge was intact throughout; only the adjective was wrong.
+- **`mb upgrade` synchronises less than it prints** — read in `scripts/mb.sh`. `ADVISORY_CREATE`
+  (all 15 `standards/*.md`) is copied only when absent. Mechanics and the specific file pair this
+  will desynchronise on our next upgrade: `techContext.md`.
+
+## ✅ #78 merged, and disproved its own reasoning (2026-08-28)
+
+Squashed to `2711d4e`. It cleared the stale `main` hash from `activeContext.md` and argued, in its
+own PR body, that "a current hash belongs here, since this section exists to state current state."
+
+**That was wrong, and merging it was the disproof.** The moment #78 landed, `activeContext.md`
+claimed `874b784` while `main` was `2711d4e` — stale again, by exactly one commit, four minutes
+later. The defect is **self-invalidating, not merely decaying**: a memory-bank PR moves the very
+commit it names, so the value cannot be correct once written. Two consecutive PRs tried to keep it
+current and both shipped stale.
+
+Fixed by removing the hash rather than updating it a third time; the rule is in `systemPatterns.md`,
+with the exception that matters — a **release tag** is safe to record because nothing can move it.
+
+## ✅ #77 merged (2026-08-28)
+
+Squashed to `874b784`; branch deleted local and remote, stale remote-tracking ref pruned. Carried the
+handoff merge, the `standards/MEMORY-BANK.md` constant fix, and the four-item follow-up below.
+
+**A merge was reported before it had happened, and the check caught it.** Asked to do post-merge
+cleanup, three independent signals disagreed: `gh pr view` said `OPEN` with `mergedAt: null`,
+`origin/main` was unmoved at `c284d57`, and the branch tip was contained in no main ref. Branch
+protection turned out not to be the cause — `mergeStateStatus` was `CLEAN` and required checks
+passed; the click simply had not landed. **Deleting the local branch on the reported state would
+have discarded the only copy of three commits.** Generalisable, and the same shape as the `v1.15.0`
+tagging incident where a rejected merge went unnoticed: verify a merge against `origin/main` and the
+PR's own `mergedAt`, never against the report that it happened.
+
+## ✅ Follow-up: the four "known, not fixed" items (2026-08-28)
+
+Two turned out to be **PMB's, and neither can reach us** — reported upstream as one defect, which
+PMB confirmed in their own tree and extended:
+
+- Their `templates/memory-bank/README.md` handoff-threshold fix (80% → 40%, in `2052c3c`) is in
+  **neither** ownership array. `memory-bank/*` is init-only, so it reaches new projects only —
+  silently, with no diff notice. Our copy will read 80% against a `CLAUDE.md` reading 40%
+  indefinitely.
+- Their `standards/MEMORY-BANK.md` `=50` fix is real and correct upstream, and `ADVISORY_CREATE`
+  means it can never arrive either. We fixed our copy independently the same day; **two correct
+  fixes that cannot meet.**
+
+**Root cause, agreed with PMB:** ownership class answers "may the adopter customize this file" and
+is being asked to also answer "how does a correction reach them". Those are orthogonal, and
+collapsing them is why the `=50` drift survived however many upgrades. PMB added a fourth case we
+had missed (`templates/AGENTS.md`, no distribution path at all) and confirmed the
+`memory-bank-size.yml` collision guard is **filename-based**, so its stated intent — "a project with
+its own CI keeps it" — does not hold for us, whose gate is `ci.yml`. Delivery table in
+`techContext.md`. Not ours to fix; surfaced to the operator with our reasoning attached.
+
+**One finding retracted on evidence.** We had filed `standards/MEMORY-BANK.md` pointing at
+`docs/archive/` as staleness. It is correct upstream — PMB uses `docs/archive/` consistently and has
+no `memory-bank/archive/`. **We** are the divergence. Retracted to PMB directly.
+
+**The two genuinely ours are fixed.** `techContext.md` claimed the remote branch was `master` (it is
+`main`) inside a "Current State (as of 2026-06-06)" block whose every line had rotted — 19 tests
+against 826, 20 commits against 456. Fixed the way the threshold was: **the section no longer
+restates state**, it points at `npm test`, `git`, and `progress.md`. A stale per-file test table and
+a hardcoded test count in the scripts block went the same way.
+
+**And the cap pressure is structurally resolved, not trimmed.** Moving the upgrade _procedure_ next
+to the upgrade _mechanics_ in `techContext.md`, and the `BaseAgent` parse-stage mechanics and agent
+thinking config out of `systemPatterns.md`, took `activeContext.md` from 149/150 to 122 and
+`systemPatterns.md` from 299/300 to 276. Both now have real headroom. Neither is inside the target
+range in `README.md`, and closing that gap further would mean removing live operational rules — a
+judgment call left open rather than made quietly.
+
+## ✅ Session closed (2026-08-28)
+
+**Twelve PRs merged (#65–#76) before this entry was written, nothing half-done.** The hash that sat
+here decayed within the day — #77 landed after it, which is exactly the "record the delta, not the
+level" failure this file warns about; current `main` is in `activeContext.md`. `npm run check` green, 826
+tests across 47 files, `npm audit` clean, no open PRs, no stashes. Eight of the twelve were the
+v1.15.0 release and docs audit (#65–#72); the remaining four were memory-bank corrections (#73–#76),
+recorded below. `handoff.md` was merged into the memory bank and deleted on 2026-08-28.
+
+**Merging it required archiving first, and the first attempt at that went wrong.**
+`activeContext.md` was at 149/150 and `systemPatterns.md` at 299/300, so material had to move before
+anything new could land. The first pass **compressed instead of moving**, and a five-lens review
+caught it deleting substance outright: `pre-push-check.*` as the second PMB-defect example, `#69`'s
+`run.cmd`-is-interactive and not-a-required-check clauses, the `INCOMPLETE` glyph rationale, and the
+middle `elapsedMs` round — the one that carries the rule's whole point. All restored, to `archive/`
+where historical and to the live file where still operative.
+
+**The structural fix was moving the standing capability inventory out of `activeContext.md`** into
+`techContext.md`, which is where an inventory of what exists belongs; that file's frontmatter scopes
+it to focus, blockers and next steps. That moved 22 lines out of `activeContext.md`; archiving the
+2026-08-26 section moved 104 out of `progress.md`. Deltas, not levels — the levels decay, and this
+file's own rule says so. **Cap pressure was the cause
+of the deletions, not an unrelated inconvenience** — compressing to fit is how substance gets lost,
+which is why the rule in `memory-bank/README.md` says archive rather than trim.
+
+Fourth move, 2026-09-18: the section below (`#84`'s merge with `#83`, its two fast-follow fixes,
+and its full change-review) came across because `progress.md` reached 420 lines against its 400
+hard max after that session's model-comparison update. Fully superseded by the
+"`#84`/`#85`/`#86`/`#87` all merged" entry now at the top of `progress.md`, which covers the same
+merge plus what happened after (`#85`'s own conflict resolution and `testgen` gap).
+
+## 🔎 #84's merge with #83, two fast-follow fixes, and a full change-review (2026-09-13–17)
+
+**#83 merged 2026-09-13, so #84's branch had to absorb it.** Both PRs touched the same 10 files
+additively (#83: `earlyExit`/`agentsPlanned` visibility; #84: `policy`/`filteredFiles` real-merge).
+Resolved by combining both — domain code-review + independent opposition review + the full test
+suite (908 tests) — pushed as `b7634e2`. Neither feature regressed the other.
+
+**Fast-follow #1 (`2039538`): `mergePolicy` needed the same `coverageIncomplete` guard
+`mergeToolAvailability` already had.** Found by opposition review of the merge itself: once
+chunking can exit early, "skipped in every chunk that ran" is not "skipped entirely" — the
+remaining chunks were never examined and might disprove it. Same fix shape as `mergeToolAvailability`,
+mutation-tested (reverting reproduces the exact failures it resolves).
+
+**Fast-follow #2 (`c3b184b`): `mergePolicy` could return `{agentsSkipped: [], reason: {}}`
+instead of `undefined`.** Found by a full `/change-review` of the resulting branch — this is a
+shape the non-chunked path (`runner.ts:938`, gated on `agentsSkipped.length > 0`) can never
+produce, contradicting the documented `--format json` contract for any consumer checking
+truthiness rather than `.agentsSkipped.length`. Fixed to match `mergeToolAvailability`'s and
+`mergeFilteredFiles`'s existing undefined-when-empty pattern. Mutation-tested the same way.
+
+**The full `/change-review` (9 jobs + ACR + opposition) found no Blocking findings**, but several
+real Medium ones worth a fast-follow:
+
+- `policy.agentsSkipped`'s "fully skipped" predicate (`result.policy?.agentsSkipped.length > 0`) is
+  reimplemented independently in all 4 formatters (`cli/formatter.ts`, `githubAnnotations.ts`,
+  `mcp/formatter.ts`, `sarif.ts`) instead of sharing one `schema.ts` helper, unlike the sibling
+  `filteredFiles` concept (`agentsWithNarrowedView`/`narrowedFileCount`). Opposition review checked
+  this against the file's own documented 3-incident drift history (`toolAvailability`,
+  `locationCheck`, `earlyExit`) and judged it a real but lesser risk — those incidents were all
+  silent _omissions_ on some surface; this predicate is uniformly present on all 4, just
+  duplicated. Medium, not High.
+- Every test fixture for "N files withheld" text has narrowed-agent-count == distinct-file-count
+  (2≈2 or 1≈1), so a `narrowedFileCount(result)` / `agentsWithNarrowedView(result).length`
+  copy-paste swap would render the wrong number and pass every test undetected.
+- `tests/unit/mcp/formatter.test.ts` lacks the "policy note doesn't flip the headline to
+  INCOMPLETE" regression test that markdown and SARIF both have. Safe today by inspection
+  (`mcp/formatter.ts` routes policy notes to `toolNotes`, never `warnings`), but unguarded.
+- `chunkRunner.ts`'s `mergedFilteredFiles` post-processing has the identical
+  truthy-but-empty-object hazard fast-follow #2 fixed for `mergePolicy`, but the one test
+  exercising it asserts only `merged.filteredFiles?.security`, not the whole object.
+
+**ACR (local Ollama swarm) reported 5 "high"/"blocking:true" findings — all 5 confirmed
+fabricated**, independently by the orchestrator and by the opposition reviewer reading the actual
+cited lines: every finding cites the wrong `file:line`, and 4 of 5 quote code that already
+null-guards via `?.`/`??`/`&&` — the exact guard being flagged AS the bug is the fix. All 5
+self-reported `locationCheck: mismatch`/`unknown`. Concrete data point for the still-outstanding
+Task Contract Proposal on ACR's hallucination pattern (`activeContext.md`).
+
+**Two smaller issues, found by opposition review, fixed inline rather than left open (`b63793f`):**
+`active-task.json`'s scope array was missing 3 files the contract's own work touched (`README.md`,
+`src/core/schema.ts`, `tests/unit/mcp/formatter.test.ts`); a pre-existing comment in
+`chunkRunner.ts` and two in `chunkRunner.test.ts` cited `runner.ts:931` for the policy-gating line
+— code had shifted since, the real line is 938 (comment-only, no behavior change). Also fixed: a
+stale `--format json` example in `README.md` still showed `"policy": {"agentsSkipped": [],
+"reason": {}}` next to a `filteredFiles`-only scenario, contradicting the rule this same PR added
+three lines below it.
+
+Pushed to `origin/fix/filtered-files-visibility` 2026-09-17. Full report in this session's
+transcript; not duplicated here.
+
 Third move, 2026-09-17: the two sections below (`chunkRunner` merge policy detail, and the
 `filteredFiles` invisibility investigation) came across because `progress.md` reached 397 lines
 against its 400 hard max after that session's #84 update. Both are superseded by the
