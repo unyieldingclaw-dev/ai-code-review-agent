@@ -1,0 +1,1146 @@
+diff --git a/.claude/contracts/active-task.json b/.claude/contracts/active-task.json
+index dd490a6..1d38921 100644
+--- a/.claude/contracts/active-task.json
++++ b/.claude/contracts/active-task.json
+@@ -1,87 +1,18 @@
+ {
+-  "task": "Make ReviewResult.earlyExit visible on ALL SIX output surfaces with a truthful agent-coverage denominator, record chunk coverage when the chunk loop breaks early, and stop chunkRunner claiming full coverage. No exit-code change.",
++  "task": "Resolve #84's merge conflict against current main by combining #84's policy/filteredFiles real-merge additions with #83's already-merged earlyExit/agentsPlanned visibility additions, without regressing either.",
+   "status": "complete",
+-  "created_at": "2026-08-31T19:30:35Z",
+-  "expires_at": "2026-09-01T03:30:35Z",
+-  "approved_by": "user (\"revise the contract to the six-surface scope\", 2026-08-31), superseding the four-surface contract approved earlier the same day",
+-  "supersedes": "four-surface contract; scope doubled after an adversarial design pass returned yes-with-changes on all six fronts",
+-  "design_review": "docs/superpowers/plans/2026-08-31-early-exit-visibility-design-review.md",
+-  "notes": "SIX surfaces, not four. The four-formatter rule in systemPatterns.md never reached the last two because neither is a formatter: (5) .github/workflows/review.yml:147-150 is a hand-rolled github-script PR-comment renderer whose ONLY result read is result.findings, posting a green check on zero findings -- the highest-visibility surface in the repo; (6) vscode-extension does not even DECLARE earlyExit/agentStatus/truncation in its ReviewResult (types.ts:33-37) and prints a bare count plus a green check (output.ts:29-31), so it is missing the ENTIRE incompleteness contract, not just earlyExit. BLOCKERS from the design pass: (a) the denominator is NOT constant across chunks -- agent selection depends on each chunk diff via the migration-safety gate (runner.ts:714-717) and evaluatePolicy over extractChangedFiles (:719-724), so last-chunk-wins is wrong and max is only a floor; a chunking:{total,reviewed} field is needed instead; (b) SARIF executionSuccessful is the WRONG field -- a fail-fast stop is the tool obeying instructions; (c) the denominator trap recurs at mcp/formatter.ts:23, not only cli/formatter.ts:29; (d) the CLI no-findings early-return path still renders a green check. CONSTRAINTS from the PMB consumer, verified in their checkout: no exit-code change, and a consumer who never passes --fail-fast must still be protected. review.yml is a CI change (CONFIRM tier in CLAUDE.md) -- included deliberately by the scope approval, not incidentally. review.yml turned out to be TWO renderers, not one -- the PR comment and the Step Summary each parsed findings.json independently. Both now go through scripts/reviewIncompleteness.cjs so they cannot drift, the same single-renderer discipline as formatRunTiming. Also folded in (user directive, not a separate task): the wall-clock flake in tests/unit/runner.test.ts, both instances.",
+-  "open_subdecision": "RESOLVED 2026-08-31: user approved bringing vscode-extension to FULL parity, not earlyExit alone. It was missing truncation and agentStatus visibility too, having received none of the incompleteness work -- the four-formatter rule enumerates formatters and this is a second renderer behind a duplicated type. renderReport had zero test coverage, which is how it drifted; vscode-extension/tests/output.test.ts now covers all four states.",
++  "created_at": "2026-09-14T02:24:12Z",
++  "expires_at": "2026-09-14T10:24:12Z",
+   "scope": [
+-    {
+-      "file": "src/core/schema.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "src/core/runner.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "src/core/chunkRunner.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "src/cli/formatter.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "src/mcp/formatter.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "src/cli/formatters/sarif.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "src/cli/formatters/githubAnnotations.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "src/cli/index.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": ".github/workflows/review.yml",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "vscode-extension/src/types.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "vscode-extension/src/output.ts",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "tests/unit",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "CHANGELOG.md",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "docs/superpowers/plans/2026-08-31-early-exit-visibility-design-review.md",
+-      "op": "create"
+-    },
+-    {
+-      "file": ".claude/contracts/active-task.json",
+-      "op": "edit"
+-    },
+-    {
+-      "file": "vscode-extension/tests/output.test.ts",
+-      "op": "create"
+-    },
+-    {
+-      "file": "scripts/reviewIncompleteness.cjs",
+-      "op": "create"
+-    }
+-  ],
+-  "completion_notes": "Approved by code review after four Blocking findings were fixed and mutation-proved, plus two non-blocking findings from the opposition pass folded in rather than deferred (per operator directive against spun-out follow-up tasks). Opposition verdict: Approve. Final: npm run check exit 0, 875 tests / 48 files, extension 40 tests, esbuild build clean.",
+-  "review_findings": "Code review found FOUR Blocking defects, all fixed and each mutation-proved: (1) the incompleteness predicate was duplicated across four TS files, which the design review had already flagged as blocker O2 -- now centralised in schema.ts; (2) mergeToolAvailability merged to 'used' when the chunk loop broke early, claiming a completed gitleaks scan over a diff it never saw, and claiming it by SILENCE since 'used' renders nothing; (3) earlyExit alone triggered a partial-review claim even when zero agents were skipped, because shouldEarlyExit runs after the LAST agent too -- producing \"INCOMPLETE - 0 findings from 3/3 agents that completed\"; (4) an absent agentsPlanned made the denominator fall back to the count that RAN, so the ratio was tautological. Three of those four were blockers the projects own design-review document had already named and this implementation shipped past. Also fixed: a Math.max that could fall below mergeAgentStatus union size, printing a NEGATIVE agent count into a PR annotation; and CRLF endings that broke prettier --check.",
+-  "test_accounting": "29 new tests. 17 are regression tests (12 main-suite + 5 extension), proven by reverting every behaviour change at once and confirming each expected failure message. 6 are explicitly-labelled guards. The remaining 6, in tests/unit/reviewIncompleteness.test.ts, CANNOT be falsified by that method because scripts/reviewIncompleteness.cjs is a new module with no prior version to revert to -- they are unit tests for new pure functions and are deliberately NOT counted as regression evidence. Plus 6 further tests added for the four blocker fixes, each mutation-proved separately.",
+-  "known_not_fixed": "systemPatterns.md still states the four-formatter rule when there are demonstrably six; not edited here because memory-bank changes live on a separate uncommitted branch and editing both would conflict. Non-blocking test gaps left open and named rather than silently closed: truncation+earlyExit combined, a CLI-wiring test that the footer renders exactly once, noEmoji variants of the new banners, and SARIF notification ordering. Also: the no-findings verdict line restates agent counts but omits chunk coverage (opposition finding C); mcp/formatter.ts re-derives its gate from the sub-predicates rather than calling isIncomplete directly (equivalent, verified, but inconsistent); and the INCOMPLETE-headline/exit-0 asymmetry is documented only in CHANGELOG.md, not in a code comment as the design review O9 suggested.",
+-  "completed_at": "2026-08-31T22:24:33Z",
+-  "opposition_findings": "Opposition found three beyond the domain agents, two now fixed: (A) the three copies of the incompleteness gate ACTUALLY DIVERGED -- scripts/reviewIncompleteness.cjs gated on  where schema.ts floors at 0 and the vscode copy checks , so a malformed envelope made the PR comment claim a partial review while every other surface stayed silent. Latent, not live, but it falsified the exact property the shared module exists to guarantee. (B) toolAvailability 'partial' has two producers with opposite meanings; chunkRunner reusing it made the report say \"part of the diff was never analyzed\" and \"nothing was left unscanned\" two lines apart. Prose is now conditional on the cause. (C) the no-findings verdict omits chunk info while restating agent counts -- verbose and lossy, not silent; left, and named in known_not_fixed."
++    { "file": ".claude/contracts/active-task.json", "op": "edit" },
++    { "file": "CHANGELOG.md", "op": "edit" },
++    { "file": "src/cli/formatter.ts", "op": "edit" },
++    { "file": "src/cli/formatters/githubAnnotations.ts", "op": "edit" },
++    { "file": "src/cli/formatters/sarif.ts", "op": "edit" },
++    { "file": "src/core/chunkRunner.ts", "op": "edit" },
++    { "file": "src/mcp/formatter.ts", "op": "edit" },
++    { "file": "tests/unit/formatters/githubAnnotations.test.ts", "op": "edit" },
++    { "file": "tests/unit/formatters/markdown.test.ts", "op": "edit" },
++    { "file": "tests/unit/formatters/sarif.test.ts", "op": "edit" }
++  ]
+ }
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 99fd46d..73bebc1 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -55,6 +55,73 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+   `timings[0].effectiveTimeoutMs` directly — the number they were always about, and one that does
+   not move under load.
+ 
++- **`policy.agentsSkipped` could contradict `agentStatus` and `summary.byAgent` in the same
++  `--chunk` result.** Found by the PMB peer against a real 7-chunk run and reproduced
++  independently: an agent skipped on some chunks (every file in that chunk matched an
++  `agentPolicy` exclude) but not others was reported as skipped for the **entire run**, while the
++  same object's `agentStatus` said it ran fine and `summary.byAgent` showed it had findings.
++
++  The merge across chunks (added earlier in this same `filteredFiles`/`policy` promotion) computed
++  the fraction of chunks that skipped an agent using the wrong denominator: chunks that reported
++  **any** skip, rather than the total chunk count. `runner.ts` attaches a `policy` field to a
++  chunk's result only when something was skipped in that chunk — a chunk where the agent ran
++  cleanly carries no `policy` field at all, not an empty one — so that chunk was silently excluded
++  from both sides of the fraction and could never disprove a false full-run skip.
++
++  The test fixtures meant to catch exactly this modeled a "nothing skipped" chunk as an explicit
++  `{ agentsSkipped: [], reason: {} }` object, which is truthy and so was counted correctly by the
++  buggy code — masking the defect, because that is not the shape a real run produces.
++
++- **A partially-excluded agent no longer reports as a clean run.** `agentPolicy` excludes take
++  effect two different ways and only one of them was ever rendered. The whole-agent skip fires only
++  when EVERY changed file matches an exclude (`policyFilter.ts:47`, via `matchesAll`, which is
++  `files.every(...)`). On a mixed diff the match is partial, so `policy.agentsSkipped` stays empty,
++  the excluded sections are stripped from that agent's input, the stripping is recorded in
++  `filteredFiles` — and no rendered surface printed it. Markdown, SARIF, github-annotations and MCP
++  all reported a clean run.
++
++  **Adding one non-excluded file SUPPRESSED the signal**, which is the opposite of what a reader
++  would guess, and reaching it needs no flag at all — unlike the `earlyExit` case, which needs
++  `--fail-fast`. Measured on `--profile security`, where `security` and `adversarial` both exclude
++  `**/*.md`: a diff of six `.md` files plus one `.sh` left those two agents reviewing one file of
++  seven, and every surface called it clean.
++
++  All four formatters now name the affected agents and how many files were withheld. **`--format
++json` was never affected** — `formatJson` is `JSON.stringify(result, null, 2)` and the runner
++  already spread `filteredFiles` onto the envelope — so consumers reading the raw envelope always
++  had the data and still do. SARIF now carries `filteredFiles` in run properties for that same
++  reason: a consumer computing its own coverage needs the mapping, not a rendered sentence.
++
++  **A partial exclusion renders at the policy-note tier and deliberately does not flip the
++  INCOMPLETE headline.** The exclusion is configured and the agents did run; gating the headline on
++  it would fire on nearly every mixed diff — in a documentation-heavy repo, most of them — and
++  train the reader past the banner that matters.
++
++  Scope is the four formatters. `review.yml` and `vscode-extension` also render a verdict, but
++  carry none of this policy/filteredFiles narrowing yet — the `scripts/reviewIncompleteness.cjs`
++  module those two surfaces now share (see above) covers only `earlyExit`/`agentsPlanned`/
++  `chunking`, not this feature. Extending it to policy/filteredFiles is separate follow-up work,
++  not a gap in this change.
++
++- **Under `--chunk`, an agent narrowed in one chunk no longer reports as fully covered.**
++  `chunkRunner`'s merge policy listed `filteredFiles` among "purely diagnostic metadata" and took
++  whichever chunk ran last. That premise held only while nothing rendered the field. Now that four
++  formatters raise a coverage warning from it, a narrowing in chunk 1 followed by a clean chunk 3
++  silently reported full coverage — the same defect the warning exists to prevent, reappearing one
++  layer up. `filteredFiles` is now merged per agent as a sorted union across chunks: the same
++  promotion `toolAvailability` received once `partial` made it a claim about coverage rather than a
++  diagnostic detail.
++
++  `policy` moved with it, and needed more than a union. An agent skipped on one chunk may have
++  run on another, so carrying that into the merged `agentsSkipped` would render "skipped
++  entirely — their domains were not reviewed" about an agent that did review most of the diff.
++  The merge therefore keeps `agentsSkipped` for agents skipped in **every** chunk, and demotes a
++  partial skip to the narrowed-diff note by attributing that chunk's files to `filteredFiles`.
++  Each case is now reported once, and truthfully.
++
++  `filteredFiles` is also documented in the `--format json` envelope for the first time, since
++  this change makes it the field a consumer needs to compute coverage.
++
+ ### Notes
+ 
+ - **No exit code changed.** A fail-fast run still exits `0`. Routing it to `3` was considered and
+diff --git a/README.md b/README.md
+index ff02e0b..dcbb59b 100644
+--- a/README.md
++++ b/README.md
+@@ -456,6 +456,7 @@ Every `--format json` response includes a stable envelope:
+   "agentStatus": { "security": "ok", "correctness": "timeout" },
+   "sanitizer": { "enabled": true, "applied": false, "redactedLines": 0, "warnings": [] },
+   "policy": { "agentsSkipped": [], "reason": {} },
++  "filteredFiles": { "security": ["docs/notes.md"] },
+   "context": { "mode": "memory-bank", "filesLoaded": [], "truncated": false, "estimatedTokens": 0 },
+   "timings": [
+     {
+@@ -484,7 +485,15 @@ Every `--format json` response includes a stable envelope:
+   because the code is clean or because every agent failed; only this field distinguishes them.
+ - `testFiles` is always present and empty unless `--suggest-tests` or `--write-tests` was passed.
+   Each entry is `{ path, content, framework }`. A default run never writes files.
+-- `policy` only appears when at least one agent was skipped by policy rules.
++- `policy` only appears when at least one agent was skipped by policy rules. An agent is listed
++  only if **every** changed file matched its excludes — under `--chunk`, only if that held for
++  every chunk.
++- `filteredFiles` only appears when an `agentPolicy` exclude removed file sections from an
++  agent's input **without** skipping the agent outright, and maps that agent to the paths it
++  never saw. **Check it alongside `agentStatus` before trusting a clean result**: those agents
++  ran and reported honestly on a reduced diff, so nothing in `findings` or `agentStatus` shows
++  the gap. It is the common case, not the rare one — a partial match leaves `policy` empty, so
++  a diff mixing excluded and non-excluded files lands here rather than there.
+ - `context` only appears when `--context memory-bank` is active.
+ - `timings` carries **one row per review pass**. Without `--chunk` there is exactly one; with
+   `--chunk` there is one per chunk, concatenated in order — never summed. Every result this tool
+diff --git a/src/cli/formatter.ts b/src/cli/formatter.ts
+index 9fbda37..0bbc474 100644
+--- a/src/cli/formatter.ts
++++ b/src/cli/formatter.ts
+@@ -2,6 +2,8 @@ import type { ReviewResult, Severity } from '../core/schema.js'
+ import {
+   TOOL_LABELS,
+   toolsWithAvailability,
++  agentsWithNarrowedView,
++  narrowedFileCount,
+   agentsRanCount,
+   agentsPlannedCount,
+   earlyExitLostCoverage,
+@@ -54,6 +56,12 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
+   // sanitizer footer at least -- redactedLines is a measured count that a 0-finding run
+   // currently drops. Left alone here rather than changed in passing.
+   const timingLines = buildTimingLines(result)
++  // Built here beside timingLines and pushed on BOTH exit paths, for the same reason that block is:
++  // the no-findings path returns early, and a run whose agents were handed a reduced diff and then
++  // reported nothing is exactly when "0 findings" needs qualifying. The sanitizer and context
++  // footers stay findings-path-only, which this file already calls arguably wrong; for this field
++  // it is not arguable -- it was the whole defect.
++  const policyLines = buildPolicyLines(result)
+ 
+   lines.push('# AI Code Review Report')
+   lines.push('')
+@@ -324,6 +332,7 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
+                 : 'No issues found.'
+       )
+     }
++    lines.push(...policyLines)
+     lines.push(...timingLines)
+     return lines.join('\n')
+   }
+@@ -401,16 +410,53 @@ export function formatMarkdown(result: ReviewResult, options?: { noEmoji?: boole
+     lines.push(`*Context: ${mode} — loaded ${fileList || 'no files'} (~${estimatedTokens} tokens)*`)
+   }
+ 
+-  if (result.policy && result.policy.agentsSkipped.length > 0) {
+-    lines.push('---')
+-    lines.push(`*Policy: ${result.policy.agentsSkipped.join(', ')} skipped by agentPolicy rules.*`)
+-  }
++  lines.push(...policyLines)
+ 
+   lines.push(...timingLines)
+ 
+   return lines.join('\n')
+ }
+ 
++/**
++ * Policy notes: agents skipped outright, and agents whose view of the diff was narrowed.
++ *
++ * WHY the narrowed case needs a line of its own: the whole-agent skip fires only when EVERY changed
++ * file matches an exclude, so a mixed diff produces a partial match, leaves `agentsSkipped` empty,
++ * and silently strips the excluded sections from that agent's input. Adding ONE non-excluded file
++ * to a documentation diff therefore suppressed the only signal the report carried. Measured on
++ * `--profile security`, where `security` and `adversarial` both exclude markdown: two agents saw
++ * one file of seven and every rendered surface reported a clean run.
++ *
++ * WHY it does not flip the INCOMPLETE headline: the exclusion is deliberate configuration and the
++ * agents did run. Gating the headline on it would fire on nearly every mixed diff -- in a
++ * documentation-heavy repo, most of them -- and train the reader past the banner that matters.
++ * Same line mcp/formatter.ts draws for a documented degraded tool.
++ */
++function buildPolicyLines(result: ReviewResult): string[] {
++  const skipped = result.policy?.agentsSkipped ?? []
++  const narrowed = agentsWithNarrowedView(result)
++  if (skipped.length === 0 && narrowed.length === 0) return []
++  // The leading '' is load-bearing, exactly as in buildTimingLines: in CommonMark a '---'
++  // directly beneath a paragraph is a setext heading UNDERLINE, so a bare '---' here promotes
++  // the verdict line to an <h2> and swallows its own rule. That was harmless-ish while this
++  // footer only ever followed other footers on the findings path -- the state buildTimingLines
++  // describes as "pre-existing, left alone". Pushing it on the no-findings path put it directly
++  // beneath "No issues found.", which is the line a skimming reader treats as THE result, so
++  // the one-line fix that comment prescribes is taken here rather than deferred again.
++  const out: string[] = ['', '---']
++  if (skipped.length > 0) {
++    out.push(`*Policy: ${skipped.join(', ')} skipped by agentPolicy rules.*`)
++  }
++  if (narrowed.length > 0) {
++    const n = narrowedFileCount(result)
++    out.push(
++      `*Policy: ${narrowed.join(', ')} reviewed a reduced diff — ${n} file${n === 1 ? '' : 's'} ` +
++        `withheld in total by agentPolicy excludes. No other agent covers their domain.*`
++    )
++  }
++  return out
++}
++
+ function buildTimingLines(result: ReviewResult): string[] {
+   if (!result.timings || result.timings.length === 0) return []
+   // The leading '' is load-bearing, not spacing. In CommonMark a line of '---' directly beneath
+diff --git a/src/cli/formatters/githubAnnotations.ts b/src/cli/formatters/githubAnnotations.ts
+index 97b48e0..96f4406 100644
+--- a/src/cli/formatters/githubAnnotations.ts
++++ b/src/cli/formatters/githubAnnotations.ts
+@@ -7,6 +7,7 @@
+ // agents or a truncated diff is never indistinguishable from a clean, fully-analyzed one.
+ 
+ import type { ReviewResult, Finding, Severity } from '../../core/schema.js'
++import { agentsWithNarrowedView, narrowedFileCount } from '../../core/schema.js'
+ import { agentsRanCount, missedChunks, earlyExitLostCoverage } from '../../core/schema.js'
+ 
+ function severityToAnnotationLevel(severity: Severity): 'error' | 'warning' | 'notice' {
+@@ -77,6 +78,26 @@ export function formatGithubAnnotations(result: ReviewResult): string {
+         `::warning::Diff truncated: reviewed ${result.truncation.keptLines}/${result.truncation.originalLines} lines — results may be incomplete`,
+       ]
+     : []
++  // Distinguished from the deliberately-excluded `timings` by that note's own second test: there
++  // is no other signal for this on this surface. A PR reviewer reading annotations has no way to
++  // learn that the security agent was handed a reduced diff.
++  const narrowedAgents = agentsWithNarrowedView(result)
++  const policyLines = [
++    ...(result.policy && result.policy.agentsSkipped.length > 0
++      ? [
++          `::warning::${escapeAnnotationValue(
++            `agentPolicy skipped ${result.policy.agentsSkipped.join(', ')} entirely — those domains were not reviewed`
++          )}`,
++        ]
++      : []),
++    ...(narrowedAgents.length > 0
++      ? [
++          `::warning::${escapeAnnotationValue(
++            `agentPolicy withheld ${narrowedFileCount(result)} file(s) in total from ${narrowedAgents.join(', ')} — those agents reviewed a reduced diff`
++          )}`,
++        ]
++      : []),
++  ]
+   // WHY earlyExit is rendered here when `timings` deliberately is not, given the exclusion note
+   // above applies to "a diagnostic about the run rather than a defect in the code under review":
+   // that note's SECOND reason is the distinguishing test, and it does not hold here. For timings,
+@@ -112,11 +133,20 @@ export function formatGithubAnnotations(result: ReviewResult): string {
+   const missed = missedChunks(result)
+   const chunkLines = missed
+     ? [
+-        `::warning::Chunked review stopped early: ${missed.reviewed}/${missed.total} chunks analyzed — part of the diff was never reviewed`,
++        `::warning::${escapeAnnotationValue(
++          `Chunked review stopped early: ${missed.reviewed}/${missed.total} chunks analyzed — part of the diff was never reviewed`
++        )}`,
+       ]
+     : []
+   const findingLines = result.findings.map(findingToAnnotation)
+-  return [...warningLines, ...truncationLines, ...earlyExitLines, ...chunkLines, ...findingLines]
++  return [
++    ...warningLines,
++    ...truncationLines,
++    ...policyLines,
++    ...earlyExitLines,
++    ...chunkLines,
++    ...findingLines,
++  ]
+     .filter((l) => l.length > 0)
+     .join('\n')
+ }
+diff --git a/src/cli/formatters/sarif.ts b/src/cli/formatters/sarif.ts
+index 95554f2..48ccffe 100644
+--- a/src/cli/formatters/sarif.ts
++++ b/src/cli/formatters/sarif.ts
+@@ -4,6 +4,7 @@ import { readFileSync } from 'fs'
+ import { fileURLToPath } from 'url'
+ import { dirname, join } from 'path'
+ import type { ReviewResult, Finding, Severity } from '../../core/schema.js'
++import { agentsWithNarrowedView, narrowedFileCount } from '../../core/schema.js'
+ import { missedChunks, isIncomplete, earlyExitLostCoverage } from '../../core/schema.js'
+ 
+ const __dirname = dirname(fileURLToPath(import.meta.url))
+@@ -69,6 +70,7 @@ function buildInvocation(result: ReviewResult) {
+   const failedAgents = Object.entries(result.agentStatus ?? {}).filter(
+     ([, status]) => status !== 'ok'
+   )
++  const narrowedAgents = agentsWithNarrowedView(result)
+   const chunksMissed = missedChunks(result)
+   // A design review objected that `executionSuccessful: false` is semantically wrong for
+   // --fail-fast, and the objection is half right: SARIF defines the field as whether the TOOL
+@@ -84,6 +86,22 @@ function buildInvocation(result: ReviewResult) {
+   // the detail is not left guessing.
+   const executionSuccessful = !isIncomplete(result)
+   const notifications = [
++    // A note, not an error, and it does not clear executionSuccessful: the exclusion is configured
++    // and the agents ran. It exists so a consumer reading the detail can see which domains were
++    // handed a reduced diff.
++    ...(narrowedAgents.length > 0
++      ? [
++          {
++            level: 'note' as const,
++            message: {
++              text:
++                `agentPolicy withheld ${narrowedFileCount(result)} file(s) in total from ` +
++                `${narrowedAgents.join(', ')} — those agents reviewed a reduced diff, and no ` +
++                `other agent covers their domain.`,
++            },
++          },
++        ]
++      : []),
+     ...(result.earlyExit && earlyExitLostCoverage(result)
+       ? [
+           {
+@@ -156,6 +174,11 @@ export function formatSarif(result: ReviewResult): string {
+             ? { policy: result.policy }
+             : {}),
+           ...(result.agentStatus ? { agentStatus: result.agentStatus } : {}),
++          // Machine-read alongside the note above: a consumer computing its own coverage needs
++          // which files went to which agent, not a rendered sentence.
++          ...(result.filteredFiles && Object.keys(result.filteredFiles).length > 0
++            ? { filteredFiles: result.filteredFiles }
++            : {}),
+           ...(result.truncation?.truncated ? { truncation: result.truncation } : {}),
+           // Machine-read alongside the invocation notification above, not instead of it: a
+           // consumer computing its own coverage ratio needs the numbers, and agentStatus alone
+diff --git a/src/core/chunkRunner.ts b/src/core/chunkRunner.ts
+index 322c3cd..01fc9a1 100644
+--- a/src/core/chunkRunner.ts
++++ b/src/core/chunkRunner.ts
+@@ -16,13 +16,21 @@
+ // internal truncation applies within it, same as it always has for an over-max-lines diff) -- a
+ // much narrower, already-handled edge case than the general boundary-split this replaces.
+ //
+-// Known, accepted simplification: purely diagnostic metadata (policy, filteredFiles, context)
++// Known, accepted simplification: purely diagnostic metadata (context)
+ // reflects whichever chunk ran LAST, not a true merge across chunks -- acceptable for an opt-in
+ // feature, since none of it gates an exit code, and losing an earlier chunk's copy of it costs
+ // nothing the user-facing report still depends on.
+ // toolAvailability was on that list until 'partial' existed, and no longer qualifies: a partial
+ // first chunk followed by a clean one rendered as a COMPLETED tool scan, which is a claim about
+ // security coverage rather than a diagnostic detail. See mergeToolAvailability below.
++// filteredFiles left that list for the same reason and by the same test: it was diagnostic only
++// while nothing rendered it, and four formatters now raise a coverage warning from it. Under
++// last-chunk-wins an agent handed a reduced diff in chunk 1 but a full one in chunk 3 reports as
++// fully covered -- which is precisely the defect that warning was added to prevent, reappearing
++// one layer up. See mergeFilteredFiles below.
++// policy followed it for the same reason and in the same change: this class of exclusion is now
++// rendered on all four formatters, so last-chunk-wins could assert an agent had been skipped
++// entirely on the strength of the final chunk alone. See mergePolicy and attributeChunkSkips.
+ // agentStatus and evidenceCheckFilter are the two exceptions and ARE merged across all chunks
+ // (see mergeAgentStatus/mergeEvidenceCheckFilter below): agentStatus feeds cli/index.ts's exit
+ // code 2, so a last-chunk-wins simplification there would let a real failure in an earlier chunk
+@@ -48,20 +56,22 @@ import type {
+   GeneratedTestFile,
+   AgentName,
+   AgentStatus,
++  PolicyResult,
+   EvidenceCheckFilterMetadata,
+   ToolAvailability,
+   ToolAvailabilityMetadata,
+ } from './schema.js'
+ import { SEVERITY_RANK, TOOL_LABELS } from './schema.js'
+ import { splitByFileBoundary } from './diffSplit.js'
++import { extractChangedFiles } from './policyFilter.js'
+ 
+ // Re-exported for the existing chunkRunner.test.ts contract tests; defined in diffSplit.ts so
+ // leaf consumers (claimSupport) need not import this orchestration module.
+ //
+ // Merge policy across chunks is per-field, and the reason differs per field -- see each
+ // helper's own comment rather than inferring a rule from the grouping. The shapes in use:
+-//   last-chunk-wins  policy, filteredFiles, context, coverageGapFilter
+-//   merged           agentStatus, toolAvailability, evidenceCheckFilter
++//   last-chunk-wins  context, coverageGapFilter
++//   merged           agentStatus, toolAvailability, evidenceCheckFilter, filteredFiles, policy
+ //   concatenated     hallucinationFilter.dropped, timings
+ //   summed           summary.durationMs, sanitizer.redactedLines
+ //   concat + re-cap  findings (via capAndSort, to restore the global ordering invariant)
+@@ -86,7 +96,7 @@ export async function runChunked(
+   for (const chunkDiff of chunks) {
+     const chunkInput: ReviewInput = { ...input, diff: chunkDiff }
+     const result = await runner.run(chunkInput, onProgress, contextMode)
+-    results.push(result)
++    results.push(attributeChunkSkips(result, chunkDiff))
+     if (result.earlyExit) break // --fail-fast should stop across chunks too, not just within one
+   }
+ 
+@@ -150,6 +160,17 @@ function mergeResults(
+   const mergedHallucinationFilter =
+     droppedAcrossChunks.length > 0 ? { dropped: droppedAcrossChunks } : undefined
+   const mergedToolAvailability = mergeToolAvailability(results, results.length < totalChunks)
++  const mergedPolicy = mergePolicy(results)
++  // A fully-skipped agent is reported by agentsSkipped; leaving it in filteredFiles too would
++  // render both "skipped entirely" and "reviewed a reduced diff" for the same agent.
++  const mergedFilteredFilesAll = mergeFilteredFiles(results)
++  const mergedFilteredFiles = mergedFilteredFilesAll
++    ? (() => {
++        const out = { ...mergedFilteredFilesAll }
++        for (const agent of mergedPolicy?.agentsSkipped ?? []) delete out[agent]
++        return Object.keys(out).length > 0 ? out : undefined
++      })()
++    : undefined
+ 
+   // CONCATENATED, never summed -- and this is the one line the whole field depends on.
+   // `durationMs` (summed at the top of this function) is correct for a "how long did the review
+@@ -209,13 +230,13 @@ function mergeResults(
+     // chunked run has already taken -- but the JUSTIFICATION was false, and it was the only thing
+     // standing between an abandoned chunk loop and a report that looked complete. `chunking`
+     // above now carries that state instead, without moving any exit code.
+-    ...(last.policy ? { policy: last.policy } : {}),
++    ...(mergedPolicy ? { policy: mergedPolicy } : {}),
+     ...(mergedAgentStatus ? { agentStatus: mergedAgentStatus } : {}),
+     ...(mergedHallucinationFilter ? { hallucinationFilter: mergedHallucinationFilter } : {}),
+     ...(last.coverageGapFilter ? { coverageGapFilter: last.coverageGapFilter } : {}),
+     ...(mergedToolAvailability ? { toolAvailability: mergedToolAvailability } : {}),
+     ...(mergedEvidenceCheckFilter ? { evidenceCheckFilter: mergedEvidenceCheckFilter } : {}),
+-    ...(last.filteredFiles ? { filteredFiles: last.filteredFiles } : {}),
++    ...(mergedFilteredFiles ? { filteredFiles: mergedFilteredFiles } : {}),
+     ...(timings.length > 0 ? { timings } : {}),
+   }
+ }
+@@ -258,6 +279,83 @@ function mergeEvidenceCheckFilter(
+  * changes says nothing about npm audit, and must not degrade a verdict another chunk legitimately
+  * earned.
+  */
++// An agent skipped for THIS chunk saw none of THIS chunk's files -- but it may have run on other
++// chunks, so carrying that into the merged agentsSkipped would render "skipped entirely ... their
++// domains were not reviewed", which would be false. A per-chunk skip is precisely a narrowed view
++// of the overall diff, which filteredFiles already renders truthfully, so the chunk's files are
++// attributed there instead. mergePolicy then keeps agentsSkipped for agents skipped in EVERY
++// chunk, and mergeResults strips those agents back out of filteredFiles so a full skip is reported
++// once rather than twice.
++function attributeChunkSkips(result: ReviewResult, chunkDiff: string): ReviewResult {
++  const skipped = result.policy?.agentsSkipped ?? []
++  if (skipped.length === 0) return result
++  const files = extractChangedFiles(chunkDiff)
++  if (files.length === 0) return result
++  const filteredFiles: Partial<Record<AgentName, string[]>> = { ...(result.filteredFiles ?? {}) }
++  for (const agent of skipped) {
++    filteredFiles[agent] = [...new Set([...(filteredFiles[agent] ?? []), ...files])].sort()
++  }
++  return { ...result, filteredFiles }
++}
++
++// Intersection, not union: "skipped entirely" is only true if every chunk skipped it. Was
++// last-chunk-wins, which reported whatever the final chunk happened to say -- arbitrary for an
++// agent skipped on some chunks and not others.
++//
++// BUG FIXED 2026-09-12, found by the PMB peer and reproduced independently. The denominator
++// must be the total chunk count, not the count of chunks that reported ANY skip.
++// `runner.ts:931` attaches `policy` to a chunk result ONLY when something was skipped in that
++// chunk -- a chunk where the agent ran cleanly has NO policy field at all, not an empty one.
++// Dividing by `withPolicy.length` silently dropped exactly the chunks that would disprove a
++// full-run skip from both the numerator and the denominator. Reproduced: two all-`.md` chunks
++// (agent skipped in both) plus one `.ts` chunk (agent ran and found something) still reported
++// the agent as skipped for the ENTIRE run -- directly contradicting `agentStatus` and
++// `summary.byAgent` in the same result object. The test fixtures meant to catch this modeled
++// "nothing skipped this chunk" as an explicit `{ agentsSkipped: [], reason: {} }` object, which
++// is truthy and so was counted correctly by the buggy code -- masking the bug, because that is
++// not the shape `runner.ts` actually emits.
++function mergePolicy(results: ReviewResult[]): PolicyResult | undefined {
++  const withPolicy = results.filter((r) => r.policy)
++  if (withPolicy.length === 0) return undefined
++  const counts = new Map<AgentName, number>()
++  const firstReason: Partial<Record<AgentName, string>> = {}
++  for (const r of withPolicy) {
++    for (const agent of r.policy!.agentsSkipped) {
++      counts.set(agent, (counts.get(agent) ?? 0) + 1)
++      firstReason[agent] ??= r.policy!.reason[agent]
++    }
++  }
++  // results.length (every chunk), NOT withPolicy.length (chunks with any skip) -- see the
++  // incident note above.
++  const agentsSkipped = [...counts.entries()]
++    .filter(([, n]) => n === results.length)
++    .map(([agent]) => agent)
++    .sort()
++  const reason: Partial<Record<AgentName, string>> = {}
++  for (const agent of agentsSkipped) {
++    const r = firstReason[agent]
++    if (r !== undefined) reason[agent] = r
++  }
++  return { agentsSkipped, reason }
++}
++
++// See the header comment for why this is merged rather than last-chunk-wins. Union per agent:
++// a file withheld from an agent in ANY chunk was withheld from that agent for the run, so the
++// warning must survive a later chunk that happened to exclude nothing. Sorted so the rendered
++// output is deterministic regardless of chunk order, matching agentsWithNarrowedView's sort.
++function mergeFilteredFiles(
++  results: ReviewResult[]
++): Partial<Record<AgentName, string[]>> | undefined {
++  const merged: Partial<Record<AgentName, string[]>> = {}
++  for (const r of results) {
++    for (const [agent, files] of Object.entries(r.filteredFiles ?? {})) {
++      const key = agent as AgentName
++      merged[key] = [...new Set([...(merged[key] ?? []), ...(files ?? [])])].sort()
++    }
++  }
++  return Object.keys(merged).length > 0 ? merged : undefined
++}
++
+ function mergeToolAvailability(
+   results: ReviewResult[],
+   coverageIncomplete: boolean
+diff --git a/src/core/schema.ts b/src/core/schema.ts
+index fa53456..7d353be 100644
+--- a/src/core/schema.ts
++++ b/src/core/schema.ts
+@@ -225,6 +225,35 @@ export const TOOL_LABELS: Record<keyof ToolAvailabilityMetadata, string> = {
+   lizard: 'lizard',
+ }
+ 
++/**
++ * Agents whose view of the diff was NARROWED by agentPolicy without the agent being skipped.
++ *
++ * WHY this is distinct from `policy.agentsSkipped`, and why it needed a renderer of its own: the
++ * whole-agent skip fires only when EVERY changed file matches an exclude pattern
++ * (`policyFilter.ts`, `matchesAll`). On a mixed diff -- say six `.md` files and one `.sh` -- the
++ * match is partial, `agentsSkipped` stays empty, and the excluded sections are simply stripped
++ * from those agents' input and recorded here. The result is that adding ONE non-excluded file
++ * SUPPRESSES the only signal the report had, which is the opposite of what a reader would guess.
++ *
++ * Measured on `--profile security`, where `security` and `adversarial` both exclude `**\/*.md`:
++ * two agents reviewed one file of seven and every rendered surface reported a clean run.
++ */
++export function agentsWithNarrowedView(result: ReviewResult): string[] {
++  return Object.entries(result.filteredFiles ?? {})
++    .filter(([, files]) => (files?.length ?? 0) > 0)
++    .map(([agent]) => agent)
++    .sort()
++}
++
++/** Total file sections withheld from at least one agent by an agentPolicy exclude. */
++export function narrowedFileCount(result: ReviewResult): number {
++  const all = new Set<string>()
++  for (const files of Object.values(result.filteredFiles ?? {})) {
++    for (const f of files ?? []) all.add(f)
++  }
++  return all.size
++}
++
+ /** Tool keys whose reported availability matches `state`, in TOOL_LABELS order. */
+ export function toolsWithAvailability(
+   toolAvailability: ToolAvailabilityMetadata | undefined,
+diff --git a/src/mcp/formatter.ts b/src/mcp/formatter.ts
+index 3658042..099eaeb 100644
+--- a/src/mcp/formatter.ts
++++ b/src/mcp/formatter.ts
+@@ -2,6 +2,8 @@ import type { Finding, ReviewResult } from '../core/schema.js'
+ import {
+   TOOL_LABELS,
+   toolsWithAvailability,
++  agentsWithNarrowedView,
++  narrowedFileCount,
+   agentsRanCount,
+   agentsPlannedCount,
+   earlyExitLostCoverage,
+@@ -93,6 +95,22 @@ export function formatMcpOutput(result: ReviewResult): string {
+           : `findings for the remainder came from the model, not the tool.`)
+     )
+   }
++  // This surface read neither `policy` nor `filteredFiles`, so a skipped agent and a narrowed one
++  // were both invisible to a caller that has no terminal to check against.
++  if (result.policy && result.policy.agentsSkipped.length > 0) {
++    toolNotes.push(
++      `🔧 Policy: ${result.policy.agentsSkipped.join(', ')} were skipped entirely by agentPolicy ` +
++        `rules — their domains were not reviewed.`
++    )
++  }
++  const narrowedAgents = agentsWithNarrowedView(result)
++  if (narrowedAgents.length > 0) {
++    const n = narrowedFileCount(result)
++    toolNotes.push(
++      `🔧 Policy: ${narrowedAgents.join(', ')} reviewed a reduced diff — ${n} file${n === 1 ? '' : 's'} ` +
++        `withheld in total by agentPolicy excludes, and no other agent covers their domain.`
++    )
++  }
+   const degradedTools = toolsWithAvailability(result.toolAvailability, 'unavailable-llm-fallback')
+   if (degradedTools.length > 0) {
+     const names = degradedTools.map((t) => TOOL_LABELS[t]).join(', ')
+diff --git a/tests/unit/chunkRunner.test.ts b/tests/unit/chunkRunner.test.ts
+index 6df1854..870d1f7 100644
+--- a/tests/unit/chunkRunner.test.ts
++++ b/tests/unit/chunkRunner.test.ts
+@@ -258,6 +258,157 @@ describe('runChunked', () => {
+     expect(merged.toolAvailability?.gitleaks).toBe('partial')
+   })
+ 
++  // Regression, and the same shape as the toolAvailability one above. filteredFiles was
++  // last-chunk-wins on the premise that it was purely diagnostic. Four formatters now raise a
++  // coverage warning from it, so a narrowing in chunk 1 followed by a clean chunk 2 reported as
++  // fully covered -- the exact defect that warning was added to prevent, reappearing one layer up.
++  it('merges filteredFiles -- a narrowing in an earlier chunk is not hidden by a later clean one', async () => {
++    const runMock = vi
++      .fn()
++      .mockResolvedValueOnce(makeResult({ filteredFiles: { security: ['docs/a.md'] } }))
++      .mockResolvedValueOnce(makeResult({}))
++    const runner = { run: runMock } as unknown as SwarmRunner
++
++    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
++
++    expect(merged.filteredFiles?.security).toEqual(['docs/a.md'])
++  })
++
++  it('unions filteredFiles per agent across chunks, deduped and sorted', async () => {
++    const runMock = vi
++      .fn()
++      .mockResolvedValueOnce(
++        makeResult({ filteredFiles: { security: ['docs/b.md', 'docs/a.md'] } })
++      )
++      .mockResolvedValueOnce(
++        makeResult({ filteredFiles: { security: ['docs/b.md'], adversarial: ['docs/c.md'] } })
++      )
++    const runner = { run: runMock } as unknown as SwarmRunner
++
++    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
++
++    // Sorted, so the rendered warning does not change wording with chunk order.
++    expect(merged.filteredFiles?.security).toEqual(['docs/a.md', 'docs/b.md'])
++    expect(merged.filteredFiles?.adversarial).toEqual(['docs/c.md'])
++  })
++
++  // makeFileDiff above omits the '--- a/' / '+++ b/' headers a real git diff carries, and
++  // extractChangedFiles reads exactly those. Attribution of a per-chunk skip therefore needs a
++  // realistic diff; the shared helper is left alone because other tests depend on its line counts.
++  const withHeaders = (p: string, bodyLines: number) =>
++    `diff --git a/${p} b/${p}\n--- a/${p}\n+++ b/${p}\n` +
++    Array.from({ length: bodyLines }, (_, i) => `+line ${i}`).join('\n')
++  const twoFilesWithHeaders = () =>
++    [withHeaders('file0.ts', 2500), withHeaders('file1.ts', 2500)].join('\n')
++  const threeFilesWithHeaders = () =>
++    [
++      withHeaders('file0.ts', 2500),
++      withHeaders('file1.ts', 2500),
++      withHeaders('file2.ts', 2500),
++    ].join('\n')
++
++  // policy was last-chunk-wins, so an agent skipped only on the final chunk was reported as
++  // skipped for the whole run and vice versa. Intersection is the only reading under which the
++  // rendered "skipped entirely -- their domains were not reviewed" is true.
++  it('keeps agentsSkipped only for an agent skipped in EVERY chunk', async () => {
++    const skipped = {
++      policy: { agentsSkipped: ['security' as const], reason: { security: 'all files excluded' } },
++    }
++    const runMock = vi
++      .fn()
++      .mockResolvedValueOnce(makeResult(skipped))
++      .mockResolvedValueOnce(makeResult(skipped))
++    const runner = { run: runMock } as unknown as SwarmRunner
++
++    const merged = await runChunked(runner, { diff: twoFilesWithHeaders() }, 2000, 15)
++
++    expect(merged.policy?.agentsSkipped).toEqual(['security'])
++    expect(merged.policy?.reason.security).toBe('all files excluded')
++    // Reported once, as a skip -- not also as a narrowed view of the same agent.
++    expect(merged.filteredFiles?.security).toBeUndefined()
++  })
++
++  it('demotes a partial skip to a narrowed view instead of claiming the agent was skipped entirely', async () => {
++    // Chunk 2 omits `policy` entirely -- the real shape runner.ts:931 emits when nothing was
++    // skipped, not an explicit empty object. Using the wrong shape here is what let the
++    // 2026-09-12 denominator bug through: an explicit `{ agentsSkipped: [], reason: {} }` is
++    // truthy and was (wrongly) counted toward the total, masking the bug it should have caught.
++    const runMock = vi
++      .fn()
++      .mockResolvedValueOnce(
++        makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
++      )
++      .mockResolvedValueOnce(makeResult({}))
++    const runner = { run: runMock } as unknown as SwarmRunner
++
++    const merged = await runChunked(runner, { diff: twoFilesWithHeaders() }, 2000, 15)
++
++    // It ran on chunk 2, so "skipped entirely" would be false.
++    expect(merged.policy?.agentsSkipped).toEqual([])
++    // But it never saw chunk 1's files, which is exactly a reduced diff.
++    expect(merged.filteredFiles?.security).toEqual(['file0.ts'])
++  })
++
++  // The case that separates intersection from last-chunk-wins, and the one the previous two
++  // tests did not reach: both of those had a final chunk that happened to agree with the
++  // intersection, so a reverted merge passed them. Mutation testing surfaced the gap.
++  it('does not claim a whole-run skip on the strength of the last chunk alone', async () => {
++    // Chunk 1 omits `policy` entirely -- see the comment in the previous test for why an
++    // explicit empty object here would mask the exact bug this test exists to catch.
++    const runMock = vi
++      .fn()
++      .mockResolvedValueOnce(makeResult({}))
++      .mockResolvedValueOnce(
++        makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
++      )
++    const runner = { run: runMock } as unknown as SwarmRunner
++
++    const merged = await runChunked(runner, { diff: twoFilesWithHeaders() }, 2000, 15)
++
++    // It ran on chunk 1; last-chunk-wins would have asserted it was skipped for the whole run.
++    expect(merged.policy?.agentsSkipped).toEqual([])
++    expect(merged.filteredFiles?.security).toEqual(['file1.ts'])
++  })
++
++  // REGRESSION (2026-09-12): reported by the PMB peer against a real 7-chunk run, reproduced
++  // independently here. `policy.agentsSkipped` claimed a whole-run skip for an agent that had
++  // plainly run and found something, in the same result object -- verified by cross-referencing
++  // `agentStatus` (`ok`) and `summary.byAgent` (nonzero) at the time. Root cause: the denominator
++  // was `withPolicy.length` (chunks reporting ANY skip), not the total chunk count, so a chunk
++  // where the agent ran cleanly (no `.policy` field, per runner.ts:931) was silently excluded from
++  // both sides of the fraction and could never disprove a full-run skip.
++  it('does not claim a whole-run skip when an untouched-by-skip chunk found something', async () => {
++    const runMock = vi
++      .fn()
++      .mockResolvedValueOnce(
++        makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
++      )
++      .mockResolvedValueOnce(
++        makeResult({ policy: { agentsSkipped: ['security'], reason: { security: 'excluded' } } })
++      )
++      // The chunk where security ran cleanly. No `.policy` field at all -- that is what "nothing
++      // was skipped in this chunk" looks like in real output (agentStatus.security: 'ok' there,
++      // in the real report this reproduces).
++      .mockResolvedValueOnce(makeResult({}))
++    const runner = { run: runMock } as unknown as SwarmRunner
++
++    const merged = await runChunked(runner, { diff: threeFilesWithHeaders() }, 2000, 15)
++
++    // It ran cleanly on chunk 3, so "skipped entirely" would be false -- the buggy denominator
++    // (chunks-with-any-skip = 2) missed this and claimed a whole-run skip anyway.
++    expect(merged.policy?.agentsSkipped).toEqual([])
++    expect(merged.filteredFiles?.security).toEqual(['file0.ts', 'file1.ts'])
++  })
++
++  it('omits filteredFiles entirely when no chunk withheld anything', async () => {
++    const runMock = vi.fn().mockResolvedValue(makeResult({}))
++    const runner = { run: runMock } as unknown as SwarmRunner
++
++    const merged = await runChunked(runner, { diff: makeMultiFileDiff(2) }, 2000, 15)
++
++    expect(merged.filteredFiles).toBeUndefined()
++  })
++
+   // A tool that ran on one chunk and not another covered part of the diff and not the rest, which
+   // is what 'partial' means. Reporting 'unavailable-llm-fallback' here would claim it never ran.
+   it('collapses a used/unavailable disagreement to partial rather than to unavailable', async () => {
+diff --git a/tests/unit/formatters/githubAnnotations.test.ts b/tests/unit/formatters/githubAnnotations.test.ts
+index b68a249..6eff5ea 100644
+--- a/tests/unit/formatters/githubAnnotations.test.ts
++++ b/tests/unit/formatters/githubAnnotations.test.ts
+@@ -352,6 +352,25 @@ describe('formatGithubAnnotations timing', () => {
+   })
+ })
+ 
++describe('formatGithubAnnotations policy notes', () => {
++  it('warns that agents reviewed a reduced diff', () => {
++    const out = formatGithubAnnotations(makeResult({ filteredFiles: { security: ['docs/a.md'] } }))
++    expect(out).toContain('::warning::')
++    expect(out).toContain('agentPolicy withheld 1 file(s) in total from security')
++  })
++
++  it('warns that agents were skipped entirely', () => {
++    const out = formatGithubAnnotations(
++      makeResult({ policy: { agentsSkipped: ['security'], reason: {} } })
++    )
++    expect(out).toContain('agentPolicy skipped security entirely')
++  })
++
++  it('says nothing about policy when neither applies', () => {
++    expect(formatGithubAnnotations(makeResult())).not.toContain('agentPolicy')
++  })
++})
++
+ describe('formatGithubAnnotations — earlyExit', () => {
+   it('emits a warning naming the agent and how many never ran', () => {
+     const out = formatGithubAnnotations(
+@@ -388,3 +407,23 @@ describe('formatGithubAnnotations — earlyExit', () => {
+     expect(out).not.toContain('Fail-fast')
+   })
+ })
++
++describe('policy narrowing and earlyExit combined', () => {
++  // REGRESSION: these two incompleteness causes were added by independent branches that both
++  // touched the same return array, and were merged by hand. This is the only test in this file
++  // that sets both, proving the merge concatenated policyLines and earlyExitLines rather than one
++  // replacing the other.
++  it('emits both the policy-skip warning and the fail-fast warning for the same result', () => {
++    const out = formatGithubAnnotations(
++      makeResult({
++        policy: { agentsSkipped: ['license'], reason: {} },
++        earlyExit: { stoppedAt: 'security' },
++        agentStatus: { coverage: 'ok', correctness: 'ok', security: 'ok' },
++        agentsPlanned: 15,
++      })
++    )
++    expect(out).toContain('agentPolicy skipped license entirely')
++    expect(out).toContain('Fail-fast')
++    expect(out).toContain('12 of 15 agents never ran')
++  })
++})
+diff --git a/tests/unit/formatters/markdown.test.ts b/tests/unit/formatters/markdown.test.ts
+index 7113629..e33e015 100644
+--- a/tests/unit/formatters/markdown.test.ts
++++ b/tests/unit/formatters/markdown.test.ts
+@@ -786,6 +786,118 @@ describe('formatMarkdown timing separator', () => {
+   })
+ })
+ 
++describe('formatMarkdown policy notes', () => {
++  // docs/a.md is withheld from both agents: two entries, one distinct file.
++  const narrowed: Partial<ReviewResult> = {
++    filteredFiles: { security: ['docs/a.md'], adversarial: ['docs/a.md', 'docs/b.md'] },
++  }
++
++  // THE defect this change exists for. A run whose agents were handed a reduced diff and then
++  // found nothing returns through the no-findings early path, which rendered no policy note at
++  // all -- so the least-covered runs were exactly the ones that reported clean.
++  it('names the narrowed agents on the no-findings path', () => {
++    const out = formatMarkdown(makeResult(narrowed))
++    expect(out).toContain('No issues found')
++    expect(out).toContain('reviewed a reduced diff')
++    expect(out).toContain('adversarial, security')
++  })
++
++  it('names the narrowed agents on the findings path', () => {
++    const out = formatMarkdown(
++      makeResult({
++        ...narrowed,
++        findings: [makeFinding()],
++        summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: {}, durationMs: 100 },
++      })
++    )
++    expect(out).toContain('reviewed a reduced diff')
++  })
++
++  it('counts each withheld file once across agents', () => {
++    expect(formatMarkdown(makeResult(narrowed))).toContain('2 files withheld')
++  })
++
++  it('uses the singular for a single withheld file', () => {
++    const out = formatMarkdown(makeResult({ filteredFiles: { security: ['docs/a.md'] } }))
++    expect(out).toContain('1 file withheld')
++    expect(out).not.toContain('1 files withheld')
++  })
++
++  it('still reports agents skipped outright', () => {
++    const out = formatMarkdown(makeResult({ policy: { agentsSkipped: ['security'], reason: {} } }))
++    expect(out).toContain('security skipped by agentPolicy rules')
++  })
++
++  it('reports a skip and a narrowing together', () => {
++    const out = formatMarkdown(
++      makeResult({ ...narrowed, policy: { agentsSkipped: ['license'], reason: {} } })
++    )
++    expect(out).toContain('license skipped by agentPolicy rules')
++    expect(out).toContain('reviewed a reduced diff')
++  })
++
++  it('emits no policy block when nothing was skipped or narrowed', () => {
++    expect(formatMarkdown(makeResult())).not.toContain('*Policy:')
++  })
++
++  it('ignores an agent whose withheld list is empty', () => {
++    expect(formatMarkdown(makeResult({ filteredFiles: { security: [] } }))).not.toContain(
++      '*Policy:'
++    )
++  })
++
++  // Deliberate, and the reason is in buildPolicyLines: the exclusion is configured and the agents
++  // did run. Gating the headline on it would fire on nearly every mixed diff and train the reader
++  // past the banner that matters.
++  it('does not flip the headline to INCOMPLETE', () => {
++    expect(formatMarkdown(makeResult(narrowed))).not.toContain('INCOMPLETE')
++  })
++})
++
++describe('formatMarkdown policy separator', () => {
++  // REGRESSION, asserted on ADJACENCY rather than with toContain, for the reason the timing
++  // separator block above records: in CommonMark a '---' directly beneath a paragraph is a setext
++  // heading underline, not a thematic break. Every policy-note assertion in this file uses
++  // toContain, and every one of them passed while the rendered output promoted the verdict line to
++  // an <h2> and swallowed its own rule. Adjacency is the only assertion that catches it.
++  const rendersRuleNotHeading = (md: string) => {
++    const lines = md.split('\n')
++    const i = lines.findIndex((l) => l.startsWith('*Policy'))
++    expect(i).toBeGreaterThan(0)
++    expect(lines[i - 1]).toBe('---')
++    expect(lines[i - 2]).toBe('')
++  }
++
++  it('does not turn the clean-run verdict into a heading', () => {
++    rendersRuleNotHeading(
++      formatMarkdown(makeResult({ filteredFiles: { security: ['docs/a.md'] } }))
++    )
++  })
++
++  it('does not turn the INCOMPLETE verdict into a heading', () => {
++    rendersRuleNotHeading(
++      formatMarkdown(
++        makeResult({
++          truncation: { truncated: true, originalLines: 12599, keptLines: 2000 },
++          filteredFiles: { security: ['docs/a.md'] },
++        })
++      )
++    )
++  })
++
++  it('does not turn the last footer into a heading on the findings path', () => {
++    rendersRuleNotHeading(
++      formatMarkdown(
++        makeResult({
++          findings: [makeFinding()],
++          summary: { totalFindings: 1, bySeverity: { high: 1 }, byAgent: {}, durationMs: 100 },
++          policy: { agentsSkipped: ['license'], reason: {} },
++        })
++      )
++    )
++  })
++})
++
+ describe('earlyExit that cost no coverage', () => {
+   // shouldEarlyExit is evaluated after EVERY sequential agent including the last one, so a run can
+   // stop "early" having already executed its whole roster. Before this gate, the report said
+@@ -870,3 +982,24 @@ describe('a partial tool scan says which kind of partial it was', () => {
+     expect(output).toContain('nothing was left unscanned')
+   })
+ })
++
++describe('policy narrowing and earlyExit combined', () => {
++  // REGRESSION: these two incompleteness causes were added by independent branches that both
++  // touched the same formatters, and were merged by hand. Every other test in this file exercises
++  // one cause at a time -- this is the only one that sets both, proving the merge combined rather
++  // than replaced either code path.
++  it('renders both the policy-skip note and the fail-fast banner for the same result', () => {
++    const output = formatMarkdown(
++      makeResult({
++        findings: [],
++        policy: { agentsSkipped: ['license'], reason: {} },
++        earlyExit: { stoppedAt: 'security' },
++        agentStatus: { coverage: 'ok', correctness: 'ok', security: 'ok' },
++        agentsPlanned: 15,
++      })
++    )
++    expect(output).toContain('license skipped by agentPolicy rules')
++    expect(output).toContain('INCOMPLETE')
++    expect(output).toContain('12 of 15 agents never ran')
++  })
++})
+diff --git a/tests/unit/formatters/sarif.test.ts b/tests/unit/formatters/sarif.test.ts
+index a3973fb..d5c68f9 100644
+--- a/tests/unit/formatters/sarif.test.ts
++++ b/tests/unit/formatters/sarif.test.ts
+@@ -347,6 +347,38 @@ describe('formatSarif timing', () => {
+   })
+ })
+ 
++describe('formatSarif policy notes', () => {
++  const narrowed: Partial<ReviewResult> = {
++    filteredFiles: { security: ['docs/a.md'], adversarial: ['docs/a.md', 'docs/b.md'] },
++  }
++
++  it('emits a note-level notification naming the narrowed agents', () => {
++    const sarif = JSON.parse(formatSarif(makeResult(narrowed)))
++    const notes = sarif.runs[0].invocations[0].toolExecutionNotifications.filter(
++      (n: { level: string }) => n.level === 'note'
++    )
++    expect(notes).toHaveLength(1)
++    expect(notes[0].message.text).toContain('adversarial, security')
++    expect(notes[0].message.text).toContain('2 file(s)')
++  })
++
++  it('carries filteredFiles in run properties for machine consumers', () => {
++    const sarif = JSON.parse(formatSarif(makeResult(narrowed)))
++    expect(sarif.runs[0].properties.filteredFiles).toEqual(narrowed.filteredFiles)
++  })
++
++  // A note, not an error: the exclusion is configured and the agents ran.
++  it('does not clear executionSuccessful', () => {
++    const sarif = JSON.parse(formatSarif(makeResult(narrowed)))
++    expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(true)
++  })
++
++  it('omits filteredFiles from run properties when nothing was narrowed', () => {
++    const sarif = JSON.parse(formatSarif(makeResult()))
++    expect(sarif.runs[0].properties.filteredFiles).toBeUndefined()
++  })
++})
++
+ describe('formatSarif — earlyExit and chunk coverage', () => {
+   it('does not report a fail-fast run as a successful execution', () => {
+     // executionSuccessful is the field SARIF consumers actually gate on. Leaving it true for a
+@@ -411,3 +443,30 @@ describe('formatSarif — earlyExit and chunk coverage', () => {
+     expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(true)
+   })
+ })
++
++describe('policy narrowing and earlyExit combined', () => {
++  // REGRESSION: these two incompleteness causes were added by independent branches that both
++  // touched buildInvocation's notifications array, and were merged by hand. This is the only test
++  // in this file that sets both, proving the merge combined the two notification lists rather
++  // than one silently overwriting the other.
++  it('emits both a policy note and a fail-fast warning notification for the same result', () => {
++    const sarif = JSON.parse(
++      formatSarif(
++        makeResult({
++          filteredFiles: { security: ['docs/a.md'] },
++          earlyExit: { stoppedAt: 'security' },
++          agentStatus: { coverage: 'ok' },
++          agentsPlanned: 15,
++        })
++      )
++    )
++    const notifications = sarif.runs[0].invocations[0].toolExecutionNotifications
++    const levels = notifications.map((n: { level: string }) => n.level)
++    expect(levels).toContain('note')
++    expect(levels).toContain('warning')
++    const texts = notifications.map((n: { message: { text: string } }) => n.message.text).join(' ')
++    expect(texts).toContain('reviewed a reduced diff')
++    expect(texts).toContain('Fail-fast')
++    expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(false)
++  })
++})
+diff --git a/tests/unit/mcp/formatter.test.ts b/tests/unit/mcp/formatter.test.ts
+index c7a91ea..1c200a5 100644
+--- a/tests/unit/mcp/formatter.test.ts
++++ b/tests/unit/mcp/formatter.test.ts
+@@ -369,3 +369,26 @@ describe('formatMcpOutput timing', () => {
+     expect(formatMcpOutput(makeResult())).toBe('## AI Code Review — ✅ No findings' + '\n')
+   })
+ })
++
++describe('formatMcpOutput policy notes', () => {
++  // This surface read neither policy nor filteredFiles, and its caller is an LLM with no terminal
++  // to cross-check against -- so it was the worst place for the omission to sit.
++  it('names the narrowed agents and counts distinct files', () => {
++    const out = formatMcpOutput(
++      makeResult({
++        filteredFiles: { security: ['docs/a.md'], adversarial: ['docs/a.md', 'docs/b.md'] },
++      })
++    )
++    expect(out).toContain('adversarial, security reviewed a reduced diff')
++    expect(out).toContain('2 files')
++  })
++
++  it('reports agents skipped outright', () => {
++    const out = formatMcpOutput(makeResult({ policy: { agentsSkipped: ['security'], reason: {} } }))
++    expect(out).toContain('skipped entirely by agentPolicy')
++  })
++
++  it('says nothing about policy when neither applies', () => {
++    expect(formatMcpOutput(makeResult())).not.toContain('Policy:')
++  })
++})
