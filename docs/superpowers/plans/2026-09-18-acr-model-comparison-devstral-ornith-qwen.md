@@ -76,15 +76,15 @@ positives across all three models.
 
 ## Results (N=20 each, `adversarial-clean`, 2026-09-18)
 
-| Metric | Devstral (prior) | Ornith-1.5:9b @300s | Qwen3.5:9b @300s |
-| --- | --- | --- | --- |
-| Timeouts | 0 | 3 (15%) | 0 |
-| Clean runs (no findings) | 6/20 (30%) | 3/20 (15%)\* | 9/20 (45%) |
-| Failing runs | 14 | 17\* | 11 |
-| Total false positives | 31 | 20\* | 38 |
-| FPs per failing run | 2.21 | 1.18\* | 3.45 |
-| `locationCheck: verified` | 8 (25.8%) | 11 (55%) | 7 (18.4%) |
-| `locationCheck: mismatch` | 23 (74.2%) | 9 (45%) | 31 (81.6%) |
+| Metric                    | Devstral (prior) | Ornith-1.5:9b @300s | Qwen3.5:9b @300s |
+| ------------------------- | ---------------- | ------------------- | ---------------- |
+| Timeouts                  | 0                | 3 (15%)             | 0                |
+| Clean runs (no findings)  | 6/20 (30%)       | 3/20 (15%)\*        | 9/20 (45%)       |
+| Failing runs              | 14               | 17\*                | 11               |
+| Total false positives     | 31               | 20\*                | 38               |
+| FPs per failing run       | 2.21             | 1.18\*              | 3.45             |
+| `locationCheck: verified` | 8 (25.8%)        | 11 (55%)            | 7 (18.4%)        |
+| `locationCheck: mismatch` | 23 (74.2%)       | 9 (45%)             | 31 (81.6%)       |
 
 \* Ornith's 3 timed-out trials produced no output and are excluded from the failing/FP-density
 denominators; they are not genuinely "clean," they simply never completed.

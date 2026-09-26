@@ -25,13 +25,13 @@ fixture avoids; all ground truth lives in the separate oracle file below, never 
 4 planted defects, 1 intentionally-correct trap, each independently verified against real runtime
 behavior (Node) before being locked in, not just reasoned about:
 
-| ID | Category | Function (lines) | Verified behavior |
-| --- | --- | --- | --- |
-| `D1-clamp-upper-bound` | Straightforward local bug | `clampScore` (1-5) | `clampScore(150)` → `0` (should be `100`) |
-| `D2-offbyone-nan-propagation` | Obvious location, reasoning-required consequence | `averageFindingsPerChunk` (7-13) | Returns `NaN` for every input, including `[]` |
-| `D3-ms-seconds-unit-mismatch` | Cross-function/data-flow bug | `chunkDurationsMs` → `formatDurationSummary` (15-22) | 5000ms+3000ms of real duration renders as `"8000s total"` |
-| `D4-empty-array-median` | Boundary-condition bug | `medianReviewTimeMs` (24-27) | `medianReviewTimeMs([])` → `undefined`, violating the declared `number` return type |
-| `T1-guarded-division-normalizeWeights` (trap, not a defect) | Intentionally correct | `normalizeWeights` (29-33) | `normalizeWeights([0,0,0])` → `[0,0,0]`, no throw, no `NaN` — the `total === 0` guard works |
+| ID                                                          | Category                                         | Function (lines)                                     | Verified behavior                                                                           |
+| ----------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `D1-clamp-upper-bound`                                      | Straightforward local bug                        | `clampScore` (1-5)                                   | `clampScore(150)` → `0` (should be `100`)                                                   |
+| `D2-offbyone-nan-propagation`                               | Obvious location, reasoning-required consequence | `averageFindingsPerChunk` (7-13)                     | Returns `NaN` for every input, including `[]`                                               |
+| `D3-ms-seconds-unit-mismatch`                               | Cross-function/data-flow bug                     | `chunkDurationsMs` → `formatDurationSummary` (15-22) | 5000ms+3000ms of real duration renders as `"8000s total"`                                   |
+| `D4-empty-array-median`                                     | Boundary-condition bug                           | `medianReviewTimeMs` (24-27)                         | `medianReviewTimeMs([])` → `undefined`, violating the declared `number` return type         |
+| `T1-guarded-division-normalizeWeights` (trap, not a defect) | Intentionally correct                            | `normalizeWeights` (29-33)                           | `normalizeWeights([0,0,0])` → `[0,0,0]`, no throw, no `NaN` — the `total === 0` guard works |
 
 The optional 6th category (a `totalChunks`-shaped contract-validation bug) is **excluded from this
 fixture**, per the approved adjustment: upstream reachability of untrusted input was not
@@ -155,7 +155,7 @@ exact append-across-invocations pattern `calibration/calibrate.ts` already has f
 locked run configuration — is presented for sign-off before any of the three models is run against
 it.** A smoke test against the current default model (`devstral:latest`) was run to confirm the new
 calibration case executes end-to-end (agent runs, findings are tagged against the oracle, raw log is
-written) *before* this doc was finalized — a mechanical check that the harness works, not a scored
+written) _before_ this doc was finalized — a mechanical check that the harness works, not a scored
 trial. **Approved 2026-09-18**, with 5 additional procedural protections applied below before trial 1.
 
 **Terminology correction accepted:** `T1-guarded-division-normalizeWeights` is a **negative
@@ -165,11 +165,11 @@ control**, not a fifth defect. 4 known-positive defects + 1 negative control, no
 
 sha256 (first 16 hex chars), computed 2026-09-18, immediately before the first scored trial:
 
-| File | Hash |
-| --- | --- |
-| `calibration/fixtures/adversarial-dirty.diff` | `06a5eccee4e2e255` |
-| `calibration/fixtures/adversarial-dirty.oracle.json` | `c7fa4dc695363174` |
-| This design doc, as it stood *before* this Frozen State section was appended | `f705467439c1613c` |
+| File                                                                                     | Hash               |
+| ---------------------------------------------------------------------------------------- | ------------------ |
+| `calibration/fixtures/adversarial-dirty.diff`                                            | `06a5eccee4e2e255` |
+| `calibration/fixtures/adversarial-dirty.oracle.json`                                     | `c7fa4dc695363174` |
+| This design doc, as it stood _before_ this Frozen State section was appended             | `f705467439c1613c` |
 | `calibration/calibrate.ts` (with per-model logging, hashing, and the `smoke` flag added) | `e866ebf85bc01192` |
 
 **Not committed to git.** Hashes are being used as the freeze mechanism instead, per the explicit
@@ -201,18 +201,18 @@ job, not as a reason to adjust it.
 **Exact-detection recall per defect, denominator = 20 attempted trials (a timeout counts as a
 miss, matching how timeouts were treated in the restraint measurement):**
 
-| Defect | Devstral | Qwen3.5:9b | Ornith-1.5:9b |
-| --- | --- | --- | --- |
-| `D1-clamp-upper-bound` | 0/20 (0%) | 4/20 (20%) | 15/20 (75%) |
-| `D2-offbyone-nan-propagation` | 13/20 (65%) | 16/20 (80%) | 17/20 (85%) |
-| `D3-ms-seconds-unit-mismatch` | 0/20 (0%) | 0/20 (0%) | 0/20 (0%) |
-| `D4-empty-array-median` | 3/20 (15%) | 6/20 (30%) | 10/20 (50%) |
-| **Mean across 4 defects** | **20%** | **32.5%** | **52.5%** |
-| Timeouts | 4/20 (20%) | 0/20 (0%) | 1/20 (5%) |
-| Trap (`T1`) location-hit trials | 9/16 logged (56%) | 6/20 (30%) | 1/19 logged (5%) |
+| Defect                          | Devstral          | Qwen3.5:9b  | Ornith-1.5:9b    |
+| ------------------------------- | ----------------- | ----------- | ---------------- |
+| `D1-clamp-upper-bound`          | 0/20 (0%)         | 4/20 (20%)  | 15/20 (75%)      |
+| `D2-offbyone-nan-propagation`   | 13/20 (65%)       | 16/20 (80%) | 17/20 (85%)      |
+| `D3-ms-seconds-unit-mismatch`   | 0/20 (0%)         | 0/20 (0%)   | 0/20 (0%)        |
+| `D4-empty-array-median`         | 3/20 (15%)        | 6/20 (30%)  | 10/20 (50%)      |
+| **Mean across 4 defects**       | **20%**           | **32.5%**   | **52.5%**        |
+| Timeouts                        | 4/20 (20%)        | 0/20 (0%)   | 1/20 (5%)        |
+| Trap (`T1`) location-hit trials | 9/16 logged (56%) | 6/20 (30%)  | 1/19 logged (5%) |
 
 **`D3`'s 0% is part of the official score for all three models, not excluded or adjusted.** The
-"adjacent bug dominated attention" explanation below is interpretation of *why* the miss happened —
+"adjacent bug dominated attention" explanation below is interpretation of _why_ the miss happened —
 it does not touch the number. Removing or footnoting-away a preregistered defect after seeing that
 every model missed it is exactly the kind of after-the-fact goalpost move this experiment's whole
 methodology exists to prevent. The `20%`/`32.5%`/`52.5%` means above already include `D3`'s `0%` for
@@ -236,11 +236,11 @@ measurement's existed to expose it.
 
 **The honest summary is a precision-recall-runtime frontier, not a winner:**
 
-| Model | Restraint | Recall | Runtime |
-| --- | --- | --- | --- |
-| Devstral | mediocre | **weakest** (20% mean) | degraded on this harder fixture (20% timeouts, 0% before) |
-| Qwen3.5:9b | **best** (45% clean, 18.4% verified) | middle (32.5% mean) | **best** (0% timeouts on both fixtures) |
-| Ornith-1.5:9b | **worst on the clean fixture** (15% clean, 55% verified) | **best** (52.5% mean) | variable / timeout-prone (15%, then 5%) |
+| Model         | Restraint                                                | Recall                 | Runtime                                                   |
+| ------------- | -------------------------------------------------------- | ---------------------- | --------------------------------------------------------- |
+| Devstral      | mediocre                                                 | **weakest** (20% mean) | degraded on this harder fixture (20% timeouts, 0% before) |
+| Qwen3.5:9b    | **best** (45% clean, 18.4% verified)                     | middle (32.5% mean)    | **best** (0% timeouts on both fixtures)                   |
+| Ornith-1.5:9b | **worst on the clean fixture** (15% clean, 55% verified) | **best** (52.5% mean)  | variable / timeout-prone (15%, then 5%)                   |
 
 **No production model change, and deliberately no synthetic scalar score invented to force a
 winner out of this table.** Weighting recall against dangerous-false-positive rate now, having
@@ -250,7 +250,7 @@ beat — it is one of three candidates, and of the three it currently has the we
 no clear advantage on any of the three axes above, where Qwen3.5 and Ornith each have one.
 
 **`D3` was missed by every trial of every model (0/60 total attempts) — a fixture design finding,
-not a model quality signal.** All three models converged on the same *different*, real, but
+not a model quality signal.** All three models converged on the same _different_, real, but
 unplanted observation instead: `chunkDurationsMs` doesn't validate that `startTimes` and `endTimes`
 have equal length. That's a legitimate finding (confirmed: mismatched-length inputs do produce
 `undefined`/`NaN` via the array read), but it is not the ms/seconds unit mismatch this defect was
@@ -267,9 +267,9 @@ diff complexity for every model tested here.
 
 **Classification honesty notes, disclosed rather than smoothed over:**
 
-- A recurring cross-contamination pattern emerged: findings whose *content* clearly describes one
+- A recurring cross-contamination pattern emerged: findings whose _content_ clearly describes one
   location (most often the trap, `normalizeWeights`, or `D3`'s `chunkDurationsMs`/`endTimes` pattern)
-  but whose *cited line* fell inside a different defect's declared range. The deterministic tagger
+  but whose _cited line_ fell inside a different defect's declared range. The deterministic tagger
   correctly reports these as location hits on the wrong defect; manual classification overrode the
   tagger using the finding's actual content, per the design's own stated split of labor (automated:
   location range; manual: mechanism). None of these overrides changed a trial's best-of outcome,
