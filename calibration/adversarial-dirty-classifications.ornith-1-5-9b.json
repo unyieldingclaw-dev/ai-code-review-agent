@@ -1,0 +1,975 @@
+[
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "1",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore returns 0 instead of 100 for out-of-range high scores",
+        "detail": "clampScore clamps any value greater than 100 back to 0 instead of the intended maximum of 100. Any score > 100 (e.g. 150) returns 0.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "2",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore returns 0 for scores above 100 instead of clamping to 100",
+        "detail": "clampScore(150) returns 0 instead of the expected clamped value 100. The upper-bound branch uses `return 0`, which inverts the clamp intent for any score above 100 (e.g. score=150 → 0, score=1000 → 0). This corrupts any downstream metric derived from a clamped score.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "3",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "4",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore maps values above 100 to 0 instead of 100",
+        "detail": "The upper-bound guard reads `if (score > 100) return 0`, which clamps oversized scores to 0 instead of to the intended maximum of 100. Any score above 100 is inverted to the floor of the range.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "5",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "7",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore clamps high scores to 0 instead of 100",
+        "detail": "Scores above the maximum of 100 are clamped down to `0` instead of up to `100`. A score of 150 therefore produces `0`, an incorrect result.",
+        "line": 2
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "8",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "9",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore returns 0 for scores above 100 instead of clamping to 100",
+        "detail": "clampScore's upper-bound guard `if (score > 100) return 0` collapses any score above 100 to 0 instead of clamping it to the maximum value of 100. Input e.g. 150 → returns 0, expected 100.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "10",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore clamps >100 to 0 instead of 100",
+        "detail": "`clampScore` clamps values above 100 to 0 instead of to 100. A score of 150 returns 0, and any score >100 returns 0, corrupting the returned value (and inverts intent for high scores).",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "11",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore returns 0 for scores above 100 instead of 100",
+        "detail": "The upper-bound clamp check reads `if (score > 100) return 0`, which clamps any score above 100 (e.g. 150) to 0 instead of to the upper bound 100. Clamping a high score silently corrupts the metric to a floor value.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "12",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore upper bound returns 0 instead of 100",
+        "detail": "clampScore returns 0 for any score greater than 100 instead of clamping to 100. A valid in-range-but-above-100 score (e.g. 150, 200) is wrongly collapsed to 0, inverting the intended clamping behavior. Empty/normal/negative inputs are handled, but the upper-bound branch is inverted.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "13",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore inverts upper bound, zeroing scores above 100",
+        "detail": "clampScore clamps any score greater than 100 down to 0 instead of up to 100. Input: score=150 (or any value >100) returns 0. Input: score=-50 returns 0 (correct). The upper bound is inverted. Any legitimate high score is silently zeroed.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "14",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore clamps high values to 0 instead of to 100",
+        "detail": "`clampScore(150)` returns 0 instead of 100. The upper-clamp branch clamps to the lower bound; it should return the maximum when the value exceeds 100.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "15",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore returns 0 for scores above 100",
+        "detail": "clampScore returns 0 for any score > 100 instead of clamping to 100. Input 150 → 0, 101 → 0, Infinity → 0. The upper-bound guard inverts the intended clamping behavior.",
+        "line": 2
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "16",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "17",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore upper clamp returns 0 instead of 100",
+        "detail": "The upper-bound branch returns 0 instead of 100. Any input above the maximum is clamped down to the floor rather than to the ceiling, so score=150 yields 0 and score=101 yields 0.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "18",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore returns 0 instead of 100 for scores above 100",
+        "detail": "clampScore returns 0 for any score greater than 100 instead of clamping to 100. The second branch is a typo: `if (score > 100) return 0` should return 100. An input like 150, 200, or Infinity yields 0, silently collapsing valid high scores. Also note it does not handle NaN/Infinity explicitly (Infinity > 100 returns 0, which is acceptable, but negative scores are clamped to 0 correctly).",
+        "line": 2
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "19",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore saturates below the ceiling for values over 100",
+        "detail": "The upper-clamp branch returns 0 for any score above the maximum, so a value like 150 clamps to 0 instead of to the intended ceiling of 100. A clamping function must saturate at the bound, not below it.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "20",
+    "defectId": "D1-clamp-upper-bound",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "clampScore returns 0 for values above 100",
+        "detail": "clampScore clamps scores ABOVE 100 to 0 instead of 100. For any input score > 100 (e.g. 150, 1000, Number.MAX_SAFE_INTEGER), the function returns 0, which is the opposite of a clamp-to-[0,100]. Note the lower bound correctly returns 0, but the upper bound branch is inverted/wrong.",
+        "line": 3
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "1",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk always returns NaN (off-by-one reads undefined)",
+        "detail": "Loop uses `i <= findingsPerChunk.length`, so it reads findingsPerChunk[length] which is always undefined, corrupting total to NaN for every non-empty input. Empty arrays also yield NaN/0 = NaN.",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "2",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk off-by-one loop reads undefined index, always yields NaN",
+        "detail": "The loop uses `i <= findingsPerChunk.length`, reading findingsPerChunk[findingsPerChunk.length], which is undefined. `total += undefined` yields NaN for ANY non-empty input (e.g. averageFindingsPerChunk([1,2,3]) → NaN), breaking every consumer of the result.",
+        "line": 9
+      },
+      {
+        "title": "averageFindingsPerChunk divides by zero on empty array, returns NaN",
+        "detail": "With an empty array, total stays 0 and the function computes 0 / 0 = NaN. Combined with the off-by-one above, averageFindingsPerChunk([]) → NaN. Any empty findings collection poisons the result.",
+        "line": 12
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "3",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk off-by-one loop yields NaN for every input",
+        "detail": "The loop uses `i <= findingsPerChunk.length`, so it reads one index past the end. For any non-empty array, `findingsPerChunk[findingsPerChunk.length]` is `undefined`, and `total += undefined` collapses the whole sum to `NaN`. Even for an empty array the loop still runs once (`0 <= 0`), adds `undefined`, and returns `NaN/0 = NaN`. The function always returns `NaN` for every input.",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "4",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk always returns NaN",
+        "detail": "The loop uses `i <= findingsPerChunk.length`, so on the last iteration it reads `findingsPerChunk[findingsPerChunk.length]`, which is `undefined`. Adding `undefined` to `total` yields `NaN`. For an empty array the loop still runs once (i=0 <= 0) reading undefined, then `total / 0` is `0/0` = `NaN`. Every possible input returns NaN.",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "5",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk off-by-one reads out-of-bounds index, always returns NaN",
+        "detail": "`averageFindingsPerChunk` uses `for (let i = 0; i <= findingsPerChunk.length; i++)`, which reads index `length` on every non-empty call. `findingsPerChunk[length]` is `undefined` in JS/TS, so `total += undefined` makes `total` NaN, and the function always returns NaN. For an empty array it additionally divides by zero length (NaN/0 = NaN), so it is broken for every input.",
+        "line": 11
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "7",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk off-by-one loop always returns NaN",
+        "detail": "The loop uses `<=` instead of `<`, so it reads `findingsPerChunk[findingsPerChunk.length]` which is `undefined`. On the very first iteration `total += undefined` yields `NaN`, so the function returns `NaN` for every input including an empty array (`0 / 0 = NaN`).",
+        "line": 8
+      },
+      {
+        "title": "chunkDurationsMs yields NaN when endTimes is shorter",
+        "detail": "`.map` iterates over `startTimes` and reads `endTimes[i]`. If `endTimes` is shorter than `startTimes`, the read is `undefined`, so `endTimes[i] - start` becomes `NaN` for the trailing elements.",
+        "line": 13
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "8",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk divides by zero on empty array",
+        "detail": "Empty array triggers integer division by zero. With findingsPerChunk = [], the loop runs once (i=0, 0<=0), adding findingsPerChunk[0] (undefined) so total becomes undefined, then line 12 computes undefined / 0 = NaN. Even if the loop were fixed, 0/0 = NaN.",
+        "line": 12
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "9",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk reads past end and divides by zero on empty input",
+        "detail": "Loop condition `i <= findingsPerChunk.length` reads one index past the end, so `findingsPerChunk[length]` is undefined and `total += undefined` yields NaN for every non-empty array. Dividing by `findingsPerChunk.length` also yields Infinity (not an error) when the array is empty.",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "10",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk off-by-one loop yields NaN",
+        "detail": "The loop condition `i <= findingsPerChunk.length` iterates one index past the end. At `i === length`, `findingsPerChunk[i]` is `undefined`, so `total += undefined` yields `NaN` for ANY non-empty array (and `0/0 = NaN` for an empty array). The average is always NaN.",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "11",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk off-by-one reads undefined index yielding NaN",
+        "detail": "Loop condition `i <= findingsPerChunk.length` iterates one past the end of the array, so it reads `findingsPerChunk[findingsPerChunk.length]`, which is undefined. Adding undefined to the running total yields NaN, so the average is NaN for every non-empty array.",
+        "line": 8
+      },
+      {
+        "title": "averageFindingsPerChunk returns Infinity on empty array (div by zero)",
+        "detail": "When `findingsPerChunk` is an empty array, `total` remains 0 and the final line executes `return 0 / findingsPerChunk.length` (0 / 0). JS/TS produces Infinity rather than throwing, silently returning a non-finite value.",
+        "line": 11
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "12",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk off-by-one loop always returns NaN",
+        "detail": "The loop uses `i <= findingsPerChunk.length`, so on the last iteration it reads findingsPerChunk[length], which is undefined. `total += undefined` yields NaN, so this function returns NaN for every non-empty input. With an empty array it also divides by zero, still NaN. Any number[] input breaks expected averaging.",
+        "line": 12
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "13",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk off-by-one reads undefined and div-by-zero on empty",
+        "detail": "averageFindingsPerChunk iterates with 'i <= findingsPerChunk.length', so it reads index length (undefined) and adds NaN to the total for every non-empty input. On empty input the final 'total / findingsPerChunk.length' is a division by zero (yields NaN). The function always returns NaN regardless of input.",
+        "line": 10
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "14",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk always returns NaN (off-by-one loop + empty-array divide)",
+        "detail": "Any non-empty array produces NaN: the loop condition `i <= findingsPerChunk.length` iterates one extra time, reading `findingsPerChunk[length]` which is `undefined`, so `total += undefined` yields NaN. An empty array also yields NaN (division by zero).",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "15",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "16",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk off-by-one yields NaN for every non-empty array",
+        "detail": "The loop condition `i <= findingsPerChunk.length` iterates one index past the end of the array. For any non-empty input, `findingsPerChunk[findingsPerChunk.length]` is `undefined`, so `total += undefined` yields `NaN`, and the average is always `NaN`. Every non-empty call returns a wrong result (NaN).",
+        "line": 7
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "17",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk off-by-one loop always yields NaN",
+        "detail": "Loop condition uses `i <= findingsPerChunk.length`, so the final iteration reads index `length`, which is `undefined`. `total += undefined` produces NaN, so the function returns NaN for every non-empty array regardless of input.",
+        "line": 9
+      },
+      {
+        "title": "averageFindingsPerChunk divides by zero on empty array",
+        "detail": "Passing an empty array leaves `total` at 0 while `findingsPerChunk.length` is 0, so the final `total / findingsPerChunk.length` is a division by zero, producing NaN.",
+        "line": 12
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "18",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk always returns NaN (off-by-one and empty divide)",
+        "detail": "Off-by-one loop bound `i <= findingsPerChunk.length` reads one index past the end (`findingsPerChunk[findingsPerChunk.length]` is undefined), so `total += undefined` produces NaN for every non-empty input. Additionally, an empty array divides by 0 (`total / 0`), also yielding NaN. The function always returns NaN regardless of input.",
+        "line": 11
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "19",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "20",
+    "defectId": "D2-offbyone-nan-propagation",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "averageFindingsPerChunk returns NaN on empty and over-reads",
+        "detail": "Off-by-one loop reads past the end and divides by zero. The loop condition `i <= findingsPerChunk.length` accesses index `length`, which is undefined, so `total += undefined` yields NaN for every non-empty array. Additionally, an empty array causes `total / findingsPerChunk.length` = `0 / 0` = NaN. There is no guard for empty or zero-length input.",
+        "line": 9
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "1",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs yields NaN when endTimes is shorter than startTimes",
+        "detail": "Maps startTimes to endTimes[i] - start, so when endTimes is shorter than startTimes the tail elements read undefined and produce NaN in the returned durations.",
+        "line": 16
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "2",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs assumes equal-length arrays; mismatched lengths yield NaN",
+        "detail": "chunkDurationsMs maps over startTimes and indexes endTimes, assuming both arrays share the same length. If endTimes is shorter (e.g. chunkDurationsMs([1,2,3],[5,6])), endTimes[2] is undefined, producing NaN in the result array.",
+        "line": 16
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "3",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "4",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs emits NaN for mismatched array lengths",
+        "detail": "If `startTimes` is longer than `endTimes`, then for indices beyond `endTimes.length` the expression `endTimes[i] - start` is `undefined - start`, which evaluates to `NaN` in those result slots. Only manifests when the two arrays have mismatched lengths.",
+        "line": 16
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "5",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "7",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs returns undefined for empty input",
+        "detail": "With an empty array, `mid` is `Math.floor(0 / 2) = 0`, and the function returns `sortedTimesMs[0]`, which is `undefined`. Additionally, for even-length arrays it returns only the upper-middle element instead of the true median (average of the two middle values).",
+        "line": 19
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "8",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "9",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs produces NaN when start/end arrays differ in length",
+        "detail": "The function maps over startTimes and indexes endTimes[i]. If endTimes is shorter than startTimes, results contain NaN (undefined - start); if startTimes is shorter, some durations are dropped silently.",
+        "line": 16
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "10",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs yields NaN on length mismatch",
+        "detail": "`startTimes.map(...)` indexes into `endTimes` by position. If `endTimes` is shorter than `startTimes`, `endTimes[i]` is `undefined` and `undefined - start` produces `NaN` for every index beyond the shorter array's length.",
+        "line": 16
+      },
+      {
+        "title": "formatDurationSummary large totals render in scientific notation",
+        "detail": "`formatDurationSummary` reduces a float total and interpolates it directly into a template literal. Very large or non-integer totals render in scientific notation (e.g. `1.048576e+21s total`) or lose precision, which downstream parsers expecting a plain integer may choke on.",
+        "line": 20
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "11",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs yields NaN on mismatched array lengths",
+        "detail": "The function maps over `startTimes` and indexes into `endTimes` by position (`endTimes[i] - start`). If `endTimes` is shorter than `startTimes`, the missing elements are undefined, so `undefined - start` is NaN for every missing slot. An empty `endTimes` makes the entire result NaN.",
+        "line": 15
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "12",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "13",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs emits NaN on array length mismatch",
+        "detail": "chunkDurationsMs maps over startTimes without bounds-checking endTimes. If endTimes is shorter than startTimes (or missing an element), endTimes[i] is undefined and the subtraction yields NaN for those entries. Input: startTimes=[0,10], endTimes=[5] produces [5, NaN].",
+        "line": 16
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "14",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs emits NaN when arrays have mismatched lengths",
+        "detail": "When `endTimes` is shorter than `startTimes`, `endTimes[i]` is `undefined` for out-of-range indices, so `undefined - start` evaluates to NaN for every trailing duration.",
+        "line": 16
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "15",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "16",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "17",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs returns NaN on mismatched array lengths",
+        "detail": "When `endTimes` is shorter than `startTimes`, `endTimes[i]` is `undefined` for the extra indices, so `undefined - start` evaluates to NaN for every trailing entry.",
+        "line": 16
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "18",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs is undefined for empty and wrong for even-length",
+        "detail": "medianReviewTimeMs returns undefined for an empty array (`sortedTimesMs[0]` on empty is undefined). It also produces an incorrect median for even-length arrays: it returns only the upper-middle element `sortedTimesMs[mid]` instead of averaging the two central values. For example [1,2,3,4] returns 3, but the true median is 2.5.",
+        "line": 21
+      },
+      {
+        "title": "chunkDurationsMs yields NaN when arrays differ in length",
+        "detail": "chunkDurationsMs assumes both arrays share the same length. If endTimes is shorter than startTimes (or vice versa), `endTimes[i]` is undefined and `undefined - start` yields NaN for the extra entries. There is no validation that the two arrays are equal length.",
+        "line": 15
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "19",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "20",
+    "defectId": "D3-ms-seconds-unit-mismatch",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "chunkDurationsMs yields NaN when endTimes is shorter",
+        "detail": "Mismatched-length arrays produce NaN. When `endTimes` is shorter than `startTimes`, `endTimes[i]` is `undefined` for the out-of-range indices, so `undefined - start` evaluates to NaN in the resulting array. (Empty arrays of equal length are handled fine by map.)",
+        "line": 16
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "1",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs returns undefined for empty array and wrong value for even-length input",
+        "detail": "medianReviewTimeMs returns sortedTimesMs[0] (undefined) for an empty array, and for even-length arrays it returns the upper-middle element instead of the average of the two middle elements.",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "2",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs returns undefined on empty array (and miscomputes median for even length)",
+        "detail": "medianReviewTimeMs computes mid = floor(length/2) and returns the element at that index. For an empty array, mid = 0 and sortedTimesMs[0] is undefined, so medianReviewTimeMs([]) → undefined. It also never guards empty input.",
+        "line": 26
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "3",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "4",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs returns undefined for empty input",
+        "detail": "For an empty array, `mid = Math.floor(0 / 2) = 0`, so the function returns `sortedTimesMs[0]` which is `undefined`. Separately, for even-length arrays `mid` points at the upper-middle element instead of the true median (average of the two central elements), so even-length inputs return an incorrect value.",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "5",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "7",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "8",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "9",
+    "defectId": "D4-empty-array-median",
+    "category": "location-correct-mechanism-wrong",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs returns wrong value for even-length arrays",
+        "detail": "medianReviewTimeMs returns `sortedTimesMs[Math.floor(length/2)]`, which for even-length arrays selects the upper-middle element instead of the average of the two central elements. It also returns undefined for an empty array.",
+        "line": 24
+      }
+    ],
+    "classifierNote": "Cites a location inside (or attributed by the harness to) this defect's range, but the finding's content asserts a different, incorrect, or unplanted mechanism -- verified by reading the finding text against the oracle and, where relevant, the fixture's actual runtime behavior."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "10",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs returns undefined for empty input",
+        "detail": "For an empty `sortedTimesMs`, `mid = floor(0/2) = 0` and `sortedTimesMs[0]` is `undefined`, so the function returns `undefined` instead of a number (and would be `NaN` for even-length inputs, which never averages the two middle elements).",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "11",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs returns undefined for empty array",
+        "detail": "With an empty `sortedTimesMs`, `mid = Math.floor(0 / 2) = 0` and the function returns `sortedTimesMs[0]`, which is undefined. The median of an empty set is therefore undefined rather than a defined value.",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "12",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs wrong for even-length and empty arrays",
+        "detail": "For even-length sorted arrays, the median is computed as the element at index length/2 instead of the average of the two middle elements. E.g. [10,20] returns 20 instead of 15. An empty array returns undefined (mid=0, sortedTimesMs[0] is undefined).",
+        "line": 24
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "13",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs returns upper element for even arrays and undefined when empty",
+        "detail": "medianReviewTimeMs for an even-length array returns sortedTimesMs[length/2] (the upper middle element) instead of the average of the two middle elements, so the reported median is wrong for even counts. For an empty array it returns sortedTimesMs[0] = undefined.",
+        "line": 24
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "14",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs wrong for even-length arrays and returns undefined when empty",
+        "detail": "`sortedTimesMs` of even length returns only the upper-middle element instead of the average of the two middle elements (e.g., [1,2,3,4] -> 3 instead of 2.5). An empty array returns undefined (length 0, mid 0, undefined).",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "15",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "16",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "17",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs wrong result for even-length arrays",
+        "detail": "For an even-length array the function returns the upper-middle element instead of the average of the two middle elements. E.g. [1,2,3,4] returns 3 instead of the true median 2.5.",
+        "line": 25
+      },
+      {
+        "title": "medianReviewTimeMs returns undefined on empty array",
+        "detail": "Passing an empty array yields `mid = 0` and `sortedTimesMs[0]` is `undefined`, so the function returns `undefined` instead of a number.",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "18",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "19",
+    "defectId": "D4-empty-array-median",
+    "category": "miss",
+    "originalFindingText": [],
+    "classifierNote": "No finding in this trial satisfied the defect's minimumEvidence."
+  },
+  {
+    "model": "ornith-1.5:9b",
+    "trial": "20",
+    "defectId": "D4-empty-array-median",
+    "category": "exact",
+    "originalFindingText": [
+      {
+        "title": "medianReviewTimeMs returns undefined on empty array and wrong median for even counts",
+        "detail": "medianReviewTimeMs returns undefined for an empty array (mid = Math.floor(0/2) = 0, sortedTimesMs[0] is undefined). For even-length arrays it also returns a wrong value: it selects element at index length/2 instead of averaging the two middle elements, so the true median is not computed for even counts.",
+        "line": 25
+      }
+    ],
+    "classifierNote": "Satisfies the oracle's minimumEvidence for this defect."
+  }
+]
