@@ -378,6 +378,7 @@ export class SwarmRunner {
         attempts: stats.attempts,
         attemptMs: stats.maxAttemptMs,
         earlyExit,
+        status: 'ok',
       })
       return { findings, gaps, earlyExit }
     } catch (err) {
@@ -392,6 +393,7 @@ export class SwarmRunner {
         elapsedMs: Date.now() - startMs,
         attempts: stats.attempts,
         attemptMs: stats.maxAttemptMs,
+        status: agentStatus.coverage,
       })
       return { findings: [], gaps: [], earlyExit: false }
     }
@@ -443,6 +445,7 @@ export class SwarmRunner {
           attempts: stats.attempts,
           attemptMs: stats.maxAttemptMs,
           earlyExit: shouldStop,
+          status: 'ok',
         })
         if (shouldStop) {
           earlyExitAgent = agent.name
@@ -462,6 +465,7 @@ export class SwarmRunner {
           elapsedMs: Date.now() - startMs,
           attempts: stats.attempts,
           attemptMs: stats.maxAttemptMs,
+          status: agentStatus[agent.name],
         })
       }
     }
@@ -517,6 +521,7 @@ export class SwarmRunner {
             elapsedMs: Date.now() - startMs,
             attempts: stats.attempts,
             attemptMs: stats.maxAttemptMs,
+            status: 'ok',
           })
         } catch (err) {
           agentStatus[agent.name] = classifyAgentError(err)
@@ -532,6 +537,7 @@ export class SwarmRunner {
             elapsedMs: Date.now() - startMs,
             attempts: stats.attempts,
             attemptMs: stats.maxAttemptMs,
+            status: agentStatus[agent.name],
           })
         }
       })
@@ -873,6 +879,7 @@ export class SwarmRunner {
         elapsedMs: Date.now() - startMs,
         attempts: stats.attempts,
         attemptMs: stats.maxAttemptMs,
+        status: agentStatus.testgen,
       })
     }
 

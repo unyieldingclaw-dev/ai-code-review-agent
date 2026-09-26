@@ -313,8 +313,13 @@ program
                 .map((s) => `${bySev[s]} ${s}`)
               summary += ` (${parts.join(', ')})`
             }
+            // WHY this suffix: without it, an agent that timed out or errored renders identically
+            // to one that ran clean and genuinely found nothing -- both print "0 raw findings",
+            // and duration is the only tell, which nothing here parses. Reported from a real
+            // 610s-fetch-failed row that was visually indistinguishable from a 13s genuine zero.
+            const statusSuffix = event.status && event.status !== 'ok' ? ` (${event.status})` : ''
             process.stderr.write(
-              `[${event.index}/${event.total}] ${event.name}   ${elapsed} — ${summary}\n`
+              `[${event.index}/${event.total}] ${event.name}   ${elapsed} — ${summary}${statusSuffix}\n`
             )
             if (event.earlyExit) {
               const bolt = options.emoji !== false ? '⚡ ' : ''

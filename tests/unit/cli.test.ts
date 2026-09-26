@@ -218,6 +218,53 @@ describe('CLI — agent-count announcement', () => {
     const { stderr } = await runCli([])
     expect(stderr).toContain('with 1 agent...')
   })
+
+  // REGRESSION: a dead agent and a clean one both printed "0 raw findings" here, distinguishable
+  // only by duration -- which nothing parses, and a real multi-chunk report needed a hand-built
+  // table to tell them apart. This proves the CLI actually renders the distinguishing signal now
+  // that the event carries it.
+  it('marks a non-ok agent status on the progress line instead of printing an identical clean line', async () => {
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockImplementation(async (_input, onProgress) => {
+          onProgress?.({
+            phase: 'end',
+            name: 'security',
+            index: 1,
+            total: 1,
+            findings: [],
+            elapsedMs: 610000,
+            status: 'timeout',
+          })
+          return makeResult({ findings: [] })
+        }),
+      }
+    })
+    const { stderr } = await runCli([])
+    expect(stderr).toContain('0 raw findings (timeout)')
+  })
+
+  it('adds no suffix when the agent status is ok', async () => {
+    MockSwarmRunner.mockImplementation(function () {
+      return {
+        run: vi.fn().mockImplementation(async (_input, onProgress) => {
+          onProgress?.({
+            phase: 'end',
+            name: 'security',
+            index: 1,
+            total: 1,
+            findings: [],
+            elapsedMs: 13000,
+            status: 'ok',
+          })
+          return makeResult({ findings: [] })
+        }),
+      }
+    })
+    const { stderr } = await runCli([])
+    expect(stderr).toContain('0 raw findings\n')
+    expect(stderr).not.toMatch(/0 raw findings \(/)
+  })
 })
 
 describe('CLI — argument parsing and output', () => {

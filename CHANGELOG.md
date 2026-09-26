@@ -7,6 +7,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **A dead agent and a clean one printed the identical stderr progress line.** `AgentProgressEvent`
+  had no `status` field, so an agent that timed out or failed and one that ran clean and genuinely
+  found nothing both rendered `Ns — 0 raw findings`, distinguishable only by duration — which
+  nothing parses. The value was already computed at every emission site
+  (`agentStatus[agent.name] = classifyAgentError(err)`) in the same statement as the `onProgress`
+  call that omitted it. Now passed through and rendered as a suffix (e.g. `(timeout)`) whenever the
+  status isn't `'ok'`.
+
+- **A `--chunk` run's stderr gave no way to tell which chunk you were reading.** `runner.ts`'s
+  `run()` resets its per-agent progress index to 1 on every call, and `chunkRunner` calls it once
+  per chunk with the same `onProgress` callback — so `[1/4] security` printed with the identical
+  index on every chunk, and nothing else in the stream marked a chunk boundary. The one-time
+  "split into N chunks" announcement fires before the loop starts and is never repeated. Now each
+  chunk prints its own `chunk N/total (lines)` marker as it begins.
+
+  Both gaps were reported from a real multi-chunk run whose reader had to hand-reconstruct a
+  chunk-by-chunk table from timing alone to tell a genuine zero from a `fetch failed`. Neither
+  affects the JSON envelope or any rendered report — `--format json` and all four report
+  formatters were already correct; this is the real-time stderr channel only.
+
 - **`mergePolicy` no longer attaches an empty `policy` object to the envelope.** After the
   `coverageIncomplete` guard above, an agent that survived the cross-chunk intersection could still
   end up with `agentsSkipped: []` — but the function returned `{ agentsSkipped: [], reason: {} }`

@@ -93,7 +93,17 @@ export async function runChunked(
   )
 
   const results: ReviewResult[] = []
-  for (const chunkDiff of chunks) {
+  for (const [i, chunkDiff] of chunks.entries()) {
+    // WHY this line exists: `runner.run()` resets its own per-agent progress index to 1 on every
+    // call, and chunkRunner calls it once per chunk with the same onProgress callback -- so
+    // `[1/4] security` prints with the IDENTICAL index on every chunk, with nothing else in the
+    // stderr stream marking where one chunk ends and the next begins. A real multi-chunk report
+    // had to be hand-reconstructed into a chunk-by-chunk table by the reader for exactly this
+    // reason. The one-time "split into N chunks" line above announces the total once; this says
+    // which one is running now.
+    console.warn(
+      `[ai-review] chunk ${i + 1}/${chunks.length} (${chunkDiff.split('\n').length} lines)`
+    )
     const chunkInput: ReviewInput = { ...input, diff: chunkDiff }
     const result = await runner.run(chunkInput, onProgress, contextMode)
     results.push(attributeChunkSkips(result, chunkDiff))
