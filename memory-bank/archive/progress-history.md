@@ -1,10 +1,68 @@
 # Progress — archived history
 
+Sixth move, 2026-09-26: the `earlyExit` invisibility investigation below (2026-08-31) came across
+to make room for this session's PR #88/#90/#85 merge entries. It predates its own fix — PR #83
+(2026-09-01 or earlier) closed the gap this section investigated; `progress.md`'s and
+`activeContext.md`'s "Next Steps" already point to that resolution, so this section is proof/detail
+only, nothing still open.
+
 Fifth move, 2026-09-19: the five sections below (Corrections from PMB, #78 merged, #77 merged, the
 four "known, not fixed" follow-up items, and Session closed — all 2026-08-28) came across because
 `progress.md` reached 405 lines against its 400 hard max while today's timeout-plumbing-bug
 correction and new dated entry were being added. All five predate every open item currently tracked
 in `progress.md`; nothing in them is still active.
+
+## 🔎 `earlyExit` invisibility — investigated and proven, not yet fixed (2026-08-31)
+
+**Not a fix entry. This records what was established, so the next session does not re-derive it.**
+`#79` (2026-08-29), `#80` and `#81` (2026-08-31) merged; `npm run check` green, verified by running
+it rather than inherited. Count in the Metrics table below — once, not restated here.
+
+**`grep -rn earlyExit src/` hits `cli/index.ts`, `core/runner.ts` and `core/chunkRunner.ts` — no
+formatter.** The only trace a reader ever sees is a footer `cli/index.ts:411` appends _after_
+`formatMarkdown` returns, and `cli/index.ts:405-409` skips it for json, sarif **and**
+github-annotations (the handoff said SARIF only; it is all three). Any other caller of
+`formatMarkdown` gets nothing.
+
+**Proven by replay through the real shipped exports in `dist/`, not by reading** — the discipline
+this file's own rules demand, and the one the prior session's six proxy assertions failed. A
+realistic fail-fast result (3 of 15 agents run) rendered:
+
+| surface            | output                                                                 |
+| ------------------ | ---------------------------------------------------------------------- |
+| CLI markdown       | `# AI Code Review Report` — no signal                                  |
+| SARIF              | `executionSuccessful: true`, no notifications, no `earlyExit` property |
+| GitHub annotations | finding line only, no `::warning::`                                    |
+| MCP                | `## AI Code Review — ✅ No critical or high findings`                  |
+| exit code          | **0**                                                                  |
+
+**Why exit 0 rather than 1, which was not expected.** `shouldEarlyExit` (`runner.ts:239`) fires on
+**raw** per-agent findings; `orchestrator.ts:306-307` then applies "Solo High → Medium" to any high
+with no corroborator at the same location — and halting the swarm is precisely what guarantees
+nothing corroborates the trigger. Fail-fast reads pre-orchestrator severity, the exit code reads
+post-orchestrator severity, and they disagree. Precondition: ≥2 agents produced findings, else
+`orchestrator.ts:279` short-circuits and the high survives to exit 1. **This reaches a consumer** —
+PMB's Job 7 branches on `0` = clean.
+
+**A second, independent defect, live today with no fail-fast involved.** `cli/formatter.ts:29`
+derives `totalAgents` from `agentStatus`, which `runner.ts:434` writes only for agents that ran, so
+the INCOMPLETE banner's denominator shrinks to the agents that started. Demonstrated through the
+real formatter with 15 configured, 4 started, 11 never run, 1 timed out:
+`⚠️ INCOMPLETE — **0 findings** from 3/4 agents that completed`. It states 3/4 where the truth is
+3/15 — an affirmative claim of full agent coverage inside the banner meant to signal incompleteness.
+
+**That sets a trap for the obvious fix**, which is why it is recorded before any code was written:
+folding `earlyExit` into the `incomplete` gate makes that scope string render on **every** fail-fast
+run as "from 3/3 agents that completed", converting a silent omission into a confident false claim.
+Same shape as this repo's own `elapsedMs` rounds, where round 2's fix recorded the _last_ attempt
+instead of the _longest_ and hid a slow attempt behind a fast retry. Adding `'skipped'` to
+`AgentStatus` would fix the four formatters through machinery they already read, but `hasAgentFailures`
+treats anything `!== 'ok'` as failure, so every fail-fast run would start exiting 2 and re-route
+PMB's mapping — rejected for that reason, not for cost.
+
+**Third part:** `chunkRunner.ts:167` omits `truncation` on the stated premise "Full coverage achieved
+across all chunks", which the `break` at line 90 falsifies — chunks go unreviewed with no field able
+to trigger any incompleteness gate.
 
 ## ✅ Corrections from PMB, verified in their checkout (2026-08-28)
 

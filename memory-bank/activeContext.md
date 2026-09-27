@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-09-19
+last-reviewed: 2026-09-26
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,44 +16,26 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-09-19
+**Last Updated**: 2026-09-26
 
 ## Current Focus
 
-**Today's entire calibration/measurement work moved off `#85`'s own unmerged branch onto its own
-branch, `chore/model-recall-calibration` (off `main`), per explicit user direction** — it was never
-part of `#85`'s feature and had no business sitting uncommitted on that branch. `#85`'s own
-resolution work is untouched, still on `origin/fix/chunked-progress-visibility`, still merely
-unclicked (`#84`/`#86`/`#87` merged 2026-09-18; `#85` confirmed `OPEN`/`mergedAt: null` via
-`gh pr view 85`, not assumed).
+**All four of this session's PRs are now merged and `main` is caught up — `gh pr list` returns
+empty, verified directly.** In order: `#89` (calibration `agentPolicy` excludes), `#90` (historical
+checkpoint — the synthetic model ranking does **not** transfer to real code at N=2, full detail in
+`progress.md`), `#88` (the timeout-plumbing fix + oracle-backed calibration measurements), `#85`
+(the long-stale `earlyExit`/stderr-distinguishing fix, sitting done-and-pushed for over a week
+before finally being clicked). Full narrative for each: `progress.md`.
 
-**Timeout plumbing bug found via this repo's own `/code-review`, fixed, verified, and its one
-operational fallout resolved — full detail in `progress.md`'s "Timeout plumbing bug" entry, not
-restated here.** `calibrate.ts` never actually enforced `CALIBRATION_TIMEOUT_MS`/`agentTimeoutMs`;
-every batch below ran under Ollama's hardcoded ~300s default the whole time. Fixed and verified
-(`npm run calibrate` unfiltered against `devstral:latest`: 23 passed, 3 failed, none a regression
-from this fix). The one flagged timeout (`adversarial-dirty` vs `devstral:latest`, exposed because
-CI's real 180s default is now genuinely enforced for the first time) is resolved: user directed
-raising it, `.github/workflows/calibrate.yml` now sets `CALIBRATION_TIMEOUT_MS: '300000'`, pinning
-calibration back to the budget it always effectively had. Production's real timeout path
-(`runner.ts`'s `withTimeout`) is untouched. `.claude/.code-review-ok` self-certified and written
-(reasoning in `progress.md`) — self-check on that certification caught and fixed one real overclaim
-in a test comment before it stood (see `progress.md`). **Still blocked on the actual `git commit`**
-— nothing committed or pushed yet on `chore/model-recall-calibration`, the user's call to make.
-
-**`#85`'s own CI comment reported 11 ACR findings on its diff — all 11 confirmed fabricated**,
-verified against actual source. Extends the pattern already measured in `#87` (74.2%
-`mismatch`/`unknown`, N=20) to domains beyond `adversarial`. **Paused, not abandoned, per explicit
-direction to fix the harness first:** re-adjudicate these 11 against commit `7f07fd6`, and build
-`#84`'s pre-registered pre-fix oracle at `b7634e2` — a first real-code checkpoint, explicitly NOT
-"the historical corpus" at N=2. Not resumed yet.
-
-**Restraint (2026-09-18, `adversarial-clean`, N=20×3) and recall (2026-09-18, oracle-backed
-`adversarial-dirty`, N=20×3) measured — full results in `progress.md`'s two dated entries, not
-restated here.** Headline: a real precision-recall-runtime frontier, no winner — Qwen3.5 best
-restraint/runtime, Ornith best recall but worst restraint and timeout-prone, Devstral weakest on
-recall with a new operational strike (timeouts scale with diff complexity). Deliberately no
-synthetic scalar score invented to rank them. **No production model change.**
+**Getting all three of #90/#88/#85 merged back-to-back surfaced two generalizable patterns, now in
+`systemPatterns.md`:** merging one PR pushes every other open PR to `BEHIND` again, not just once
+(branch protection's `strict` mode re-checks after each merge); and `.claude/contracts/active-task.json`
+is single-slot, so long-lived branches collide on it (resolved by keeping the newer completed
+record). Also: `ai-review` CI timeouts correlate with Ollama's CPU-heavy 70/30 split and clear once
+Ollama goes idle and reloads — extended in `techContext.md`. And: this working directory is
+confirmed **shared with concurrent peer Claude sessions**, not a theoretical risk — an untracked file
+from another session's in-progress work (a `TEMPLATE_OWNED`-hook fix, reported upstream to PMB as
+NS-58) appeared mid-session; investigated before assuming it was stray, per standing practice.
 
 **`npm run check` run directly 2026-09-17: green, 908 tests.** Calibration is nondeterministic —
 **treat a single pass as weak evidence**. Use `grep "orchestrator] dropped"` to tell a real filter
@@ -98,10 +80,11 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
   `agentsWithNarrowedView().length` swap currently passes every test), and add the
   headline-stability regression test to `tests/unit/mcp/formatter.test.ts` that markdown/sarif
   already have.
-- **ACR false-positive pattern — measured twice, not yet acted on; detail in Current Focus.**
-  `#87`'s `locationCheck` measurement and the 2026-09-18 three-way model comparison are both
-  measured-not-acted-on. Any future mitigation contract needs to separately address the
+- **ACR false-positive pattern — measured three times now (synthetic ×2, real code ×1 via #90's
+  checkpoint), still not acted on.** Any future mitigation contract needs to separately address the
   `verified`-but-fabricated quarter; a blanket `locationCheck`-based demotion doesn't touch it.
+- **Extending PR #90's historical checkpoint past N=2 into an actual historical corpus is a
+  separate, not-yet-made decision** — the checkpoint explicitly was not that; see `progress.md`.
 - **`chunkRunner`'s `mergeResults` drops `truncation`, so exit 3 is unreachable under `--chunk`.**
   Peer-reported and live-reproduced 2026-09-01; detail in `progress.md`. **Not fixed on purpose** —
   making exit 3 reachable changes what PMB's Job 7 branches on, so it is an operator decision.
@@ -112,17 +95,23 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
   [`archive/activeContext-history.md`](archive/activeContext-history.md).
 - **`fetch failed` — the one open technical thread, deliberately passive.** One invocation in twelve
   (Ollama dropping the connection under load). **n=1: do not act on it.**
+- **`docs/CONTRACTS-GUIDE.md` says `.claude/contracts/` should be gitignored; it demonstrably isn't**
+  (tracked in git — confirmed by this session's own conflicts on `active-task.json` across
+  branches). Flagged, never actioned; worth fixing if it causes a third conflict.
 
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: `#82`/`#83`/`#84`/`#86`/`#87` merged, branches deleted. `#85` OPEN, not
-merged, ready, on `origin/fix/chunked-progress-visibility` (see Current Focus) — **this session's
-checkout is `chore/model-recall-calibration`, off `main`**, not that branch. **The `main` hash is
-deliberately not recorded here** — read it from
-`git log`; two prior PRs tried to keep it current and each went stale the moment it merged, since a
-memory-bank PR moves the very commit it names. Two long-retained orphan branches remain
-(`chore/agent-calibration`, `claude/plan-overview-4dg42o`) — containment unproven, so both stay.
-`v1.15.0` tagged at `6e2ed34` and published; that tag hash **is** recorded, because a release tag is
-immutable and a branch tip is not. Commands are in `techContext.md`; `npm run check` covers
-typecheck/build/format/lint/test in one pass.
+unit tests. **Git**: no open PRs (`gh pr list` empty, 2026-09-26) — `#82`–`#90` all merged. Four
+remote branches from this session's PRs (`chore/historical-checkpoint-pr84-pr85`,
+`chore/model-recall-calibration`, `fix/chunked-progress-visibility`,
+`fix/exclude-calibration-fixtures-from-acr-policy`) are merged but **not yet deleted** — routine
+cleanup, not urgent, not done here since it wasn't asked for. Two long-retained orphan branches
+remain (`chore/agent-calibration`, `claude/plan-overview-4dg42o`) — containment unproven, so both
+stay. **The `main` hash is deliberately not recorded here** — read it from `git log`; two prior PRs
+tried to keep it current and each went stale the moment it merged, since a memory-bank PR moves the
+very commit it names. `v1.15.0` tagged at `6e2ed34` and published; that tag hash **is** recorded,
+because a release tag is immutable and a branch tip is not. Commands are in `techContext.md`;
+`npm run check` covers typecheck/build/format/lint/test in one pass. **This working directory is
+shared with concurrent peer Claude sessions** — see Current Focus; do not assume you are the only
+session touching this checkout.

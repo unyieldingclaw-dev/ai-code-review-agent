@@ -7,7 +7,7 @@ tags:
   - architecture/decisions
   - patterns/code
   - anti-patterns
-last-reviewed: 2026-07-26
+last-reviewed: 2026-09-26
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -185,6 +185,16 @@ landed correctly each time and the check that was supposed to confirm it lied.
 
 - **`gh pr merge` is denied to Claude** (`permissions.deny` in `.claude/settings.json`) and this is
   intentional. The user merges. Do not route around a denial; stop and ask.
+
+- **`.claude/contracts/active-task.json` is single-slot, so two long-lived branches collide on it**
+  (2026-09-26, hit twice in one session: PR #88 vs #90, then #85 vs #90). Resolution: keep the
+  newer completed record. The file is scratch state, not an audit trail — each task's durable
+  record already lives in `progress.md`/`CHANGELOG.md`/the PR body, so the older side is never
+  actually lost by discarding it here.
+- **Merging one PR pushes every other open PR to `BEHIND` again, not just once** (2026-09-26).
+  `strict` branch protection re-checks after every merge to `main`, so with three PRs open at once,
+  each remaining PR needed the main-merge-in step repeated once per merge ahead of it, not once
+  total. Budget for N merges when N PRs are open together.
 
 - **Memory-bank line caps are CI-enforced** (`ci.yml`, "Memory bank size limits"), so an
   overflowing edit fails the build. Archive the evidence, keep the rule, and **leave headroom** —

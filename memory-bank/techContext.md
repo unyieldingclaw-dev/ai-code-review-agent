@@ -7,7 +7,7 @@ tags:
   - stack/backend
   - stack/frontend
   - env/tools
-last-reviewed: 2026-06-06
+last-reviewed: 2026-09-26
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -87,6 +87,15 @@ reopening a settled one. **Do not raise the ceiling on it** — n=2 in one envir
 above exists to stop exactly that kind of re-derivation. What it does establish is that the
 deterministic agents are unaffected, so ACR keeps useful coverage on CPU even when the LLM agents
 never complete.
+
+**The same 70/30 split reproduced in `ai-review` CI three times in a row (2026-09-26).** A PR with an
+unusually large diff (~3750 lines) timed out at the 45-minute job ceiling twice back to back
+(`ollama ps` showing 70%/30% both times); a third retry after Ollama had gone fully idle (no model
+loaded) passed in 44m34s, and later runs against smaller diffs on the same idle-then-reload cycle
+passed in 31m and 13m. **n=1 environment transition, not a fix** — the correlation (CPU-heavy →
+near/over ceiling; idle-then-reload → comfortably under) matches the 2026-09-01 datum closely enough
+to be worth retrying a timed-out `ai-review` job once Ollama is confirmed idle (`ollama ps`) rather
+than immediately reaching for `timeout-minutes` or a config change.
 
 ### Key Source Files
 
@@ -173,6 +182,24 @@ nests under `tool_input`, so `last-reviewed` is never stamped and `mb doctor` re
 `pre-push-check.*` calls `mb validate`, folded into `mb doctor`, and prints its "use mb doctor"
 message as evidence of inconsistency on every push. Moved here from `activeContext.md` on
 2026-08-31 — a standing fact about an upstream dependency, not session state.
+
+**A third instance, drafted then deliberately not committed here (2026-09-26): `.githooks/pre-commit`
+has no local check that staged files are formatted, so `calibration/*.json` (written directly by
+`npm run calibrate`, never through an editor's format-on-save) repeatedly broke CI's Format check
+after the fact.** A fix was drafted and put through this repo's full `/code-review`, then reported
+upstream as **NS-58** rather than committed locally, since the hook is `TEMPLATE_OWNED` and a local
+fix would not survive `mb upgrade` — the draft is parked in
+`docs/superpowers/plans/2026-09-26-ns58-pre-commit-format-check-reference.md` so it isn't lost. This
+also resolves an earlier, unexplained observation (an uncommitted `.githooks/pre-commit` edit that
+appeared and vanished with no traceable origin): it was this same draft, in progress in a Claude
+session sharing this working directory.
+
+**Two PMB peer-session claims independently verified 2026-09-19–26, not just accepted:** NS-11
+(NPM_TOKEN renewal) is genuinely obsolete — ACR uses OIDC/Trusted Publishing (`release.yml`), not a
+stored token. NS-14 (PMB version drift, ACR pinned to 1.1.1 vs PMB's actual 1.2.1) is genuinely
+real, confirmed by reading both version files directly — **no upgrade action taken**, deliberately
+left to the user's own timing, especially since PMB itself hasn't tagged past `v1.0.4` despite being
+at `VERSION` 1.2.1.
 
 ### Sharing this machine with the PMB peer session
 
