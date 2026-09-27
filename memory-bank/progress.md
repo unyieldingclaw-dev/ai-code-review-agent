@@ -7,7 +7,7 @@ tags:
   - work/completed
   - work/in-progress
   - work/backlog
-last-reviewed: 2026-09-19
+last-reviewed: 2026-09-26
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,9 +16,70 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-09-19
+**Last Updated**: 2026-09-26
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
+
+## ✅ Three PRs merged back to back (2026-09-26): #90, #88, #85 — `main` caught up, no open PRs
+
+**All three of this session's open PRs merged today, in this order: #90 (historical checkpoint),
+#88 (timeout-plumbing fix + calibration oracle), #85 (the long-stale `earlyExit`/stderr fix).**
+`gh pr list` returns empty afterward — verified directly, not assumed. Getting there took three
+real, generalizable lessons, now in `systemPatterns.md`/`techContext.md` in full — summarized here
+for the "what happened" record:
+
+- **Merging one PR pushes every other open PR to `BEHIND` again, cascading.** With three PRs open,
+  each of #88 and #85 needed `main` merged in twice — once after #90 merged, again after the other
+  merged next. Branch protection's `strict` mode re-checks after every merge to `main`, not once.
+- **`.claude/contracts/active-task.json` is single-slot, so long-lived branches collide on it.** Both
+  #88-vs-#90 and #85-vs-#90 hit the identical conflict (two branches each writing their own
+  completed-task record). Resolved both times by keeping the newer record — the file is scratch
+  state, not an audit trail, so the older side's own durable record (already in this file, or in
+  `CHANGELOG.md`) is never actually lost.
+- **`ai-review` timed out three times in a row on #90** (45m56s–47m25s, over the 45-minute CI
+  ceiling) while `ollama ps` showed devstral pinned at the CPU-heavy 70%/30% split documented in
+  `techContext.md`'s 2026-09-01 counter-datum. Passed on the fourth retry once Ollama had gone fully
+  idle and reloaded (44m34s), then comfortably on later runs (31m, 13m) — see `techContext.md` for
+  the full pattern. Retrying after confirming `ollama ps` is idle is now the first move for this
+  failure shape, before reaching for a CI config change.
+
+**Also resolved in passing:** the mid-session "unexplained `.githooks/pre-commit` modification" this
+project had never actually recorded anywhere — it was a legitimate `TEMPLATE_OWNED`-hook fix draft
+(reported upstream to PMB as **NS-58**, parked in
+`docs/superpowers/plans/2026-09-26-ns58-pre-commit-format-check-reference.md`) being worked on by
+another Claude session sharing this same working directory. **This directory is confirmed shared
+with concurrent peer sessions, not a theoretical risk** — worth checking `git status` for
+unfamiliar-but-untracked files before assuming they're stray.
+
+## 🔎 Historical checkpoint (PR #90): the synthetic ranking does not transfer at N=2 (2026-09-21)
+
+**First real-code test of whether the synthetic-fixture model ranking (Ornith best recall, Qwen3.5
+best restraint/runtime, Devstral weakest) holds up against real historical defects. It does not.**
+Explicitly not "the historical corpus" — N=2, a checkpoint, not a corpus-scale conclusion.
+
+**Corrected on refetch: PR #85's CI comment had 12 findings, not the inherited 11** — recounted
+fresh via `gh api`, not trusted. All 12 re-adjudicated against the real code at commit `7f07fd68`;
+all 12 confirmed fabricated, each traced to its own falsifying mechanism (e.g. one cites
+`runner.ts:873` for a `status` field that doesn't exist anywhere near that line in the diff).
+**Pre-registered a real-defect oracle for PR #84** at commit `b7634e2` (D1: `mergePolicy` missing its
+`coverageIncomplete` guard; D2: `mergePolicy` returning a truthy-but-empty object instead of
+`undefined`), independently re-verified against the actual snapshot before any model saw the diff.
+
+**Ran all three models once each against both real diffs via the real CLI** (`--timeout 300000`,
+full default agent set, locked order). **Ornith — best synthetic recall (52.5%) — produced zero
+findings on either real diff.** No model detected either PR #84 defect. Devstral repeated 2 of its
+original 12 fabrications, added new ones, and produced a new failure mode: hallucinating that an
+already-fixed historical bug still applies. Qwen3.5 had the best runtime, but 2 of its 3
+`"source": "lizard"`-attributed complexity numbers were independently confirmed fabricated by
+running `lizard` directly against the real files — **a separate, generalizable finding: `lizard`
+attribution is not reliable provenance on its own**, even when `toolAvailability.lizard: "used"` is
+genuinely true (the tool ran; the number attached to it didn't come from it).
+
+Full write-up, all 6 raw model outputs, and both fixture diffs:
+`docs/superpowers/plans/2026-09-19-acr-historical-checkpoint-pr84-pr85.md`,
+`calibration/fixtures/historical-pr{84,85}.diff`,
+`calibration/historical-checkpoint-raw.*.json`. **No production model change.** Extending this past
+N=2 into an actual historical corpus is a separate, not-yet-made decision.
 
 ## 🔧 Timeout plumbing bug: found, fixed, verified (2026-09-19)
 
@@ -88,10 +149,10 @@ are independent of this fix, not new regressions it introduced:**
   (`src/core/runner.ts`'s `withTimeout`) is untouched — this only affects the calibration
   harness's own budget, not `DEFAULT_CONFIG.agentTimeoutMs` (180000) or real review runs.
 
-**Not yet done, deliberately paused for this fix:** re-adjudicating PR #85's 11 persisted findings
-against commit `7f07fd6`, and building PR #84's pre-registered pre-fix oracle at commit `b7634e2` —
-see the entry below. This remediation work happened first per explicit user direction: fix and
-verify the harness before collecting more evidence with it.
+**Done, not paused any longer:** the re-adjudication of PR #85's findings and PR #84's pre-registered
+oracle — see "Historical checkpoint" above. **This fix itself merged to `main` as PR #88 on
+2026-09-26**, alongside PR #90 (the checkpoint) and PR #85 (finally clicked to merge) — see "Three
+PRs merged back to back" above for what that took.
 
 ## ✅ #84/#86/#87 merged; #85's merge-conflict resolution is done and pushed, NOT merged (2026-09-18)
 
@@ -138,6 +199,10 @@ Recall measurement entry below. **Correction (2026-09-19):** this entry original
 fix below, "Timeout plumbing bug" entry), so every batch, both before and after the intended
 change, ran under the same hardcoded ~300s Ollama default. The observed rate drop was run-to-run
 variance.
+
+**`#85` finally merged 2026-09-26** (as `fix: distinguish a dead agent from a clean one, and one
+chunk from another, on stderr`) — the resolution work described above sat done-and-pushed for over
+a week before actually being clicked; see "Three PRs merged back to back" above.
 
 ## 🔎 Recall measurement: a real precision-recall-runtime frontier, no winner (2026-09-18)
 
@@ -244,61 +309,10 @@ independent trigger for the same field-drop is recorded below via the `break` at
 now-fixed `policy`/`filteredFiles` merge and the `filteredFiles` invisibility investigation that
 preceded it: [`archive/progress-history.md`](archive/progress-history.md).
 
-## 🔎 `earlyExit` invisibility — investigated and proven, not yet fixed (2026-08-31)
-
-**Not a fix entry. This records what was established, so the next session does not re-derive it.**
-`#79` (2026-08-29), `#80` and `#81` (2026-08-31) merged; `npm run check` green, verified by running
-it rather than inherited. Count in the Metrics table below — once, not restated here.
-
-**`grep -rn earlyExit src/` hits `cli/index.ts`, `core/runner.ts` and `core/chunkRunner.ts` — no
-formatter.** The only trace a reader ever sees is a footer `cli/index.ts:411` appends _after_
-`formatMarkdown` returns, and `cli/index.ts:405-409` skips it for json, sarif **and**
-github-annotations (the handoff said SARIF only; it is all three). Any other caller of
-`formatMarkdown` gets nothing.
-
-**Proven by replay through the real shipped exports in `dist/`, not by reading** — the discipline
-this file's own rules demand, and the one the prior session's six proxy assertions failed. A
-realistic fail-fast result (3 of 15 agents run) rendered:
-
-| surface            | output                                                                 |
-| ------------------ | ---------------------------------------------------------------------- |
-| CLI markdown       | `# AI Code Review Report` — no signal                                  |
-| SARIF              | `executionSuccessful: true`, no notifications, no `earlyExit` property |
-| GitHub annotations | finding line only, no `::warning::`                                    |
-| MCP                | `## AI Code Review — ✅ No critical or high findings`                  |
-| exit code          | **0**                                                                  |
-
-**Why exit 0 rather than 1, which was not expected.** `shouldEarlyExit` (`runner.ts:239`) fires on
-**raw** per-agent findings; `orchestrator.ts:306-307` then applies "Solo High → Medium" to any high
-with no corroborator at the same location — and halting the swarm is precisely what guarantees
-nothing corroborates the trigger. Fail-fast reads pre-orchestrator severity, the exit code reads
-post-orchestrator severity, and they disagree. Precondition: ≥2 agents produced findings, else
-`orchestrator.ts:279` short-circuits and the high survives to exit 1. **This reaches a consumer** —
-PMB's Job 7 branches on `0` = clean.
-
-**A second, independent defect, live today with no fail-fast involved.** `cli/formatter.ts:29`
-derives `totalAgents` from `agentStatus`, which `runner.ts:434` writes only for agents that ran, so
-the INCOMPLETE banner's denominator shrinks to the agents that started. Demonstrated through the
-real formatter with 15 configured, 4 started, 11 never run, 1 timed out:
-`⚠️ INCOMPLETE — **0 findings** from 3/4 agents that completed`. It states 3/4 where the truth is
-3/15 — an affirmative claim of full agent coverage inside the banner meant to signal incompleteness.
-
-**That sets a trap for the obvious fix**, which is why it is recorded before any code was written:
-folding `earlyExit` into the `incomplete` gate makes that scope string render on **every** fail-fast
-run as "from 3/3 agents that completed", converting a silent omission into a confident false claim.
-Same shape as this repo's own `elapsedMs` rounds, where round 2's fix recorded the _last_ attempt
-instead of the _longest_ and hid a slow attempt behind a fast retry. Adding `'skipped'` to
-`AgentStatus` would fix the four formatters through machinery they already read, but `hasAgentFailures`
-treats anything `!== 'ok'` as failure, so every fail-fast run would start exiting 2 and re-route
-PMB's mapping — rejected for that reason, not for cost.
-
-**Third part:** `chunkRunner.ts:167` omits `truncation` on the stated premise "Full coverage achieved
-across all chunks", which the `break` at line 90 falsifies — chunks go unreviewed with no field able
-to trigger any incompleteness gate.
-
-> Completed work through 2026-08-28 (PMB corrections, #77/#78, the four "known, not fixed"
-> follow-ups, and the 2026-08-28 session close) is in
-> [`archive/progress-history.md`](archive/progress-history.md).
+> The `earlyExit` invisibility investigation (2026-08-31) that preceded its fix (PR #83) is archived
+> in [`archive/progress-history.md`](archive/progress-history.md), along with completed work through
+> 2026-08-28 (PMB corrections, #77/#78, the four "known, not fixed" follow-ups, and the 2026-08-28
+> session close).
 
 ## 📊 Metrics
 

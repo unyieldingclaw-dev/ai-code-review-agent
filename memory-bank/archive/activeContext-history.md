@@ -1,5 +1,31 @@
 # Active Context — archived history
 
+## Moved out 2026-09-26 (superseded by "All four PRs merged" — #89/#90/#88/#85 all landed)
+
+**Today's entire calibration/measurement work moved off `#85`'s own unmerged branch onto its own
+branch, `chore/model-recall-calibration` (off `main`), per explicit user direction** — it was never
+part of `#85`'s feature and had no business sitting uncommitted on that branch.
+
+**Timeout plumbing bug found via this repo's own `/code-review`, fixed, verified.** `calibrate.ts`
+never actually enforced `CALIBRATION_TIMEOUT_MS`/`agentTimeoutMs`; every batch ran under Ollama's
+hardcoded ~300s default the whole time. Fixed and verified (`npm run calibrate` unfiltered against
+`devstral:latest`: 23 passed, 3 failed, none a regression from this fix). The one flagged timeout
+(`adversarial-dirty` vs `devstral:latest`) was resolved by raising `CALIBRATION_TIMEOUT_MS` to
+300000 in `.github/workflows/calibrate.yml`. Full detail in `progress.md`'s "Timeout plumbing bug"
+entry, which is not superseded (this fix later merged as PR #88).
+
+**`#85`'s own CI comment reported 11 ACR findings on its diff — all 11 confirmed fabricated.**
+Extended the pattern already measured in `#87` (74.2% mismatch/unknown, N=20) to domains beyond
+`adversarial`. Paused pending the timeout-plumbing fix above, then resumed and completed as PR #90's
+historical checkpoint (which also corrected the count from 11 to the actual 12) — see `progress.md`.
+
+**Restraint (`adversarial-clean`, N=20×3) and recall (oracle-backed `adversarial-dirty`, N=20×3)
+measured — a real precision-recall-runtime frontier, no winner.** Qwen3.5 best restraint/runtime,
+Ornith best recall but worst restraint and timeout-prone, Devstral weakest on recall with timeouts
+scaling with diff complexity. Deliberately no synthetic scalar score invented to rank them. **This
+ranking did not transfer when checked against real historical code** — see PR #90's checkpoint in
+`progress.md`, the actual finding that matters more than the synthetic numbers above.
+
 ## Moved out 2026-09-18 (170 lines against 150 limit; superseded by "#84/#85/#86/#87 merged")
 
 **`#83` merged 2026-09-13. `#84`'s branch then had to absorb that merge**: its own
