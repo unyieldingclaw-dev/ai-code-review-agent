@@ -24,6 +24,7 @@ import { ComplexityAgent } from '../src/core/agents/complexity.js'
 import { OrchestratorAgent } from '../src/core/agents/orchestrator.js'
 import { claimsInjection, claimsSwallowedException } from '../src/core/claimSupport.js'
 import { BaseAgent } from '../src/core/agents/base.js'
+import { CalibrationTally } from './calibrationTally.js'
 import type { Finding } from '../src/core/schema.js'
 
 interface CalibrationCase {
@@ -556,8 +557,7 @@ async function main() {
     complexity: new ComplexityAgent(provider, config),
   }
 
-  let passed = 0
-  let failed = 0
+  const tally = new CalibrationTally()
 
   // Measurement contract (docs/superpowers/plans/2026-09-17-acr-locationcheck-fpr-measurement.md):
   // does `locationCheck` (verified/mismatch/unknown) predict a finding is a false positive? Every
@@ -701,14 +701,15 @@ async function main() {
           elapsedMs: Date.now() - callStart,
           findings: tagged,
         })
-        passed++
+        // This fixture requires manual mechanism scoring: a completed run is not a pass.
+        tally.recordOracle()
         continue
       }
 
       if (c.expectEmpty) {
         if (findings.length === 0) {
           console.log(`  ✅ PASS — correctly reported no findings`)
-          passed++
+          tally.pass()
         } else {
           console.log(
             `  ❌ FAIL — expected zero findings, got ${findings.length}: ` +
@@ -722,7 +723,7 @@ async function main() {
               title: f.title,
             })
           }
-          failed++
+          tally.fail()
         }
         continue
       }
@@ -734,7 +735,7 @@ async function main() {
             `  ✅ PASS — no surviving injection/swallowed-exception claims ` +
               `(${findings.length} other finding(s) tolerated)`
           )
-          passed++
+          tally.pass()
         } else {
           console.log(
             `  ❌ FAIL — ${bad.length} injection/swallowed-exception claim(s) survived: ` +
@@ -748,7 +749,7 @@ async function main() {
               title: f.title,
             })
           }
-          failed++
+          tally.fail()
         }
         continue
       }
@@ -763,7 +764,7 @@ async function main() {
             `  ✅ PASS — no surviving "${c.forbiddenKeyword}" finding ` +
               `(${findings.length} other finding(s) tolerated)`
           )
-          passed++
+          tally.pass()
         } else {
           console.log(
             `  ❌ FAIL — ${bad.length} "${c.forbiddenKeyword}" finding(s) survived: ` +
@@ -777,7 +778,7 @@ async function main() {
               title: f.title,
             })
           }
-          failed++
+          tally.fail()
         }
         continue
       }
@@ -809,7 +810,7 @@ async function main() {
             ? `  ✅ PASS — found '${c.expectedKeyword}', rejected '${c.baitKeyword}'`
             : `  ✅ PASS — found '${c.expectedKeyword}' (no bait declared)`
         )
-        passed++
+        tally.pass()
       } else {
         if (!hasLegitimate) console.log(`  ❌ FAIL — missed '${c.expectedKeyword}'`)
         if (hasBait) console.log(`  ❌ FAIL — false positive '${c.baitKeyword}'`)
@@ -819,11 +820,11 @@ async function main() {
         // entirely (real regression). Diagnosing a failure previously meant re-running the agent
         // by hand through the CLI to see its actual output.
         printFindings(findings)
-        failed++
+        tally.fail()
       }
     } catch (err) {
       console.log(`  ❌ FAIL — agent error: ${(err as Error).message}`)
-      failed++
+      tally.fail()
     }
   }
 
@@ -847,14 +848,14 @@ async function main() {
         testFiles.length > 0 && testFiles[0].content.toLowerCase().includes('calculatetax')
       if (hasTestContent) {
         console.log(`  ✅ PASS — generated test file with calculateTax coverage`)
-        passed++
+        tally.pass()
       } else {
         console.log(`  ❌ FAIL — no test content generated for calculateTax`)
-        failed++
+        tally.fail()
       }
     } catch (err) {
       console.log(`  ❌ FAIL — agent error: ${(err as Error).message}`)
-      failed++
+      tally.fail()
     }
   }
 
@@ -926,8 +927,8 @@ async function main() {
     console.log(`\n${oracleRuns.length} oracle run(s) logged to ${oracleLogPath}`)
   }
 
-  console.log(`\nCalibration [${model}]: ${passed} passed, ${failed} failed`)
-  process.exit(failed > 0 ? 1 : 0)
+  console.log(tally.format(model))
+  process.exit(tally.hasFailures ? 1 : 0)
 }
 
 main().catch((err) => {
