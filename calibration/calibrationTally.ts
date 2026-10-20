@@ -22,6 +22,8 @@ export class CalibrationTally {
   }
 
   format(model: string): string {
-    return `\nCalibration [${model}]: ${this.passed} passed, ${this.failed} failed, ${this.oracleUnscored} oracle run(s) unscored (manual classification required)`
+    const scored = `${this.passed} passed, ${this.failed} failed`
+    const unscored = `${this.oracleUnscored} oracle run(s) unscored (manual classification required)`
+    return `\nCalibration [${model}]: ${scored}, ${unscored}`
   }
 }
