@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`calibration/ollamaLogCheck.ts` explains a calibration window from Ollama's own server log.**
+  A timed-out request returns no response body, so ACR could not tell a model that ran out of time
+  generating from one that never got the slot. On 2026-09-18 it was the latter for 3 of devstral's
+  4 recall-study timeouts (at least 281, 288 and 300 s of 300 s spent queued behind another
+  client), and those were read as model latency. For each request in a window the check reports
+  the minimum wait before its task started, model-load time, prompt-cache time, maximum compute
+  time and tokens generated, and names what dominated (`queue`, `load`, `prefill`, `generation`).
+  It also reports how much of each prompt came from cache, silent input and context-full
+  truncations, and contention: overlapping requests, or a model other than `--expected-blob`
+  loaded; its text output adds each model load's real envelope (GPU layers, allocated context, KV
+  split, flash attention, speculative decoding), and each task's sampler settings are recorded for
+  library callers. POSTs to Ollama's OpenAI-compatible `/v1/` API count as model traffic. Exits 3
+  on contention. Its "no contention" covers completed requests only: Ollama writes a request's line
+  when the request ends, and a request still queued inside Ollama appears nowhere until then, so it
+  holds only once every request overlapping the window -- other clients' included -- has ended; a
+  check at the end of a run is provisional until re-checked from the complete log. The window must
+  lie within one log file's span. It exits 1 rather than 0 when the logs read cannot vouch for the
+  window (e.g. it lies outside every file read, as after its file has rotated away, or a file's
+  format was not understood) and, as a best-effort tripwire, while a llama-server task that started
+  by the window's end has not released (unless its llama-server has terminated, e.g. crashed); bad
+  arguments also exit 1. "Contention" is any overlap, including the caller's own parallel requests.
+  Warns when requests that failed together could only be paired with their tasks by log order, and
+  when the log comes from an Ollama version it was not validated on (0.34.0, 0.34.4). Read-only; no
+  product code changes. Tested against real log slices whose expected values were derived by hand,
+  and replayed over the full preserved Sep 15-24 log: of 2,063 chat requests only 6 (all `404`
+  model-not-found, which have no task) are left unexplained, and 5 are flagged as paired by log
+  order. Replayed too over the Sep 25-Oct 23 logs (Ollama 0.34.4-0.40.4), where three times a
+  timed-out request's cancel line was logged before its own failure line; each is linked to its
+  own request, and the only requests left unexplained there are the two whose llama-server crashed.
+  `npx tsx calibration/ollamaLogCheck.ts --from <local time> --to <local time> [--log <file>]...`
+
 ### Fixed
 
 - **A dead agent and a clean one printed the identical stderr progress line.** `AgentProgressEvent`
