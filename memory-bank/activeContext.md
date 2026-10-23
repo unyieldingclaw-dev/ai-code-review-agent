@@ -29,7 +29,7 @@ PR — the only copy is this checkout; its contract in `.claude/contracts/active
 
 **As of 2026-10-23, Claude cannot commit or push from a git worktree** — the `review-reminders.*`
 gate is worktree-blind. Work happens in this checkout, which also holds the only copy of the
-unpushed branch above. `TEMPLATE_OWNED`, so not fixable here: report upstream to PMB (detail in
+unpushed branch above. Fixed on PMB `main` (`a0850a3`, untagged); needs a blocked `mb upgrade` (detail in
 `techContext.md`, "PMB-owned defects").
 
 **Earlier (2026-09-26): all four of this session's PRs are now merged and `main` is caught up —

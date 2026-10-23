@@ -194,11 +194,12 @@ also resolves an earlier, unexplained observation (an uncommitted `.githooks/pre
 appeared and vanished with no traceable origin): it was this same draft, in progress in a Claude
 session sharing this working directory.
 
-**A further defect, outside the sixteen and a different shape (wrong-repo resolution, not a result
-decoupled from its check) — 2026-10-23, not yet reported upstream: `review-reminders.*` is
-worktree-blind.** It resolves the repo with `git rev-parse --show-toplevel` from the session's cwd,
-not the directory being committed, so a Claude commit/push from a git worktree is always denied. PR
-#93's commits had to be made by the operator from their own terminal.
+**Already fixed upstream, not delivered here (2026-10-23): ACR's `review-reminders.*` is
+worktree-blind.** Its `1.1.1` copy (`.ps1:47`, `.sh:51`) runs a bare `git rev-parse --show-toplevel`
+from the session's cwd, so a Claude commit/push from a git worktree is always denied; PR #93's
+commits had to be made by the operator from their own terminal. PMB fixed it in `a0850a3`
+(2026-09-15; repo taken from a leading quoted `cd "<path>" &&` or `git -C`), on PMB `main` but in no
+release tag, so only an `mb upgrade` from a checkout containing it delivers it — blocked; see NS-14.
 
 **Two PMB peer-session claims independently verified 2026-09-19–26, not just accepted:** NS-11
 (NPM_TOKEN renewal) is genuinely obsolete — ACR uses OIDC/Trusted Publishing (`release.yml`), not a
