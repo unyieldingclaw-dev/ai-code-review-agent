@@ -466,6 +466,8 @@ async function main() {
   // matches nothing would report "0 passed, 0 failed" and exit 0 -- a green result from a
   // suite that never executed, which is precisely the failure class this suite exists to
   // catch. Checked before the Ollama ping so a typo fails in milliseconds, not after setup.
+  // (An oracle-only run also reports 0 passed, 0 failed, but it did execute: oracle runs are
+  // unscored, and the summary line counts them separately.)
   //
   // WHY 'testgen' is a valid name despite not being in CASES: it runs from a hardcoded block
   // after the loop rather than as a CalibrationCase, so it needs explicit inclusion both in the
@@ -701,7 +703,8 @@ async function main() {
           elapsedMs: Date.now() - callStart,
           findings: tagged,
         })
-        passed++
+        // An oracle run is a measurement awaiting manual mechanism classification, not an
+        // assertion -- counting it as passed would report reviewer quality nobody has scored.
         continue
       }
 
@@ -926,7 +929,15 @@ async function main() {
     console.log(`\n${oracleRuns.length} oracle run(s) logged to ${oracleLogPath}`)
   }
 
-  console.log(`\nCalibration [${model}]: ${passed} passed, ${failed} failed`)
+  // Only when nonzero: an instruction printed on every run where it doesn't apply teaches
+  // readers to skip it on the runs where it does.
+  const unscored =
+    oracleRuns.length > 0
+      ? `, ${oracleRuns.length} oracle run(s) unscored (manual classification required)`
+      : ''
+  console.log(`\nCalibration [${model}]: ${passed} passed, ${failed} failed${unscored}`)
+  // Exit 0 means no asserted case failed, not that reviewer quality was verified: a completed
+  // oracle run never affects the exit code (one that errors is counted as failed above).
   process.exit(failed > 0 ? 1 : 0)
 }
 

@@ -162,6 +162,16 @@ json` was never affected** — `formatJson` is `JSON.stringify(result, null, 2)`
   `filteredFiles` is also documented in the `--format json` envelope for the first time, since
   this change makes it the field a consumer needs to compute coverage.
 
+- **`npm run calibrate` counted an oracle measurement as a pass.** The `adversarial-dirty` case
+  has a pre-registered oracle for manual mechanism classification and asserts nothing, yet after
+  logging its findings it incremented `passed` — so the summary claimed a reviewer-quality pass
+  even when the oracle's known defects went entirely undetected. When any oracle run completes,
+  the summary now reports `N oracle run(s) unscored (manual classification required)` alongside
+  the scored counts; runs without one print the summary unchanged. The exit code is unchanged: a
+  completed oracle run never affects it, and one that errors still counts as failed. **A
+  full-suite `passed` total is one lower than before for identical model behavior** — compare
+  pre- and post-change calibration runs accordingly.
+
 ### Notes
 
 - **No exit code changed.** A fail-fast run still exits `0`. Routing it to `3` was considered and
