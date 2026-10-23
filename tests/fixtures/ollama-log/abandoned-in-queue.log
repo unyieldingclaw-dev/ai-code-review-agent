@@ -1,0 +1,12 @@
+[GIN] 2026/09/21 - 16:04:00 | 500 |    9.9844011s |       127.0.0.1 | POST     "/api/chat"
+slot print_timing: id  0 | task 9045 | n_gen =    100, tg =   1.83 t/s, tg_3s =   1.84 t/s
+time=2026-09-21T16:04:10.614-05:00 level=INFO source=llama_server.go:1542 msg="aborting completion request due to client closing the connection"
+[GIN] 2026/09/21 - 16:04:10 | 500 |   10.0070865s |       127.0.0.1 | POST     "/api/chat"
+slot print_timing: id  0 | task 9045 | n_gen =    106, tg =   1.83 t/s, tg_3s =   1.82 t/s
+slot print_timing: id  0 | task 9045 | prompt eval time =   91397.04 ms / 29946 tokens (    3.05 ms per token,   327.65 tokens per second)
+slot print_timing: id  0 | task 9045 |        eval time =   60536.88 ms /   111 tokens (  550.34 ms per token,     1.82 tokens per second)
+slot print_timing: id  0 | task 9045 |       total time =  151933.92 ms / 30057 tokens
+slot print_timing: id  0 | task 9045 |    graphs reused =       7492
+slot      release: id  0 | task 9045 | stop processing: n_tokens = 30066, truncated = 0
+srv  update_slots: all slots are idle
+[GIN] 2026/09/21 - 16:04:15 | 200 |         2m38s |       127.0.0.1 | POST     "/api/chat"
