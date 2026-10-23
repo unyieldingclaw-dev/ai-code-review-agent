@@ -1,14 +1,40 @@
 {
-  "task": "Reconstruct PR #85's exact reviewed diff at commit 7f07fd6 and re-adjudicate its 11 persisted findings against it (not assumed 11/11 false), and build a pre-registered oracle for PR #84's 2 known defects at commit b7634e2 in the same format as adversarial-dirty.oracle.json (defect ID -> commit/snapshot -> location -> mechanism -> consequence -> evidence -> fixing commit/test) -- a first real-code checkpoint testing whether the synthetic-fixture ranking (Ornith best recall, Qwen3.5 best restraint/runtime, Devstral weakest) transfers. Explicitly NOT \"the historical corpus\" at N=2.",
-  "status": "complete",
-  "completion_notes": "Corrected PR #85's finding count from an inherited 11 to the verified 12 (refetched fresh via gh api rather than trusted). Re-adjudicated all 12 against the real historical code at 7f07fd68 -- all 12 confirmed fabricated, each traced to its own mechanism. Built and pre-registered the PR #84 oracle (D1: mergePolicy missing coverageIncomplete guard; D2: mergePolicy returning a truthy-but-empty object) at b7634e2, both independently re-verified against the actual snapshot. User approved proceeding past the checkpoint. Ran all three models once each against both diffs via the real CLI (--timeout 300000, full agent set, locked order). Result: the synthetic-fixture ranking does not transfer at N=2 -- Ornith (best synthetic recall) produced zero findings on real code; no model detected either PR #84 defect; Devstral repeated 2 of its original fabrications and added new ones plus a hallucinated-already-fixed-bug pattern; Qwen3.5 had the best runtime but 2 of 3 lizard-attributed complexity numbers were independently confirmed fabricated despite the tool genuinely running -- a new, separate finding about source:\"lizard\" attribution reliability. Full write-up in docs/superpowers/plans/2026-09-19-acr-historical-checkpoint-pr84-pr85.md. Explicitly not the historical corpus -- extending past N=2 is a separate future decision. Files created beyond original scope: calibration/fixtures/historical-pr84.diff, historical-pr85.diff, and 6 raw JSON outputs (calibration/historical-checkpoint-raw.*.json) -- disclosed here since they weren't in the original scope array.",
-  "created_at": "2026-09-21T15:24:18Z",
-  "expires_at": "2026-09-21T23:24:18Z",
-  "scope": [
-    {
-      "file": "docs/superpowers/plans/2026-09-19-acr-historical-checkpoint-pr84-pr85.md",
-      "op": "create"
-    }
+  "task": "Make every scored calibration trial record which model build and code ran, how Ollama ran it and where the time went, and add a read-only Ollama server-log check that explains timeouts (queue wait vs load vs prefill vs generation) -- without changing anything sent to Ollama or any production review behaviour. PR 1: log check; PR 2: per-trial records.",
+  "status": "active",
+  "created_at": "2026-09-27T03:02:44Z",
+  "expires_at": "2026-10-23T20:49:41Z",
+  "amendments": [
+    "Added tests/fixtures/ollama-log/simultaneous-failures.log (round-2 review: pairing by log order).",
+    "Added tests/fixtures/ollama-log/cold-load-short-answer.log (round-2 review T1) while the contract had expired, so that write ran without scope checks.",
+    "Renewed at 2026-09-30T01:08Z (new expiry 2026-09-30T09:08Z).",
+    "Renewed at 2026-09-30T23:04Z (new expiry 2026-10-01T07:04Z).",
+    "Renewed at 2026-10-05T01:43Z (new expiry 2026-10-05T09:43Z); added tests/fixtures/ollama-log/runner-crash.log (a real llama-server crash, 2026-09-30, that left a task that never releases).",
+    "Renewed at 2026-10-23T12:49Z (new expiry 2026-10-23T20:49Z) after /change-review of PR 1. In the gap since the 2026-10-05 expiry no scoped file was edited; the PR 1 commit (2026-10-21) and its rebase onto main (2026-10-23, just before this renewal) fell in it. Added tests/fixtures/ollama-log/cancel-before-500.log (a real 0.40.4 slice where a timed-out request's cancel line precedes its 500)."
   ],
-  "checkpoint": "Present the re-adjudicated #85 findings and the pre-registered #84 oracle for the user's sign-off BEFORE running any of the three models (devstral:latest, ornith-1.5:9b, qwen3.5:9b) against either historical diff."
+  "scope": [
+    { "file": "calibration/ollamaLogCheck.ts", "op": "create" },
+    { "file": "tests/unit/ollamaLogCheck.test.ts", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/queue-bound-trials-6-8.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/mixed-trial-11.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/generation-bound-ornith.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/input-truncation.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/context-full.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/devstral-load-and-request.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/aborted-load.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/back-to-back-requests.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/cancel-after-next-ping.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/fast-200-before-release.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/abandoned-in-queue.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/simultaneous-failures.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/cold-load-short-answer.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/runner-crash.log", "op": "create" },
+    { "file": "tests/fixtures/ollama-log/cancel-before-500.log", "op": "create" },
+    { "file": "src/core/llm/ollamaProvider.ts", "op": "edit" },
+    { "file": "tests/unit/ollamaProvider.test.ts", "op": "edit" },
+    { "file": "calibration/calibrate.ts", "op": "edit" },
+    { "file": "CHANGELOG.md", "op": "edit" },
+    { "file": "memory-bank/progress.md", "op": "edit" },
+    { "file": "memory-bank/techContext.md", "op": "edit" }
+  ],
+  "checkpoint": "Live checks (announced to the PMB session first; their full suite not running): a deliberately created queue wait MUST be classified queue-bound by the log check, or stop and report before PR 2."
 }

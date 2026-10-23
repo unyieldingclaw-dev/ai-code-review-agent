@@ -1,0 +1,17 @@
+[GIN] 2026/09/18 - 18:41:44 | 500 |          5m7s |       127.0.0.1 | POST     "/api/chat"
+srv  server_strea: conv_id= (empty=1)
+[GIN] 2026/09/18 - 18:41:44 | 200 |      6.0394ms |       127.0.0.1 | GET      "/api/tags"
+slot get_availabl: id  0 | task 8490 |  - skipping, is_processing = 1
+srv          stop: cancel task, id_task = 8490
+slot      release: id  0 | task 8490 | stop processing: n_tokens = 18936, truncated = 0
+slot get_availabl: id  0 | task -1 |  - checking sim = 0.669 (788/1178) > 0.100
+slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 0.669 (> 0.100 thold), f_keep = 0.042
+srv  get_availabl: updating prompt cache
+srv   prompt_save:  - saving prompt with length 18936, total state size = 2958.968 MiB (draft: 0.000 MiB)
+srv          load:  - looking for better prompt, base f_keep = 0.042, f_sim = 0.669
+srv          load:    - prompt with length   18697, lcp =       4, f_keep = 0.000, f_sim = 0.003
+srv          load:    - prompt with length    1746, lcp =    1178, f_keep = 0.675, f_sim = 1.000
+srv          load:    - prompt with length   18936, lcp =     788, f_keep = 0.042, f_sim = 0.669
+srv          load:  - found better prompt with f_keep = 0.675, f_sim = 1.000
+srv        update:  - cache state: 2 prompts, 5880.589 MiB (limits: 8192.000 MiB, 32768 tokens, 52424 est)
+srv        update:    - prompt 000002E1FA5952A0:   18697 tokens, checkpoints:  0,  2921.621 MiB
