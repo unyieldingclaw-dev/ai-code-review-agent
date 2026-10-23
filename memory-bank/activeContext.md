@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-09-26
+last-reviewed: 2026-10-23
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,16 +16,28 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-09-26
+**Last Updated**: 2026-10-23
 
 ## Current Focus
 
-**All four of this session's PRs are now merged and `main` is caught up — `gh pr list` returns
-empty, verified directly.** In order: `#89` (calibration `agentPolicy` excludes), `#90` (historical
-checkpoint — the synthetic model ranking does **not** transfer to real code at N=2, full detail in
-`progress.md`), `#88` (the timeout-plumbing fix + oracle-backed calibration measurements), `#85`
-(the long-stale `earlyExit`/stderr-distinguishing fix, sitting done-and-pushed for over a week
-before finally being clicked). Full narrative for each: `progress.md`.
+**PR #93 merged 2026-10-23** (calibration oracle runs reported as unscored, not passed — full-suite
+`passed` totals are now one lower for identical behavior; detail in `progress.md`). **Open:** `#92`
+(docs, reviewer composition — not yet reviewed). **Unpushed local work:** branch
+`feat/calibration-envelope-provenance` holds a commit (`ollamaLogCheck.ts`) with no upstream and no
+PR — the only copy is this checkout; its contract in `.claude/contracts/active-task.json` expired
+2026-10-05. Do not delete or rebase it without the operator.
+
+**As of 2026-10-23, Claude cannot commit or push from a git worktree** — the `review-reminders.*`
+gate is worktree-blind. Work happens in this checkout, which also holds the only copy of the
+unpushed branch above. `TEMPLATE_OWNED`, so not fixable here: report upstream to PMB (detail in
+`techContext.md`, "PMB-owned defects").
+
+**Earlier (2026-09-26): all four of this session's PRs are now merged and `main` is caught up —
+`gh pr list` returns empty, verified directly.** In order: `#89` (calibration `agentPolicy` excludes),
+`#90` (historical checkpoint — the synthetic model ranking does **not** transfer to real code at
+N=2, full detail in `progress.md`), `#88` (the timeout-plumbing fix + oracle-backed calibration
+measurements), `#85` (the long-stale `earlyExit`/stderr-distinguishing fix, sitting done-and-pushed
+for over a week before finally being clicked). Full narrative for each: `progress.md`.
 
 **Getting all three of #90/#88/#85 merged back-to-back surfaced two generalizable patterns, now in
 `systemPatterns.md`:** merging one PR pushes every other open PR to `BEHIND` again, not just once
@@ -102,16 +114,13 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: no open PRs (`gh pr list` empty, 2026-09-26) — `#82`–`#90` all merged. Four
-remote branches from this session's PRs (`chore/historical-checkpoint-pr84-pr85`,
-`chore/model-recall-calibration`, `fix/chunked-progress-visibility`,
-`fix/exclude-calibration-fixtures-from-acr-policy`) are merged but **not yet deleted** — routine
-cleanup, not urgent, not done here since it wasn't asked for. Two long-retained orphan branches
-remain (`chore/agent-calibration`, `claude/plan-overview-4dg42o`) — containment unproven, so both
-stay. **The `main` hash is deliberately not recorded here** — read it from `git log`; two prior PRs
-tried to keep it current and each went stale the moment it merged, since a memory-bank PR moves the
-very commit it names. `v1.15.0` tagged at `6e2ed34` and published; that tag hash **is** recorded,
-because a release tag is immutable and a branch tip is not. Commands are in `techContext.md`;
-`npm run check` covers typecheck/build/format/lint/test in one pass. **This working directory is
-shared with concurrent peer Claude sessions** — see Current Focus; do not assume you are the only
-session touching this checkout.
+unit tests. **Git**: open PRs as of 2026-10-23: `#92` only — `#82`–`#91` and `#93` all merged. The
+four merged 2026-09-26 PR branches are gone from the remote (`git ls-remote`, 2026-10-23). Two
+long-retained orphan branches remain (`chore/agent-calibration`, `claude/plan-overview-4dg42o`) —
+containment unproven, so both stay. **The `main` hash is deliberately not recorded here** — read it
+from `git log`; two prior PRs tried to keep it current and each went stale the moment it merged,
+since a memory-bank PR moves the very commit it names. `v1.15.0` tagged at `6e2ed34` and published;
+that tag hash **is** recorded, because a release tag is immutable and a branch tip is not. Commands
+are in `techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass. **This
+working directory is shared with concurrent peer Claude sessions** — see Current Focus; do not
+assume you are the only session touching this checkout.
