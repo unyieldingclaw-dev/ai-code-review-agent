@@ -20,17 +20,17 @@ lineage: []
 
 ## Current Focus
 
-**PR #93 merged 2026-10-23** (calibration oracle runs reported as unscored, not passed — full-suite
-`passed` totals are now one lower for identical behavior; detail in `progress.md`). **Open:** `#92`
-(docs, reviewer composition — not yet reviewed). **Unpushed local work:** branch
-`feat/calibration-envelope-provenance` holds a commit (`ollamaLogCheck.ts`) with no upstream and no
-PR — the only copy is this checkout; its contract in `.claude/contracts/active-task.json` expired
-2026-10-05. Do not delete or rebase it without the operator.
+**Merged 2026-10-23: #93, #94, #95, #96 and #92; no PR is open.** #93: calibration oracle runs
+reported as unscored, not passed — full-suite `passed` totals are now one lower for identical
+behavior. #95: the read-only Ollama server-log check (`calibration/ollamaLogCheck.ts`), PR 1 of the
+calibration-envelope contract; PR 2 (per-trial provenance) has not started. #92: the
+reviewer-composition contract, kept in `docs/architecture/reviewer-composition.md` behind a pointer
+in `systemPatterns.md` — **not auto-read; open it before changing the reviewer set**. Detail for
+each: `progress.md`.
 
 **As of 2026-10-23, Claude cannot commit or push from a git worktree** — the `review-reminders.*`
-gate is worktree-blind. Work happens in this checkout, which also holds the only copy of the
-unpushed branch above. Fixed on PMB `main` (`a0850a3`, untagged); needs a blocked `mb upgrade` (detail in
-`techContext.md`, "PMB-owned defects").
+gate is worktree-blind. Work happens in this checkout. Fixed on PMB `main` (`a0850a3`,
+untagged); needs a blocked `mb upgrade` (detail in `techContext.md`, "PMB-owned defects").
 
 **Earlier (2026-09-26): all four of this session's PRs are now merged and `main` is caught up —
 `gh pr list` returns empty, verified directly.** In order: `#89` (calibration `agentPolicy` excludes),
@@ -105,8 +105,22 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 - **5 operator calls parked, unmade** (corroboration-downgrade contract, `systemPatterns.md` size,
   `ping()`'s substring guess, `--chunk` as default, PMB upgrade) — full detail in
   [`archive/activeContext-history.md`](archive/activeContext-history.md).
-- **`fetch failed` — the one open technical thread, deliberately passive.** One invocation in twelve
-  (Ollama dropping the connection under load). **n=1: do not act on it.**
+- **`fetch failed` — root-caused 2026-10-23; fix not started, unscheduled.** Not Ollama dropping
+  the connection: `ollamaProvider.chat()` calls `fetch` with `stream: false` and no `dispatcher`
+  (`src/core/llm/ollamaProvider.ts:107-117`), so Node's default undici `headersTimeout` kills any
+  call that passes 300 s. That binds only when ACR's own ceiling is above 300 s (the scaled
+  `agentTimeoutMs` reaches 360 s; calibration). It classifies as `error`, not `timeout`
+  (`src/core/parsing.ts:21`), so the runner retries it onto a busy server and the "raise
+  `--timeout`" hint never shows. **Raising `--timeout` or `CALIBRATION_TIMEOUT_MS` above 300 s has
+  no effect until this is fixed** — a ceiling that silently does not apply, as in `progress.md`'s
+  "Timeout plumbing bug". Reproduced without Ollama: fails at 307,142 ms, `UND_ERR_HEADERS_TIMEOUT`;
+  Ollama logs these as 500s of 5m6s-5m7s. The fix (an undici `Agent` with a higher `headersTimeout`
+  passed as `dispatcher`, or `stream: true`) is a product change and needs its own contract.
+- **CI's `ai-review` runs without `--chunk`** (`review.yml`), so a PR diff over `maxDiffLines`
+  (2000) is reviewed truncated. Unscheduled.
+- **Flaky timing test:** `tests/unit/runner.test.ts:1570` expects a 300 ms backoff to measure at
+  least 300 ms; #92's CI got 299 and passed on re-run. Give it a 1 ms tolerance. Unscheduled.
+- **`techContext.md` is at 399/400** — archive before adding to it.
 - **`docs/CONTRACTS-GUIDE.md` says `.claude/contracts/` should be gitignored; it demonstrably isn't**
   (tracked in git — confirmed by this session's own conflicts on `active-task.json` across
   branches). Flagged, never actioned; worth fixing if it causes a third conflict.
@@ -114,7 +128,7 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: open PRs as of 2026-10-23: `#92` only — `#82`–`#91` and `#93` all merged. The
+unit tests. **Git**: open PRs as of 2026-10-23: none — `#82`–`#96` all merged. The
 four merged 2026-09-26 PR branches are gone from the remote (`git ls-remote`, 2026-10-23). Two
 long-retained orphan branches remain (`chore/agent-calibration`, `claude/plan-overview-4dg42o`) —
 containment unproven, so both stay. **The `main` hash is deliberately not recorded here** — read it

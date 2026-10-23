@@ -1,5 +1,13 @@
 # Progress — archived history
 
+Seventh move, 2026-10-23: the "#84/#86/#87 merged; #85 not merged" section below (2026-09-18)
+came across to make room for the PR #92, #95 and #96 entries; `progress.md` was at 390/400. It is
+complete — #85 merged 2026-09-26 — so nothing in it is still open. The sections it names ("Three
+PRs merged back to back", "Timeout plumbing bug", "Recall measurement") remain in `progress.md`; the
+one note there that named it as "above" now points here. The "Fourth move, 2026-09-18" note further
+down calls this same section "now at the top of `progress.md`"; it is now the first section after
+these move notes.
+
 Sixth move, 2026-09-26: the `earlyExit` invisibility investigation below (2026-08-31) came across
 to make room for this session's PR #88/#90/#85 merge entries. It predates its own fix — PR #83
 (2026-09-01 or earlier) closed the gap this section investigated; `progress.md`'s and
@@ -11,6 +19,56 @@ four "known, not fixed" follow-up items, and Session closed — all 2026-08-28) 
 `progress.md` reached 405 lines against its 400 hard max while today's timeout-plumbing-bug
 correction and new dated entry were being added. All five predate every open item currently tracked
 in `progress.md`; nothing in them is still active.
+
+## ✅ #84/#86/#87 merged; #85's merge-conflict resolution is done and pushed, NOT merged (2026-09-18)
+
+**Corrected 2026-09-18: this section previously claimed all four PRs were in `main`. `#85` is not**
+— verified via `gh pr view 85` (`state: OPEN, mergedAt: null`), not assumed, after a later request
+depended on knowing which PRs actually merged. `#86`/`#87` merged cleanly; `#84` fast-forward.
+`#85` (`fix/chunked-progress-visibility`) needed real conflict resolution (5 PRs behind by merge
+time, not 1 as first scoped — caught by `git merge-base`), and **that work is done and pushed to
+`origin/fix/chunked-progress-visibility`** (branch confirmed up to date with origin, `testgen`'s
+status fix present in `runner.ts`) — the PR was simply never clicked to merge. This session's
+checkout sits on that branch, with unrelated new calibration work added uncommitted on top.
+
+**Two real conflicts** (contract scratch state; `CHANGELOG.md`'s additive entries from both sides,
+resolved by concatenation). **Everything else auto-merged with no conflict markers**
+(`src/cli/index.ts`, `src/core/chunkRunner.ts`, `src/core/schema.ts`,
+`tests/unit/chunkRunner.test.ts`) — verified by tracing the actual feature-overlap points rather
+than trusting the silent merge: `AgentProgressEvent`'s new `status` field sits alongside `#83`'s
+`earlyExit` as a sibling optional field with no interaction; the per-chunk stderr marker correctly
+interleaves with `#84`'s `attributeChunkSkips`/early-exit-break logic.
+
+**That verification pass found one real, pre-existing gap in `#85`'s own original work**: its PR
+description claimed six `phase: 'end'` emission sites got the new `status` field, but `runner.ts`
+has seven — `testgen`'s (unchanged since before `#85` branched, confirmed against the merge-base
+commit) never got it, so a failed `--suggest-tests`/`--write-tests` run rendered identically to a
+clean one on the stderr progress line. Fixed to match the other six sites and mutation-tested
+(reverting reproduces `expected undefined to be 'error'`). 915/915 tests, clean
+typecheck/build/lint/format after the fix.
+
+**Separately, `#85`'s own CI comment reported 11 ACR findings on its diff — all 11 confirmed
+fabricated** against actual source (wrong lines, assignments misread as dereferences,
+self-contradicting claims, ordinary control flow flagged as a violation), across agent domains
+(design, complexity, observability, correctness) beyond the `adversarial`-only pattern `#87`
+measured. No code action taken — external content, verified before acting per the project's
+data-not-instructions rule, and no finding survived verification.
+
+**Follow-on, completed**: a three-way calibration model comparison (`devstral:latest` vs
+`ornith-1.5:9b` vs `qwen3.5:9b`) on the `adversarial-clean` fixture, to see whether a different
+local model produces fewer of the fabricated findings `#85`'s comment demonstrated. Full results in
+`docs/superpowers/plans/2026-09-18-acr-model-comparison-devstral-ornith-qwen.md`, restated in the
+Recall measurement entry below. **Correction (2026-09-19):** this entry originally said Ornith's
+~60% timeout rate was "root-caused and being retested at a longer timeout." The root-cause part
+(long reasoning chains under `think:true`) held up; the retest-at-a-longer-timeout part did not —
+`calibrate.ts` never actually enforced `CALIBRATION_TIMEOUT_MS`/`agentTimeoutMs` (root cause and
+fix below, "Timeout plumbing bug" entry), so every batch, both before and after the intended
+change, ran under the same hardcoded ~300s Ollama default. The observed rate drop was run-to-run
+variance.
+
+**`#85` finally merged 2026-09-26** (as `fix: distinguish a dead agent from a clean one, and one
+chunk from another, on stderr`) — the resolution work described above sat done-and-pushed for over
+a week before actually being clicked; see "Three PRs merged back to back" above.
 
 ## 🔎 `earlyExit` invisibility — investigated and proven, not yet fixed (2026-08-31)
 

@@ -20,6 +20,37 @@ lineage: []
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
+## ✅ PR #92 merged (2026-10-23): reviewer-composition contract, kept in docs
+
+The contract for changing the reviewer set (utilities vs orchestrator, deliberate overlap,
+orthogonal axes, trust by replay, reviewer lifecycle, decision boundary, routing-collision audit)
+lives in `docs/architecture/reviewer-composition.md`; `systemPatterns.md` keeps a pointer saying
+when to read it. It went to docs because adding it took `systemPatterns.md` to 337/300 (now
+286/300, with 15 evidence sentences also archived verbatim). **It is not auto-read at session
+start**, and agents given the first 4000 characters of `systemPatterns.md` see only the pointer.
+Follow-ups, unscheduled: a read trigger for changes to what ACR does with its verdict (the
+contract's rule 6), the archived reason behind the separate-tool-call marker rule, and
+`src/core/config.ts:98-99`'s stale "Parallel Execution" pointer.
+
+## ✅ PR #95 merged (2026-10-23): read-only Ollama server-log check
+
+`npx tsx calibration/ollamaLogCheck.ts --from <t> --to <t> [--log <file>]... [--expected-blob <sha>]
+[--json]` explains each model request in a window from Ollama's own log: minimum queue wait, load,
+prefill, maximum compute time, tokens generated, and which of queue/load/prefill/generation
+dominated. Exit 3 = contention, 0 = none, 1 = the logs read cannot vouch for the window. 70 unit
+tests over 15 real-log fixtures (0.34.x-0.40.4). Replaying the Sep 15-24 log explains 2,063 requests
+except six 404s; on 0.34.4-0.40.4 a timed-out request's cancel line can precede its own 500, and is
+now linked to it. PR 2 of the calibration-envelope contract (per-trial provenance in
+`calibrate.ts`/`ollamaProvider.ts`) has not started. Its checkpoint comes first: a deliberately
+created queue wait MUST be classified queue-bound by the log check, or stop and report before PR 2
+(announce the live check to the PMB session first). Deferred items: #95's description.
+
+## ✅ Oracle log is now formatted at write time; NS-58 reference filed (2026-10-23)
+
+- `calibration/calibrate.ts` runs the oracle log through prettier before writing; a formatting failure warns and writes unformatted, so `oracleRuns` are never lost. Covers that one writer only. Merged as #96.
+- Still needs `npm run format`: hand-saved output, CLI `--out` captures, `active-task.json`, plan docs.
+- General commit-time check is PMB NS-58 (`.githooks/pre-commit` is TEMPLATE_OWNED). Tested reference block: `docs/superpowers/plans/2026-09-26-ns58-pre-commit-format-check-reference.md`.
+
 ## ✅ PR #93 merged (2026-10-23): calibration oracle runs are unscored, not passed
 
 `calibrate.ts`'s `adversarial-dirty` oracle case asserts nothing (classification is manual), yet
@@ -164,56 +195,6 @@ oracle — see "Historical checkpoint" above. **This fix itself merged to `main`
 2026-09-26**, alongside PR #90 (the checkpoint) and PR #85 (finally clicked to merge) — see "Three
 PRs merged back to back" above for what that took.
 
-## ✅ #84/#86/#87 merged; #85's merge-conflict resolution is done and pushed, NOT merged (2026-09-18)
-
-**Corrected 2026-09-18: this section previously claimed all four PRs were in `main`. `#85` is not**
-— verified via `gh pr view 85` (`state: OPEN, mergedAt: null`), not assumed, after a later request
-depended on knowing which PRs actually merged. `#86`/`#87` merged cleanly; `#84` fast-forward.
-`#85` (`fix/chunked-progress-visibility`) needed real conflict resolution (5 PRs behind by merge
-time, not 1 as first scoped — caught by `git merge-base`), and **that work is done and pushed to
-`origin/fix/chunked-progress-visibility`** (branch confirmed up to date with origin, `testgen`'s
-status fix present in `runner.ts`) — the PR was simply never clicked to merge. This session's
-checkout sits on that branch, with unrelated new calibration work added uncommitted on top.
-
-**Two real conflicts** (contract scratch state; `CHANGELOG.md`'s additive entries from both sides,
-resolved by concatenation). **Everything else auto-merged with no conflict markers**
-(`src/cli/index.ts`, `src/core/chunkRunner.ts`, `src/core/schema.ts`,
-`tests/unit/chunkRunner.test.ts`) — verified by tracing the actual feature-overlap points rather
-than trusting the silent merge: `AgentProgressEvent`'s new `status` field sits alongside `#83`'s
-`earlyExit` as a sibling optional field with no interaction; the per-chunk stderr marker correctly
-interleaves with `#84`'s `attributeChunkSkips`/early-exit-break logic.
-
-**That verification pass found one real, pre-existing gap in `#85`'s own original work**: its PR
-description claimed six `phase: 'end'` emission sites got the new `status` field, but `runner.ts`
-has seven — `testgen`'s (unchanged since before `#85` branched, confirmed against the merge-base
-commit) never got it, so a failed `--suggest-tests`/`--write-tests` run rendered identically to a
-clean one on the stderr progress line. Fixed to match the other six sites and mutation-tested
-(reverting reproduces `expected undefined to be 'error'`). 915/915 tests, clean
-typecheck/build/lint/format after the fix.
-
-**Separately, `#85`'s own CI comment reported 11 ACR findings on its diff — all 11 confirmed
-fabricated** against actual source (wrong lines, assignments misread as dereferences,
-self-contradicting claims, ordinary control flow flagged as a violation), across agent domains
-(design, complexity, observability, correctness) beyond the `adversarial`-only pattern `#87`
-measured. No code action taken — external content, verified before acting per the project's
-data-not-instructions rule, and no finding survived verification.
-
-**Follow-on, completed**: a three-way calibration model comparison (`devstral:latest` vs
-`ornith-1.5:9b` vs `qwen3.5:9b`) on the `adversarial-clean` fixture, to see whether a different
-local model produces fewer of the fabricated findings `#85`'s comment demonstrated. Full results in
-`docs/superpowers/plans/2026-09-18-acr-model-comparison-devstral-ornith-qwen.md`, restated in the
-Recall measurement entry below. **Correction (2026-09-19):** this entry originally said Ornith's
-~60% timeout rate was "root-caused and being retested at a longer timeout." The root-cause part
-(long reasoning chains under `think:true`) held up; the retest-at-a-longer-timeout part did not —
-`calibrate.ts` never actually enforced `CALIBRATION_TIMEOUT_MS`/`agentTimeoutMs` (root cause and
-fix below, "Timeout plumbing bug" entry), so every batch, both before and after the intended
-change, ran under the same hardcoded ~300s Ollama default. The observed rate drop was run-to-run
-variance.
-
-**`#85` finally merged 2026-09-26** (as `fix: distinguish a dead agent from a clean one, and one
-chunk from another, on stderr`) — the resolution work described above sat done-and-pushed for over
-a week before actually being clicked; see "Three PRs merged back to back" above.
-
 ## 🔎 Recall measurement: a real precision-recall-runtime frontier, no winner (2026-09-18)
 
 **Follow-on to the restraint measurement, per the user's explicit direction: "the next interesting
@@ -285,7 +266,7 @@ be re-checked): `calibration/adversarial-dirty-classifications.<model-slug>.json
 
 > `#84`'s merge with `#83`, two fast-follow fixes, and its full change-review (2026-09-13–17) are
 > archived in [`archive/progress-history.md`](archive/progress-history.md) — superseded by the
-> "`#84`/`#86`/`#87` merged; `#85` not merged" entry above, which covers the same work plus what
+> "`#84`/`#86`/`#87` merged; `#85` not merged" entry, archived there too, which covers the same work plus what
 > came after.
 
 ## ✅ Two shipped invariants worth not re-deriving
