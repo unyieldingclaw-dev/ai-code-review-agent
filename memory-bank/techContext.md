@@ -194,6 +194,13 @@ also resolves an earlier, unexplained observation (an uncommitted `.githooks/pre
 appeared and vanished with no traceable origin): it was this same draft, in progress in a Claude
 session sharing this working directory. `calibrate.ts` now formats its own oracle log (2026-10-23).
 
+**Already fixed upstream, not delivered here (2026-10-23): ACR's `review-reminders.*` is
+worktree-blind.** Its `1.1.1` copy (`.ps1:47`, `.sh:51`) runs a bare `git rev-parse --show-toplevel`
+from the session's cwd, so a Claude commit/push from a git worktree is always denied; PR #93's
+commits had to be made by the operator from their own terminal. PMB fixed it in `a0850a3`
+(2026-09-15; repo taken from a leading quoted `cd "<path>" &&` or `git -C`), on PMB `main` but in no
+release tag, so only an `mb upgrade` from a checkout containing it delivers it — blocked; see NS-14.
+
 **Two PMB peer-session claims independently verified 2026-09-19–26, not just accepted:** NS-11
 (NPM_TOKEN renewal) is genuinely obsolete — ACR uses OIDC/Trusted Publishing (`release.yml`), not a
 stored token. NS-14 (PMB version drift, ACR pinned to 1.1.1 vs PMB's actual 1.2.1) is genuinely
