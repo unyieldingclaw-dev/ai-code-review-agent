@@ -2,6 +2,7 @@ import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'fs'
 import { createHash } from 'crypto'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { format, resolveConfig } from 'prettier'
 import { OllamaProvider } from '../src/core/llm/ollamaProvider.js'
 import { extractChangedFiles } from '../src/core/policyFilter.js'
 import { DEFAULT_CONFIG } from '../src/core/config.js'
@@ -925,7 +926,21 @@ async function main() {
         )
       }
     }
-    writeFileSync(oracleLogPath, JSON.stringify([...priorOracleRuns, ...oracleRuns], null, 2))
+    // Formatted here because JSON.stringify output fails CI's `prettier --check`: this file is
+    // committed, and nothing else formats it between this write and the commit.
+    // A formatting failure must not cost the run's only copy of oracleRuns, so it degrades to the
+    // unformatted write, as the unreadable-prior-log handling above does.
+    let oracleLogOut = JSON.stringify([...priorOracleRuns, ...oracleRuns], null, 2)
+    try {
+      const prettierOptions = (await resolveConfig(oracleLogPath)) ?? {}
+      oracleLogOut = await format(oracleLogOut, { ...prettierOptions, filepath: oracleLogPath })
+    } catch (err) {
+      console.warn(
+        `\nWARNING: could not format ${oracleLogPath} (${(err as Error).message}); ` +
+          `wrote it unformatted. Run \`npm run format\` before committing it.`
+      )
+    }
+    writeFileSync(oracleLogPath, oracleLogOut)
     console.log(`\n${oracleRuns.length} oracle run(s) logged to ${oracleLogPath}`)
   }
 

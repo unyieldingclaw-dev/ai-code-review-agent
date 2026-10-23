@@ -192,7 +192,7 @@ fix would not survive `mb upgrade` — the draft is parked in
 `docs/superpowers/plans/2026-09-26-ns58-pre-commit-format-check-reference.md` so it isn't lost. This
 also resolves an earlier, unexplained observation (an uncommitted `.githooks/pre-commit` edit that
 appeared and vanished with no traceable origin): it was this same draft, in progress in a Claude
-session sharing this working directory.
+session sharing this working directory. `calibrate.ts` now formats its own oracle log (2026-10-23).
 
 **Already fixed upstream, not delivered here (2026-10-23): ACR's `review-reminders.*` is
 worktree-blind.** Its `1.1.1` copy (`.ps1:47`, `.sh:51`) runs a bare `git rev-parse --show-toplevel`
