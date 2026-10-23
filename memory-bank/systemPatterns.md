@@ -34,43 +34,11 @@ reviewers' would. See the open corroboration contract before relying on agreemen
 
 ### Reviewer Composition, Routing, and Lifecycle (2026-10-15)
 
-Mined from Anthropic's public Small Business skill library as an architecture analogue, not as a
-runtime dependency. The useful distinction is **composition role**:
-
-- specialist review agents are **utilities** — each owns one bounded review lens and produces
-  evidence in that lens;
-- the `Orchestrator` is an **orchestrator** — it consumes specialist outputs, preserves their
-  provenance, reconciles overlap, cross-references related findings, and produces the final review
-  view.
-
-This sharpens the existing Agent Swarm contract:
-
-1. **The orchestrator must consume evidence, not silently redo the review.** It may synthesize,
-   deduplicate, correlate, or add clearly-labelled inference, but it must not replace a specialist's
-   evidence with an untraceable new conclusion. When facts disagree, preserve the disagreement and
-   provenance rather than manufacturing consensus.
-2. **Reviewer overlap must be deliberate.** If two reviewer prompts can both claim the same defect
-   class, either define a clear ownership boundary/exclusion rule or explicitly treat the overlap as
-   independent corroboration. Accidental routing collisions waste inference and make duplicate
-   findings look like stronger evidence than they are.
-3. **Orthogonal axes survive convergence.** Standards compliance, correctness, security,
-   architecture, tests, and other independent questions are not interchangeable scores. Fan-in may
-   connect them, but must not collapse them into one blended confidence before their individual
-   evidence is visible.
-4. **New or changed reviewers earn trust by replay.** Evaluate against cases with a known expected
-   outcome/oracle before promoting the reviewer or prompt to the default set. A reviewer that only
-   "looks reasonable" on fresh unknown cases has not established value.
-5. **The reviewer set has a lifecycle.** Add a specialist only for a demonstrated coverage gap or
-   materially useful independent lens. Measure overlap and yield; consolidate or retire reviewers
-   that duplicate another lens without adding verified signal. Swarm size is not a quality metric.
-6. **Stop at the decision boundary.** ACR gathers, checks, ranks, explains, and recommends. It does
-   not merge, rewrite the reviewed code, or weaken its own review requirement to reach a clean
-   verdict. Consequential action stays with the human/workflow that owns it.
-
-**Routing-collision audit:** whenever a new specialist, policy, or filter is added, compare its
-positive trigger/claim space against every existing reviewer. If an ordinary finding could
-reasonably be owned by more than one agent, document whether that is intentional corroboration or a
-boundary defect and test the chosen behavior in calibration.
+This contract governs the reviewer set and how its output is combined: utilities vs orchestrator,
+deliberate overlap, orthogonal axes, trust by replay, the reviewer lifecycle, the decision
+boundary, and the routing-collision audit. **Read it before adding, changing or retiring a reviewer
+or its prompt, adding a policy or filter, or changing the orchestrator's fan-in:**
+[`docs/architecture/reviewer-composition.md`](../docs/architecture/reviewer-composition.md).
 
 ### Sequential Execution
 
@@ -78,10 +46,7 @@ boundary defect and test the chosen behavior in calibration.
 off-by-default opt-in for hardware that's been verified to benefit from it.
 
 **Rationale**: Ollama serializes `devstral:latest` inference on this hardware — measured, not
-assumed. A 2026-07-25 attempt to default to parallel looked good small and failed at real scale:
-a queued request's timeout clock starts when it is _dispatched_, not when Ollama begins generating,
-so most agents would time out on queue wait alone — the "everything times out, 0 findings" failure
-this tool exists to prevent. Reverted before shipping.
+assumed.
 
 Load-bearing premise: no Anthropic/Claude integration, so every run is local inference and there is
 no token-cost pressure to trade reliability for a hardware-dependent speedup. `--parallel` stays
@@ -146,12 +111,10 @@ data. Mechanism and the matcher's exact pattern:
 - **Keep the literal gated verbs out of command text.** A PR body, a `grep` pattern, or a script
   inlined into a shell command that contains them trips the gate and burns the marker. Write the
   text to a file and run the file. Commit messages go in a file passed with `-F`, never inline.
-  Hit three times now, once inside the very edit that was rewriting this rule.
 - **A stale PR branch is updated with `gh pr update-branch`, never a rebase.** Force-push is
   hard-blocked here, so rebasing an already-pushed branch is a dead end. Merging `main` in
   locally also works.
-- **Write the marker in a separate tool call from the gated command.** The gate is `PreToolUse`,
-  so a marker written in the same call does not exist yet when the hook checks.
+- **Write the marker in a separate tool call from the gated command.**
 - Tag pushes trip the push gate too. The marker is then the hash of an empty diff
   (`e3b0c442...`), which is legitimate — there is genuinely nothing to review.
 - **The two markers are not interchangeable and gate different commands.** `/code-review` writes
@@ -173,9 +136,6 @@ data. Mechanism and the matcher's exact pattern:
 
 ### Verifying Your Own Edits to Prose Files (learned 2026-08-31)
 
-Three failures from one session. All are **verification** failures, not editing failures — the edit
-landed correctly each time and the check that was supposed to confirm it lied.
-
 - **Prettier reflows blocks after every write**, so a literal string match against text written one
   step earlier is unstable: the line breaks move under you between the write and the next match.
   Anchor on **line ranges**, or on text that was already committed and formatted.
@@ -183,12 +143,9 @@ landed correctly each time and the check that was supposed to confirm it lied.
   markdown, because the phrase spans a line break. `grep -c` reports false _presences_ when the
   string survives inside a note that records its own deletion. Both directions fail; normalise
   whitespace before believing either.
-- **Subagents mutate the repo.** Review agents edited files twice during reviews, and a stray 0-byte
-  file reached a commit and had to be amended out. Tell review agents explicitly not to edit, and
-  read `git status` before staging rather than assuming a review was read-only.
-- Corollary to the gated-verb rule above: **write the script to a file and run the file.** The
-  matcher cannot tell a command from quoted data, and it fired on an inlined script while that
-  script was editing the very rule which documents the problem.
+- **Subagents mutate the repo.** Tell review agents explicitly not to edit, and read `git status`
+  before staging rather than assuming a review was read-only.
+- Corollary to the gated-verb rule above: **write the script to a file and run the file.**
 
 ### Stacked PRs, and Fields That Must Reach Every Formatter (learned 2026-08-26)
 
@@ -232,9 +189,7 @@ landed correctly each time and the check that was supposed to confirm it lied.
   record already lives in `progress.md`/`CHANGELOG.md`/the PR body, so the older side is never
   actually lost by discarding it here.
 - **Merging one PR pushes every other open PR to `BEHIND` again, not just once** (2026-09-26).
-  `strict` branch protection re-checks after every merge to `main`, so with three PRs open at once,
-  each remaining PR needed the main-merge-in step repeated once per merge ahead of it, not once
-  total. Budget for N merges when N PRs are open together.
+  Budget for N merges when N PRs are open together.
 
 - **Memory-bank line caps are CI-enforced** (`ci.yml`, "Memory bank size limits"), so an
   overflowing edit fails the build. Archive the evidence, keep the rule, and **leave headroom** —
@@ -247,18 +202,15 @@ to prompts, and to the tests meant to protect both. (Deliberately uncounted — 
 rule below, which this heading violated first.)
 
 **Assert from the thing, not from a proxy for it** (2026-08-30). Every instance so far has been
-wrong, and **none was caught by re-reading one's own work** — each came from a measurement or the peer.
-_Neither of us is finding these by looking; we find them when something else breaks nearby._
-Instances: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
+wrong, and **none was caught by re-reading one's own work** — each came from a measurement or the
+peer. Instances: [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
-**A probe proves the idea, not the wiring.** A predicate passed every unit test and a scratch probe
-while wired so it could never fire; only a real-artifact replay exposed it. Case:
+**A probe proves the idea, not the wiring.** Case:
 [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md).
 
-- **Replay real captured output through the real entry point.** `gh run download <run-id>`
-  retrieves the `ai-review-findings` artifact — the highest-value test input this project has,
-  because it is what the tool produced rather than what a fixture author imagined. It has twice
-  surfaced bugs nobody was looking for.
+- **Replay real captured output through the real entry point.** `gh run download <run-id>` retrieves
+  the `ai-review-findings` artifact — the highest-value test input this project has, because it is
+  what the tool produced rather than what a fixture author imagined.
 - **Test at the wiring seam, not only the predicate.** A predicate's whole unit suite can pass
   while the call site is wired so it can never fire.
 - **Distrust a probe that agrees with you.** If a scratch script and the real pipeline disagree, the
@@ -268,9 +220,8 @@ while wired so it could never fire; only a real-artifact replay exposed it. Case
   pattern misses; and `grep -c` counts a string that survives only inside a note recording its own
   deletion, which reads as "still there". Verify whitespace-normalised, and read the line, not the
   count.
-- **Record the delta, not the level** (2026-08-27, from PMB). "This removed 20,953 bytes" stays
-  true; "the file is now 46,956 bytes" decays within hours, and did. Same root as the duration
-  lesson below: a figure recorded without the frame that makes it meaningful.
+- **Record the delta, not the level** (2026-08-27, from PMB). Same root as the duration lesson
+  below: a figure recorded without the frame that makes it meaningful.
 - **A rule that enumerates its own members is a stale-list bug waiting to fire** (2026-08-31,
   named by PMB — the sharper sibling of the above). The guard keeps passing while the family
   grows, so nothing signals the drift. The fix is always the same: point at the source of truth
@@ -311,9 +262,7 @@ assertion that could not fail. Illustration:
 
 A test that has never failed for the right reason has not been shown to test anything. Before
 claiming a behaviour is covered, **revert it in the source and confirm the expected test dies.**
-This is the **Falsify Before You Trust It** rule above, applied to tests. Moved here from
-`activeContext.md` when the work that prompted it shipped, because it is a standing rule rather
-than session state.
+This is the **Falsify Before You Trust It** rule above, applied to tests.
 
 - **Count guards separately, never as regression evidence.** A test asserting _absence_ passes just
   as well when the feature is deleted outright. Worth keeping, worthless as proof.
@@ -322,14 +271,14 @@ than session state.
 - **An unparseable run is INCONCLUSIVE, never zero** — that bug reported a false survivor here.
 - **A surviving mutation is usually a test gap, not a harness bug.** Establish which before
   concluding either; the one found this way was a real gap.
-- **Write after every edit and verify restoration by hash.** A script batching its writes turns one
-  late anchor failure into silent loss of every earlier edit.
+- **Write after every edit and verify restoration by hash.**
 
 ## Never Do This
 
-- ❌ Default agent execution to parallel without verifying it actually helps on real hardware at
-  real scale (see "Sequential Execution" above — a 2026-07-25 attempt looked good on a small,
-  unrepresentative test and made things worse at the real default scale)
+- ❌ Default agent execution to parallel without verifying it actually helps on real hardware at real
+  scale (measurements in [`archive/systemPatterns-history.md`](archive/systemPatterns-history.md) —
+  a 2026-07-25 attempt looked good on a small, unrepresentative test and made things worse at the
+  real default scale)
 - ❌ Hard-fail on JSON parse errors (degrade gracefully)
 - ❌ Call Anthropic/OpenAI APIs in the review pipeline
 - ❌ Replace PMB's `/code-review` — both coexist

@@ -36,6 +36,15 @@ field-to-surface history, the release-tagging and squash-merge numbers, and the 
 examples all moved here; every rule stayed upstream, verified by diffing the bolded rule statements
 before and after. Detail below.
 
+Eleventh move, 2026-10-23: `systemPatterns.md` reached 337/300 when PR #92 added the
+reviewer-composition contract. 15 whole sentences of narrative, measurement, mechanism
+and incident detail moved here verbatim, listed at the end of this file under the section they came
+from, and one cross-reference in "Never Do This" was repointed here; no sentence carrying an
+instruction, a scope or a precondition was moved, and none was reworded except that
+cross-reference. PR #92's own section was
+relocated verbatim to `docs/architecture/reviewer-composition.md`, with a pointer, rather than
+archived: it is a contract for changing reviewers, not evidence.
+
 ## PostToolUse marker-reissue defect — reproduction (2026-08-20)
 
 **Confirmed defect (reproduced 2026-08-20):** `review-reminders-post.*` is supposed to reissue the
@@ -323,3 +332,53 @@ separate reviewers' would, and the orchestrator's corroboration step treats thei
 evidence. Left in place but qualified, pointing at the open measurement contract, because an
 unqualified independence claim in the file that governs the design is precisely the confident stale
 assertion this document keeps being burned by.
+
+## Moved in the eleventh pass (2026-10-23) — verbatim sentences
+
+Each sentence below was removed whole from the named section of `systemPatterns.md`; the rest of
+that section is unchanged there.
+
+### From "Sequential Execution"
+
+- A 2026-07-25 attempt to default to parallel looked good small and failed at real scale: a queued
+  request's timeout clock starts when it is _dispatched_, not when Ollama begins generating, so most
+  agents would time out on queue wait alone — the "everything times out, 0 findings" failure this
+  tool exists to prevent.
+- Reverted before shipping.
+
+### From "Working With the Review Gates (learned 2026-08-19)"
+
+- Hit three times now, once inside the very edit that was rewriting this rule.
+- The gate is `PreToolUse`, so a marker written in the same call does not exist yet when the hook
+  checks.
+
+### From "Verifying Your Own Edits to Prose Files (learned 2026-08-31)"
+
+- Three failures from one session.
+- All are **verification** failures, not editing failures — the edit landed correctly each time and
+  the check that was supposed to confirm it lied.
+- Review agents edited files twice during reviews, and a stray 0-byte file reached a commit and had
+  to be amended out.
+- The matcher cannot tell a command from quoted data, and it fired on an inlined script while that
+  script was editing the very rule which documents the problem.
+
+### From "Stacked PRs, and Fields That Must Reach Every Formatter (learned 2026-08-26)"
+
+- `strict` branch protection re-checks after every merge to `main`, so with three PRs open at once,
+  each remaining PR needed the main-merge-in step repeated once per merge ahead of it, not once
+  total.
+
+### From "Falsify Before You Trust It (2026-08-21, reconfirmed through 2026-08-27)"
+
+- _Neither of us is finding these by looking; we find them when something else breaks nearby._
+- A predicate passed every unit test and a scratch probe while wired so it could never fire; only a
+  real-artifact replay exposed it.
+- It has twice surfaced bugs nobody was looking for.
+- "This removed 20,953 bytes" stays true; "the file is now 46,956 bytes" decays within hours, and
+  did.
+
+### From "Mutation Proof — a Green Suite Is Not Evidence (2026-09-01)"
+
+- Moved here from `activeContext.md` when the work that prompted it shipped, because it is a
+  standing rule rather than session state.
+- A script batching its writes turns one late anchor failure into silent loss of every earlier edit.
