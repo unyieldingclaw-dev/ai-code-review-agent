@@ -7,7 +7,7 @@ tags:
   - work/completed
   - work/in-progress
   - work/backlog
-last-reviewed: 2026-09-26
+last-reviewed: 2026-10-23
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -16,9 +16,19 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-09-26
+**Last Updated**: 2026-10-23
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
+
+## ✅ PR #93 merged (2026-10-23): calibration oracle runs are unscored, not passed
+
+`calibrate.ts`'s `adversarial-dirty` oracle case asserts nothing (classification is manual), yet
+its path did `passed++`. Now the summary reports `N oracle run(s) unscored (manual classification
+required)` only when N > 0, and the exit code is unchanged (a completed oracle run never affects
+it; one that errors still counts as failed). **A full-suite `passed` total is one lower than before
+for identical model behavior** — the "23 passed" figures below predate this. A `CalibrationTally`
+class from the first draft was dropped: it duplicated `oracleRuns.length`. Note `tsconfig.json`
+covers only `src/**`, so CI's typecheck never sees `calibration/`; typecheck it standalone.
 
 ## ✅ Three PRs merged back to back (2026-09-26): #90, #88, #85 — `main` caught up, no open PRs
 
