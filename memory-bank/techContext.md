@@ -7,7 +7,7 @@ tags:
   - stack/backend
   - stack/frontend
   - env/tools
-last-reviewed: 2026-09-26
+last-reviewed: 2026-10-23
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -192,7 +192,7 @@ fix would not survive `mb upgrade` — the draft is parked in
 `docs/superpowers/plans/2026-09-26-ns58-pre-commit-format-check-reference.md` so it isn't lost. This
 also resolves an earlier, unexplained observation (an uncommitted `.githooks/pre-commit` edit that
 appeared and vanished with no traceable origin): it was this same draft, in progress in a Claude
-session sharing this working directory.
+session sharing this working directory. `calibrate.ts` now formats its own oracle log (2026-10-23).
 
 **Two PMB peer-session claims independently verified 2026-09-19–26, not just accepted:** NS-11
 (NPM_TOKEN renewal) is genuinely obsolete — ACR uses OIDC/Trusted Publishing (`release.yml`), not a
