@@ -1,7 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { Agent } from 'undici'
 import { OllamaProvider } from '../../src/core/llm/ollamaProvider.js'
 
-const mockFetch = vi.fn()
+// chat() calls undici's fetch; the capability probe and ping() call the global one. Both are routed
+// to the same mockFetch so every test below stubs Ollama in one place, while undiciFetch records
+// which fetch chat() actually used.
+const { mockFetch, undiciFetch } = vi.hoisted(() => {
+  const mockFetch = vi.fn()
+  return { mockFetch, undiciFetch: vi.fn((...args: unknown[]) => mockFetch(...args)) }
+})
+
+// Wraps the real Agent so the options chat()'s dispatcher was built with can be asserted; a plain
+// function, not an arrow, because the provider calls it with `new`.
+vi.mock('undici', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('undici')>()
+  return {
+    ...actual,
+    fetch: undiciFetch,
+    Agent: vi.fn(function (opts: ConstructorParameters<typeof actual.Agent>[0]) {
+      return new actual.Agent(opts)
+    }),
+  }
+})
+
 vi.stubGlobal('fetch', mockFetch)
 
 describe('OllamaProvider', () => {
@@ -255,6 +278,68 @@ describe('OllamaProvider', () => {
       const longElapsed = Date.now() - longStart
 
       expect(longElapsed).toBeGreaterThan(shortElapsed)
+    })
+
+    // The regression this pins: Node's default undici dispatcher gives up on any response whose
+    // headers take over 300s (headersTimeout) -- the reasoning is at chatDispatcher in the source.
+    it('sends chat through undici fetch with header and body timeouts disabled', async () => {
+      let capturedDispatcher: unknown
+      mockFetch.mockImplementation(async (_url?: string, init?: RequestInit) => {
+        if (init) capturedDispatcher = (init as { dispatcher?: unknown }).dispatcher
+        return { ok: true, json: async () => ({ message: { content: 'ok' } }) }
+      })
+      undiciFetch.mockClear()
+      const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
+      await provider.chat([{ role: 'user', content: 'test' }])
+
+      // Found by its options rather than by position, so another Agent elsewhere can't stand in.
+      const AgentMock = vi.mocked(Agent)
+      const at = AgentMock.mock.calls.findIndex(
+        ([opts]) => opts?.headersTimeout === 0 && opts?.bodyTimeout === 0
+      )
+      expect(at).toBeGreaterThanOrEqual(0)
+      expect(capturedDispatcher).toBe(AgentMock.mock.results[at]?.value)
+      expect(undiciFetch).toHaveBeenCalledWith('http://localhost:11434/api/chat', expect.anything())
+    })
+
+    // With undici's own timeouts off, the AbortSignal is the only thing that ends a call, so a
+    // call with no options must still get one.
+    it('still passes an AbortSignal when called with no options', async () => {
+      let capturedSignal: unknown
+      mockFetch.mockImplementation(async (_url?: string, init?: RequestInit) => {
+        if (init) capturedSignal = init.signal
+        return { ok: true, json: async () => ({ message: { content: 'ok' } }) }
+      })
+      const provider = new OllamaProvider('http://localhost:11434', 'devstral:latest')
+      await provider.chat([{ role: 'user', content: 'test' }])
+      expect(capturedSignal).toBeInstanceOf(AbortSignal)
+    })
+
+    // A real socket rather than the fetch mock, because what matters is that the caller's signal
+    // still ends a request travelling through the custom dispatcher.
+    it('aborts a real request through the dispatcher when the caller signal fires', async () => {
+      const server = createServer(() => {
+        // Never answer: the only way out is the abort.
+      })
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+      const { port } = server.address() as AddressInfo
+      const { fetch: realFetch } = await vi.importActual<typeof import('undici')>('undici')
+      // See the phantom-invocation note above: a no-args call must not reach the real fetch.
+      mockFetch.mockImplementation(async (...args: Parameters<typeof realFetch>) =>
+        args.length ? realFetch(...args) : { ok: true, json: async () => ({}) }
+      )
+      try {
+        const provider = new OllamaProvider(`http://127.0.0.1:${port}`, 'devstral:latest')
+        const start = Date.now()
+        // The signal's own reason, not just any failure: a broken dispatcher would also reject.
+        await expect(
+          provider.chat([{ role: 'user', content: 'test' }], { signal: AbortSignal.timeout(200) })
+        ).rejects.toHaveProperty('name', 'TimeoutError')
+        expect(Date.now() - start).toBeLessThan(2_000)
+      } finally {
+        server.closeAllConnections()
+        await new Promise<void>((resolve) => server.close(() => resolve()))
+      }
     })
   })
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Contributor setup — wires up a cloned repo for local development.
-# Checks Node.js >=18, verifies repo root, runs npm install + build + link,
+# Checks Node.js >=20.18.1, verifies repo root, runs npm install + build + link,
 # and runs a smoke test. No Ollama steps — unit tests run without Ollama.
 set -euo pipefail
 
@@ -21,9 +21,11 @@ if [ -z "$NODE_VERSION" ]; then
   echo "        Download: https://nodejs.org"
   exit 1
 fi
-NODE_MAJOR=$(echo "$NODE_VERSION" | sed 's/v\([0-9]*\).*/\1/')
-if [ "$NODE_MAJOR" -lt 18 ]; then
-  echo "[ERROR] Node.js v$NODE_MAJOR found — v18 or higher required."
+# 20.18.1 is the floor of the undici dependency, so compare the whole version, not the major.
+IFS=. read -r NODE_MAJOR NODE_MINOR NODE_PATCH <<<"${NODE_VERSION#v}"
+NODE_PATCH=${NODE_PATCH%%[!0-9]*}
+if [ $((NODE_MAJOR * 1000000 + NODE_MINOR * 1000 + NODE_PATCH)) -lt 20018001 ]; then
+  echo "[ERROR] Node.js $NODE_VERSION found — v20.18.1 or higher required."
   echo "        Download: https://nodejs.org"
   exit 1
 fi

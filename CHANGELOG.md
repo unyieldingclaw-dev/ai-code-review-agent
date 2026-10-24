@@ -38,7 +38,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   own request, and the only requests left unexplained there are the two whose llama-server crashed.
   `npx tsx calibration/ollamaLogCheck.ts --from <local time> --to <local time> [--log <file>]...`
 
+### Changed
+
+- **BREAKING for Node older than 20.18.1: `engines.node` is now `>=20.18.1`, and `undici` is a new
+  runtime dependency.** undici 7, which the chat-timeout fix below needs, supports nothing older.
+  Node 18 and every Node 20 release before 20.18.1 are no longer supported; both lines are past
+  end of life, and CI runs Node 24. The README and the four setup scripts (`scripts/setup.*`,
+  `scripts/dev-setup.*`) now check for 20.18.1 rather than 18.
+
 ### Fixed
+
+- **Any Ollama chat call longer than 300 s failed as a bare `fetch failed`, whatever `--timeout`
+  said.** Node's default `fetch` dispatcher (undici) abandons a response whose headers take over
+  300 s (`headersTimeout`), and with `stream: false` Ollama sends none until it has finished
+  generating. The call died at about 307 s with `UND_ERR_HEADERS_TIMEOUT` before ACR's own deadline
+  could fire. It was classified as an `error`, not a `timeout`, so it was retried onto the same busy
+  server, and the "raise `--timeout`" advice never appeared — while raising `--timeout` (or
+  `CALIBRATION_TIMEOUT_MS`) past 300 s had no effect. It only bites when ACR's ceiling is above
+  300 s: a large diff's scaled timeout (up to 360 s by default) or a calibration run. `chat()` now
+  sends its requests through undici's own `fetch` with a dispatcher whose header and body timeouts
+  are turned off, so the caller's AbortSignal, which every call carries, is the only deadline.
+  Streaming would not have been enough: Ollama sends no headers before the first token, and queue
+  waits alone have reached 300 s. Reproduced against a local server that withholds its headers for
+  310 s: before, `fetch failed` at 307,133 ms; after, the answer at 310,028 ms. Not covered: the
+  standalone `calibration/responseTruncationDiagnostic.ts`, which calls Ollama with its own raw
+  `fetch` and still has the 300 s cap.
 
 - **A dead agent and a clean one printed the identical stderr progress line.** `AgentProgressEvent`
   had no `status` field, so an agent that timed out or failed and one that ran clean and genuinely

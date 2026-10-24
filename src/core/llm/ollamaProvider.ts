@@ -1,6 +1,21 @@
+import { Agent, fetch as undiciFetch } from 'undici'
 import type { LLMProvider, Message, ChatOptions } from './provider.js'
 
 const DEFAULT_TIMEOUT_MS = 300_000
+
+// WHY a dispatcher with undici's own timeouts off: Node's default one abandons any response whose
+// headers take over 300s (headersTimeout), and with `stream: false` Ollama sends none until it has
+// finished generating. So every call longer than that died as a bare "fetch failed" -- classified
+// 'error', not 'timeout', and retried -- before the caller's deadline could fire, and raising
+// --timeout past 300s did nothing. Reproduced at 307,133 ms, UND_ERR_HEADERS_TIMEOUT.
+//
+// Off rather than raised: agents pass only a signal, so no fixed number is known to exceed every
+// caller's ceiling (calibration sets its own). chat() always sends an AbortSignal (see below), and
+// that signal is the one deadline.
+//
+// chat() uses undici's own fetch with it, not the global one: Node 20 and 22 bundle undici 6, and
+// pairing that fetch with this package's undici 7 Agent is untested; one package keeps them in step.
+const chatDispatcher = new Agent({ headersTimeout: 0, bodyTimeout: 0 })
 
 export class OllamaProvider implements LLMProvider {
   constructor(
@@ -104,7 +119,7 @@ export class OllamaProvider implements LLMProvider {
     // abandoned one, making contention worse under load. Honoring the caller's signal lets a
     // "timed out" agent's request actually stop. Falls back to the old internal timeout for
     // any caller that doesn't provide one (e.g. direct use outside SwarmRunner).
-    const res = await fetch(`${this.baseUrl}/api/chat`, {
+    const res = await undiciFetch(`${this.baseUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -115,6 +130,7 @@ export class OllamaProvider implements LLMProvider {
         messages,
       }),
       signal: options.signal ?? AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS),
+      dispatcher: chatDispatcher,
     })
     if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`)
     const data = (await res.json()) as { message?: { content?: string } }

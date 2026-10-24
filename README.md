@@ -39,7 +39,7 @@ Each specialist agent receives only the (sanitized) diff and its own system prom
 
 ## Requirements
 
-- **Node.js** v18+ (v24 recommended)
+- **Node.js** v20.18.1+ (v24 recommended)
 - **Ollama** running locally at `http://localhost:11434`
 - **devstral:latest** model pulled in Ollama (`ollama pull devstral:latest`)
 - Windows 11, macOS, or Linux

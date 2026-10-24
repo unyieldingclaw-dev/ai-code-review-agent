@@ -105,17 +105,9 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 - **5 operator calls parked, unmade** (corroboration-downgrade contract, `systemPatterns.md` size,
   `ping()`'s substring guess, `--chunk` as default, PMB upgrade) — full detail in
   [`archive/activeContext-history.md`](archive/activeContext-history.md).
-- **`fetch failed` — root-caused 2026-10-23; fix not started, unscheduled.** Not Ollama dropping
-  the connection: `ollamaProvider.chat()` calls `fetch` with `stream: false` and no `dispatcher`
-  (`src/core/llm/ollamaProvider.ts:107-117`), so Node's default undici `headersTimeout` kills any
-  call that passes 300 s. That binds only when ACR's own ceiling is above 300 s (the scaled
-  `agentTimeoutMs` reaches 360 s; calibration). It classifies as `error`, not `timeout`
-  (`src/core/parsing.ts:21`), so the runner retries it onto a busy server and the "raise
-  `--timeout`" hint never shows. **Raising `--timeout` or `CALIBRATION_TIMEOUT_MS` above 300 s has
-  no effect until this is fixed** — a ceiling that silently does not apply, as in `progress.md`'s
-  "Timeout plumbing bug". Reproduced without Ollama: fails at 307,142 ms, `UND_ERR_HEADERS_TIMEOUT`;
-  Ollama logs these as 500s of 5m6s-5m7s. The fix (an undici `Agent` with a higher `headersTimeout`
-  passed as `dispatcher`, or `stream: true`) is a product change and needs its own contract.
+- **`fetch failed` at ~307 s — fixed 2026-10-23** (undici's 300 s `headersTimeout`; detail in
+  `progress.md`). **Any calibration or timing result taken before the fix with a ceiling above
+  300 s was silently capped there**; its failures at ~307 s were that cap, not the model.
 - **CI's `ai-review` runs without `--chunk`** (`review.yml`), so a PR diff over `maxDiffLines`
   (2000) is reviewed truncated. Unscheduled.
 - **Flaky timing test:** `tests/unit/runner.test.ts:1570` expects a 300 ms backoff to measure at

@@ -2,7 +2,7 @@
 .SYNOPSIS
     Contributor setup — wires up a cloned repo for local development.
 .DESCRIPTION
-    Checks Node.js >=18, verifies the working directory is the repo root,
+    Checks Node.js >=20.18.1, verifies the working directory is the repo root,
     runs npm install, builds TypeScript, links the binary globally via npm link,
     and runs a smoke test.
 #>
@@ -24,9 +24,10 @@ try {
         Write-Host "        Download: https://nodejs.org" -ForegroundColor Yellow
         exit 1
     }
-    $major = [int]($nodeVersion -replace 'v(\d+)\..*', '$1')
-    if ($major -lt 18) {
-        Write-Host "[ERROR] Node.js v$major found — v18 or higher required." -ForegroundColor Red
+    # 20.18.1 is the floor of the undici dependency, so compare the whole version, not the major.
+    $version = [version]("$nodeVersion".Trim() -replace '^v(\d+\.\d+\.\d+).*', '$1')
+    if ($version -lt [version]'20.18.1') {
+        Write-Host "[ERROR] Node.js $nodeVersion found — v20.18.1 or higher required." -ForegroundColor Red
         Write-Host "        Download: https://nodejs.org" -ForegroundColor Yellow
         exit 1
     }
