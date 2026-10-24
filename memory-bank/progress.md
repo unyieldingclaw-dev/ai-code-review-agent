@@ -20,6 +20,20 @@ lineage: []
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
+## ✅ `fetch failed` fixed (2026-10-23): undici's 300 s cap on Ollama calls removed
+
+Node's default `fetch` dispatcher abandons a response whose headers take over 300 s, and with
+`stream: false` Ollama sends none until generation ends. So any call past 300 s died at ~307 s as
+`fetch failed` (`UND_ERR_HEADERS_TIMEOUT`), classified `error` not `timeout` (`parsing.ts`), retried,
+and raising `--timeout`/`CALIBRATION_TIMEOUT_MS` past 300 s did nothing. `ollamaProvider.chat()` now
+uses undici's own `fetch` with an `Agent` whose header/body timeouts are off (one package, so fetch
+and Agent match on every Node); the AbortSignal every call carries is the only deadline. Off rather
+than raised: agents pass only a signal, so no fixed value covers every ceiling. Local server
+withholding headers 310 s: before, failed at 307,133 ms; after, answered at 310,028 ms. Adds
+`undici@^7.30.1`; `engines.node`, README and setup scripts now require `>=20.18.1` (CHANGELOG
+"Changed", BREAKING). Ollama logged these as 500s of 5m6s-5m7s; the 2026-09-18 recall-study
+"5m7s" 500s carry the same signature.
+
 ## ✅ PR #92 merged (2026-10-23): reviewer-composition contract, kept in docs
 
 The contract for changing the reviewer set (utilities vs orchestrator, deliberate overlap,

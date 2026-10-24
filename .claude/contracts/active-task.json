@@ -1,40 +1,73 @@
 {
-  "task": "Make every scored calibration trial record which model build and code ran, how Ollama ran it and where the time went, and add a read-only Ollama server-log check that explains timeouts (queue wait vs load vs prefill vs generation) -- without changing anything sent to Ollama or any production review behaviour. PR 1: log check; PR 2: per-trial records.",
+  "task": "Stop Node's default undici headersTimeout (300 s) from capping ACR's Ollama chat calls, so ACR's own per-agent ceiling (the AbortSignal) is the only deadline -- verified against a real slow server, not only mocks.",
   "status": "active",
-  "created_at": "2026-09-27T03:02:44Z",
-  "expires_at": "2026-10-23T20:49:41Z",
+  "created_at": "2026-10-23T21:48:08Z",
+  "expires_at": "2026-10-24T05:48:13Z",
   "amendments": [
-    "Added tests/fixtures/ollama-log/simultaneous-failures.log (round-2 review: pairing by log order).",
-    "Added tests/fixtures/ollama-log/cold-load-short-answer.log (round-2 review T1) while the contract had expired, so that write ran without scope checks.",
-    "Renewed at 2026-09-30T01:08Z (new expiry 2026-09-30T09:08Z).",
-    "Renewed at 2026-09-30T23:04Z (new expiry 2026-10-01T07:04Z).",
-    "Renewed at 2026-10-05T01:43Z (new expiry 2026-10-05T09:43Z); added tests/fixtures/ollama-log/runner-crash.log (a real llama-server crash, 2026-09-30, that left a task that never releases).",
-    "Renewed at 2026-10-23T12:49Z (new expiry 2026-10-23T20:49Z) after /change-review of PR 1. In the gap since the 2026-10-05 expiry no scoped file was edited; the PR 1 commit (2026-10-21) and its rebase onto main (2026-10-23, just before this renewal) fell in it. Added tests/fixtures/ollama-log/cancel-before-500.log (a real 0.40.4 slice where a timed-out request's cancel line precedes its 500)."
+    "Replaces the calibration-envelope contract (PR 1 merged as #95; expired 2026-10-23T20:49:41Z). Its PR 2 checkpoint is recorded in memory-bank/progress.md (#97) and its deferred items in #95's description.",
+    "2026-10-23T23:54Z, approved by the user (option A after /code-review): take fetch from undici as well as the Agent (same version on every Node release); add README.md and scripts/{setup,dev-setup}.{sh,ps1} to update the stated Node minimum to 20.18.1."
   ],
   "scope": [
-    { "file": "calibration/ollamaLogCheck.ts", "op": "create" },
-    { "file": "tests/unit/ollamaLogCheck.test.ts", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/queue-bound-trials-6-8.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/mixed-trial-11.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/generation-bound-ornith.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/input-truncation.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/context-full.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/devstral-load-and-request.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/aborted-load.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/back-to-back-requests.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/cancel-after-next-ping.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/fast-200-before-release.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/abandoned-in-queue.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/simultaneous-failures.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/cold-load-short-answer.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/runner-crash.log", "op": "create" },
-    { "file": "tests/fixtures/ollama-log/cancel-before-500.log", "op": "create" },
-    { "file": "src/core/llm/ollamaProvider.ts", "op": "edit" },
-    { "file": "tests/unit/ollamaProvider.test.ts", "op": "edit" },
-    { "file": "calibration/calibrate.ts", "op": "edit" },
-    { "file": "CHANGELOG.md", "op": "edit" },
-    { "file": "memory-bank/progress.md", "op": "edit" },
-    { "file": "memory-bank/techContext.md", "op": "edit" }
+    {
+      "file": "src/core/llm/ollamaProvider.ts",
+      "op": "edit"
+    },
+    {
+      "file": "tests/unit/ollamaProvider.test.ts",
+      "op": "edit"
+    },
+    {
+      "file": "package.json",
+      "op": "edit"
+    },
+    {
+      "file": "package-lock.json",
+      "op": "edit"
+    },
+    {
+      "file": "CHANGELOG.md",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/activeContext.md",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/progress.md",
+      "op": "edit"
+    },
+    {
+      "file": ".claude/contracts/active-task.json",
+      "op": "edit"
+    },
+    {
+      "file": "README.md",
+      "op": "edit"
+    },
+    {
+      "file": "scripts/setup.sh",
+      "op": "edit"
+    },
+    {
+      "file": "scripts/setup.ps1",
+      "op": "edit"
+    },
+    {
+      "file": "scripts/dev-setup.sh",
+      "op": "edit"
+    },
+    {
+      "file": "scripts/dev-setup.ps1",
+      "op": "edit"
+    }
   ],
-  "checkpoint": "Live checks (announced to the PMB session first; their full suite not running): a deliberately created queue wait MUST be classified queue-bound by the log check, or stop and report before PR 2."
+  "success_criteria": [
+    "chat() passes fetch a dispatcher with headersTimeout and bodyTimeout disabled (unit test).",
+    "chat() with no options still passes an AbortSignal (unit test).",
+    "Real local socket that never responds + 200 ms signal: chat() rejects within ~1 s (unit test).",
+    "Removing the dispatcher makes the dispatcher test fail (mutation check).",
+    "Manual scratch repro: server withholding headers 310 s -- before: ~307 s UND_ERR_HEADERS_TIMEOUT; after: succeeds at ~310 s.",
+    "npm run check green; npm audit shows nothing new.",
+    "/code-review before commit, /change-review before push, each with the user's approval."
+  ]
 }
