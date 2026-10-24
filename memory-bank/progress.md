@@ -20,7 +20,13 @@ lineage: []
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
-## ✅ `fetch failed` fixed (2026-10-23): undici's 300 s cap on Ollama calls removed
+## ✅ `techContext.md` first archive pass (2026-10-23): 155 lines moved out of 399
+
+The three PMB reference blocks moved verbatim to `docs/architecture/pmb-integration.md` (pointer left,
+naming when to read it); 12 narrative/measurement sentences to `archive/techContext-history.md`.
+Done before `mb upgrade`, whose warn-only size check flags `techContext.md` past 300 lines.
+
+## ✅ `fetch failed` fixed — merged as #98 (`2aa8c0b`, 2026-10-24): undici's 300 s cap removed
 
 Node's default `fetch` dispatcher abandons a response whose headers take over 300 s, and with
 `stream: false` Ollama sends none until generation ends. So any call past 300 s died at ~307 s as

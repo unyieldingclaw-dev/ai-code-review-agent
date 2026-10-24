@@ -30,7 +30,8 @@ each: `progress.md`.
 
 **As of 2026-10-23, Claude cannot commit or push from a git worktree** — the `review-reminders.*`
 gate is worktree-blind. Work happens in this checkout. Fixed on PMB `main` (`a0850a3`,
-untagged); needs a blocked `mb upgrade` (detail in `techContext.md`, "PMB-owned defects").
+untagged); needs an `mb upgrade`, planned next (detail in `docs/architecture/pmb-integration.md`,
+"PMB-owned defects").
 
 **Earlier (2026-09-26): all four of this session's PRs are now merged and `main` is caught up —
 `gh pr list` returns empty, verified directly.** In order: `#89` (calibration `agentPolicy` excludes),
@@ -52,7 +53,8 @@ NS-58) appeared mid-session; investigated before assuming it was stray, per stan
 **`npm run check` run directly 2026-09-17: green, 908 tests.** Calibration is nondeterministic —
 **treat a single pass as weak evidence**. Use `grep "orchestrator] dropped"` to tell a real filter
 regression from model variance, and target cases with `CALIBRATION_CASE=name1,name2` rather than
-running the suite. PMB-owned defects live in `techContext.md`, not here.
+running the suite. PMB-owned defects live in `docs/architecture/pmb-integration.md` (pointer in
+`techContext.md`), not here.
 
 **Still open from the 2026-08-26 PMB briefs:** line attribution is unreliable from the model itself
 (7/5/7 across trials, unchunked), including across files. Exit 1 outranks exit 3, so a truncated
@@ -102,17 +104,27 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
   making exit 3 reachable changes what PMB's Job 7 branches on, so it is an operator decision.
 - **`earlyExit` reached NO renderer — fixed and merged (PR #83, six surfaces not four)**, resolved,
   kept only as a pointer; detail in `progress.md`/`systemPatterns.md`.
-- **5 operator calls parked, unmade** (corroboration-downgrade contract, `systemPatterns.md` size,
-  `ping()`'s substring guess, `--chunk` as default, PMB upgrade) — full detail in
-  [`archive/activeContext-history.md`](archive/activeContext-history.md).
-- **`fetch failed` at ~307 s — fixed 2026-10-23** (undici's 300 s `headersTimeout`; detail in
+- **4 operator calls parked, unmade** (corroboration-downgrade contract, `systemPatterns.md` size,
+  `ping()`'s substring guess, `--chunk` as default) — full detail in
+  [`archive/activeContext-history.md`](archive/activeContext-history.md). The fifth, the PMB
+  upgrade, is scheduled: see the `mb upgrade` item below.
+- **`fetch failed` at ~307 s — fixed, merged as #98** (undici's 300 s `headersTimeout`; detail in
   `progress.md`). **Any calibration or timing result taken before the fix with a ceiling above
-  300 s was silently capped there**; its failures at ~307 s were that cap, not the model.
+  300 s was silently capped there**; its failures at ~307 s were that cap, not the model. **Open
+  operator call:** that includes the 2026-08-27 measurement behind `techContext.md`'s "per-agent
+  timeout ceiling — MEASURED, CLOSED … do not re-derive it". Its one outlier (`adversarial`, 611.7 s
+  against a 354.7 s ceiling, first attempt `fetch failed`) was this cap, so its "no invocation came
+  near its ceiling" no longer holds (`archive/activeContext-history.md`). Re-measuring is undecided.
 - **CI's `ai-review` runs without `--chunk`** (`review.yml`), so a PR diff over `maxDiffLines`
   (2000) is reviewed truncated. Unscheduled.
 - **Flaky timing test:** `tests/unit/runner.test.ts:1570` expects a 300 ms backoff to measure at
   least 300 ms; #92's CI got 299 and passed on re-run. Give it a 1 ms tolerance. Unscheduled.
-- **`techContext.md` is at 399/400** — archive before adding to it.
+- **Next: `mb upgrade`, from PMB's `main`.** PMB has no release tag past `v1.0.4`, so the docs
+  procedure's `git checkout v1.2.1` cannot run; PMB's `main` contains the worktree fix `a0850a3`.
+  `mb upgrade` copies PMB's working tree, so right before it, check that the PMB checkout has no
+  difference from `origin/main` under `templates/`, `scripts/`, `VERSION` or `install.*`, and no
+  untracked files there. What it overwrites: `docs/architecture/pmb-integration.md`. The size check
+  it adds is warn-only (`ENFORCE=false`).
 - **`docs/CONTRACTS-GUIDE.md` says `.claude/contracts/` should be gitignored; it demonstrably isn't**
   (tracked in git — confirmed by this session's own conflicts on `active-task.json` across
   branches). Flagged, never actioned; worth fixing if it causes a third conflict.
