@@ -1,73 +1,23 @@
 {
-  "task": "Stop Node's default undici headersTimeout (300 s) from capping ACR's Ollama chat calls, so ACR's own per-agent ceiling (the AbortSignal) is the only deadline -- verified against a real slow server, not only mocks.",
+  "task": "Bring memory-bank/techContext.md from 399 to <=250 lines: relocate PMB reference sections verbatim to docs/architecture/pmb-integration.md (with a pointer saying when to read it) and archive whole narrative/measurement/incident sentences verbatim to a new archive/techContext-history.md; no instruction, scope or precondition sentence moves.",
   "status": "active",
-  "created_at": "2026-10-23T21:48:08Z",
-  "expires_at": "2026-10-24T05:48:13Z",
+  "created_at": "2026-10-24T02:20:00Z",
+  "expires_at": "2026-10-24T10:20:00Z",
   "amendments": [
-    "Replaces the calibration-envelope contract (PR 1 merged as #95; expired 2026-10-23T20:49:41Z). Its PR 2 checkpoint is recorded in memory-bank/progress.md (#97) and its deferred items in #95's description.",
-    "2026-10-23T23:54Z, approved by the user (option A after /code-review): take fetch from undici as well as the Agent (same version on every Node release); add README.md and scripts/{setup,dev-setup}.{sh,ps1} to update the stated Node minimum to 20.18.1."
+    "Replaces the fetch-failed fix contract, which is complete: merged as PR #98 (main 2aa8c0b, 2026-10-24T01:50Z), every success criterion met (310 s repro before 307,133 ms fail / after 310,028 ms OK)."
   ],
   "scope": [
-    {
-      "file": "src/core/llm/ollamaProvider.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/ollamaProvider.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "package.json",
-      "op": "edit"
-    },
-    {
-      "file": "package-lock.json",
-      "op": "edit"
-    },
-    {
-      "file": "CHANGELOG.md",
-      "op": "edit"
-    },
-    {
-      "file": "memory-bank/activeContext.md",
-      "op": "edit"
-    },
-    {
-      "file": "memory-bank/progress.md",
-      "op": "edit"
-    },
-    {
-      "file": ".claude/contracts/active-task.json",
-      "op": "edit"
-    },
-    {
-      "file": "README.md",
-      "op": "edit"
-    },
-    {
-      "file": "scripts/setup.sh",
-      "op": "edit"
-    },
-    {
-      "file": "scripts/setup.ps1",
-      "op": "edit"
-    },
-    {
-      "file": "scripts/dev-setup.sh",
-      "op": "edit"
-    },
-    {
-      "file": "scripts/dev-setup.ps1",
-      "op": "edit"
-    }
+    { "file": "memory-bank/techContext.md", "op": "edit" },
+    { "file": "docs/architecture/pmb-integration.md", "op": "create" },
+    { "file": "memory-bank/archive/techContext-history.md", "op": "create" },
+    { "file": "memory-bank/progress.md", "op": "edit" },
+    { "file": "memory-bank/activeContext.md", "op": "edit" },
+    { "file": ".claude/contracts/active-task.json", "op": "edit" }
   ],
   "success_criteria": [
-    "chat() passes fetch a dispatcher with headersTimeout and bodyTimeout disabled (unit test).",
-    "chat() with no options still passes an AbortSignal (unit test).",
-    "Real local socket that never responds + 200 ms signal: chat() rejects within ~1 s (unit test).",
-    "Removing the dispatcher makes the dispatcher test fail (mutation check).",
-    "Manual scratch repro: server withholding headers 310 s -- before: ~307 s UND_ERR_HEADERS_TIMEOUT; after: succeeds at ~310 s.",
-    "npm run check green; npm audit shows nothing new.",
-    "/code-review before commit, /change-review before push, each with the user's approval."
+    "techContext.md <= 250 lines (passes ours 400 and PMB's 300) and under PMB's 24,000-byte warn.",
+    "Script check: live file == old minus exactly the moved text plus pointers; every moved line appears verbatim in the docs or archive file.",
+    "CI size and pointer-integrity scripts pass; prettier --check . passes.",
+    "/code-review before commit and /change-review before push, each with the user's approval."
   ]
 }
