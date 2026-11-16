@@ -267,9 +267,13 @@ After installing, use `/ai-review` inside any Claude Code session to run the 15-
 
 ### GitHub Actions
 
-See `.github/workflows/review.yml` for the full PR review workflow.
-
-A weekly calibration workflow (`.github/workflows/calibrate.yml`) runs `npm run calibrate` on a self-hosted runner and skips gracefully when Ollama is unavailable.
+This repository's own CI (`.github/workflows/ci.yml`) runs typecheck, build, format, lint and the
+unit tests on GitHub-hosted runners. It does **not** run the AI review: the self-hosted runner that
+`review.yml` and `calibrate.yml` target was retired on 2026-11-09 (a public repository should not
+dispatch jobs to a personal machine), and both workflows are disabled in GitHub. Run
+`ai-review-agent` locally on code you trust instead. The two workflow files remain in the
+repository as reference for wiring ACR into a PR workflow; they require a self-hosted runner with
+Ollama and will not run unless re-enabled.
 
 ## Configuration
 
@@ -336,7 +340,9 @@ Create `ai-review.config.json` in your project root to override defaults:
 Policy decisions appear in `--format json` output under `result.policy`. They are also summarized in `--format markdown` output when any agents are skipped.
 
 **Note on defaults:** `security` and `adversarial` exclude `**/*.md` by default (documentation
-files were being misread as executable code). `ai-review.config.json`'s config loading does a
+files were being misread as executable code), plus `calibration/fixtures/**` and
+`calibration/*.json` on `main` (this repo's synthetic vulnerable fixtures were being read as real
+code; not in the published 1.15.0). `ai-review.config.json`'s config loading does a
 shallow merge — if you set your own `agentPolicy` for _any_ agent, it replaces the entire
 `agentPolicy` object, including these defaults. Re-specify them in your own config if you want to
 keep them:
@@ -344,8 +350,8 @@ keep them:
 ```json
 {
   "agentPolicy": {
-    "security": { "exclude": ["**/*.md"] },
-    "adversarial": { "exclude": ["**/*.md"] },
+    "security": { "exclude": ["**/*.md", "calibration/fixtures/**", "calibration/*.json"] },
+    "adversarial": { "exclude": ["**/*.md", "calibration/fixtures/**", "calibration/*.json"] },
     "your-other-agent": { "exclude": ["some/pattern"] }
   }
 }
@@ -521,7 +527,7 @@ Every `--format json` response includes a stable envelope:
 ```bash
 npm run check                           # full local gate: tests + typecheck + build + format check + eslint
 npm test                                # unit tests only — no Ollama needed
-npm run test:extension                  # VS Code extension tests (32 passing)
+npm run test:extension                  # VS Code extension tests (40 passing)
 npm run typecheck                       # 0 TypeScript errors
 npm run build                           # compile to dist/
 INTEGRATION=1 npm run test:integration  # e2e pipeline — requires Ollama + devstral
