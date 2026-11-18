@@ -273,7 +273,9 @@ unit tests on GitHub-hosted runners. It does **not** run the AI review: the self
 dispatch jobs to a personal machine), and both workflows are disabled in GitHub. Run
 `ai-review-agent` locally on code you trust instead. The two workflow files remain in the
 repository as reference for wiring ACR into a PR workflow; they require a self-hosted runner with
-Ollama and will not run unless re-enabled.
+Ollama and will not run unless re-enabled. **Do not re-enable them on a public repository:** the
+`if:` guard in `review.yml` can be bypassed from a fork, because `pull_request` runs the workflow
+file from the PR itself, so a fork PR could run its code on your runner.
 
 ## Configuration
 

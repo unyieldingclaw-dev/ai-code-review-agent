@@ -16,9 +16,15 @@ lineage: []
 
 # Active Context - Current State
 
-**Last Updated**: 2026-10-23
+**Last Updated**: 2026-11-18
 
 ## Current Focus
+
+**Retired the self-hosted runner `mizzo-local` (2026-11-09).** A public repo should not dispatch jobs
+to the owner's laptop, and the `review.yml` `if:` guard can be bypassed from a fork (`pull_request`
+uses the PR's workflow file). AI review and calibration are local, on-demand, for trusted code;
+`review.yml` and `calibrate.yml` are disabled in GitHub, not edited. Long-term automation stays a
+goal, on a path that does not use the laptop. Tracked in Bastion's `memory-bank/activeContext.md`.
 
 **Merged 2026-10-23: #93, #94, #95, #96 and #92; no PR is open.** #93: calibration oracle runs
 reported as unscored, not passed — full-suite `passed` totals are now one lower for identical
@@ -48,8 +54,8 @@ for over a week before finally being clicked). Full narrative for each: `progres
 `systemPatterns.md`:** merging one PR pushes every other open PR to `BEHIND` again, not just once
 (branch protection's `strict` mode re-checks after each merge); and `.claude/contracts/active-task.json`
 is single-slot, so long-lived branches collide on it (resolved by keeping the newer completed
-record). Also: `ai-review` CI timeouts correlate with Ollama's CPU-heavy 70/30 split and clear once
-Ollama goes idle and reloads — extended in `techContext.md`. And: this working directory is
+record). Also: `ai-review` CI timeouts (while CI ran it) correlated with Ollama's CPU-heavy 70/30
+split and cleared once Ollama went idle and reloads — extended in `techContext.md`. And: this working directory is
 confirmed **shared with concurrent peer Claude sessions**, not a theoretical risk — an untracked file
 from another session's in-progress work (a `TEMPLATE_OWNED`-hook fix, reported upstream to PMB as
 NS-58) appeared mid-session; investigated before assuming it was stray, per standing practice.
@@ -73,11 +79,10 @@ those briefs were verified wrong — do not chase them; reasons in
 - `license-clean`/`dependencies` no longer couple to this repo's state; other cases unaudited.
 - `context` is still last-chunk-wins in `chunkRunner` (deliberate). `policy`/`filteredFiles` no
   longer are — both were promoted to real cross-chunk merges by #84.
-- `ai-review` is **slow, not broken**: 8 consecutive runs to 2026-08-27 succeeded (6m43s–44m53s);
-  `mizzo-local` is online. It hung once (43 min, no step 1) — environment-side, because `run.cmd` is
-  interactive, and `timeout-minutes: 45` is the backstop. A docs PR showing no `ai-review` check is
-  by design: `review.yml` `paths-ignore`s `**/*.md`, **and it is not a required check** (both
-  clauses restored — #69 added them and a later compression dropped them).
+- **CI `ai-review` history (runner retired 2026-11-09; applies only if `review.yml` is re-enabled):**
+  it was slow, not broken — 8 consecutive runs to 2026-08-27 succeeded (6m43s–44m53s) and it hung
+  once (43 min, no step 1; environment-side, `run.cmd` is interactive). It is not a required check,
+  and `review.yml` `paths-ignore`s `**/*.md`.
 
 > Prior session history: [`archive/activeContext-history.md`](archive/activeContext-history.md).
 
@@ -119,7 +124,7 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
   timeout ceiling — MEASURED, CLOSED … do not re-derive it". Its one outlier (`adversarial`, 611.7 s
   against a 354.7 s ceiling, first attempt `fetch failed`) was this cap, so its "no invocation came
   near its ceiling" no longer holds (`archive/activeContext-history.md`). Re-measuring is undecided.
-- **CI's `ai-review` runs without `--chunk`** (`review.yml`), so a PR diff over `maxDiffLines`
+- **`review.yml` (disabled) runs without `--chunk`**: if re-enabled, a PR diff over `maxDiffLines`
   (2000) is reviewed truncated. Unscheduled.
 - **Flaky timing test:** `tests/unit/runner.test.ts:1570` expects a 300 ms backoff to measure at
   least 300 ms; #92's CI got 299 and passed on re-run. Give it a 1 ms tolerance. Unscheduled.
