@@ -7,7 +7,7 @@ tags:
   - session/focus
   - session/blockers
   - session/next-steps
-last-reviewed: 2026-10-23
+last-reviewed: 2026-11-18
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -28,9 +28,9 @@ reviewer-composition contract, kept in `docs/architecture/reviewer-composition.m
 in `systemPatterns.md` — **not auto-read; open it before changing the reviewer set**. Detail for
 each: `progress.md`.
 
-**In flight 2026-11-18:** `fix/fail-fast-final-severity` (not yet committed). Prompted by PMB.s
-issue that ACR output has no approval verdict: confirmed (none exists); ACR will not add one (rule 6,
-`reviewer-composition.md`), PMB owns authorization.
+**In flight 2026-11-18:** `fix/fail-fast-final-severity` (committed `fedc1bf`, not pushed).
+Prompted by PMB's issue that ACR output has no approval verdict: confirmed (none exists); ACR will
+not add one (rule 6, `reviewer-composition.md`), PMB owns authorization.
 
 **As of 2026-10-23, Claude cannot commit or push from a git worktree** — the `review-reminders.*`
 gate is worktree-blind. Work happens in this checkout. Fixed on PMB `main` (`a0850a3`,

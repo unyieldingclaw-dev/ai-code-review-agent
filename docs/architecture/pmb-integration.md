@@ -77,7 +77,7 @@ than accepted on their report — the standing rule in `progress.md`, and this i
   agent failed", calling it "a silently skipped security check reading as a pass" — the defect
   `earlyExit` reintroduced one level up, by returning `0` from a run that stopped early. (Since
   `fix/fail-fast-final-severity` a fail-fast stop always publishes a finding at `--fail-on`, so it
-  exits `1`, or `2`/`3` where those outrank it; the row is still wrong, as the run did not run fully.)
+  exits `1`, or `2` if an agent also failed; the row is still wrong, as the run did not run fully.)
   **#83 makes that row wrong, and they know.** It is their fix, on their side, and they asked
   explicitly that #83 not be held for it. Do not block on it.
 - **`--model` claims are peer-reported, not verified**: their file pins no model, so today's tagged

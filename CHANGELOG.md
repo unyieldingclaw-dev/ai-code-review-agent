@@ -244,11 +244,13 @@ json` was never affected** — `formatJson` is `JSON.stringify(result, null, 2)`
 
 ### Notes
 
-- **No exit code changed.** A fail-fast run still exits `0`. Routing it to `3` was considered and
-  rejected: `3` means partial _coverage_ of a complete run, whereas fail-fast is a
-  complete-coverage decision to stop early. Different states, different remedies, so they do not
-  share a code. The downstream consumer that branches on these codes was consulted before the
-  decision.
+- **No new exit code.** Fail-fast was not given a code of its own. A stopped run exits `1`, or `2`
+  if an agent also failed; until the published-severity fix under Fixed it could also exit `0`,
+  when the orchestrator dropped the finding it stopped on or downgraded it below `--fail-on`.
+  Routing it to `3` was considered and rejected: `3` means partial _coverage_ of a complete run,
+  whereas fail-fast is a complete-coverage decision to stop early. Different states, different
+  remedies, so they do not share a code. The downstream consumer that branches on these codes was
+  consulted before the decision.
 - **A consumer's exit-`0` row now needs updating, and that is a consequence of this change.** That
   row asserted "ran fully", which was safe only while a run that had _not_ run fully was
   indistinguishable from one that had. Making the state visible is what makes the assertion wrong.
