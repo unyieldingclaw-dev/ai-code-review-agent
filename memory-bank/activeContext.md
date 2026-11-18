@@ -43,16 +43,6 @@ gate is worktree-blind. Work happens in this checkout. Fixed on PMB `main` (`a08
 untagged); needs an `mb upgrade`, on hold (detail in `docs/architecture/pmb-integration.md`,
 "PMB-owned defects").
 
-**Getting all three of #90/#88/#85 merged back-to-back surfaced two generalizable patterns, now in
-`systemPatterns.md`:** merging one PR pushes every other open PR to `BEHIND` again, not just once
-(branch protection's `strict` mode re-checks after each merge); and `.claude/contracts/active-task.json`
-is single-slot, so long-lived branches collide on it (resolved by keeping the newer completed
-record). Also: `ai-review` CI timeouts (while CI ran it) correlated with Ollama's CPU-heavy 70/30
-split and cleared once Ollama went idle and reloads — extended in `techContext.md`. And: this working directory is
-confirmed **shared with concurrent peer Claude sessions**, not a theoretical risk — an untracked file
-from another session's in-progress work (a `TEMPLATE_OWNED`-hook fix, reported upstream to PMB as
-NS-58) appeared mid-session; investigated before assuming it was stray, per standing practice.
-
 **`npm run check` run directly 2026-09-17: green, 908 tests.** Calibration is nondeterministic —
 **treat a single pass as weak evidence**. Use `grep "orchestrator] dropped"` to tell a real filter
 regression from model variance, and target cases with `CALIBRATION_CASE=name1,name2` rather than
@@ -104,8 +94,6 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 - **`chunkRunner`'s `mergeResults` drops `truncation`, so exit 3 is unreachable under `--chunk`.**
   Peer-reported and live-reproduced 2026-09-01; detail in `progress.md`. **Not fixed on purpose** —
   making exit 3 reachable changes what PMB's Job 7 branches on, so it is an operator decision.
-- **`earlyExit` reached NO renderer — fixed and merged (PR #83, six surfaces not four)**, resolved,
-  kept only as a pointer; detail in `progress.md`/`systemPatterns.md`.
 - **4 operator calls parked, unmade** (corroboration-downgrade contract, `systemPatterns.md` size,
   `ping()`'s substring guess, `--chunk` as default) — full detail in
   [`archive/activeContext-history.md`](archive/activeContext-history.md). The fifth, the PMB
@@ -144,5 +132,7 @@ from `git log`; two prior PRs tried to keep it current and each went stale the m
 since a memory-bank PR moves the very commit it names. `v1.15.0` tagged at `6e2ed34` and published;
 that tag hash **is** recorded, because a release tag is immutable and a branch tip is not. Commands
 are in `techContext.md`; `npm run check` covers typecheck/build/format/lint/test in one pass. **This
-working directory is shared with concurrent peer Claude sessions** — see Current Focus; do not
-assume you are the only session touching this checkout.
+working directory is shared with concurrent peer Claude sessions**: do not assume you are the only
+session touching this checkout. Check `git status` for unfamiliar untracked files, and investigate
+before assuming one is stray. The 2026-09-26 case (NS-58) is in `archive/progress-history.md`,
+"Three PRs merged back to back".
