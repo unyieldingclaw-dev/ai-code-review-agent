@@ -175,20 +175,19 @@ fixed here, and PMB `/change-review` Job 7's exit-code contract with ACR. **Read
 ### Sharing this machine with the PMB peer session
 
 The Personal-Memory-Bank session runs on this machine and contends for the same two resources: the
-Ollama daemon, and the **self-hosted CI runner** (which is that same Ollama). Opening a PR takes the
-server via CI, so it is not a local-only act.
+Ollama daemon. (The self-hosted CI runner that once shared it was retired 2026-11-09, so opening a
+PR no longer takes the server.)
 
-- **Announce before restarting Ollama or opening a PR.** Both take the server.
+- **Announce before restarting Ollama.** It takes the server from the peer session.
 - **`ollama ps` cannot tell you whether a multi-pass run is in flight.** A decaying `UNTIL` means no
   inference _right now_, not "no run active" — a chunked run between chunks is indistinguishable
   from idle. The server cannot see its own clients between requests; ask the consumer side. Acting
   on that reading once killed the peer's 979 s run mid-chunk.
 - **A peer session's name rotates without the session ending** (`7b` → `1d` → `c9` → `8b`). Absence
   under a known name is not evidence it ended — read the current name from `ListAgents`.
-- **An all-markdown PR takes no server**: `review.yml` `paths-ignore`s `**/*.md`, so no `ai-review`
-  job is queued. A memory-bank PR therefore needs no announcement.
-- **An `ai-review` check showing _fail_ on a merged PR may be a cancellation, not a result** — the
-  job is cancelled by hand when it would contend with the peer.
+- **No PR takes the server now**: `review.yml` is disabled, so no `ai-review` job is queued and a PR
+  needs no announcement. (Before the runner was retired, an `ai-review` _fail_ on a merged PR could
+  be a hand cancellation to avoid contending with the peer, not a result.)
 
 **PMB `/change-review` Job 7 shells out to ACR and branches on our exit codes — a consumer
 contract.** Changing what a code means, or making a new condition emit an existing one, changes
@@ -228,8 +227,9 @@ that file pinned against its 150-line cap.
 - Policy layer: `agentPolicy` per-agent include/exclude glob path filtering
 - `.aiignore` negation patterns: `!pattern` overrides excludes (gitignore-style)
 - ESLint (`npm run lint:eslint`) — 0 warnings, included in `npm run check`
-- Calibration CI: self-hosted runner, 20min timeout. It is nondeterministic — the guidance for
-  reading a single run lives under "Verified state" in `activeContext.md`.
+- Calibration: `calibrate.yml` is disabled (the self-hosted runner was retired 2026-11-09); run
+  `npm run calibrate` locally. It is nondeterministic — the guidance for reading a single run lives
+  under "Verified state" in `activeContext.md`.
 - `npm run test:docker` is the fallback when native modules will not load (Smart App Control) or CI
   is unreliable. Key source files are tabulated under "Key Source Files" above.
 - `SecretsAgent`/`DependenciesAgent` use gitleaks/`npm audit` directly when available, skipping the
