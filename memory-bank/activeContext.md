@@ -34,13 +34,13 @@ reviewer-composition contract, kept in `docs/architecture/reviewer-composition.m
 in `systemPatterns.md` — **not auto-read; open it before changing the reviewer set**. Detail for
 each: `progress.md`.
 
-**In flight 2026-11-18:** `fix/fail-fast-final-severity`, open as PR #102.
+**Merged 2026-11-18: #102.** `--fail-fast` now stops on published severity.
 Prompted by PMB's issue that ACR output has no approval verdict: confirmed (none exists); ACR will
 not add one (rule 6, `reviewer-composition.md`), PMB owns authorization.
 
 **As of 2026-10-23, Claude cannot commit or push from a git worktree** — the `review-reminders.*`
 gate is worktree-blind. Work happens in this checkout. Fixed on PMB `main` (`a0850a3`,
-untagged); needs an `mb upgrade`, planned next (detail in `docs/architecture/pmb-integration.md`,
+untagged); needs an `mb upgrade`, on hold (detail in `docs/architecture/pmb-integration.md`,
 "PMB-owned defects").
 
 **Getting all three of #90/#88/#85 merged back-to-back surfaced two generalizable patterns, now in
@@ -121,12 +121,14 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
   (2000) is reviewed truncated. Unscheduled.
 - **Flaky timing test:** `tests/unit/runner.test.ts:1570` expects a 300 ms backoff to measure at
   least 300 ms; #92's CI got 299 and passed on re-run. Give it a 1 ms tolerance. Unscheduled.
-- **Next: `mb upgrade`, from PMB's `main`.** PMB has no release tag past `v1.0.4`, so the docs
-  procedure's `git checkout v1.2.1` cannot run; PMB's `main` contains the worktree fix `a0850a3`.
-  `mb upgrade` copies PMB's working tree, so right before it, check that the PMB checkout has no
-  difference from `origin/main` under `templates/`, `scripts/`, `VERSION` or `install.*`, and no
-  untracked files there. What it overwrites: `docs/architecture/pmb-integration.md`. The size check
-  it adds is warn-only (`ENFORCE=false`).
+- **Next: `mb upgrade`, from PMB's `main` — ON HOLD since 2026-10-24 at the user's request.**
+  Do not run it until PMB fixes both: it overwrites `.claude/settings.json`, stripping ACR's
+  `permissions.deny`; and `mb.ps1` rejects `--dry-run`. PMB has no release tag past `v1.0.4`, so
+  the docs procedure's `git checkout v1.2.1` cannot run; PMB's `main` contains the worktree fix
+  `a0850a3`. `mb upgrade` copies PMB's working tree, so right before it, check that the PMB checkout
+  has no difference from `origin/main` under `templates/`, `scripts/`, `VERSION` or `install.*`, and
+  no untracked files there. What it overwrites: `docs/architecture/pmb-integration.md`. The size
+  check it adds is warn-only (`ENFORCE=false`).
 - **`docs/CONTRACTS-GUIDE.md` says `.claude/contracts/` should be gitignored; it demonstrably isn't**
   (tracked in git — confirmed by this session's own conflicts on `active-task.json` across
   branches). Flagged, never actioned; worth fixing if it causes a third conflict.
@@ -134,7 +136,7 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
 ## Environment Status
 
 **Infrastructure**: Ollama on port 11434 — required for integration tests and calibration, not for
-unit tests. **Git**: open PRs as of 2026-10-23: none — `#82`–`#96` all merged. The
+unit tests. **Git**: open PRs as of 2026-11-18: none — `#82`–`#102` all merged. The
 four merged 2026-09-26 PR branches are gone from the remote (`git ls-remote`, 2026-10-23). Two
 long-retained orphan branches remain (`chore/agent-calibration`, `claude/plan-overview-4dg42o`) —
 containment unproven, so both stay. **The `main` hash is deliberately not recorded here** — read it
