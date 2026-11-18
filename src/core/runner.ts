@@ -347,6 +347,7 @@ export class SwarmRunner {
     index: number,
     agentStatus: Partial<Record<AgentName, AgentStatus>>,
     timeout: number,
+    wouldStop: (findingsSoFar: Finding[]) => boolean,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<{ findings: Finding[]; gaps: CoverageGap[]; earlyExit: boolean }> {
     const retryAttempts = this.config.retryAttempts
@@ -366,7 +367,7 @@ export class SwarmRunner {
       )
       const findings = coverageResult.findings
       const gaps = coverageResult.gaps
-      const earlyExit = shouldEarlyExit(this.config, findings)
+      const earlyExit = wouldStop(findings)
       agentStatus.coverage = 'ok'
       onProgress?.({
         phase: 'end',
@@ -408,6 +409,7 @@ export class SwarmRunner {
     agentStatus: Partial<Record<AgentName, AgentStatus>>,
     toolAvailability: ToolAvailabilityMetadata,
     timeout: number,
+    wouldStop: (findingsSoFar: Finding[]) => boolean,
     onProgress?: (e: AgentProgressEvent) => void
   ): Promise<{ findings: Finding[]; earlyExitAgent?: AgentName }> {
     const retryAttempts = this.config.retryAttempts
@@ -434,7 +436,7 @@ export class SwarmRunner {
         findings.push(...agentFindings)
         recordToolAvailability(agent, toolAvailability)
         agentStatus[agent.name] = 'ok'
-        const shouldStop = shouldEarlyExit(this.config, findings)
+        const shouldStop = wouldStop(findings)
         onProgress?.({
           phase: 'end',
           name: agent.name,
@@ -783,6 +785,24 @@ export class SwarmRunner {
     let index = 0
     let earlyExitAgent: AgentName | undefined
 
+    // --fail-fast stops on what would be PUBLISHED, not on raw agent output, because the exit code
+    // (cli/index.ts) reads result.findings, which synthesize produced. Checking raw severities let
+    // the swarm halt on a solo High that the orchestrator then downgraded, so the run skipped the
+    // remaining agents and still exited 0. allFindings is read at call time, so the sequential
+    // check includes coverage's findings -- the same set the final synthesize call sees. The
+    // failFast test duplicates shouldEarlyExit's own guard on purpose: it skips a full
+    // synthesize pass per agent when --fail-fast is off.
+    const wouldStop = (findingsSoFar: Finding[]): boolean =>
+      !!this.config.failFast &&
+      shouldEarlyExit(
+        this.config,
+        this.orchestrator.previewPublished(
+          [...allFindings, ...findingsSoFar],
+          changedFiles,
+          input.diff
+        )
+      )
+
     // Run CoverageAnalyst first if enabled (TestGen depends on it)
     if (hasCoverage) {
       index++
@@ -795,6 +815,7 @@ export class SwarmRunner {
         index,
         agentStatus,
         effectiveTimeoutMs,
+        wouldStop,
         emit
       )
       allFindings.push(...coverageResult.findings)
@@ -834,6 +855,7 @@ export class SwarmRunner {
           agentStatus,
           toolAvailability,
           effectiveTimeoutMs,
+          wouldStop,
           emit
         )
         allFindings.push(...seqResult.findings)

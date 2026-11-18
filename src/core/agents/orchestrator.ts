@@ -118,6 +118,22 @@ export class OrchestratorAgent {
   // filtering), no LLM calls.
   constructor(private readonly config: ReviewConfig) {}
 
+  private quiet = false
+
+  // synthesize() without its drop logs, for runner.ts's --fail-fast check: it asks after every
+  // agent whether the PUBLISHED result would contain a blocker yet, so the stop decision and the
+  // exit code read the same severities. Logging there would repeat each drop once per remaining
+  // agent and again at the real synthesize call. An instance flag is safe because synthesize is
+  // synchronous -- nothing can interleave with it.
+  previewPublished(findings: Finding[], changedFiles?: string[], diffText?: string): Finding[] {
+    this.quiet = true
+    try {
+      return this.synthesize(findings, changedFiles, undefined, diffText)
+    } finally {
+      this.quiet = false
+    }
+  }
+
   // changedFiles is optional so existing/other callers that don't have a diff's file list handy
   // (e.g. every existing test in this file) are unaffected -- the filter simply no-ops when
   // omitted. The real runner.ts call site always provides it.
@@ -201,10 +217,11 @@ export class OrchestratorAgent {
       const stripped = stripDiffPrefix(normalized)
       if (changedSet.has(stripped)) return [{ ...f, file: stripped }]
       dropped?.push({ agent: f.agent, title: f.title, file: f.file })
-      console.error(
-        `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- references ` +
-          `${f.file}, which is not in the reviewed diff (likely a hallucinated finding)`
-      )
+      if (!this.quiet)
+        console.error(
+          `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- references ` +
+            `${f.file}, which is not in the reviewed diff (likely a hallucinated finding)`
+        )
       return []
     })
   }
@@ -252,11 +269,12 @@ export class OrchestratorAgent {
           file: f.file,
           reason: 'pre-image-only-evidence',
         })
-        console.error(
-          `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- its evidence quotes ` +
-            `lines ${f.file} DELETES and appears nowhere in the resulting code (the finding ` +
-            `describes the pre-image, not the change under review)`
-        )
+        if (!this.quiet)
+          console.error(
+            `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- its evidence quotes ` +
+              `lines ${f.file} DELETES and appears nowhere in the resulting code (the finding ` +
+              `describes the pre-image, not the change under review)`
+          )
         return false
       }
 
@@ -266,10 +284,11 @@ export class OrchestratorAgent {
       if (!rule) return true
 
       dropped?.push({ agent: f.agent, title: f.title, file: f.file, reason: rule.reason })
-      console.error(
-        `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- ${f.file} contains ` +
-          `${rule.missing}, so the claimed mechanism cannot be present (likely a fabricated finding)`
-      )
+      if (!this.quiet)
+        console.error(
+          `[orchestrator] dropped finding "${f.title}" from ${f.agent} -- ${f.file} contains ` +
+            `${rule.missing}, so the claimed mechanism cannot be present (likely a fabricated finding)`
+        )
       return false
     })
   }

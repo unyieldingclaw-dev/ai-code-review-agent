@@ -48,6 +48,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`--fail-fast` could stop on a finding the published report no longer contained, then exit 0.**
+  The stop decision read raw agent severities; the exit code reads the orchestrator's output, which
+  downgrades an uncorroborated High to Medium once a second agent has findings (for example when
+  coverage, which runs first, has already reported) and drops findings it judges fabricated. The
+  swarm skipped the remaining agents on a "blocker" that then vanished. The stop check now runs the
+  same orchestrator pass on the findings so far, so it halts only when the published result would
+  meet `--fail-on`. No exit code changes meaning; the check repeats no `[orchestrator] dropped`
+  lines. Two consequences to expect: fail-fast can now also stop on a finding the orchestrator
+  _escalates_ to the threshold (e.g. correctness at a coverage finding's location), and
+  `--fail-on any` no longer stops on findings the report never shows (Lows, and SPECULATIVE
+  findings below High). Still true, and unchanged: a solo High from the first agent to report
+  stops the run, though a full run might later downgrade it; that run exits 1, consistently.
+
 - **Any Ollama chat call longer than 300 s failed as a bare `fetch failed`, whatever `--timeout`
   said.** Node's default `fetch` dispatcher (undici) abandons a response whose headers take over
   300 s (`headersTimeout`), and with `stream: false` Ollama sends none until it has finished
@@ -241,10 +254,8 @@ json` was never affected** — `formatJson` is `JSON.stringify(result, null, 2)`
   indistinguishable from one that had. Making the state visible is what makes the assertion wrong.
   Reported to the consumer, who is fixing it; this change was not held for it, because the report
   is now truthful and the description is what lags.
-- Still open, deliberately: `--fail-fast` triggers on **pre-orchestrator** severity while the exit
-  code reads **post-orchestrator** severity, so the swarm can halt saying "threshold met" and then
-  report that nothing met the threshold. That is a behaviour question, not a visibility one, and is
-  tracked separately.
+- Still open at the time: `--fail-fast` triggered on **pre-orchestrator** severity while the exit
+  code read **post-orchestrator** severity. Fixed under [Unreleased].
 
 ## [1.15.0] — 2026-08-27 (a timing number now says what it spans)
 

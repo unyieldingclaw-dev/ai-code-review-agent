@@ -27,10 +27,12 @@ import { DEFAULT_CONFIG } from '../../src/core/config.js'
 import { formatMarkdown } from '../../src/cli/formatter.js'
 import { BaseAgent } from '../../src/core/agents/base.js'
 import type { LLMProvider } from '../../src/core/llm/provider.js'
+import { shouldFail } from '../../src/cli/exitCode.js'
 import type {
   AgentName,
   AgentProgressEvent,
   FailOnLevel,
+  Severity,
   ToolAvailabilityMetadata,
 } from '../../src/core/schema.js'
 
@@ -38,6 +40,23 @@ const makeProvider = (response = '[]'): LLMProvider => ({
   chat: vi.fn().mockResolvedValue(response),
   ping: vi.fn().mockResolvedValue({ ok: true }),
 })
+
+// One schema-valid finding, for the --fail-fast tests that need to control severity, file and line.
+const oneFinding = (severity: string, file: string, title: string, line = 1) => ({
+  severity,
+  basis: 'VERIFIED',
+  confidence: 80,
+  file,
+  line,
+  title,
+  detail: 'detail',
+  suggestion: 'suggestion',
+})
+
+// The invariant the fix exists for: a run that stopped early must publish a finding that makes
+// the CLI's exit gate fire (cli/index.ts), so it can never stop and then exit 0.
+const expectStopMatchesExitGate = (findings: { severity: Severity }[], failOn: FailOnLevel) =>
+  expect(findings.some((f) => shouldFail(f.severity, failOn))).toBe(true)
 
 describe('SwarmRunner', () => {
   it('runs agents sequentially and returns a ReviewResult', async () => {
@@ -555,9 +574,142 @@ describe('SwarmRunner', () => {
     const runner = new SwarmRunner(config, provider)
     const result = await runner.run({ diff: 'diff' })
     expect(result.earlyExit).toEqual({ stoppedAt: 'security' })
+    expectStopMatchesExitGate(result.findings, 'high')
     expect(chatCallCount).toBe(1)
   })
 
+  // Regression: the stop decision used to read raw agent severities while the exit code reads the
+  // orchestrator's output. A solo High is downgraded to Medium once a second agent has findings
+  // (hallucinationCrossCheck), so the swarm halted on a "blocker" the published result no longer
+  // contained -- remaining agents skipped, and the CLI exited 0 because nothing met the threshold.
+  it('failFast does not stop on a finding the orchestrator would downgrade below failOn', async () => {
+    const finding = (severity: string, file: string, title: string) =>
+      JSON.stringify([
+        {
+          severity,
+          basis: 'VERIFIED',
+          confidence: 80,
+          file,
+          line: 1,
+          title,
+          detail: 'detail',
+          suggestion: 'suggestion',
+        },
+      ])
+    const responses = [
+      finding('low', 'a.ts', 'Minor issue'), // security
+      finding('high', 'b.ts', 'Solo high'), // correctness: uncorroborated, so published as medium
+      '[]', // design
+    ]
+    let call = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => Promise.resolve(responses[call++] ?? '[]')),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'correctness', 'design'] as AgentName[],
+      failFast: true,
+      failOn: 'high' as FailOnLevel,
+    }
+    const runner = new SwarmRunner(config, provider)
+    const result = await runner.run({ diff: 'diff' })
+    expect(result.findings.find((f) => f.title === 'Solo high')?.severity).toBe('medium')
+    expect(result.earlyExit).toBeUndefined()
+    expect(provider.chat).toHaveBeenCalledTimes(3)
+  })
+
+  // The per-agent stop check runs the orchestrator's filters too; it must not repeat their drop
+  // logs, or one hallucinated finding would be reported once per remaining agent plus once more.
+  it('failFast logs each orchestrator drop once, not once per stop check', async () => {
+    const ghost = JSON.stringify([
+      {
+        severity: 'low',
+        basis: 'VERIFIED',
+        confidence: 80,
+        file: 'ghost.ts',
+        line: 1,
+        title: 'Ghost finding',
+        detail: 'detail',
+        suggestion: 'suggestion',
+      },
+    ])
+    let call = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => Promise.resolve(call++ === 0 ? ghost : '[]')),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['security', 'correctness', 'design'] as AgentName[],
+      failFast: true,
+      failOn: 'high' as FailOnLevel,
+    }
+    const diff =
+      'diff --git a/real.ts b/real.ts\n--- a/real.ts\n+++ b/real.ts\n@@ -1 +1 @@\n-a\n+b\n'
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let drops: unknown[][]
+    try {
+      await new SwarmRunner(config, provider).run({ diff })
+      drops = errorSpy.mock.calls.filter((c) => String(c[0]).includes('"Ghost finding"'))
+    } finally {
+      errorSpy.mockRestore()
+    }
+    expect(drops).toHaveLength(1)
+  })
+
+  // The fix also lets fail-fast stop where raw severity was BELOW the threshold: crossReference
+  // escalates a correctness finding at the same location as a coverage finding, and the coverage
+  // finding corroborates it, so the published result holds a High the raw output never had.
+  it('failFast stops on a finding the orchestrator escalates to failOn', async () => {
+    const responses = [
+      JSON.stringify({
+        findings: [oneFinding('medium', 'app.ts', 'Untested branch', 10)],
+        gaps: [],
+      }),
+      JSON.stringify([oneFinding('medium', 'app.ts', 'Off-by-one', 10)]),
+      '[]', // design: must never be called
+    ]
+    let call = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => Promise.resolve(responses[call++] ?? '[]')),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['coverage', 'correctness', 'design'] as AgentName[],
+      failFast: true,
+      failOn: 'high' as FailOnLevel,
+    }
+    const result = await new SwarmRunner(config, provider).run({ diff: 'diff' })
+    expect(result.earlyExit).toEqual({ stoppedAt: 'correctness' })
+    expect(provider.chat).toHaveBeenCalledTimes(2)
+    expectStopMatchesExitGate(result.findings, 'high')
+  })
+
+  // The coverage agent runs first and has its own stop check (runCoverageAgent). Alone, its High
+  // has nothing to be downgraded against, so the stop and the published result agree.
+  it('failFast stops at the coverage agent when its finding alone meets failOn', async () => {
+    const coverageHigh = JSON.stringify({
+      findings: [oneFinding('high', 'app.ts', 'Unguarded path')],
+      gaps: [],
+    })
+    let call = 0
+    const provider: LLMProvider = {
+      chat: vi.fn().mockImplementation(() => Promise.resolve(call++ === 0 ? coverageHigh : '[]')),
+      ping: vi.fn().mockResolvedValue({ ok: true }),
+    }
+    const config = {
+      ...DEFAULT_CONFIG,
+      agents: ['coverage', 'security'] as AgentName[],
+      failFast: true,
+      failOn: 'high' as FailOnLevel,
+    }
+    const result = await new SwarmRunner(config, provider).run({ diff: 'diff' })
+    expect(result.earlyExit).toEqual({ stoppedAt: 'coverage' })
+    expect(provider.chat).toHaveBeenCalledTimes(1)
+    expectStopMatchesExitGate(result.findings, 'high')
+  })
   it('failFast does not stop when findings are below failOn threshold', async () => {
     const lowFinding = JSON.stringify([
       {
