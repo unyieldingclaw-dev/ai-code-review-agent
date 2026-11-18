@@ -7,7 +7,7 @@ tags:
   - work/completed
   - work/in-progress
   - work/backlog
-last-reviewed: 2026-10-23
+last-reviewed: 2026-11-18
 compaction_generation: 0
 source_type: canonical
 confidence: high
@@ -20,10 +20,10 @@ lineage: []
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
-## 🔧 `--fail-fast` stops on published severity (2026-11-18, branch `fix/fail-fast-final-severity`)
+## ✅ `--fail-fast` stops on published severity (2026-11-18): merged as #102 (`81dce80`)
 
 The stop check now runs `orchestrator.previewPublished` (quiet `synthesize`) on findings so far, so a
-solo High later downgraded can no longer halt the swarm and exit 0. No exit code changed. CHANGELOG.
+solo High later downgraded can no longer halt the swarm and exit 0. No new exit code. CHANGELOG.
 
 ## ✅ `techContext.md` first archive pass (2026-10-23): 155 lines moved out of 399
 
