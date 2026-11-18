@@ -34,7 +34,7 @@ reviewer-composition contract, kept in `docs/architecture/reviewer-composition.m
 in `systemPatterns.md` — **not auto-read; open it before changing the reviewer set**. Detail for
 each: `progress.md`.
 
-**In flight 2026-11-18:** `fix/fail-fast-final-severity` (committed `fedc1bf`, not pushed).
+**In flight 2026-11-18:** `fix/fail-fast-final-severity`, open as PR #102.
 Prompted by PMB's issue that ACR output has no approval verdict: confirmed (none exists); ACR will
 not add one (rule 6, `reviewer-composition.md`), PMB owns authorization.
 
@@ -42,13 +42,6 @@ not add one (rule 6, `reviewer-composition.md`), PMB owns authorization.
 gate is worktree-blind. Work happens in this checkout. Fixed on PMB `main` (`a0850a3`,
 untagged); needs an `mb upgrade`, planned next (detail in `docs/architecture/pmb-integration.md`,
 "PMB-owned defects").
-
-**Earlier (2026-09-26): all four of this session's PRs are now merged and `main` is caught up —
-`gh pr list` returns empty, verified directly.** In order: `#89` (calibration `agentPolicy` excludes),
-`#90` (historical checkpoint — the synthetic model ranking does **not** transfer to real code at
-N=2, full detail in `progress.md`), `#88` (the timeout-plumbing fix + oracle-backed calibration
-measurements), `#85` (the long-stale `earlyExit`/stderr-distinguishing fix, sitting done-and-pushed
-for over a week before finally being clicked). Full narrative for each: `progress.md`.
 
 **Getting all three of #90/#88/#85 merged back-to-back surfaced two generalizable patterns, now in
 `systemPatterns.md`:** merging one PR pushes every other open PR to `BEHIND` again, not just once

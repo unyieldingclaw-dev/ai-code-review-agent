@@ -2,10 +2,11 @@
   "task": "Make --fail-fast decide to stop on the same orchestrator-filtered severities the exit code reads, so a run that stopped early cannot exit 0.",
   "status": "active",
   "created_at": "2026-11-18T07:27:16Z",
-  "expires_at": "2026-11-18T15:27:16Z",
+  "expires_at": "2026-11-19T01:53:31Z",
   "amendments": [
     "Replaces the on-hold mb upgrade contract. Its uncommitted text is not recoverable from the repo; it is kept outside the repo for this session and restored here when this task completes.",
-    "2026-11-18: user approved applying /code-review fixes; scope adds docs/architecture/pmb-integration.md (one stale fail-fast sentence)."
+    "2026-11-18: user approved applying /code-review fixes; scope adds docs/architecture/pmb-integration.md (one stale fail-fast sentence).",
+    "2026-11-18: PR #102 CI failed the memory-bank size cap (activeContext 153/150 once merged with #101). User approved merging origin/main and archiving one completed paragraph verbatim; scope adds memory-bank/archive/activeContext-history.md. The contract had expired at 15:27Z; approved 17:53Z, expires_at renewed to 2026-11-19T01:53Z (8 h)."
   ],
   "scope": [
     {
@@ -38,6 +39,10 @@
     },
     {
       "file": "memory-bank/progress.md",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/archive/activeContext-history.md",
       "op": "edit"
     },
     {
