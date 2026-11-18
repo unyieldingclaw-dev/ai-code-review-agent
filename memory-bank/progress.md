@@ -20,6 +20,11 @@ lineage: []
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
+## 🔧 `--fail-fast` stops on published severity (2026-11-18, branch `fix/fail-fast-final-severity`)
+
+The stop check now runs `orchestrator.previewPublished` (quiet `synthesize`) on findings so far, so a
+solo High later downgraded can no longer halt the swarm and exit 0. No exit code changed. CHANGELOG.
+
 ## ✅ `techContext.md` first archive pass (2026-10-23): 155 lines moved out of 399
 
 The three PMB reference blocks moved verbatim to `docs/architecture/pmb-integration.md` (pointer left,

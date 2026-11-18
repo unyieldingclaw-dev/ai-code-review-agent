@@ -1,5 +1,14 @@
 # Active Context — archived history
 
+## Moved out 2026-11-18 (153 lines against 150 limit once merged with #101; completed history)
+
+**Earlier (2026-09-26): all four of this session's PRs are now merged and `main` is caught up —
+`gh pr list` returns empty, verified directly.** In order: `#89` (calibration `agentPolicy` excludes),
+`#90` (historical checkpoint — the synthetic model ranking does **not** transfer to real code at
+N=2, full detail in `progress.md`), `#88` (the timeout-plumbing fix + oracle-backed calibration
+measurements), `#85` (the long-stale `earlyExit`/stderr-distinguishing fix, sitting done-and-pushed
+for over a week before finally being clicked). Full narrative for each: `progress.md`.
+
 ## Moved out 2026-09-26 (superseded by "All four PRs merged" — #89/#90/#88/#85 all landed)
 
 **Today's entire calibration/measurement work moved off `#85`'s own unmerged branch onto its own

@@ -1,23 +1,59 @@
 {
-  "task": "Bring memory-bank/techContext.md from 399 to <=250 lines: relocate PMB reference sections verbatim to docs/architecture/pmb-integration.md (with a pointer saying when to read it) and archive whole narrative/measurement/incident sentences verbatim to a new archive/techContext-history.md; no instruction, scope or precondition sentence moves.",
+  "task": "Make --fail-fast decide to stop on the same orchestrator-filtered severities the exit code reads, so a run that stopped early cannot exit 0.",
   "status": "active",
-  "created_at": "2026-10-24T02:20:00Z",
-  "expires_at": "2026-10-24T10:20:00Z",
+  "created_at": "2026-11-18T07:27:16Z",
+  "expires_at": "2026-11-19T01:53:31Z",
   "amendments": [
-    "Replaces the fetch-failed fix contract, which is complete: merged as PR #98 (main 2aa8c0b, 2026-10-24T01:50Z), every success criterion met (310 s repro before 307,133 ms fail / after 310,028 ms OK)."
+    "Replaces the on-hold mb upgrade contract. Its uncommitted text is not recoverable from the repo; it is kept outside the repo for this session and restored here when this task completes.",
+    "2026-11-18: user approved applying /code-review fixes; scope adds docs/architecture/pmb-integration.md (one stale fail-fast sentence).",
+    "2026-11-18: PR #102 CI failed the memory-bank size cap (activeContext 153/150 once merged with #101). User approved merging origin/main and archiving one completed paragraph verbatim; scope adds memory-bank/archive/activeContext-history.md. The contract had expired at 15:27Z; approved 17:53Z, expires_at renewed to 2026-11-19T01:53Z (8 h)."
   ],
   "scope": [
-    { "file": "memory-bank/techContext.md", "op": "edit" },
-    { "file": "docs/architecture/pmb-integration.md", "op": "create" },
-    { "file": "memory-bank/archive/techContext-history.md", "op": "create" },
-    { "file": "memory-bank/progress.md", "op": "edit" },
-    { "file": "memory-bank/activeContext.md", "op": "edit" },
-    { "file": ".claude/contracts/active-task.json", "op": "edit" }
+    {
+      "file": "src/core/runner.ts",
+      "op": "edit"
+    },
+    {
+      "file": "src/core/agents/orchestrator.ts",
+      "op": "edit"
+    },
+    {
+      "file": "tests/unit/runner.test.ts",
+      "op": "edit"
+    },
+    {
+      "file": "CHANGELOG.md",
+      "op": "edit"
+    },
+    {
+      "file": "README.md",
+      "op": "edit"
+    },
+    {
+      "file": "docs/architecture/pmb-integration.md",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/activeContext.md",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/progress.md",
+      "op": "edit"
+    },
+    {
+      "file": "memory-bank/archive/activeContext-history.md",
+      "op": "edit"
+    },
+    {
+      "file": ".claude/contracts/active-task.json",
+      "op": "edit"
+    }
   ],
   "success_criteria": [
-    "techContext.md <= 250 lines (passes ours 400 and PMB's 300) and under PMB's 24,000-byte warn.",
-    "Script check: live file == old minus exactly the moved text plus pointers; every moved line appears verbatim in the docs or archive file.",
-    "CI size and pointer-integrity scripts pass; prettier --check . passes.",
-    "/code-review before commit and /change-review before push, each with the user's approval."
+    "New regression test fails against the unfixed code with the expected assertion and passes after the fix.",
+    "Full vitest suite and tsc pass.",
+    "No exit code changes meaning.",
+    "/code-review before commit."
   ]
 }
