@@ -16,7 +16,7 @@ lineage: []
 
 # Progress Tracker
 
-**Last Updated**: 2026-10-23
+**Last Updated**: 2026-11-18
 
 > Older completed work lives in [`archive/progress-history.md`](archive/progress-history.md).
 
@@ -82,40 +82,10 @@ created queue wait MUST be classified queue-bound by the log check, or stop and 
 its path did `passed++`. Now the summary reports `N oracle run(s) unscored (manual classification
 required)` only when N > 0, and the exit code is unchanged (a completed oracle run never affects
 it; one that errors still counts as failed). **A full-suite `passed` total is one lower than before
-for identical model behavior** — the "23 passed" figures below predate this. A `CalibrationTally`
+for identical model behavior** — the "23 passed" figures in the "Timeout plumbing bug" entry
+([`archive/progress-history.md`](archive/progress-history.md)) predate this. A `CalibrationTally`
 class from the first draft was dropped: it duplicated `oracleRuns.length`. Note `tsconfig.json`
 covers only `src/**`, so CI's typecheck never sees `calibration/`; typecheck it standalone.
-
-## ✅ Three PRs merged back to back (2026-09-26): #90, #88, #85 — `main` caught up, no open PRs
-
-**All three of this session's open PRs merged today, in this order: #90 (historical checkpoint),
-#88 (timeout-plumbing fix + calibration oracle), #85 (the long-stale `earlyExit`/stderr fix).**
-`gh pr list` returns empty afterward — verified directly, not assumed. Getting there took three
-real, generalizable lessons, now in `systemPatterns.md`/`techContext.md` in full — summarized here
-for the "what happened" record:
-
-- **Merging one PR pushes every other open PR to `BEHIND` again, cascading.** With three PRs open,
-  each of #88 and #85 needed `main` merged in twice — once after #90 merged, again after the other
-  merged next. Branch protection's `strict` mode re-checks after every merge to `main`, not once.
-- **`.claude/contracts/active-task.json` is single-slot, so long-lived branches collide on it.** Both
-  #88-vs-#90 and #85-vs-#90 hit the identical conflict (two branches each writing their own
-  completed-task record). Resolved both times by keeping the newer record — the file is scratch
-  state, not an audit trail, so the older side's own durable record (already in this file, or in
-  `CHANGELOG.md`) is never actually lost.
-- **`ai-review` timed out three times in a row on #90** (45m56s–47m25s, over the 45-minute CI
-  ceiling) while `ollama ps` showed devstral pinned at the CPU-heavy 70%/30% split documented in
-  `techContext.md`'s 2026-09-01 counter-datum. Passed on the fourth retry once Ollama had gone fully
-  idle and reloaded (44m34s), then comfortably on later runs (31m, 13m) — see `techContext.md` for
-  the full pattern. Retrying after confirming `ollama ps` is idle is now the first move for this
-  failure shape, before reaching for a CI config change.
-
-**Also resolved in passing:** the mid-session "unexplained `.githooks/pre-commit` modification" this
-project had never actually recorded anywhere — it was a legitimate `TEMPLATE_OWNED`-hook fix draft
-(reported upstream to PMB as **NS-58**, parked in
-`docs/superpowers/plans/2026-09-26-ns58-pre-commit-format-check-reference.md`) being worked on by
-another Claude session sharing this same working directory. **This directory is confirmed shared
-with concurrent peer sessions, not a theoretical risk** — worth checking `git status` for
-unfamiliar-but-untracked files before assuming they're stray.
 
 ## 🔎 Historical checkpoint (PR #90): the synthetic ranking does not transfer at N=2 (2026-09-21)
 
@@ -147,78 +117,15 @@ Full write-up, all 6 raw model outputs, and both fixture diffs:
 `calibration/historical-checkpoint-raw.*.json`. **No production model change.** Extending this past
 N=2 into an actual historical corpus is a separate, not-yet-made decision.
 
-## 🔧 Timeout plumbing bug: found, fixed, verified (2026-09-19)
+## 🔧 Timeout plumbing bug (2026-09-19): fixed, merged as #88 — archived
 
-**Found via this repo's own `/code-review` (triggered by the pre-commit hook on
-`chore/model-recall-calibration`'s uncommitted work), independently confirmed by direct source
-reading and by the opposition reviewer.** `calibrate.ts`'s agent-invocation call site never passed
-a `signal` to `BaseAgent.run()`, so `OllamaProvider.chat()`'s
-`signal: options.signal ?? AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS)` always fell
-through to its own hardcoded 300,000ms default — regardless of `CALIBRATION_TIMEOUT_MS`,
-`agentTimeoutMs`, or anything in `config.ts`. Every calibration batch run to date, in both the
-restraint (`adversarial-clean`) and recall (`adversarial-dirty`) experiments, ran under the same
-~300s ceiling; no batch was ever actually at 180s. This invalidates the specific causal claim
-"retested Ornith at 300000ms, timeout rate dropped" as a _causal_ statement — the observed drop is
-real but is run-to-run variance, not a timeout-budget effect. Corrected in place in both
-`docs/superpowers/plans/2026-09-18-acr-model-comparison-devstral-ornith-qwen.md` and
-`.../2026-09-18-acr-adversarial-dirty-fixture-design.md`; the raw findings, FP rates, and recall
-percentages already reported are unaffected and stand as measured.
-
-**Two self-critique passes on the remediation plan (both user-requested) before touching code**
-caught: an overreach (adding a `main()`-execution guard purely for testability, rejected —
-`calibrate.ts` has zero tests by deliberate project convention); a non-protective metadata field
-(`effectiveTimeoutMs`, would have been derived from the same variable used to build the signal and
-so could never diverge — replaced with an independently-measured `elapsedMs`); and a
-data-destructive crash-safety design (silently treating a corrupted oracle log as empty, rejected
-in favor of backing it up to `.corrupted-<timestamp>.json` first).
-
-**Fix, applied to the shared call site used by every calibration case, not just the new oracle
-one**: `calibrate.ts` now passes `AbortSignal.timeout(agentTimeoutMs)` explicitly. Added
-`elapsedMs` (independently measured wall-clock time, not derived from `agentTimeoutMs`) to each
-`oracleRuns` log entry. Wrapped the oracle-log `JSON.parse` in try/catch with a corrupted-file
-backup, since it previously sat outside any try/catch and a truncated prior log would have crashed
-`main()` and lost the current invocation's freshly-collected data too, not just the old history.
-Added 3 regression tests to `tests/unit/ollamaProvider.test.ts` covering `OllamaProvider.chat()`'s
-side of the contract — `options.signal ?? AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS)`
-(caller signal honored and forwarded unchanged; a caller timeout is actually enforced rather than
-falling back to 300s; two different caller timeouts produce two measurably different enforced
-deadlines). **These do not cover `calibrate.ts`'s own call site** — it has zero test coverage by
-deliberate project convention (tsx-only, excluded from `vitest.config.ts`), so a future edit that
-drops the `AbortSignal.timeout(agentTimeoutMs)` argument there would reintroduce this exact bug and
-nothing here would catch it; caught and corrected in this session's own re-check after an earlier
-comment overstated this as closing that gap. 911/915 tests passing (4 pre-existing skips, unrelated
-to this change), clean typecheck/lint/format.
-
-**Verification run — `npm run calibrate` unfiltered against `devstral:latest`, matching CI's exact
-invocation, run once after the fix as planned: 23 passed, 3 failed. All three failures pre-date or
-are independent of this fix, not new regressions it introduced:**
-
-- `dependencies`: 3 real CVEs (fast-uri, hono, qs) — confirmed directly via `npm audit --json`
-  against this repo's actual current dependency tree (2 moderate, 1 high). `DependenciesAgent`
-  shells out to real `npm audit`, never touches Ollama, and is untouched by this fix. Environmental
-  drift (new CVEs disclosed since this fixture was last green), not a code defect.
-- `adversarial-clean`: one hallucinated finding on a single trial. Consistent with Devstral's
-  already-measured ~70% failure rate on this exact fixture (see the model-comparison entry below);
-  unrelated to timeouts.
-- `adversarial-dirty`: **"agent error: The operation was aborted due to timeout."** This is the one
-  failure worth flagging as a genuine, newly-exposed consequence of the fix rather than noise.
-  Devstral was already measured at a 20% timeout rate on this exact fixture (4/20 in the N=20×3
-  recall study) — but that study, like everything else, ran under the accidental ~300s ceiling.
-  This verification run is the first time `adversarial-dirty` has ever run against the _real_
-  180s default (`DEFAULT_CONFIG.agentTimeoutMs`, CI's implicit value — no `CALIBRATION_TIMEOUT_MS`
-  is set in `.github/workflows/calibrate.yml`), and a single trial timing out is unsurprising given
-  the fixture's already-known timeout-proneness at the longer, previously-silent budget.
-  **Resolved 2026-09-19, user's call:** flagged as an operational decision rather than patched
-  around unilaterally; user directed raising it. `.github/workflows/calibrate.yml`'s "Run
-  calibration suite" step now sets `CALIBRATION_TIMEOUT_MS: '300000'`, pinning calibration back to
-  the ~300s budget it always effectively ran under. Production's real timeout enforcement
-  (`src/core/runner.ts`'s `withTimeout`) is untouched — this only affects the calibration
-  harness's own budget, not `DEFAULT_CONFIG.agentTimeoutMs` (180000) or real review runs.
-
-**Done, not paused any longer:** the re-adjudication of PR #85's findings and PR #84's pre-registered
-oracle — see "Historical checkpoint" above. **This fix itself merged to `main` as PR #88 on
-2026-09-26**, alongside PR #90 (the checkpoint) and PR #85 (finally clicked to merge) — see "Three
-PRs merged back to back" above for what that took.
+Full entry moved to [`archive/progress-history.md`](archive/progress-history.md) on 2026-11-18.
+Two points from it still stand. **Every calibration batch before the fix ran under a ~300 s
+ceiling**, whatever `CALIBRATION_TIMEOUT_MS` or `agentTimeoutMs` said, restraint and recall alike,
+so the "Recall measurement" timeouts below were taken under it. **`calibrate.ts`'s own call site
+has no test coverage** (run by `tsx`, excluded in `tsconfig.json`, no test imports it): an edit
+that drops its `AbortSignal.timeout(agentTimeoutMs)` argument would bring the bug back, and no test
+would catch it.
 
 ## 🔎 Recall measurement: a real precision-recall-runtime frontier, no winner (2026-09-18)
 

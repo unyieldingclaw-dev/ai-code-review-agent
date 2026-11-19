@@ -1,45 +1,24 @@
 {
-  "task": "Make --fail-fast decide to stop on the same orchestrator-filtered severities the exit code reads, so a run that stopped early cannot exit 0.",
+  "task": "Archive completed history out of memory-bank/progress.md and memory-bank/activeContext.md, verbatim, to restore headroom under their size caps.",
   "status": "complete",
-  "created_at": "2026-11-18T07:27:16Z",
-  "expires_at": "2026-11-19T01:53:31Z",
+  "created_at": "2026-11-18T21:31:11Z",
+  "expires_at": "2026-11-19T05:31:11Z",
   "amendments": [
-    "Replaces the on-hold mb upgrade contract. Its uncommitted text is not recoverable from the repo; it is kept outside the repo for this session and restored here when this task completes.",
-    "2026-11-18: user approved applying /code-review fixes; scope adds docs/architecture/pmb-integration.md (one stale fail-fast sentence).",
-    "2026-11-18: PR #102 CI failed the memory-bank size cap (activeContext 153/150 once merged with #101). User approved merging origin/main and archiving one completed paragraph verbatim; scope adds memory-bank/archive/activeContext-history.md. The contract had expired at 15:27Z; approved 17:53Z, expires_at renewed to 2026-11-19T01:53Z (8 h).",
-    "2026-11-18: complete. Merged as PR #102 (main 81dce80, 2026-11-18T18:18Z). Criteria 2-3 are checkable in CI and CHANGELOG; 1 and 4 are per the session record (mutation check and /code-review before each commit). Per the user, the on-hold mb upgrade contract goes back into the working tree uncommitted, as before #102, once this record merges."
+    "Temporarily replaces the uncommitted on-hold mb upgrade contract; a byte-for-byte backup is kept outside the repo and restored here, uncommitted, when this task completes.",
+    "2026-11-18: scope revised after an adversarial review before approval: keep progress.md:85's pointer and calibrate.ts's untested-call-site warning live, and state the git status step inline in activeContext.md's Environment Status.",
+    "2026-11-18: complete. Committed on chore/memory-bank-archive-pass after /code-review (Approve) and fixes for its findings; committed as complete so main carries no active scope. The on-hold mb upgrade contract is restored here uncommitted right after the commit."
   ],
   "scope": [
     {
-      "file": "src/core/runner.ts",
+      "file": "memory-bank/progress.md",
       "op": "edit"
     },
     {
-      "file": "src/core/agents/orchestrator.ts",
-      "op": "edit"
-    },
-    {
-      "file": "tests/unit/runner.test.ts",
-      "op": "edit"
-    },
-    {
-      "file": "CHANGELOG.md",
-      "op": "edit"
-    },
-    {
-      "file": "README.md",
-      "op": "edit"
-    },
-    {
-      "file": "docs/architecture/pmb-integration.md",
+      "file": "memory-bank/archive/progress-history.md",
       "op": "edit"
     },
     {
       "file": "memory-bank/activeContext.md",
-      "op": "edit"
-    },
-    {
-      "file": "memory-bank/progress.md",
       "op": "edit"
     },
     {
@@ -52,9 +31,9 @@
     }
   ],
   "success_criteria": [
-    "New regression test fails against the unfixed code with the expected assertion and passes after the fix.",
-    "Full vitest suite and tsc pass.",
-    "No exit code changes meaning.",
+    "Every moved line appears unchanged in the archive (checked with diff).",
+    "No new line wider than 100 characters.",
+    "Both files under their CI size caps.",
     "/code-review before commit."
   ]
 }

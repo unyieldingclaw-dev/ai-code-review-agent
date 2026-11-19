@@ -1,5 +1,25 @@
 # Active Context — archived history
 
+## Moved out 2026-11-18, second pass (148/150; completed history)
+
+The paragraph is history; its lessons are live in `systemPatterns.md` and `techContext.md`, and
+its shared-checkout warning, with the `git status` step, is in `activeContext.md`'s Environment
+Status. The bullet was resolved by PR #83; its "detail in `progress.md`" moved to
+`archive/progress-history.md` on 2026-09-26.
+
+**Getting all three of #90/#88/#85 merged back-to-back surfaced two generalizable patterns, now in
+`systemPatterns.md`:** merging one PR pushes every other open PR to `BEHIND` again, not just once
+(branch protection's `strict` mode re-checks after each merge); and `.claude/contracts/active-task.json`
+is single-slot, so long-lived branches collide on it (resolved by keeping the newer completed
+record). Also: `ai-review` CI timeouts (while CI ran it) correlated with Ollama's CPU-heavy 70/30
+split and cleared once Ollama went idle and reloads — extended in `techContext.md`. And: this working directory is
+confirmed **shared with concurrent peer Claude sessions**, not a theoretical risk — an untracked file
+from another session's in-progress work (a `TEMPLATE_OWNED`-hook fix, reported upstream to PMB as
+NS-58) appeared mid-session; investigated before assuming it was stray, per standing practice.
+
+- **`earlyExit` reached NO renderer — fixed and merged (PR #83, six surfaces not four)**, resolved,
+  kept only as a pointer; detail in `progress.md`/`systemPatterns.md`.
+
 ## Moved out 2026-11-18 (153 lines against 150 limit once merged with #101; completed history)
 
 **Earlier (2026-09-26): all four of this session's PRs are now merged and `main` is caught up —
