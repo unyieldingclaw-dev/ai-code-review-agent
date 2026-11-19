@@ -109,13 +109,16 @@ The standing capability inventory moved to `techContext.md` ("Shipped Capabiliti
   (2000) is reviewed truncated. Unscheduled.
 - **Flaky timing test:** `tests/unit/runner.test.ts:1570` expects a 300 ms backoff to measure at
   least 300 ms; #92's CI got 299 and passed on re-run. Give it a 1 ms tolerance. Unscheduled.
-- **Next: `mb upgrade`, from PMB's `main` — ON HOLD since 2026-10-24 at the user's request.**
-  Do not run it until PMB fixes both: it overwrites `.claude/settings.json`, stripping ACR's
-  `permissions.deny`; and `mb.ps1` rejects `--dry-run`. PMB has no release tag past `v1.0.4`, so
-  the docs procedure's `git checkout v1.2.1` cannot run; PMB's `main` contains the worktree fix
-  `a0850a3`. `mb upgrade` copies PMB's working tree, so right before it, check that the PMB checkout
-  has no difference from `origin/main` under `templates/`, `scripts/`, `VERSION` or `install.*`, and
-  no untracked files there. What it overwrites: `docs/architecture/pmb-integration.md`. The size
+- **Next: `mb upgrade`, from PMB's `main` — ON HOLD since 2026-10-24 at the user's request;
+  lifting it is the user's call.** Both PMB defects behind the hold (the `settings.json`
+  permissions wipe, and `mb.ps1` rejecting `--dry-run`) are fixed on PMB `main`, not yet run here:
+  `docs/architecture/pmb-integration.md`, "PMB-owned defects". PMB has no release tag past
+  `v1.0.4`, so the docs procedure's `git checkout v1.2.1` cannot run; PMB's `main` contains the
+  worktree fix `a0850a3`. `mb upgrade` copies PMB's working tree, so right before it, check that the
+  PMB checkout has no difference from `origin/main` under `templates/`, `scripts/`, `VERSION` or
+  `install.*`, and no untracked files there (PMB #179 checks part of this, without fetching).
+  Then run `mb upgrade --dry-run` and confirm the `settings.json` report and diff it prints keep
+  ACR's `gh pr merge` deny. What it overwrites: `docs/architecture/pmb-integration.md`. The size
   check it adds is warn-only (`ENFORCE=false`).
 - **`docs/CONTRACTS-GUIDE.md` says `.claude/contracts/` should be gitignored; it demonstrably isn't**
   (tracked in git — confirmed by this session's own conflicts on `active-task.json` across
