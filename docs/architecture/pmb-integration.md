@@ -40,6 +40,27 @@ commits had to be made by the operator from their own terminal. PMB fixed it in 
 (2026-09-15; repo taken from a leading quoted `cd "<path>" &&` or `git -C`), on PMB `main` but in no
 release tag, so only an `mb upgrade` from a checkout containing it delivers it — blocked; see NS-14.
 
+**The two PMB defects behind the 2026-10-24 `mb upgrade` hold are both fixed on PMB `main`;
+neither fix has run here yet.** Checked 2026-11-18 in PMB's history, and against PMB's GitHub
+`main` with the compare API, since the local PMB checkout is shallow:
+
+- **`mb upgrade` overwrote `ours:.claude/settings.json` wholesale, dropping ACR's
+  `permissions.deny`.** The file is `TEMPLATE_OWNED` (table below), and
+  `PMB:templates/.claude/settings.json` has no `gh pr merge` deny. Fixed in PMB `2e1bd4e` (#111,
+  2026-10-31): `PMB:scripts/mb.sh` (`_upgrade_settings`) and `PMB:scripts/mb.ps1`
+  (`Merge-UpgradeSettingsFile`) now merge `permissions.allow`/`deny`/`ask`/`additionalDirectories`
+  as the template's entries plus every project entry the template lacks, and list the kept rules on
+  every upgrade. Everything
+  outside `permissions` still comes from the template, so for `settings.json` the table's
+  "overwritten" now holds only outside `permissions`.
+- **`PMB:scripts/mb.ps1` rejected `--dry-run`, which `PMB:scripts/mb.sh` accepted.** Fixed in PMB
+  `a384084` (#93, 2026-10-26) with a `dry-run` alias on `$DryRun`.
+
+Also on PMB `main`: `823dafe` (#179, 2026-11-18) makes `mb upgrade` refuse to run unless the files
+it copies are committed and PMB's `main` equals its local `origin/main` ref. It does not fetch, so a
+stale ref passes, and `MB_UPGRADE_UNCHECKED=1` skips it. Whether to lift the hold, and the steps for
+the upgrade, are in `memory-bank/activeContext.md`.
+
 **Two PMB peer-session claims independently verified 2026-09-19–26, not just accepted:** NS-11
 (NPM_TOKEN renewal) is genuinely obsolete — ACR uses OIDC/Trusted Publishing (`release.yml`), not a
 stored token. NS-14 (PMB version drift, ACR pinned to 1.1.1 vs PMB's actual 1.2.1) is genuinely
