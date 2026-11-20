@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640"><defs>
+<linearGradient id="accent" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0563F5"/><stop offset="0.46" stop-color="#16A1FF"/><stop offset="1" stop-color="#04EDDE"/></linearGradient>
+<linearGradient id="accent2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#04F1DB"/><stop offset="0.5" stop-color="#13B7FF"/><stop offset="1" stop-color="#075DF4"/></linearGradient>
+<linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#031843"/><stop offset="0.5" stop-color="#06245A"/><stop offset="1" stop-color="#020E2C"/></linearGradient>
+<linearGradient id="light" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#DAF9FF"/><stop offset="1" stop-color="#90FAFF"/></linearGradient>
+<linearGradient id="mintred" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FF4568"/><stop offset="1" stop-color="#01EBAE"/></linearGradient>
+<linearGradient id="handle" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#055EFF"/><stop offset="1" stop-color="#22D8FF"/></linearGradient>
+<filter id="glow" x="-25%" y="-25%" width="150%" height="150%"><feGaussianBlur stdDeviation="3"/></filter>
+</defs>
+    <rect width="1280" height="640" fill="#020B22"/>
+    <rect x="0" y="0" width="11" height="640" fill="url(#accent)"/>
+    <g transform="translate(76 57) scale(1.01)">
+<!-- code framing -->
+<path d="M145 152 L59 246 L145 340" fill="none" stroke="url(#accent2)" stroke-width="34" stroke-linejoin="round" stroke-linecap="butt"/>
+<path d="M373 152 L461 246 L374 340" fill="none" stroke="url(#accent2)" stroke-width="34" stroke-linejoin="round" stroke-linecap="butt"/>
+<!-- segmented inspection ring -->
+<path d="M131 142 A184 184 0 0 1 240 64 M284 64 A184 184 0 0 1 391 142 M391 349 A184 184 0 0 1 284 428 M240 428 A184 184 0 0 1 132 350" fill="none" stroke="url(#accent2)" stroke-width="16" stroke-linecap="butt"/>
+<path d="M259 47 V77 M259 415 V449" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+<!-- magnifier handle behind glass -->
+<path d="M335 334 L419 416" fill="none" stroke="url(#handle)" stroke-width="45" stroke-linecap="round"/>
+<!-- inspection glass -->
+<circle cx="259" cy="246" r="126" fill="#061936" stroke="url(#accent)" stroke-width="26"/>
+<circle cx="259" cy="246" r="107" fill="none" stroke="#2A91F6" stroke-width="4" opacity="0.7"/>
+<path d="M259 142 V349" stroke="#117BDE" stroke-width="5"/>
+<!-- removed lines -->
+<path d="M176 201 H226 M176 247 H226 M176 293 H226" stroke="#FF506D" stroke-width="14" stroke-linecap="round"/>
+<path d="M159 201 H163 M159 247 H163 M159 293 H163" stroke="#FF506D" stroke-width="8" stroke-linecap="round"/>
+<!-- added code -->
+<path d="M298 201 H340 M298 247 H340 M298 293 H340" stroke="#08F0BF" stroke-width="14" stroke-linecap="round"/>
+<path d="M283 188 V213 M270 201 H295 M283 235 V259 M271 247 H295 M283 281 V305 M271 293 H295" stroke="#08F0BF" stroke-width="7" stroke-linecap="round"/>
+</g>
+    <text x="680" y="284" font-family="Inter Display,Inter,sans-serif" font-weight="800" font-size="176" letter-spacing="1" fill="#F9FCFF">ACR</text>
+    <text x="690" y="355" font-family="Inter,Arial,sans-serif" font-size="33" fill="#A7C8F5">AI CODE REVIEW AGENT</text>
+    <path d="M690 399 H1110" stroke="url(#accent)" stroke-width="5" stroke-linecap="round"/>
+    </svg>
