@@ -1,6 +1,6 @@
 # AI Code Review Agent
-<p align="center"><img src="assets/branding/logo.svg" width="280" alt="AI Code Review Agent logo"></p>
 
+<p align="center"><img src="assets/branding/logo.svg" width="280" alt="AI Code Review Agent logo"></p>
 
 A local, 15-agent AI code review tool powered by [Ollama](https://ollama.com). Runs against any git diff and produces structured findings across security, correctness, performance, design, dependencies, breaking changes, license compliance, adversarial patterns, integration risks, test coverage, test generation, error handling, observability, database migration safety, secrets detection, and code complexity — no cloud API calls required.
 
