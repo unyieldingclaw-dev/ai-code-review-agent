@@ -226,4 +226,137 @@ describe('runReview', () => {
     await expect(promise).rejects.toThrow('timed out after')
     expect(child.kill).toHaveBeenCalled()
   })
+
+  describe('CLI exit-code handling (Finding #3 regression tests)', () => {
+    it('preserves partial findings and failed-agent status when CLI exits 2 with valid JSON', async () => {
+      const partialResult = {
+        findings: [
+          {
+            id: 'security-0',
+            agent: 'security',
+            severity: 'high',
+            basis: 'VERIFIED',
+            file: 'src/auth.ts',
+            line: 42,
+            title: 'SQL Injection',
+            detail: 'Unsanitized input',
+            suggestion: 'Use parameterized queries',
+            confidence: 85,
+          },
+        ],
+        testFiles: [],
+        summary: {
+          totalFindings: 1,
+          bySeverity: { high: 1 },
+          byAgent: { security: 1 },
+          durationMs: 125000,
+        },
+        agentStatus: {
+          security: 'ok',
+          correctness: 'timeout',
+        },
+        agentsPlanned: 2,
+      }
+      const stderr =
+        '[1/2] security   5s — 1 raw finding (1 high)\n' +
+        '[2/2] correctness   120s — 0 raw findings (timeout)\n'
+
+      vi.mocked(execSync).mockReturnValue('diff --git a/src/auth.ts b/src/auth.ts\n+query(input)')
+      vi.mocked(spawn).mockReturnValue(
+        makeChild('\n' + JSON.stringify(partialResult) + '\n', 2, stderr) as any
+      )
+
+      const result = await runReview(mockConfig, '/workspace', mockToken as any)
+
+      expect(result.findings).toHaveLength(1)
+      expect(result.findings[0].title).toBe('SQL Injection')
+      expect(result.agentStatus).toEqual({ security: 'ok', correctness: 'timeout' })
+      expect(result.agentsPlanned).toBe(2)
+    })
+
+    it('preserves truncation metadata when CLI exits 3 with valid JSON', async () => {
+      const truncatedResult = {
+        findings: [],
+        testFiles: [],
+        summary: {
+          totalFindings: 0,
+          bySeverity: {},
+          byAgent: {},
+          durationMs: 9000,
+        },
+        agentStatus: {
+          security: 'ok',
+        },
+        agentsPlanned: 1,
+        truncation: {
+          truncated: true,
+          originalLines: 5000,
+          keptLines: 2000,
+        },
+      }
+      const stderr = '[ai-review] Diff truncated: 3000 of 5000 lines were excluded\n'
+
+      vi.mocked(execSync).mockReturnValue('diff --git a/big.ts b/big.ts\n+line')
+      vi.mocked(spawn).mockReturnValue(
+        makeChild('\n' + JSON.stringify(truncatedResult) + '\n', 3, stderr) as any
+      )
+
+      const result = await runReview(mockConfig, '/workspace', mockToken as any)
+
+      expect(result.findings).toEqual([])
+      expect(result.truncation).toEqual({
+        truncated: true,
+        originalLines: 5000,
+        keptLines: 2000,
+      })
+    })
+
+    it('keeps exit code 1 with startup validation error as a failure', async () => {
+      vi.mocked(execSync).mockReturnValue('diff --git a/foo.ts b/foo.ts\n+const x = 1')
+      vi.mocked(spawn).mockReturnValue(
+        makeChild('', 1, 'Invalid --agents value(s): bogus-agent\n') as any
+      )
+
+      await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+        'cli-error:'
+      )
+    })
+
+    it('keeps exit code 4 with startup failure as a failure', async () => {
+      vi.mocked(execSync).mockReturnValue('diff --git a/foo.ts b/foo.ts\n+const x = 1')
+      vi.mocked(spawn).mockReturnValue(
+        makeChild('', 4, '\nError: Diff file not found: /tmp/missing.diff\n') as any
+      )
+
+      await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+        'cli-error:'
+      )
+    })
+
+    it('rejects invalid JSON on exit code 2 instead of accepting it as a successful report', async () => {
+      vi.mocked(execSync).mockReturnValue('diff --git a/foo.ts b/foo.ts\n+const x = 1')
+      vi.mocked(spawn).mockReturnValue(
+        makeChild(
+          'not valid json output',
+          2,
+          '[1/1] security   120s — 0 raw findings (timeout)\n'
+        ) as any
+      )
+
+      await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+        'parse-error:'
+      )
+    })
+
+    it('rejects invalid JSON on exit code 3 instead of accepting it as a successful report', async () => {
+      vi.mocked(execSync).mockReturnValue('diff --git a/foo.ts b/foo.ts\n+const x = 1')
+      vi.mocked(spawn).mockReturnValue(
+        makeChild('{"findings": [truncated', 3, '[ai-review] Diff truncated\n') as any
+      )
+
+      await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+        'parse-error:'
+      )
+    })
+  })
 })

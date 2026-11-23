@@ -7,6 +7,9 @@ import { buildCliArgs } from './config'
 import type { ExtensionConfig, ReviewResult } from './types'
 
 const DEFAULT_SUBPROCESS_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
+// Exit codes for which the CLI writes a complete JSON ReviewResult to stdout:
+// 0 = clean, 2 = partial/total agent failure (agentStatus), 3 = diff truncated (truncation).
+const REPORT_EXIT_CODES = new Set([0, 2, 3])
 
 /**
  * Get the staged diff, spawn the CLI, parse the result.
@@ -101,11 +104,11 @@ function spawnCli(
       stderr += chunk.toString()
     })
 
-    child.on('close', (code: number) => {
+    child.on('close', (code: number | null) => {
       clearTimeout(timeoutHandle)
       cancelDisposable.dispose()
 
-      if (code !== 0) {
+      if (code === null || !REPORT_EXIT_CODES.has(code)) {
         if (stderr.includes('ECONNREFUSED')) {
           reject(new Error(`ollama-unreachable:${config.ollamaUrl}`))
         } else {
