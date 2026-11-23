@@ -57,10 +57,10 @@ export interface ReviewResult {
 export interface ExtensionConfig {
   ollamaUrl: string
   model: string
-  agents: string[] // empty = all agents
-  profile: string // named agent subset; overrides agents when set
+  agents: string[] // empty = all agents; overrides profile when non-empty
+  profile: string // named agent subset (ignored when agents is non-empty)
   contextMode: string // 'none' | 'memory-bank' | 'memory-bank-semantic'
   maxLines: number
-  timeoutSecs: number // seconds; converted to ms before passing to CLI
+  timeoutSecs: number // seconds; 0 = CLI default with diff-size scaling, >0 = explicit override
   cliPath: string // absolute path to bundled CLI index.js
 }

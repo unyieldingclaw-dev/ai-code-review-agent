@@ -3,10 +3,9 @@ import { writeFileSync, unlinkSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type * as vscode from 'vscode'
-import { buildCliArgs } from './config'
+import { buildCliArgs, calculateSubprocessTimeoutMs } from './config'
 import type { ExtensionConfig, ReviewResult } from './types'
 
-const DEFAULT_SUBPROCESS_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
 // Exit codes for which the CLI writes a complete JSON ReviewResult to stdout:
 // 0 = clean, 2 = partial/total agent failure (agentStatus), 3 = diff truncated (truncation).
 const REPORT_EXIT_CODES = new Set([0, 2, 3])
@@ -27,15 +26,17 @@ export async function runReview(
   config: ExtensionConfig,
   workspaceDir: string,
   token: vscode.CancellationToken,
-  subprocessTimeoutMs = DEFAULT_SUBPROCESS_TIMEOUT_MS
+  subprocessTimeoutMs?: number
 ): Promise<ReviewResult> {
   const diff = getStagedDiff(workspaceDir)
+  const effectiveSubprocessTimeoutMs =
+    subprocessTimeoutMs ?? calculateSubprocessTimeoutMs(config, diff.split('\n').length)
 
   const tempFile = join(tmpdir(), `ai-review-${Date.now()}.diff`)
   writeFileSync(tempFile, diff, 'utf-8')
 
   try {
-    return await spawnCli(config, workspaceDir, tempFile, token, subprocessTimeoutMs)
+    return await spawnCli(config, workspaceDir, tempFile, token, effectiveSubprocessTimeoutMs)
   } finally {
     try {
       unlinkSync(tempFile)
