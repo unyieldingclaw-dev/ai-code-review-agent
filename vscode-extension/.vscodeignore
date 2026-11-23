@@ -4,8 +4,6 @@ tests/**
 esbuild.config.js
 tsconfig.json
 vitest.config.ts
-node_modules/**
-!node_modules/ai-review-agent/**
 node_modules/ai-review-agent/src/**
 node_modules/ai-review-agent/tests/**
 node_modules/ai-review-agent/calibration/**
@@ -26,4 +24,3 @@ node_modules/ai-review-agent/tsconfig.json
 node_modules/ai-review-agent/vitest.config.ts
 node_modules/ai-review-agent/test_output.txt
 node_modules/ai-review-agent/handoff.md
-node_modules/ai-review-agent/node_modules/**
