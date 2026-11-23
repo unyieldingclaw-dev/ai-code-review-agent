@@ -21,10 +21,23 @@ describe('getConfig', () => {
     expect(config.model).toBe('devstral:latest')
     expect(config.agents).toEqual([])
     expect(config.maxLines).toBe(2000)
-    expect(config.timeoutSecs).toBe(120)
+    expect(config.timeoutSecs).toBe(0)
     expect(config.cliPath).toBe(
       path.join('/ext/path', 'node_modules', 'ai-review-agent', 'dist', 'cli', 'index.js')
     )
+  })
+
+  it('reads explicit aiReview.timeout override from VS Code settings', async () => {
+    vi.mocked(vscodeModule.workspace.getConfiguration).mockReturnValue({
+      get: vi.fn((key: string, defaultVal: unknown) => {
+        if (key === 'timeout') return 240
+        return defaultVal
+      }),
+    } as ReturnType<typeof vscodeModule.workspace.getConfiguration>)
+
+    const { getConfig } = await import('../src/config')
+    const config = getConfig('/ext/path')
+    expect(config.timeoutSecs).toBe(240)
   })
 
   it('returns defaults including profile and contextMode', async () => {
@@ -92,12 +105,22 @@ describe('buildCliArgs', () => {
     expect(args).toContain('never')
   })
 
-  it('converts timeoutSecs to milliseconds for --timeout', async () => {
+  it('converts explicit positive timeoutSecs to milliseconds for --timeout', async () => {
     const { buildCliArgs } = await import('../src/config')
-    const args = buildCliArgs(baseConfig, '/workspace', '/tmp/diff')
+    const args = buildCliArgs({ ...baseConfig, timeoutSecs: 120 }, '/workspace', '/tmp/diff')
     const timeoutIdx = args.indexOf('--timeout')
     expect(timeoutIdx).not.toBe(-1)
     expect(args[timeoutIdx + 1]).toBe('120000')
+  })
+
+  it('omits --timeout when timeoutSecs is 0 or negative to preserve CLI scaling', async () => {
+    const { buildCliArgs } = await import('../src/config')
+    expect(
+      buildCliArgs({ ...baseConfig, timeoutSecs: 0 }, '/workspace', '/tmp/diff')
+    ).not.toContain('--timeout')
+    expect(
+      buildCliArgs({ ...baseConfig, timeoutSecs: -10 }, '/workspace', '/tmp/diff')
+    ).not.toContain('--timeout')
   })
 
   it('omits --agents when agents array is empty (runs all agents)', async () => {
@@ -169,5 +192,79 @@ describe('buildCliArgs', () => {
     const args = buildCliArgs({ ...baseConfig, contextMode: 'none' }, '/workspace', '/tmp/diff')
     expect(args).not.toContain('--context')
     expect(args).not.toContain('--context-mode')
+  })
+})
+
+describe('calculateSubprocessTimeoutMs', () => {
+  const baseConfig = {
+    ollamaUrl: 'http://localhost:11434',
+    model: 'devstral:latest',
+    agents: [] as string[],
+    profile: '',
+    contextMode: 'none',
+    maxLines: 2000,
+    timeoutSecs: 0,
+    cliPath: '/ext/node_modules/ai-review-agent/dist/cli/index.js',
+  }
+
+  it('scales guardrail budgets for fast, security, and change-review when unconfigured', async () => {
+    const { calculateSubprocessTimeoutMs } = await import('../src/config')
+
+    // 100-line diff at maxLines 2000 -> 189s per agent + 60s overhead
+    expect(calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'fast' }, 100)).toBe(627_000)
+    expect(calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'security' }, 100)).toBe(816_000)
+    expect(calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'change-review' }, 100)).toBe(
+      1_572_000
+    )
+
+    // 2000-line diff -> 360s per agent + 60s overhead
+    expect(calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'fast' }, 2000)).toBe(1_140_000)
+    expect(calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'security' }, 2000)).toBe(
+      1_500_000
+    )
+    expect(calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'change-review' }, 2000)).toBe(
+      2_940_000
+    )
+  })
+
+  it('clamps the 15-agent full profile at the 60-minute ceiling starting at 623 diff lines', async () => {
+    const { calculateSubprocessTimeoutMs } = await import('../src/config')
+    const capMs = 60 * 60 * 1000
+
+    expect(calculateSubprocessTimeoutMs({ ...baseConfig, profile: '' }, 100)).toBe(2_895_000)
+    expect(calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'full' }, 622)).toBe(3_599_700)
+    expect(calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'full' }, 623)).toBe(capMs)
+    expect(calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'full' }, 2000)).toBe(capMs)
+  })
+
+  it('prefers explicit agents list over profile', async () => {
+    const { calculateSubprocessTimeoutMs } = await import('../src/config')
+
+    // 2 explicit agents overriding full profile, 120s explicit -> 2 * 120s + 60s = 300s
+    expect(
+      calculateSubprocessTimeoutMs(
+        {
+          ...baseConfig,
+          profile: 'full',
+          agents: ['security', 'correctness'],
+          timeoutSecs: 120,
+        },
+        2000
+      )
+    ).toBe(300_000)
+  })
+
+  it('uses unscaled explicit timeoutSecs and clamps extreme overrides at 60 minutes', async () => {
+    const { calculateSubprocessTimeoutMs } = await import('../src/config')
+
+    expect(
+      calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'fast', timeoutSecs: 120 }, 2000)
+    ).toBe(420_000)
+    expect(
+      calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'full', timeoutSecs: 120 }, 2000)
+    ).toBe(1_860_000)
+    expect(
+      calculateSubprocessTimeoutMs({ ...baseConfig, profile: 'full', timeoutSecs: 600 }, 100)
+    ).toBe(3_600_000)
   })
 })

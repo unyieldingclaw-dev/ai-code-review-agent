@@ -90,8 +90,9 @@
         },
         "aiReview.timeout": {
           "type": "number",
-          "default": 120,
-          "description": "Per-agent timeout in seconds (passed to CLI as milliseconds)"
+          "default": 0,
+          "minimum": 0,
+          "description": "Per-agent timeout override in seconds (passed to CLI as milliseconds). 0 uses the CLI default (180s with automatic diff-size scaling up to 2x)."
         }
       }
     }

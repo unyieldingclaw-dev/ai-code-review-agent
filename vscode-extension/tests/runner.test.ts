@@ -371,4 +371,135 @@ describe('runReview', () => {
       )
     })
   })
+
+  describe('derived subprocess timeout guardrail', () => {
+    function makeControllableChild() {
+      let stdoutCb: ((data: Buffer) => void) | undefined
+      let closeCb: ((code: number | null) => void) | undefined
+      const child = {
+        stdout: {
+          on: vi.fn((event: string, cb: (data: Buffer) => void) => {
+            if (event === 'data') stdoutCb = cb
+          }),
+        },
+        stderr: { on: vi.fn() },
+        kill: vi.fn(),
+        on: vi.fn((event: string, cb: (code: number | null) => void) => {
+          if (event === 'close') closeCb = cb
+        }),
+      }
+      return {
+        child,
+        emitStdout: (text: string) => stdoutCb?.(Buffer.from(text)),
+        emitClose: (code: number | null) => closeCb?.(code),
+      }
+    }
+
+    it('does not kill a multi-agent run at 5 minutes and still preserves an exit-2 partial report', async () => {
+      vi.useFakeTimers()
+      try {
+        const { child, emitStdout, emitClose } = makeControllableChild()
+        const multiAgentConfig: ExtensionConfig = {
+          ...mockConfig,
+          profile: 'change-review',
+          contextMode: 'none',
+          timeoutSecs: 0,
+        }
+        const partialResult = {
+          findings: [
+            {
+              id: 'security-0',
+              agent: 'security',
+              severity: 'high',
+              basis: 'VERIFIED',
+              file: 'src/a.ts',
+              line: 10,
+              title: 'Issue',
+              detail: 'Detail',
+              suggestion: 'Fix',
+              confidence: 80,
+            },
+          ],
+          testFiles: [],
+          summary: {
+            totalFindings: 1,
+            bySeverity: { high: 1 },
+            byAgent: { security: 1 },
+            durationMs: 305_000,
+          },
+          agentStatus: { security: 'ok', correctness: 'timeout' },
+        }
+
+        vi.mocked(execSync).mockReturnValue('diff --git a/src/a.ts b/src/a.ts\n+const x = 1')
+        vi.mocked(spawn).mockReturnValue(child as any)
+
+        const promise = runReview(multiAgentConfig, '/workspace', mockToken as any)
+
+        await vi.advanceTimersByTimeAsync(300_000)
+        expect(child.kill).not.toHaveBeenCalled()
+
+        await vi.advanceTimersByTimeAsync(5_000)
+        emitStdout('\n' + JSON.stringify(partialResult) + '\n')
+        emitClose(2)
+
+        const result = await promise
+        expect(result.findings).toHaveLength(1)
+        expect(result.agentStatus).toEqual({ security: 'ok', correctness: 'timeout' })
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('terminates at the derived guardrail timeout while preserving immediate user cancellation', async () => {
+      vi.useFakeTimers()
+      try {
+        // 1. fast (3 agents) with explicit 120s override -> 3 * 120s + 60s = 420s
+        const { child: timedOutChild } = makeControllableChild()
+        const fastConfig: ExtensionConfig = {
+          ...mockConfig,
+          profile: 'fast',
+          contextMode: 'none',
+          timeoutSecs: 120,
+        }
+        vi.mocked(execSync).mockReturnValue('diff --git a/src/a.ts b/src/a.ts\n+const x = 1')
+        vi.mocked(spawn).mockReturnValue(timedOutChild as any)
+
+        const timeoutPromise = runReview(fastConfig, '/workspace', mockToken as any)
+        const timeoutAssertion = expect(timeoutPromise).rejects.toThrow('timed out after 420s')
+
+        await vi.advanceTimersByTimeAsync(300_000)
+        expect(timedOutChild.kill).not.toHaveBeenCalled()
+
+        await vi.advanceTimersByTimeAsync(120_000)
+        await timeoutAssertion
+        expect(timedOutChild.kill).toHaveBeenCalledWith('SIGTERM')
+
+        // 2. Prompt cancellation fires immediately even with a large derived full-profile guardrail
+        let cancelCallback: (() => void) | undefined
+        const cancelToken = {
+          isCancellationRequested: false,
+          onCancellationRequested: vi.fn((cb: () => void) => {
+            cancelCallback = cb
+            return { dispose: vi.fn() }
+          }),
+        }
+        const { child: cancelledChild } = makeControllableChild()
+        const fullConfig: ExtensionConfig = {
+          ...mockConfig,
+          profile: 'full',
+          contextMode: 'none',
+          timeoutSecs: 0,
+        }
+        vi.mocked(spawn).mockReturnValue(cancelledChild as any)
+
+        const cancelPromise = runReview(fullConfig, '/workspace', cancelToken as any)
+        const cancelAssertion = expect(cancelPromise).rejects.toThrow('cancelled')
+        cancelCallback?.()
+        await cancelAssertion
+        expect(cancelledChild.kill).toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
 })
