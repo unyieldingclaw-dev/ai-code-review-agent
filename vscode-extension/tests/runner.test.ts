@@ -156,6 +156,18 @@ describe('runReview', () => {
     )
   })
 
+  it('throws "ollama-unreachable" on exit 4 with "Ollama not reachable" stderr', async () => {
+    const stderr =
+      '\nError: Ollama not reachable at http://localhost:11434: fetch failed\n' +
+      'Make sure Ollama is running: ollama serve\n'
+    vi.mocked(execSync).mockReturnValue('some staged diff')
+    vi.mocked(spawn).mockReturnValue(makeChild('', 4, stderr) as any)
+
+    await expect(runReview(mockConfig, '/workspace', mockToken as any)).rejects.toThrow(
+      'ollama-unreachable:http://localhost:11434'
+    )
+  })
+
   it('throws "cli-error" for non-zero exit with unrecognised stderr', async () => {
     vi.mocked(execSync).mockReturnValue('some staged diff')
     vi.mocked(spawn).mockReturnValue(makeChild('', 1, 'Some unexpected crash') as any)

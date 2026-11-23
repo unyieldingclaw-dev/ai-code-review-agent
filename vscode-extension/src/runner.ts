@@ -109,7 +109,7 @@ function spawnCli(
       cancelDisposable.dispose()
 
       if (code === null || !REPORT_EXIT_CODES.has(code)) {
-        if (stderr.includes('ECONNREFUSED')) {
+        if (stderr.includes('ECONNREFUSED') || stderr.includes('Ollama not reachable')) {
           reject(new Error(`ollama-unreachable:${config.ollamaUrl}`))
         } else {
           reject(new Error(`cli-error:${stderr.slice(0, 500)}`))

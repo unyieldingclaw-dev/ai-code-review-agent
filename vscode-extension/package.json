@@ -103,7 +103,7 @@
     "package": "vsce package"
   },
   "dependencies": {
-    "ai-review-agent": "^1.0.0"
+    "ai-review-agent": "1.15.0"
   },
   "devDependencies": {
     "@types/node": "^18.0.0",
