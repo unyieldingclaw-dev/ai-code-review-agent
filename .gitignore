@@ -45,3 +45,6 @@ handoff.md
 
 # Local git worktrees for isolated feature work
 .worktrees/
+
+# Memory Bank
+.claude/contracts/*.json

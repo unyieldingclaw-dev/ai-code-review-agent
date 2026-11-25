@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Pre-push hook — delegates to pre-push-check.ps1 (Windows) or pre-push-check.sh (Mac/Linux).
-# Installed by: mb init / mb upgrade
-# Template source: templates/.githooks/pre-push
-
-ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-
-if command -v pwsh &>/dev/null; then
-    pwsh -NonInteractive -File "$ROOT/scripts/pre-push-check.ps1"
-elif command -v powershell &>/dev/null; then
-    powershell -NonInteractive -File "$ROOT/scripts/pre-push-check.ps1"
+# PowerShell 7.4 preserves native Git output bytes; older shells use Git Bash.
+ROOT=$(git rev-parse --show-toplevel) || exit 1
+if command -v pwsh >/dev/null 2>&1 &&
+    pwsh -NoProfile -NonInteractive -Command 'if ($PSVersionTable.PSVersion -ge [version]"7.4") { exit 0 }; exit 1' </dev/null >/dev/null 2>&1; then
+    exec pwsh -NoProfile -NonInteractive -File "$ROOT/scripts/pre-push-check.ps1" "$@"
+elif command -v bash >/dev/null 2>&1; then
+    exec bash "$ROOT/scripts/pre-push-check.sh" "$@"
 else
-    bash "$ROOT/scripts/pre-push-check.sh"
+    echo '[BLOCKED] Review gate: PowerShell 7.4 or Bash is required' >&2
+    exit 1
 fi

@@ -13,7 +13,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -File scripts/update-reviewed.ps1 2>/dev/null || bash scripts/update-reviewed.sh 2>/dev/null || true"
+            "command": "[ -f scripts/update-reviewed.ps1 ] && pwsh -NoProfile -NonInteractive -File scripts/update-reviewed.ps1 2>/dev/null || bash scripts/update-reviewed.sh 2>/dev/null || true"
           }
         ]
       },
@@ -22,7 +22,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NonInteractive -File scripts/review-reminders-post.ps1 2>/dev/null || bash scripts/review-reminders-post.sh 2>/dev/null || true"
+            "command": "[ -f scripts/review-reminders-post.ps1 ] && pwsh -NoProfile -NonInteractive -File scripts/review-reminders-post.ps1 2>/dev/null || bash scripts/review-reminders-post.sh 2>/dev/null || true"
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f scripts/review-reminders-post.ps1 ] && pwsh -NoProfile -NonInteractive -File scripts/review-reminders-post.ps1 2>/dev/null || bash scripts/review-reminders-post.sh 2>/dev/null || true"
           }
         ]
       }
@@ -33,11 +42,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NonInteractive -File scripts/dangerous-commands.ps1 2>/dev/null || bash scripts/dangerous-commands.sh 2>/dev/null || true"
+            "command": "[ -f scripts/dangerous-commands.ps1 ] && pwsh -NoProfile -NonInteractive -File scripts/dangerous-commands.ps1 2>/dev/null || bash scripts/dangerous-commands.sh 2>/dev/null || true"
           },
           {
             "type": "command",
-            "command": "pwsh -NonInteractive -File scripts/review-reminders.ps1 2>/dev/null || bash scripts/review-reminders.sh 2>/dev/null || true"
+            "command": "[ -f scripts/review-reminders.ps1 ] && pwsh -NoProfile -NonInteractive -File scripts/review-reminders.ps1 2>/dev/null || bash scripts/review-reminders.sh 2>/dev/null || true"
           }
         ]
       },
@@ -46,11 +55,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NonInteractive -File scripts/dangerous-commands.ps1 2>/dev/null || true"
+            "command": "[ -f scripts/dangerous-commands.ps1 ] && pwsh -NoProfile -NonInteractive -File scripts/dangerous-commands.ps1 2>/dev/null || bash scripts/dangerous-commands.sh 2>/dev/null || true"
           },
           {
             "type": "command",
-            "command": "pwsh -NonInteractive -File scripts/review-reminders.ps1 2>/dev/null || true"
+            "command": "[ -f scripts/review-reminders.ps1 ] && pwsh -NoProfile -NonInteractive -File scripts/review-reminders.ps1 2>/dev/null || bash scripts/review-reminders.sh 2>/dev/null || true"
           }
         ]
       },
@@ -59,7 +68,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NonInteractive -File scripts/check-contract.ps1 2>/dev/null || bash scripts/check-contract.sh 2>/dev/null || true"
+            "command": "bash scripts/check-contract.sh 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "[ -f scripts/warn-stale-review-marker.ps1 ] && pwsh -NoProfile -NonInteractive -File scripts/warn-stale-review-marker.ps1 2>/dev/null || bash scripts/warn-stale-review-marker.sh 2>/dev/null || true"
           }
         ]
       },
@@ -68,7 +81,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NonInteractive -File scripts/delegation-depth-check.ps1 2>/dev/null || bash scripts/delegation-depth-check.sh 2>/dev/null || true"
+            "command": "[ -f scripts/delegation-depth-check.ps1 ] && pwsh -NoProfile -NonInteractive -File scripts/delegation-depth-check.ps1 2>/dev/null || bash scripts/delegation-depth-check.sh 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f scripts/codex-compaction-hook.ps1 ] && pwsh -NoProfile -NonInteractive -File scripts/codex-compaction-hook.ps1 -Mode recover 2>/dev/null || bash scripts/codex-compaction-hook.sh recover 2>/dev/null || true"
           }
         ]
       }
@@ -78,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NonInteractive -File scripts/pre-compact-check.ps1 2>/dev/null || bash scripts/pre-compact-check.sh 2>/dev/null || true"
+            "command": "if command -v pwsh >/dev/null 2>&1; then pwsh -NonInteractive -File scripts/pre-compact-check.ps1 2>/dev/null; else bash scripts/pre-compact-check.sh 2>/dev/null; fi"
           }
         ]
       }
@@ -95,6 +119,20 @@
     ]
   },
   "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(npm run lint)",
+      "Bash(npm run test)",
+      "Bash(npm test)",
+      "Bash(npx *)",
+      "Bash(python -m pytest *)",
+      "Bash(python -m mypy *)",
+      "Bash(python -m ruff *)",
+      "Bash(npm run *)",
+      "Bash(npm ci)",
+      "Bash(bash tests/*.sh)",
+      "Bash(node dist/*)"
+    ],
     "deny": [
       "Bash(git -c commit.gpgsign=false *)",
       "Bash(git -c commit.gpgsign=0 *)",
@@ -102,20 +140,16 @@
       "Bash(git commit --no-gpg-sign *)",
       "Bash(git commit --no-verify *)",
       "Bash(git push --no-verify *)",
+      "PowerShell(git -c commit.gpgsign=false *)",
+      "PowerShell(git -c commit.gpgsign=0 *)",
+      "PowerShell(git -c commit.gpgSign=false *)",
+      "PowerShell(git commit --no-gpg-sign *)",
+      "PowerShell(git commit --no-verify *)",
+      "PowerShell(git push --no-verify *)",
+      "mcp__ccd_pr__set_auto_merge",
+      "mcp__plugin_engineering_github__merge_pull_request",
       "Bash(gh pr merge *)",
       "Bash(gh pr merge)"
-    ],
-    "allow": [
-      "Bash(git *)",
-      "Bash(npm run *)",
-      "Bash(npm test)",
-      "Bash(npm ci)",
-      "Bash(npx *)",
-      "Bash(bash tests/*.sh)",
-      "Bash(node dist/*)",
-      "Bash(python -m pytest *)",
-      "Bash(python -m mypy *)",
-      "Bash(python -m ruff *)"
     ]
   }
 }
