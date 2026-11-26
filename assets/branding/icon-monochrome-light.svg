@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="ACR monochrome icon">
+<!-- code framing -->
+<path d="M145 152 L59 246 L145 340" fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linejoin="round" stroke-linecap="butt"/>
+<path d="M373 152 L461 246 L374 340" fill="none" stroke="#FFFFFF" stroke-width="34" stroke-linejoin="round" stroke-linecap="butt"/>
+<!-- segmented inspection ring -->
+<path d="M131 142 A184 184 0 0 1 240 64 M284 64 A184 184 0 0 1 391 142 M391 349 A184 184 0 0 1 284 428 M240 428 A184 184 0 0 1 132 350" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="butt"/>
+<path d="M259 47 V77 M259 415 V449" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+<!-- magnifier handle behind glass -->
+<path d="M335 334 L419 416" fill="none" stroke="#FFFFFF" stroke-width="45" stroke-linecap="round"/>
+<!-- inspection glass -->
+<circle cx="259" cy="246" r="126" fill="none" stroke="#FFFFFF" stroke-width="26"/>
+<circle cx="259" cy="246" r="107" fill="none" stroke="#FFFFFF" stroke-width="4" opacity="0.7"/>
+<path d="M259 142 V349" stroke="#FFFFFF" stroke-width="5"/>
+<!-- removed lines -->
+<path d="M176 201 H226 M176 247 H226 M176 293 H226" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+<path d="M159 201 H163 M159 247 H163 M159 293 H163" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+<!-- added code -->
+<path d="M298 201 H340 M298 247 H340 M298 293 H340" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+<path d="M283 188 V213 M270 201 H295 M283 235 V259 M271 247 H295 M283 281 V305 M271 293 H295" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+</svg>
