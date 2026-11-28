@@ -1,4 +1,11 @@
+---
+authority: stable
+last-reviewed: 2026-11-24
+review-cycle: 90d
+staleness-threshold: 180d
+---
 # Secrets Management (Ephemeral by Default)
+
 
 This standard defines where secrets (API keys, tokens, passwords, certificates, connection strings) must live, when they must rotate, and what is never allowed. It extends `standards/SECURITY-GUARDRAILS.md`: the BLOCK tier refuses to commit secrets; this standard defines what to do with secrets **at runtime**, particularly when AI agents are active.
 

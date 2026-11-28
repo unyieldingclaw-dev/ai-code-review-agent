@@ -1,3 +1,9 @@
+---
+authority: stable
+last-reviewed: 2026-11-24
+review-cycle: 90d
+staleness-threshold: 180d
+---
 # Supply Chain Security Standard
 
 **Version**: 1.0.0
@@ -79,12 +85,12 @@ repositories:
 
 ## Soft vs. Hard Enforcement
 
-| Control               | Soft (AI rule)                 | Hard (CI gate)           |
-| --------------------- | ------------------------------ | ------------------------ |
-| Verify package exists | ✅ In security.mdc + CLAUDE.md | ⚠️ No automated check    |
-| SCA scan              | ❌ Not in AI rules             | ✅ Add to CI pipeline    |
-| Rules file integrity  | ❌ Not in AI rules             | ✅ Pre-commit hook above |
-| Internal mirror       | ❌ Not in AI rules             | ✅ pip/npm config        |
+| Control | Soft (AI rule) | Hard (CI gate) |
+|---------|---------------|----------------|
+| Verify package exists | ✅ In security.mdc + CLAUDE.md | ⚠️ No automated check |
+| SCA scan | ❌ Not in AI rules | ✅ Add to CI pipeline |
+| Rules file integrity | ❌ Not in AI rules | ✅ Pre-commit hook above |
+| Internal mirror | ❌ Not in AI rules | ✅ pip/npm config |
 
 **Minimum CI requirement:** SCA scan (`pip-audit` or `npm audit`) on every merge request
 that modifies `requirements*.txt`, `package*.json`, or `*.lock` files.
@@ -94,7 +100,7 @@ See also: `standards/SECURITY-GUARDRAILS.md` § Enforcement Levels for how these
 ---
 
 **References:**
-
 - [Slopsquatting: AI Hallucinations and the New Software Supply Chain Risk — FOSSA](https://fossa.com/blog/slopsquatting-ai-hallucinations-new-software-supply-chain-risk/)
 - [AI-hallucinated code dependencies become new supply chain risk — BleepingComputer](https://www.bleepingcomputer.com/news/security/ai-hallucinated-code-dependencies-become-new-supply-chain-risk/)
 - [Rules File Backdoor — Backslash Security](https://www.backslash.security/blog/claude-code-security-best-practices)
+- OWASP Top 10 for LLM Applications (2025), LLM03:2025 Supply Chain: https://genai.owasp.org/llm-top-10/

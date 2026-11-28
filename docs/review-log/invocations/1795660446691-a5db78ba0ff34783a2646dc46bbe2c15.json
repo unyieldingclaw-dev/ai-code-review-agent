@@ -1,0 +1,7 @@
+{
+  "type": "invocation",
+  "review": "code-review",
+  "started_at": "2026-11-26T02:34:06.691648+00:00",
+  "scope": "staged product patch",
+  "fingerprint": "v2 commit 9d34ce73aade3339d9ddcf349a898cd31a0c8cc9 3ccd28bd527fc33db7da5f0c3c694924656470e88462a5bf50bd2d7023c25bd0"
+}

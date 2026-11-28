@@ -1,0 +1,136 @@
+name: Memory Bank Size
+
+# Guards the one cost that every session and every compaction pays: memory-bank/ is
+# re-read in full at session start and again after each compaction, so its size is a
+# recurring context tax, not a one-time storage concern.
+#
+# WHY this workflow is distributed at all: PMB's own repo has enforced these limits in CI
+# since early on, but that workflow was never shipped to adopting projects — while
+# CLAUDE.md's "read ALL files in memory-bank/" instruction was. Projects therefore
+# inherited the cost driver without its guardrail. One measured downstream repo reached
+# ~190 KB (~47.7K tokens) of memory-bank reloaded every session before anyone noticed.
+#
+# WHY bytes AND lines: a line cap measures the wrong dimension. Collapsing several short
+# entries into one very long line satisfies a line cap while saving zero tokens — observed
+# happening in practice. Bytes are what the context budget actually pays for.
+#
+# WHY warn-only by default: a project adopting this mid-life is likely already over the
+# limits, and failing its build on day one is hostile. Start with visibility. Once the
+# files are under control, set ENFORCE to "true" below to turn the ceilings into hard
+# failures — the values are already defined and used for reporting either way.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  memory-bank-size:
+    name: Memory Bank Size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Check memory-bank file sizes
+        shell: bash
+        run: |
+          # Flip to "true" to make the ceilings blocking rather than advisory.
+          ENFORCE="false"
+
+          FAIL=0
+
+          # Line ceilings (structure) and byte ceilings (actual context cost).
+          # Byte WARN values are rounded budgets in the neighbourhood of "that file's line cap at
+          # ~120 chars/line" -- roughly derived and rounded for legibility, not an exact formula.
+          # Tune them to your project; the ratio that matters is bytes-per-session, not the math.
+          declare -A WARN_LINES=( [projectbrief.md]=80  [activeContext.md]=100 [systemPatterns.md]=200 [techContext.md]=200 [progress.md]=250 )
+          # progress.md's line FAIL was raised 400 -> 600 on 2026-08-24. WHY: a line cap measures the
+          # wrong dimension -- it is satisfied by reflowing long entries onto fewer lines, saving zero
+          # tokens -- while the byte cap below tracks what a re-read actually costs. In the source repo
+          # the line cap bound first at 39,590 bytes against a 48,000 byte WARN, blocking new entries
+          # while the byte budget still had room. Raising it lets the byte WARN fire first; the line cap
+          # stays as a secondary tripwire against pathological growth.
+          declare -A FAIL_LINES=( [projectbrief.md]=120 [activeContext.md]=150 [systemPatterns.md]=300 [techContext.md]=300 [progress.md]=600 )
+          declare -A WARN_BYTES=( [projectbrief.md]=9600 [activeContext.md]=18000 [systemPatterns.md]=24000 [techContext.md]=24000 [progress.md]=48000 )
+          declare -A FAIL_BYTES=( [projectbrief.md]=20000 [activeContext.md]=40000 [systemPatterns.md]=40000 [techContext.md]=40000 [progress.md]=60000 )
+
+          if [ ! -d memory-bank ]; then
+            echo "No memory-bank/ directory — nothing to check."
+            exit 0
+          fi
+
+          TOTAL_BYTES=0
+          while IFS= read -r -d '' file; do
+            base=$(basename "$file")
+            wl=${WARN_LINES[$base]:-80};    fl=${FAIL_LINES[$base]:-150}
+            wb=${WARN_BYTES[$base]:-12000}; fb=${FAIL_BYTES[$base]:-30000}
+            lines=$(wc -l < "$file")
+            bytes=$(wc -c < "$file")
+            TOTAL_BYTES=$((TOTAL_BYTES + bytes))
+
+            if [ "$lines" -gt "$fl" ]; then
+              echo "OVER:  $file ($lines lines -- ceiling $fl)"
+              FAIL=1
+            elif [ "$lines" -gt "$wl" ]; then
+              echo "WARN:  $file ($lines lines -- warn $wl)"
+            else
+              echo "OK:    $file ($lines lines)"
+            fi
+
+            if [ "$bytes" -gt "$fb" ]; then
+              echo "OVER:  $file ($bytes bytes -- ceiling $fb; ~$((bytes / 4)) tokens per session start)"
+              FAIL=1
+            elif [ "$bytes" -gt "$wb" ]; then
+              echo "WARN:  $file ($bytes bytes -- warn $wb; ~$((bytes / 4)) tokens per session start)"
+            else
+              echo "OK:    $file ($bytes bytes)"
+            fi
+          done < <(find memory-bank -name "*.md" -print0 2>/dev/null)
+
+          # The aggregate is the real budget: it is what a session actually pays at start and
+          # again after every compaction. Per-file ceilings above only localise WHICH file grew,
+          # and must never be read as permission to reach their sum. Thresholds mirror
+          # `mb doctor`'s own long-declared startup-context check so the two never disagree.
+          #
+          # WHY this ENUMERATES rather than naming five files, corrected 2026-08-30: the previous
+          # version used an explicit list, justified by a comment claiming `mb doctor` "does not
+          # count a shipped README.md". That premise became FALSE when doctor was changed to
+          # enumerate every *.md under memory-bank/. The result was the exact defect the old
+          # comment said it was preventing, inverted: this workflow under-counted by the size of
+          # the README.md that `mb init` ships into every adopter's memory-bank/ -- 1,905 bytes as
+          # templates/memory-bank/README.md stands today -- so it could report PASS while
+          # `mb doctor` reported WARN on the same tree, and unboundedly more once an adopter adds
+          # any other .md file. (An earlier draft said 1,116, which is PMB's OWN README.md, not
+          # the one adopters receive -- a number true in a different repo doing load-bearing work
+          # here, the same failure this check exists to catch.)
+          # Both sides enumerate now, so they measure the same set by construction rather than by
+          # two lists being kept in step.
+          CEIL=0
+          [ -f CLAUDE.md ] && CEIL=$((CEIL + $(wc -c < CLAUDE.md)))
+          while IFS= read -r f; do
+            CEIL=$((CEIL + $(wc -c < "$f")))
+          done < <(find memory-bank -name "*.md" -type f 2>/dev/null)
+          CEIL_KB=$(awk "BEGIN {printf \"%.1f\", $CEIL / 1024}")
+          echo ""
+          echo "startup context (CLAUDE.md + every memory-bank/*.md): $CEIL bytes / ${CEIL_KB} KB (~$((CEIL / 4)) tokens re-read at every session start and after every compaction)"
+          if [ "$CEIL" -gt 25600 ]; then
+            echo "OVER:  exceeds the 25 KB startup-context ceiling"
+            FAIL=1
+          elif [ "$CEIL" -gt 15360 ]; then
+            echo "WARN:  exceeds the 15 KB startup-context warn line"
+          fi
+          echo ""
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "One or more files exceed their ceiling."
+            echo "Fix: run 'mb clean', or archive completed history to docs/archive/progress-YYYY-MM-topic.md"
+            echo "     and leave a one-line pointer behind in progress.md."
+            if [ "$ENFORCE" = "true" ]; then
+              exit 1
+            fi
+            echo "(advisory only — set ENFORCE=true in this workflow to make it blocking)"
+          else
+            echo "memory-bank size: PASS"
+          fi
+          exit 0

@@ -3,3 +3,16 @@ dist/
 coverage/
 *.min.js
 vscode-extension/node_modules/
+
+# WHY: PMB delivers these via mb upgrade unformatted and overwrites them on every upgrade, so
+# formatting them here would be undone each time and would bury real changes in the upgrade diff.
+# ai-review.md is ACR's own command, so it stays checked.
+standards/
+.claude/agents/
+.claude/commands/*
+!.claude/commands/ai-review.md
+AGENTS.md
+
+# WHY: review-evidence-check.sh writes these records in an exact format it later validates, and
+# they are append-only, so Prettier must not reformat them. README.md here is PMB-delivered too.
+docs/review-log/
