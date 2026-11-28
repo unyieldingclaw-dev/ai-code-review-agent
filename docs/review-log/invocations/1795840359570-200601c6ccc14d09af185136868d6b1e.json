@@ -1,0 +1,7 @@
+{
+  "type": "invocation",
+  "review": "change-review",
+  "started_at": "2026-11-28T04:32:39.570816+00:00",
+  "scope": "committed branch and ordered content patches",
+  "fingerprint": "v2 push a91c8cc2fa596a84a5b4f51972c404e1b39f7d35 33a9f6f2f9cbe4c396c8eedcc53af52060e7c5e6563bbfeab185b0fba0011902 69542c8df5c33ef0bbcf598ed8758d30aec757ce15f16645859fa185d8df27c9"
+}
