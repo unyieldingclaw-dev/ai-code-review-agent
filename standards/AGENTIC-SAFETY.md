@@ -1,3 +1,9 @@
+---
+authority: stable
+last-reviewed: 2026-11-24
+review-cycle: 90d
+staleness-threshold: 180d
+---
 # Agentic Safety Standard
 
 Covers two related but distinct threats to an agentic session: **indirect prompt injection**, where malicious instructions embedded in external content (websites, documents, API responses) attempt to hijack an active agent session, and **subagent scope/trust violations**, where a dispatched subagent's own behavior — not any external content — exceeds or subverts what it was asked to do. Distinct from rules-file injection (`RULES-FILE-INTEGRITY.md`) and MCP server poisoning (`MCP-SECURITY.md`).

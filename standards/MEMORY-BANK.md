@@ -1,3 +1,9 @@
+---
+authority: stable
+last-reviewed: 2026-11-24
+review-cycle: 90d
+staleness-threshold: 180d
+---
 # Memory Bank Standard
 
 A structured system for maintaining persistent project context across AI coding sessions.

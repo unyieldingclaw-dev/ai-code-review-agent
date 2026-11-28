@@ -1,3 +1,9 @@
+---
+authority: stable
+last-reviewed: 2026-11-24
+review-cycle: 90d
+staleness-threshold: 180d
+---
 # Security Guardrails Standard
 
 A 3-tier system for preventing dangerous AI actions while maintaining developer productivity.

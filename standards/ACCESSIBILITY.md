@@ -1,3 +1,9 @@
+---
+authority: stable
+last-reviewed: 2026-11-24
+review-cycle: 90d
+staleness-threshold: 180d
+---
 # Accessibility Requirements (WCAG 2.2 Level AA)
 
 All UI components must conform to WCAG 2.2 Level AA standards.

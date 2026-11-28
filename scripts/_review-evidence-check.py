@@ -405,8 +405,14 @@ def main():
         count = contain(sys.argv[2], sys.argv[3])
         print(f"OK: checked {count} valid completion records; all content and final fingerprint covered")
         return
+    # The shell fingerprint twins ask here so a sync merge is judged by the one is_sync_merge(),
+    # never by a second copy of its merge-tree recompute.
+    if len(sys.argv) == 4 and sys.argv[1] == "sync-merge":
+        if not is_sync_merge(sys.argv[2], sys.argv[3]):
+            raise ValueError("not a verified sync merge")
+        return
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "--allow-mixed"):
-        raise ValueError("usage: review-evidence-check index|COMMIT [--allow-mixed] | contain BASE ACTUAL_HEAD")
+        raise ValueError("usage: review-evidence-check index|COMMIT [--allow-mixed] | contain BASE ACTUAL_HEAD | sync-merge COMMIT BASE")
     changed_records(sys.argv[1], allow_mixed=len(sys.argv) == 3)
 
 

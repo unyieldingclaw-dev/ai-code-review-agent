@@ -151,14 +151,24 @@ function Get-PushReviewFingerprint {
         $base = $bases[0]
         $baseHash = Get-CanonicalProductPatchHash -Revisions @($base, 'HEAD')
         if (-not $baseHash) { throw 'empty product diff' }
-        $commits = @(& git rev-list --reverse "$base..HEAD" 2>$null)
+        # First-parent order with a set check, as content_history() walks it, so a GitHub "Update
+        # branch" merge yields the same ordered rows the containment check recomputes.
+        $commits = @(& git rev-list --first-parent --reverse "$base..HEAD" 2>$null)
         if ($LASTEXITCODE -ne 0 -or $commits.Count -eq 0) { throw 'missing content history' }
+        $allCommits = @(& git rev-list "$base..HEAD" 2>$null)
+        if ($LASTEXITCODE -ne 0) { throw 'missing content history' }
+        if ((@($commits | Sort-Object) -join ' ') -cne (@($allCommits | Sort-Object) -join ' ')) { throw 'history outside the first-parent chain' }
         $stream = [System.IO.Path]::GetTempFileName()
         try {
             [System.IO.File]::WriteAllBytes($stream, [byte[]]@())
             foreach ($commit in $commits) {
                 $parents = (& git rev-list --parents -n 1 $commit 2>$null) -split ' '
-                if ($LASTEXITCODE -ne 0 -or $parents.Count -ne 2) { throw 'merge or invalid commit' }
+                if ($LASTEXITCODE -ne 0) { throw 'invalid commit' }
+                if ($parents.Count -eq 3) {
+                    & (Join-Path $PSScriptRoot 'review-evidence-check.ps1') sync-merge $commit $base *> $null
+                    if ($LASTEXITCODE -eq 0) { continue }
+                }
+                if ($parents.Count -ne 2) { throw 'merge or invalid commit' }
                 if (-not (Invoke-ReviewEvidenceCheck $commit -AllowMixed)) { throw 'invalid committed evidence' }
                 $hash = Get-CanonicalProductPatchHash -Revisions @($parents[1], $commit)
                 if ($hash) {

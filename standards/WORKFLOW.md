@@ -1,3 +1,9 @@
+---
+authority: stable
+last-reviewed: 2026-11-24
+review-cycle: 90d
+staleness-threshold: 180d
+---
 # Workflow Standard
 
 Structured feature development from idea to committed code. Prevents the most common AI coding failure mode: writing code before understanding what to build.

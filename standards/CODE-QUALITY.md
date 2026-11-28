@@ -1,3 +1,9 @@
+---
+authority: stable
+last-reviewed: 2026-11-24
+review-cycle: 90d
+staleness-threshold: 180d
+---
 # Code Quality Standard
 
 Generic code quality rules for AI-generated code, with an extension system for language-specific patterns.

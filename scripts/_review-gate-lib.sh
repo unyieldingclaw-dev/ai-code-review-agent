@@ -185,11 +185,18 @@ push_review_fingerprint() (
     fi
     base_hash=$(sha256_file "$patch")
     : > "$stream"
-    commits=$(git rev-list --reverse "$bases..HEAD" 2>/dev/null) || { rm -f "$patch" "$stream"; exit 1; }
+    # First-parent order with a set check, as content_history() walks it, so a GitHub "Update
+    # branch" merge yields the same ordered rows the containment check recomputes.
+    commits=$(git rev-list --first-parent --reverse "$bases..HEAD" 2>/dev/null) || { rm -f "$patch" "$stream"; exit 1; }
     [ -n "$commits" ] || { rm -f "$patch" "$stream"; exit 1; }
+    all_commits=$(git rev-list "$bases..HEAD" 2>/dev/null) || { rm -f "$patch" "$stream"; exit 1; }
+    [ "$(printf '%s\n' $commits | sort)" = "$(printf '%s\n' $all_commits | sort)" ] || { rm -f "$patch" "$stream"; exit 1; }
     for commit in $commits; do
         parents=$(git rev-list --parents -n 1 "$commit" 2>/dev/null) || { rm -f "$patch" "$stream"; exit 1; }
         set -- $parents
+        if [ "$#" -eq 3 ] && _review_evidence_check sync-merge "$commit" "$bases" >/dev/null 2>&1; then
+            continue
+        fi
         [ "$#" -eq 2 ] || { rm -f "$patch" "$stream"; exit 1; }
         parent=$2
         _review_evidence_check "$commit" --allow-mixed >/dev/null 2>&1 || { rm -f "$patch" "$stream"; exit 1; }
